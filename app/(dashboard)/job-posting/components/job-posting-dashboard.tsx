@@ -228,106 +228,47 @@ export default function JobPostingDashboard({
   }, [jobsData]);
 
   return (
-    <div className="h-full flex flex-col min-h-0 font-sans gap-4">
-      {/* Recruiter Metrics Dashboard Widgets */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 shrink-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 p-4 rounded-lg select-none shadow-xs">
-        {/* Metric 1 */}
-        <div className="flex items-center gap-3 p-3 bg-blue-50/50 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 rounded-lg transition-transform hover:scale-102 duration-200">
-          <div className="p-2 bg-blue-500 rounded text-white shrink-0">
-            <Briefcase className="h-4 w-4" />
-          </div>
-          <div>
-            <div className="text-[9px] font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider">
-              Total Requirements
-            </div>
-            <div className="text-lg font-bold text-blue-955 dark:text-white mt-0.5">
-              {stats.total}
-            </div>
-          </div>
+    <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
+      {/* Recruiter Metrics KPI Strip (CEIPAL style) */}
+      <div className="flex flex-wrap items-center gap-3 shrink-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 px-4 py-1.5 rounded-sm select-none shadow-xs text-[11px] divide-x divide-neutral-200 dark:divide-slate-800">
+        {/* Total Jobs */}
+        <div className="flex items-center gap-1.5">
+          <Briefcase className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+          <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Total Jobs:</span>
+          <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs">{stats.total}</span>
         </div>
 
-        {/* Metric 2 */}
-        <div className="flex items-center gap-3 p-3 bg-green-50/50 dark:bg-green-950/10 border border-green-100 dark:border-green-900/30 rounded-lg transition-transform hover:scale-102 duration-200">
-          <div className="p-2 bg-green-500 rounded text-white shrink-0">
-            <Activity className="h-4 w-4" />
-          </div>
-          <div>
-            <div className="text-[9px] font-bold text-green-900 dark:text-green-300 uppercase tracking-wider">
-              Active postings
-            </div>
-            <div className="text-lg font-bold text-green-955 dark:text-white mt-0.5 flex items-center gap-1.5">
-              {stats.active}
-              <Badge className="bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 scale-75 text-[9px] shadow-none font-bold border-none">
-                Open
-              </Badge>
-            </div>
-          </div>
+        {/* Active Jobs */}
+        <div className="flex items-center gap-1.5 pl-3">
+          <Activity className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+          <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Active:</span>
+          <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs">{stats.active}</span>
         </div>
 
-        {/* Metric 3 */}
-        <div className="flex items-center gap-3 p-3 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-100 dark:border-amber-900/30 rounded-lg transition-transform hover:scale-102 duration-200">
-          <div className="p-2 bg-amber-500 rounded text-white shrink-0">
-            <Users className="h-4 w-4" />
-          </div>
-          <div>
-            <div className="text-[9px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider">
-              Candidate Submissions
-            </div>
-            <div className="text-lg font-bold text-amber-955 dark:text-white mt-0.5">
-              {stats.totalSubmissions}
-            </div>
-          </div>
+        {/* Submissions */}
+        <div className="flex items-center gap-1.5 pl-3">
+          <Users className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+          <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Submissions:</span>
+          <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs">{stats.totalSubmissions}</span>
         </div>
 
-        {/* Metric 4 */}
-        <div className="flex items-center gap-3 p-3 bg-purple-50/50 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/30 rounded-lg transition-transform hover:scale-102 duration-200">
-          <div className="p-2 bg-purple-500 rounded text-white shrink-0">
-            <FileCheck className="h-4 w-4" />
-          </div>
-          <div>
-            <div className="text-[9px] font-bold text-purple-900 dark:text-purple-300 uppercase tracking-wider">
-              Placements & Offers
-            </div>
-            <div className="text-lg font-bold text-purple-955 dark:text-white mt-0.5 flex items-center gap-1.5">
-              14
-              <Badge className="bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 scale-75 text-[9px] shadow-none font-bold border-none">
-                +2 New
-              </Badge>
-            </div>
-          </div>
+        {/* Placements */}
+        <div className="flex items-center gap-1.5 pl-3">
+          <FileCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+          <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Placements:</span>
+          <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs">14</span>
         </div>
 
-        {/* Metric 5 */}
-        <div className="flex items-center gap-3 p-3 bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 rounded-lg transition-transform hover:scale-102 duration-200">
-          <div className="p-2 bg-indigo-500 rounded text-white shrink-0">
-            <TrendingUp className="h-4 w-4" />
-          </div>
-          <div>
-            <div className="text-[9px] font-bold text-indigo-900 dark:text-indigo-300 uppercase tracking-wider">
-              Avg Aging Days
-            </div>
-            <div className="text-lg font-bold text-indigo-955 dark:text-white mt-0.5">
-              {stats.avgAging} Days
-            </div>
-          </div>
-        </div>
-
-        {/* Metric 6 */}
-        <div className="flex items-center gap-3 p-3 bg-red-50/50 dark:bg-red-950/10 border border-red-100 dark:border-red-900/30 rounded-lg transition-transform hover:scale-102 duration-200">
-          <div className="p-2 bg-red-500 rounded text-white shrink-0">
-            <AlertCircle className="h-4 w-4" />
-          </div>
-          <div>
-            <div className="text-[9px] font-bold text-red-900 dark:text-red-300 uppercase tracking-wider">
-              SLA Overdue Warning
-            </div>
-            <div className="text-lg font-bold text-red-955 dark:text-white mt-0.5 flex items-center gap-1.5">
-              {stats.slaAlerts}
-              {stats.slaAlerts > 0 && (
-                <span className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
-              )}
-            </div>
-          </div>
+        {/* SLA Alerts */}
+        <div className="flex items-center gap-1.5 pl-3">
+          <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+          <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">SLA Alerts:</span>
+          <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs flex items-center gap-1">
+            {stats.slaAlerts}
+            {stats.slaAlerts > 0 && (
+              <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />
+            )}
+          </span>
         </div>
       </div>
 

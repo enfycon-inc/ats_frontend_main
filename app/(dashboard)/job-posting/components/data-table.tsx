@@ -250,16 +250,16 @@ export default function DataTable({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-hidden relative font-sans" onClick={closeContextMenu}>
+    <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none overflow-hidden relative font-sans" onClick={closeContextMenu}>
       {/* Action Bar */}
-      <div className="p-3 border-b border-neutral-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-neutral-50/50 dark:bg-slate-900/50">
-        <div className="flex items-center gap-3">
+      <div className="py-1 px-2.5 border-b border-neutral-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 bg-neutral-50/50 dark:bg-slate-900/50 text-xs">
+        <div className="flex items-center gap-2">
           {/* Saved Views Select */}
-          <div className="flex items-center bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md">
+          <div className="flex items-center bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded-sm">
             <select
               value={activeView}
               onChange={(e) => onSelectView(e.target.value)}
-              className="px-3 py-1.5 text-xs text-neutral-800 dark:text-neutral-200 bg-transparent outline-hidden cursor-pointer border-none font-bold"
+              className="px-2 py-0.5 text-xs text-neutral-800 dark:text-neutral-200 bg-transparent outline-hidden cursor-pointer border-none font-bold"
             >
               <option value="All Jobs">All Jobs</option>
               {savedViews.map((view) => (
@@ -272,22 +272,22 @@ export default function DataTable({
         </div>
 
         {/* Global actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Bulk Actions */}
           {selectedRowIds.length > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded mr-2">
-              <span className="text-xs font-bold text-primary">
+            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-sm mr-1">
+              <span className="text-[10px] font-bold text-primary">
                 {selectedRowIds.length} Selected
               </span>
               <button
                 onClick={exportToCSV}
-                className="text-xs text-primary font-bold flex items-center gap-1 hover:underline ml-2 cursor-pointer"
+                className="text-[10px] text-primary font-bold flex items-center gap-1 hover:underline ml-1 cursor-pointer"
               >
-                <Download className="h-3.5 w-3.5" /> Export
+                <Download className="h-3 w-3" /> Export
               </button>
               <button
                 onClick={() => setSelectedRowIds([])}
-                className="text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 ml-2 cursor-pointer"
+                className="text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 ml-1 cursor-pointer"
               >
                 Clear
               </button>
@@ -296,53 +296,53 @@ export default function DataTable({
 
           <button
             onClick={onRefresh}
-            className="p-2 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
+            className="p-1.5 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
             title="Refresh Table"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            <RefreshCw className="h-3 w-3" />
           </button>
 
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
           >
-            <Download className="h-3.5 w-3.5" /> Export CSV
+            <Download className="h-3 w-3" /> Export CSV
           </button>
 
           <button
             onClick={() => router.push("/job-posting/new")}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-primary hover:bg-primary/95 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-primary hover:bg-primary/95 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
           >
-            <Plus className="h-3.5 w-3.5" /> New Job
+            <Plus className="h-3 w-3" /> New Job
           </button>
 
           {/* Right side settings icons */}
-          <div className="flex items-center border-l border-neutral-200 dark:border-slate-800 pl-2 gap-1">
+          <div className="flex items-center border-l border-neutral-200 dark:border-slate-800 pl-1.5 gap-0.5">
             <button
               onClick={onOpenFilters}
-              className="p-2 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
+              className="p-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
               title="Filters"
             >
-              <Filter className="h-4 w-4" />
+              <Filter className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={onOpenColumns}
-              className="p-2 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
+              className="p-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
               title="Columns settings"
             >
-              <Settings className="h-4 w-4" />
+              <Settings className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
       </div>
 
       {/* Search and Filters bar */}
-      <div className="p-3 border-b border-neutral-200 dark:border-slate-800 flex flex-wrap items-center gap-3 bg-white dark:bg-slate-900">
-        <div className="flex items-center bg-neutral-50 dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md w-[320px]">
+      <div className="py-1 px-2.5 border-b border-neutral-200 dark:border-slate-800 flex flex-wrap items-center gap-2 bg-white dark:bg-slate-900">
+        <div className="flex items-center bg-neutral-50 dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded-sm w-[280px]">
           <select
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            className="pl-3 pr-2 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 bg-transparent outline-hidden cursor-pointer border-r border-neutral-300 dark:border-slate-700 font-medium"
+            className="pl-2 pr-1 py-0.5 text-xs text-neutral-700 dark:text-neutral-300 bg-transparent outline-hidden cursor-pointer border-r border-neutral-300 dark:border-slate-700 font-medium"
           >
             <option value="All">Search Any</option>
             <option value="jobCode">Job Code</option>
@@ -354,20 +354,20 @@ export default function DataTable({
             placeholder="Type search terms..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 px-3 py-1.5 text-xs text-neutral-850 dark:text-neutral-150 bg-transparent outline-hidden placeholder:text-neutral-400 font-medium"
+            className="flex-1 px-2 py-0.5 text-xs text-neutral-850 dark:text-neutral-150 bg-transparent outline-hidden placeholder:text-neutral-400 font-medium"
           />
-          <Search className="h-4 w-4 text-neutral-400 mr-2.5" />
+          <Search className="h-3.5 w-3.5 text-neutral-400 mr-2" />
         </div>
       </div>
 
       {/* Spreadsheet grid container */}
       <div className="flex-1 overflow-auto relative min-h-0 bg-neutral-50/20 dark:bg-slate-950/10">
-        <table className="w-full border-collapse text-left table-fixed">
+        <table className="w-full border-collapse text-left table-auto border-neutral-200 dark:border-slate-800">
           {/* Table Header */}
           <thead className="sticky top-0 z-10 bg-neutral-100 dark:bg-slate-800 border-b border-neutral-200 dark:border-slate-700 shadow-xs select-none">
             <tr>
               {/* Checkbox Header */}
-              <th className="w-12 p-2.5 text-center bg-neutral-100 dark:bg-slate-800 border-r border-neutral-250 dark:border-slate-700">
+              <th className="w-8 p-1 text-center bg-neutral-100 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700">
                 <input
                   type="checkbox"
                   checked={
@@ -375,7 +375,7 @@ export default function DataTable({
                     paginatedData.every((job) => selectedRowIds.includes(job.id))
                   }
                   onChange={(e) => handleSelectAll(e.target.checked)}
-                  className="h-3.5 w-3.5 accent-primary cursor-pointer rounded"
+                  className="h-3 w-3 accent-primary cursor-pointer rounded-xs"
                 />
               </th>
 
@@ -386,11 +386,11 @@ export default function DataTable({
                 return (
                   <th
                     key={colId}
-                    className="p-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-slate-800 border-r border-neutral-250 dark:border-slate-700 hover:bg-neutral-200 dark:hover:bg-slate-750 transition-colors cursor-pointer w-48 relative"
+                    className="p-1.5 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 hover:bg-neutral-200 dark:hover:bg-slate-750 transition-colors cursor-pointer relative whitespace-nowrap"
                     onClick={() => handleSort(colId as keyof Job)}
                   >
-                    <div className="flex items-center justify-between gap-1 pr-4">
-                      <span className="truncate uppercase tracking-wider text-[10px]">{col?.label || colId}</span>
+                    <div className="flex items-center justify-between gap-1 pr-3">
+                      <span className="uppercase tracking-wider text-[10px] whitespace-nowrap">{col?.label || colId}</span>
                       <div className="flex items-center gap-0.5 opacity-60">
                         {isSorted ? (
                           sortDirection === "asc" ? (
@@ -406,7 +406,7 @@ export default function DataTable({
                   </th>
                 );
               })}
-              <th className="w-14 bg-neutral-100 dark:bg-slate-800"></th>
+              <th className="w-10 bg-neutral-100 dark:bg-slate-800 border-b border-neutral-250 dark:border-slate-700"></th>
             </tr>
           </thead>
 
@@ -416,7 +416,7 @@ export default function DataTable({
               <tr>
                 <td
                   colSpan={selectedColumns.length + 2}
-                  className="h-48 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900"
+                  className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900"
                 >
                   No matching jobs found. Try resetting your search or filters.
                 </td>
@@ -430,25 +430,25 @@ export default function DataTable({
                     key={job.id}
                     onContextMenu={(e) => handleContextMenu(e, job.id)}
                     className={cn(
-                      "hover:bg-primary/5 dark:hover:bg-primary/5 transition-colors cursor-default bg-white dark:bg-slate-900",
-                      idx % 2 === 1 ? "bg-neutral-50/30 dark:bg-slate-900/30" : "",
+                      "hover:bg-primary/5 dark:hover:bg-primary/5 transition-colors cursor-default bg-white dark:bg-slate-900 border-b border-neutral-150 dark:border-slate-800/60",
+                      idx % 2 === 1 ? "bg-neutral-50/20 dark:bg-slate-900/10" : "",
                       isSelected ? "bg-primary/10 hover:bg-primary/10 dark:bg-primary/15 dark:hover:bg-primary/15" : ""
                     )}
                   >
                     {/* Checkbox */}
-                    <td className="p-2 text-center border-r border-neutral-200 dark:border-slate-855">
+                    <td className="p-1 text-center border-r border-neutral-200 dark:border-slate-800">
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={(e) => handleSelectRow(job.id, e.target.checked)}
-                        className="h-3.5 w-3.5 accent-primary cursor-pointer rounded"
+                        className="h-3 w-3 accent-primary cursor-pointer rounded-xs"
                       />
                     </td>
 
                     {/* Columns */}
                     {selectedColumns.map((colId) => {
                       return (
-                        <td key={colId} className="p-2.5 border-r border-neutral-200 dark:border-slate-855 truncate font-medium text-neutral-800 dark:text-neutral-200">
+                        <td key={colId} className="py-1 px-1.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap font-normal text-neutral-800 dark:text-neutral-200">
                           {isEditing && ["jobTitle", "client", "location"].includes(colId) ? (
                             <input
                               type="text"
@@ -456,17 +456,17 @@ export default function DataTable({
                               onChange={(e) =>
                                 setEditFields({ ...editFields, [colId]: e.target.value })
                               }
-                              className="w-full bg-white dark:bg-slate-950 border border-primary rounded px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-primary outline-hidden"
+                              className="w-full bg-white dark:bg-slate-955 border border-primary rounded-xs px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-primary outline-hidden"
                               onClick={(e) => e.stopPropagation()}
                             />
                           ) : colId === "jobCode" ? (
-                            <span className="text-primary dark:text-blue-400 font-bold hover:underline cursor-pointer">
+                            <span className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
                               {job.jobCode}
                             </span>
                           ) : colId === "jobStatus" ? (
                             <Badge
                               className={cn(
-                                "text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-none",
+                                "text-[10px] font-semibold px-1.5 py-0.2 rounded-xs border shadow-none",
                                 job.jobStatus === "Active"
                                   ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800/30"
                                   : job.jobStatus === "Closed"
@@ -477,25 +477,25 @@ export default function DataTable({
                               {job.jobStatus}
                             </Badge>
                           ) : colId === "jobTitle" ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="truncate font-semibold">{job.jobTitle}</span>
+                            <div className="flex items-center gap-1">
+                              <span className="whitespace-nowrap">{job.jobTitle}</span>
                               {job.agingDays > 30 && (
-                                <Badge className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/30 text-[9px] scale-90 flex items-center gap-0.5 shadow-none">
-                                  <AlertTriangle className="h-2.5 w-2.5" /> SLA Alert
+                                <Badge className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/30 text-[9px] scale-90 flex items-center gap-0.5 shadow-none px-1 py-0">
+                                  <AlertTriangle className="h-2.5 w-2.5" /> SLA
                                 </Badge>
                               )}
                             </div>
                           ) : colId === "submissionsCount" ? (
-                            <div className="flex items-center gap-2">
-                              <span className="bg-neutral-100 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 px-1.5 py-0.5 rounded font-bold text-[10px]">
+                            <div className="flex items-center gap-1.5">
+                              <span className="bg-neutral-100 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 px-1 py-0.2 rounded-xs font-semibold text-[10px]">
                                 {job.submissionsCount} Sub
                               </span>
                               <div className="flex items-center gap-0.5 text-[9px] text-neutral-500 dark:text-neutral-400 scale-90">
-                                <span className="text-blue-600 dark:text-blue-400 font-bold" title="Applied">{job.pipeline.applied}A</span>
+                                <span className="text-blue-600 dark:text-blue-400 font-semibold" title="Applied">{job.pipeline.applied}A</span>
                                 <span>/</span>
-                                <span className="text-amber-600 dark:text-amber-400 font-bold" title="Interviewing">{job.pipeline.interviewing}I</span>
+                                <span className="text-amber-600 dark:text-amber-400 font-semibold" title="Interviewing">{job.pipeline.interviewing}I</span>
                                 <span>/</span>
-                                <span className="text-green-600 dark:text-green-400 font-bold" title="Offered">{job.pipeline.offered}O</span>
+                                <span className="text-green-600 dark:text-green-400 font-semibold" title="Offered">{job.pipeline.offered}O</span>
                               </div>
                             </div>
                           ) : (
@@ -506,18 +506,18 @@ export default function DataTable({
                     })}
 
                     {/* Actions Column */}
-                    <td className="p-1 text-center">
+                    <td className="p-0.5 text-center">
                       {isEditing ? (
-                        <div className="flex items-center gap-1 justify-center">
+                        <div className="flex items-center gap-0.5 justify-center">
                           <button
                             onClick={() => saveInlineEdit(job.id)}
-                            className="bg-green-600 text-white rounded p-1 hover:bg-green-750 text-[10px] px-2 font-bold cursor-pointer"
+                            className="bg-green-600 text-white rounded-xs p-0.5 hover:bg-green-750 text-[9.5px] px-1 font-bold cursor-pointer"
                           >
                             Save
                           </button>
                           <button
                             onClick={() => setEditingRowId(null)}
-                            className="bg-neutral-200 dark:bg-slate-805 text-neutral-800 dark:text-neutral-200 rounded p-1 hover:bg-neutral-300 dark:hover:bg-slate-700 text-[10px] px-2 cursor-pointer"
+                            className="bg-neutral-200 dark:bg-slate-805 text-neutral-800 dark:text-neutral-200 rounded-xs p-0.5 hover:bg-neutral-300 dark:hover:bg-slate-700 text-[9.5px] px-1 cursor-pointer"
                           >
                             X
                           </button>
@@ -525,19 +525,19 @@ export default function DataTable({
                       ) : (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <button className="p-1 hover:bg-neutral-200 dark:hover:bg-slate-800 rounded text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer">
-                              <MoreHorizontal className="h-4 w-4" />
+                            <button className="p-0.5 hover:bg-neutral-200 dark:hover:bg-slate-800 rounded text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer">
+                              <MoreHorizontal className="h-3.5 w-3.5" />
                             </button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-36 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800">
-                            <DropdownMenuItem onClick={() => startInlineEdit(job)} className="cursor-pointer text-xs">
-                              <Edit className="h-3.5 w-3.5 mr-2 text-neutral-500" /> Quick Edit
+                          <DropdownMenuContent align="end" className="w-32 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 py-0.5">
+                            <DropdownMenuItem onClick={() => startInlineEdit(job)} className="cursor-pointer text-xs py-1 px-2">
+                              <Edit className="h-3 w-3 mr-1.5 text-neutral-500" /> Quick Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer text-xs">
-                              <Users className="h-3.5 w-3.5 mr-2 text-neutral-500" /> Pipeline
+                            <DropdownMenuItem className="cursor-pointer text-xs py-1 px-2">
+                              <Users className="h-3 w-3 mr-1.5 text-neutral-500" /> Pipeline
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600 hover:text-red-700 cursor-pointer text-xs">
-                              <Trash2 className="h-3.5 w-3.5 mr-2 text-red-500" /> Delete
+                            <DropdownMenuItem className="text-red-600 hover:text-red-700 cursor-pointer text-xs py-1 px-2">
+                              <Trash2 className="h-3 w-3 mr-1.5 text-red-500" /> Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -552,8 +552,8 @@ export default function DataTable({
       </div>
 
       {/* Pagination Footer */}
-      <div className="p-3 border-t border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-850 flex items-center justify-between select-none shrink-0 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-        <div className="flex items-center gap-2">
+      <div className="py-1 px-3 border-t border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-850 flex items-center justify-between select-none shrink-0 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+        <div className="flex items-center gap-1.5">
           <span>
             {Math.min(processedData.length, (currentPage - 1) * pageSize + 1)}-
             {Math.min(processedData.length, currentPage * pageSize)} of{" "}
@@ -562,14 +562,14 @@ export default function DataTable({
         </div>
 
         {/* Page Selector */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-1.5 border border-neutral-350 dark:border-slate-700 rounded bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              className="p-1 border border-neutral-350 dark:border-slate-700 rounded-sm bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-3.5 w-3.5" />
             </button>
             <span className="text-xs">
               Page {currentPage} of {totalPages || 1}
@@ -577,13 +577,13 @@ export default function DataTable({
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages || totalPages === 0}
-              className="p-1.5 border border-neutral-350 dark:border-slate-700 rounded bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              className="p-1 border border-neutral-350 dark:border-slate-700 rounded-sm bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <span>Show</span>
             <select
               value={pageSize}
@@ -591,7 +591,7 @@ export default function DataTable({
                 setPageSize(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              className="px-2 py-1 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded text-xs text-neutral-800 dark:text-neutral-200 outline-hidden cursor-pointer"
+              className="px-1.5 py-0.5 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded-sm text-[11px] text-neutral-805 dark:text-neutral-150 outline-hidden cursor-pointer"
             >
               <option value={10}>10 Per Page</option>
               <option value={25}>25 Per Page</option>
