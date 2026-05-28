@@ -1,19 +1,16 @@
 "use client";
 
-import { AppSidebar } from "@/components/app-sidebar";
 import Footer from "@/components/layout/footer";
-import Header from "@/components/layout/header";
+import { TopNavbar } from "@/components/layout/top-navbar";
 import ThemeCustomizer from "@/components/theme-customizer/theme-customizer";
 import { ThemeProvider } from "@/components/theme-provider";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ReactNode } from "react";
 import { Toaster } from "react-hot-toast";
 
 export function ClientRoot({
-  defaultOpen,
   children,
 }: {
-  defaultOpen: boolean;
+  defaultOpen?: boolean; // kept for API compatibility — unused with top navbar
   children: ReactNode;
 }) {
   return (
@@ -23,20 +20,21 @@ export function ClientRoot({
       enableSystem
       disableTransitionOnChange
     >
-      <SidebarProvider defaultOpen={defaultOpen}>
-        <AppSidebar />
-        <main className="dashboard-body-wrapper grow-[1] flex flex-col">
-          <SidebarInset>
-            <Header />
-          </SidebarInset>
-          <div className="dashboard-body bg-neutral-100 dark:bg-[#1e2734] md:p-6 p-4 flex-1">
-            {children}
-          </div>
-          <Footer />
-        </main>
-        <ThemeCustomizer />
-        <Toaster position="top-center" reverseOrder={false} />
-      </SidebarProvider>
+      {/* ── Top Navbar (replaces sidebar) ── */}
+      <TopNavbar />
+
+      {/* ── Main content area — full width ── */}
+      <div className="flex flex-col min-h-[calc(100vh-46px)]">
+        {/* Page content */}
+        <div className="dashboard-body bg-neutral-100 dark:bg-[#1e2734] md:p-6 p-4 flex-1">
+          {children}
+        </div>
+
+        <Footer />
+      </div>
+
+      <ThemeCustomizer />
+      <Toaster position="top-center" reverseOrder={false} />
     </ThemeProvider>
   );
 }

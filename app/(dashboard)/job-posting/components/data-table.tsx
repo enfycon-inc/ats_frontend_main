@@ -1,0 +1,687 @@
+"use client";
+
+import React, { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import {
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
+  Filter,
+  Settings,
+  Plus,
+  Search,
+  MoreHorizontal,
+  AlertTriangle,
+  Clock,
+  Download,
+  Trash2,
+  Edit,
+  Eye,
+  CheckSquare,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  FolderPlus,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { Job } from "../data/mock-jobs";
+
+interface DataTableProps {
+  data: Job[];
+  selectedColumns: string[];
+  allColumns: { id: string; label: string }[];
+  onOpenFilters: () => void;
+  onOpenColumns: () => void;
+  onRefresh: () => void;
+  onSaveView: (viewName: string) => void;
+  savedViews: string[];
+  activeView: string;
+  onSelectView: (viewName: string) => void;
+}
+
+export default function DataTable({
+  data,
+  selectedColumns,
+  allColumns,
+  onOpenFilters,
+  onOpenColumns,
+  onRefresh,
+  onSaveView,
+  savedViews,
+  activeView,
+  onSelectView,
+}: DataTableProps) {
+  const router = useRouter();
+  
+  // Sorting State
+  const [sortColumn, setSortColumn] = useState<keyof Job | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  // Selection State
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+
+  // Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFilter, setSearchFilter] = useState("All");
+
+  // Pagination State
+  const [pageSize, setPageSize] = useState(25);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // New Save View dialog state
+  const [newViewName, setNewViewName] = useState("");
+  const [isSavingView, setIsSavingView] = useState(false);
+
+  // Row edit state
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [editFields, setEditFields] = useState<{ [key: string]: string }>({});
+
+  // Context Menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    jobId: string;
+  } | null>(null);
+
+  // Handle Sort
+  const handleSort = (column: keyof Job) => {
+    if (sortColumn === column) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else {
+        setSortColumn(null);
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  // Filtered & Sorted Data
+  const processedData = useMemo(() => {
+    let result = [...data];
+
+    // Search Query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((job) => {
+        if (searchFilter === "All") {
+          return (
+            (job.jobTitle || "").toLowerCase().includes(q) ||
+            (job.jobCode || "").toLowerCase().includes(q) ||
+            (job.client || "").toLowerCase().includes(q) ||
+            (job.location || "").toLowerCase().includes(q)
+          );
+        } else {
+          const val = job[searchFilter as keyof Job];
+          return typeof val === "string" && val.toLowerCase().includes(q);
+        }
+      });
+    }
+
+    // Sort
+    if (sortColumn) {
+      result.sort((a, b) => {
+        const valA = a[sortColumn];
+        const valB = b[sortColumn];
+
+        if (typeof valA === "number" && typeof valB === "number") {
+          return sortDirection === "asc" ? valA - valB : valB - valA;
+        }
+
+        const strA = String(valA || "").toLowerCase();
+        const strB = String(valB || "").toLowerCase();
+        if (strA < strB) return sortDirection === "asc" ? -1 : 1;
+        if (strA > strB) return sortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [data, searchQuery, searchFilter, sortColumn, sortDirection]);
+
+  // Paginated Data
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return processedData.slice(startIndex, startIndex + pageSize);
+  }, [processedData, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(processedData.length / pageSize);
+
+  // Row Selection logic
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedRowIds(paginatedData.map((job) => job.id));
+    } else {
+      setSelectedRowIds([]);
+    }
+  };
+
+  const handleSelectRow = (jobId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedRowIds((prev) => [...prev, jobId]);
+    } else {
+      setSelectedRowIds((prev) => prev.filter((id) => id !== jobId));
+    }
+  };
+
+  // Context Menu handler
+  const handleContextMenu = (e: React.MouseEvent, jobId: string) => {
+    e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      jobId,
+    });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  // Keyboard Shortcuts
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeContextMenu();
+        setIsSavingView(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // CSV Export
+  const exportToCSV = () => {
+    const headers = selectedColumns.map(
+      (colId) => allColumns.find((c) => c.id === colId)?.label || colId
+    );
+    const rows = processedData.map((job) =>
+      selectedColumns.map((colId) => {
+        const value = job[colId as keyof Job];
+        if (typeof value === "object") {
+          return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
+        }
+        return `"${String(value || "").replace(/"/g, '""')}"`;
+      })
+    );
+
+    const csvContent =
+      "data:text/csv;charset=utf-8,\uFEFF" +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `jobs_export_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Inline Edit
+  const startInlineEdit = (job: Job) => {
+    setEditingRowId(job.id);
+    setEditFields({
+      jobTitle: job.jobTitle,
+      client: job.client,
+      location: job.location,
+    });
+  };
+
+  const saveInlineEdit = (jobId: string) => {
+    const jobIndex = data.findIndex((j) => j.id === jobId);
+    if (jobIndex > -1) {
+      data[jobIndex] = {
+        ...data[jobIndex],
+        ...editFields,
+      } as Job;
+    }
+    setEditingRowId(null);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-hidden relative font-sans" onClick={closeContextMenu}>
+      {/* Action Bar */}
+      <div className="p-3 border-b border-neutral-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-neutral-50/50 dark:bg-slate-900/50">
+        <div className="flex items-center gap-3">
+          {/* Saved Views Select */}
+          <div className="flex items-center bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md">
+            <select
+              value={activeView}
+              onChange={(e) => onSelectView(e.target.value)}
+              className="px-3 py-1.5 text-xs text-neutral-800 dark:text-neutral-200 bg-transparent outline-hidden cursor-pointer border-none font-bold"
+            >
+              <option value="All Jobs">All Jobs</option>
+              {savedViews.map((view) => (
+                <option key={view} value={view}>
+                  {view}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Global actions */}
+        <div className="flex items-center gap-2">
+          {/* Bulk Actions */}
+          {selectedRowIds.length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded mr-2">
+              <span className="text-xs font-bold text-primary">
+                {selectedRowIds.length} Selected
+              </span>
+              <button
+                onClick={exportToCSV}
+                className="text-xs text-primary font-bold flex items-center gap-1 hover:underline ml-2 cursor-pointer"
+              >
+                <Download className="h-3.5 w-3.5" /> Export
+              </button>
+              <button
+                onClick={() => setSelectedRowIds([])}
+                className="text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 ml-2 cursor-pointer"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={onRefresh}
+            className="p-2 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
+            title="Refresh Table"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            onClick={exportToCSV}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
+          >
+            <Download className="h-3.5 w-3.5" /> Export CSV
+          </button>
+
+          <button
+            onClick={() => router.push("/job-posting/new")}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-primary hover:bg-primary/95 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" /> New Job
+          </button>
+
+          {/* Right side settings icons */}
+          <div className="flex items-center border-l border-neutral-200 dark:border-slate-800 pl-2 gap-1">
+            <button
+              onClick={onOpenFilters}
+              className="p-2 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
+              title="Filters"
+            >
+              <Filter className="h-4 w-4" />
+            </button>
+            <button
+              onClick={onOpenColumns}
+              className="p-2 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
+              title="Columns settings"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Filters bar */}
+      <div className="p-3 border-b border-neutral-200 dark:border-slate-800 flex flex-wrap items-center gap-3 bg-white dark:bg-slate-900">
+        <div className="flex items-center bg-neutral-50 dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md w-[320px]">
+          <select
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            className="pl-3 pr-2 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 bg-transparent outline-hidden cursor-pointer border-r border-neutral-300 dark:border-slate-700 font-medium"
+          >
+            <option value="All">Search Any</option>
+            <option value="jobCode">Job Code</option>
+            <option value="jobTitle">Job Title</option>
+            <option value="client">Client</option>
+          </select>
+          <input
+            type="text"
+            placeholder="Type search terms..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 px-3 py-1.5 text-xs text-neutral-850 dark:text-neutral-150 bg-transparent outline-hidden placeholder:text-neutral-400 font-medium"
+          />
+          <Search className="h-4 w-4 text-neutral-400 mr-2.5" />
+        </div>
+      </div>
+
+      {/* Spreadsheet grid container */}
+      <div className="flex-1 overflow-auto relative min-h-0 bg-neutral-50/20 dark:bg-slate-950/10">
+        <table className="w-full border-collapse text-left table-fixed">
+          {/* Table Header */}
+          <thead className="sticky top-0 z-10 bg-neutral-100 dark:bg-slate-800 border-b border-neutral-200 dark:border-slate-700 shadow-xs select-none">
+            <tr>
+              {/* Checkbox Header */}
+              <th className="w-12 p-2.5 text-center bg-neutral-100 dark:bg-slate-800 border-r border-neutral-250 dark:border-slate-700">
+                <input
+                  type="checkbox"
+                  checked={
+                    paginatedData.length > 0 &&
+                    paginatedData.every((job) => selectedRowIds.includes(job.id))
+                  }
+                  onChange={(e) => handleSelectAll(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-primary cursor-pointer rounded"
+                />
+              </th>
+
+              {/* Column Headers */}
+              {selectedColumns.map((colId) => {
+                const col = allColumns.find((c) => c.id === colId);
+                const isSorted = sortColumn === colId;
+                return (
+                  <th
+                    key={colId}
+                    className="p-2.5 text-xs font-bold text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-slate-800 border-r border-neutral-250 dark:border-slate-700 hover:bg-neutral-200 dark:hover:bg-slate-750 transition-colors cursor-pointer w-48 relative"
+                    onClick={() => handleSort(colId as keyof Job)}
+                  >
+                    <div className="flex items-center justify-between gap-1 pr-4">
+                      <span className="truncate uppercase tracking-wider text-[10px]">{col?.label || colId}</span>
+                      <div className="flex items-center gap-0.5 opacity-60">
+                        {isSorted ? (
+                          sortDirection === "asc" ? (
+                            <ChevronUp className="h-3 w-3 text-primary font-bold" />
+                          ) : (
+                            <ChevronDown className="h-3 w-3 text-primary font-bold" />
+                          )
+                        ) : (
+                          <ChevronsUpDown className="h-3 w-3 text-neutral-400" />
+                        )}
+                      </div>
+                    </div>
+                  </th>
+                );
+              })}
+              <th className="w-14 bg-neutral-100 dark:bg-slate-800"></th>
+            </tr>
+          </thead>
+
+          {/* Table Body */}
+          <tbody className="divide-y divide-neutral-200 dark:divide-slate-800 text-xs">
+            {paginatedData.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={selectedColumns.length + 2}
+                  className="h-48 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900"
+                >
+                  No matching jobs found. Try resetting your search or filters.
+                </td>
+              </tr>
+            ) : (
+              paginatedData.map((job, idx) => {
+                const isSelected = selectedRowIds.includes(job.id);
+                const isEditing = editingRowId === job.id;
+                return (
+                  <tr
+                    key={job.id}
+                    onContextMenu={(e) => handleContextMenu(e, job.id)}
+                    className={cn(
+                      "hover:bg-primary/5 dark:hover:bg-primary/5 transition-colors cursor-default bg-white dark:bg-slate-900",
+                      idx % 2 === 1 ? "bg-neutral-50/30 dark:bg-slate-900/30" : "",
+                      isSelected ? "bg-primary/10 hover:bg-primary/10 dark:bg-primary/15 dark:hover:bg-primary/15" : ""
+                    )}
+                  >
+                    {/* Checkbox */}
+                    <td className="p-2 text-center border-r border-neutral-200 dark:border-slate-855">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => handleSelectRow(job.id, e.target.checked)}
+                        className="h-3.5 w-3.5 accent-primary cursor-pointer rounded"
+                      />
+                    </td>
+
+                    {/* Columns */}
+                    {selectedColumns.map((colId) => {
+                      return (
+                        <td key={colId} className="p-2.5 border-r border-neutral-200 dark:border-slate-855 truncate font-medium text-neutral-800 dark:text-neutral-200">
+                          {isEditing && ["jobTitle", "client", "location"].includes(colId) ? (
+                            <input
+                              type="text"
+                              value={editFields[colId]}
+                              onChange={(e) =>
+                                setEditFields({ ...editFields, [colId]: e.target.value })
+                              }
+                              className="w-full bg-white dark:bg-slate-950 border border-primary rounded px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-primary outline-hidden"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : colId === "jobCode" ? (
+                            <span className="text-primary dark:text-blue-400 font-bold hover:underline cursor-pointer">
+                              {job.jobCode}
+                            </span>
+                          ) : colId === "jobStatus" ? (
+                            <Badge
+                              className={cn(
+                                "text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-none",
+                                job.jobStatus === "Active"
+                                  ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800/30"
+                                  : job.jobStatus === "Closed"
+                                  ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800/30"
+                                  : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800/30"
+                              )}
+                            >
+                              {job.jobStatus}
+                            </Badge>
+                          ) : colId === "jobTitle" ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate font-semibold">{job.jobTitle}</span>
+                              {job.agingDays > 30 && (
+                                <Badge className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/30 text-[9px] scale-90 flex items-center gap-0.5 shadow-none">
+                                  <AlertTriangle className="h-2.5 w-2.5" /> SLA Alert
+                                </Badge>
+                              )}
+                            </div>
+                          ) : colId === "submissionsCount" ? (
+                            <div className="flex items-center gap-2">
+                              <span className="bg-neutral-100 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 px-1.5 py-0.5 rounded font-bold text-[10px]">
+                                {job.submissionsCount} Sub
+                              </span>
+                              <div className="flex items-center gap-0.5 text-[9px] text-neutral-500 dark:text-neutral-400 scale-90">
+                                <span className="text-blue-600 dark:text-blue-400 font-bold" title="Applied">{job.pipeline.applied}A</span>
+                                <span>/</span>
+                                <span className="text-amber-600 dark:text-amber-400 font-bold" title="Interviewing">{job.pipeline.interviewing}I</span>
+                                <span>/</span>
+                                <span className="text-green-600 dark:text-green-400 font-bold" title="Offered">{job.pipeline.offered}O</span>
+                              </div>
+                            </div>
+                          ) : (
+                            String(job[colId as keyof Job] || "N/A")
+                          )}
+                        </td>
+                      );
+                    })}
+
+                    {/* Actions Column */}
+                    <td className="p-1 text-center">
+                      {isEditing ? (
+                        <div className="flex items-center gap-1 justify-center">
+                          <button
+                            onClick={() => saveInlineEdit(job.id)}
+                            className="bg-green-600 text-white rounded p-1 hover:bg-green-750 text-[10px] px-2 font-bold cursor-pointer"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingRowId(null)}
+                            className="bg-neutral-200 dark:bg-slate-805 text-neutral-800 dark:text-neutral-200 rounded p-1 hover:bg-neutral-300 dark:hover:bg-slate-700 text-[10px] px-2 cursor-pointer"
+                          >
+                            X
+                          </button>
+                        </div>
+                      ) : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="p-1 hover:bg-neutral-200 dark:hover:bg-slate-800 rounded text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-36 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800">
+                            <DropdownMenuItem onClick={() => startInlineEdit(job)} className="cursor-pointer text-xs">
+                              <Edit className="h-3.5 w-3.5 mr-2 text-neutral-500" /> Quick Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer text-xs">
+                              <Users className="h-3.5 w-3.5 mr-2 text-neutral-500" /> Pipeline
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-600 hover:text-red-700 cursor-pointer text-xs">
+                              <Trash2 className="h-3.5 w-3.5 mr-2 text-red-500" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination Footer */}
+      <div className="p-3 border-t border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-850 flex items-center justify-between select-none shrink-0 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+        <div className="flex items-center gap-2">
+          <span>
+            {Math.min(processedData.length, (currentPage - 1) * pageSize + 1)}-
+            {Math.min(processedData.length, currentPage * pageSize)} of{" "}
+            {processedData.length} records
+          </span>
+        </div>
+
+        {/* Page Selector */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 border border-neutral-350 dark:border-slate-700 rounded bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-xs">
+              Page {currentPage} of {totalPages || 1}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="p-1.5 border border-neutral-350 dark:border-slate-700 rounded bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span>Show</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="px-2 py-1 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded text-xs text-neutral-800 dark:text-neutral-200 outline-hidden cursor-pointer"
+            >
+              <option value={10}>10 Per Page</option>
+              <option value={25}>25 Per Page</option>
+              <option value={50}>50 Per Page</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Save View Modal Dialog */}
+      {isSavingView && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-neutral-250 dark:border-slate-800 w-80 shadow-2xl space-y-4 font-sans">
+            <div>
+              <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-100 flex items-center gap-1.5">
+                <FolderPlus className="h-4 w-4 text-primary" /> Save Current View
+              </h3>
+              <p className="text-xs text-neutral-500 mt-1">
+                Enter a name for this custom view config.
+              </p>
+            </div>
+            <input
+              type="text"
+              placeholder="e.g. Active Java Jobs"
+              value={newViewName}
+              onChange={(e) => setNewViewName(e.target.value)}
+              className="w-full bg-neutral-50 dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-3 py-1.5 text-xs text-neutral-800 dark:text-neutral-200 outline-hidden focus:border-primary"
+            />
+            <div className="flex items-center justify-end gap-2 text-xs">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsSavingView(false)}
+                className="h-8 cursor-pointer text-neutral-500"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (newViewName.trim()) {
+                    onSaveView(newViewName);
+                    setNewViewName("");
+                    setIsSavingView(false);
+                  }
+                }}
+                className="h-8 bg-primary text-white cursor-pointer font-bold"
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Right-click Context Menu */}
+      {contextMenu && (
+        <div
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          className="fixed z-50 bg-white dark:bg-slate-900 border border-neutral-250 dark:border-slate-800 rounded shadow-2xl w-40 p-1 flex flex-col divide-y divide-neutral-200 dark:divide-slate-800 text-xs select-none font-sans"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="py-1">
+            <button
+              onClick={() => {
+                const job = data.find((j) => j.id === contextMenu.jobId);
+                if (job) startInlineEdit(job);
+                closeContextMenu();
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer font-medium"
+            >
+              <Edit className="h-3 w-3 text-neutral-500" /> Quick Edit
+            </button>
+            <button
+              onClick={closeContextMenu}
+              className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer font-medium"
+            >
+              <Eye className="h-3 w-3 text-neutral-500" /> View Pipeline
+            </button>
+          </div>
+          <div className="py-1">
+            <button
+              onClick={closeContextMenu}
+              className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-red-600 hover:text-red-700 flex items-center gap-1.5 cursor-pointer font-semibold"
+            >
+              <Trash2 className="h-3 w-3" /> Delete Job
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

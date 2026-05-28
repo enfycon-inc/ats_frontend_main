@@ -347,6 +347,24 @@
   [data-slot="dropdown-menu-trigger"] {
     @apply cursor-pointer;
   }
+
+  /* Hide scrollbar for navbar horizontal overflow */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ─── Top Navbar: Dropdown z-index elevation ─────────────────── */
+#top-navbar {
+  contain: layout style;
+}
+/* Ensure navbar dropdowns break out of overflow:hidden parents */
+#top-navbar * {
+  overflow-anchor: none;
 }
 
 .tooltip-arrow-white .bg-primary {
