@@ -15,7 +15,9 @@ export function ClientRoot({
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const isJobPostingList = pathname?.startsWith("/job-posting") && !pathname.endsWith("/new");
+  const isViewportLocked = 
+    (pathname?.startsWith("/job-posting") && !pathname.endsWith("/new")) ||
+    (pathname?.startsWith("/applicants") && !pathname.endsWith("/new"));
 
   return (
     <ThemeProvider
@@ -28,7 +30,7 @@ export function ClientRoot({
       <TopNavbar />
 
       {/* ── Main content area — full width ── */}
-      {isJobPostingList ? (
+      {isViewportLocked ? (
         <div className="flex flex-col h-[calc(100vh-46px)] max-h-[calc(100vh-46px)] overflow-hidden">
           {/* Page content */}
           <div className="dashboard-body bg-neutral-100 dark:bg-[#1e2734] md:p-3 p-2 flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -46,7 +48,7 @@ export function ClientRoot({
         </div>
       )}
 
-      <ThemeCustomizer />
+      {/* <ThemeCustomizer /> */}
       <Toaster position="top-center" reverseOrder={false} />
     </ThemeProvider>
   );
