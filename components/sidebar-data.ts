@@ -352,6 +352,16 @@ export const data = {
           circleColor: "bg-primary",
         },
         {
+          title: "Tenant Management",
+          url: "/utility/approvals",
+          circleColor: "bg-cyan-500",
+        },
+        {
+          title: "Role Management",
+          url: "/utility/roles-permissions",
+          circleColor: "bg-emerald-500",
+        },
+        {
           title: "Notification",
           url: "/settings-notification",
           circleColor: "bg-yellow-500",

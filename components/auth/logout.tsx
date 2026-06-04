@@ -7,6 +7,7 @@ import { startTransition, useState } from "react";
 import toast from "react-hot-toast";
 import { Button } from "../ui/button";
 import { doLogout, LogoutResponse } from "./actions/logout";
+import { atsApi } from "@/lib/ats-api";
 
 const Logout = () => {
   const router = useRouter();
@@ -22,6 +23,11 @@ const Logout = () => {
         if ("error" in result) {
           toast.error(result.error);
         } else {
+          try {
+            atsApi.auth.logout();
+          } catch (logoutErr) {
+            console.error("Local token clear failed:", logoutErr);
+          }
           toast.success("You logged out successfully.");
           router.push("/auth/login");
         }

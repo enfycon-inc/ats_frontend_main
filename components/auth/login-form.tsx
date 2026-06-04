@@ -1,205 +1,159 @@
-'use client'
+"use client";
 
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { useLoading } from '@/contexts/LoadingContext'
-import { loginSchema } from '@/lib/zod'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react'
-import { signIn } from 'next-auth/react'
-import Link from 'next/link'
-import { useRef, useState, useTransition } from 'react'
-import { useForm } from 'react-hook-form'
-import toast from 'react-hot-toast'
-import { z } from 'zod'
-import { handleLoginAction } from './actions/login'
-import SocialLogin from './social-login'
+import React, { useState, useTransition, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { cn } from "@/lib/utils";
+import { Loader2, Eye, EyeOff } from "lucide-react";
+import { signIn } from "next-auth/react";
+import { atsApi } from "@/lib/ats-api";
+import toast from "react-hot-toast";
+import { handleLoginAction } from "./actions/login";
+
+const schema = z.object({
+  email: z.string().email({ message: "Your email is invalid." }),
+  password: z.string().min(4, { message: "Password must be at least 4 characters." }),
+});
 
 const LoginForm = () => {
-  const [showPassword, setShowPassword] = useState(false)
-  const [isPending, startTransition] = useTransition()
-  const { loading, setLoading } = useLoading()
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null)
+  const [isPending, startTransition] = useTransition();
+  const [passwordType, setPasswordType] = useState("password");
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const form = useForm<z.infer<typeof loginSchema>>({
-    resolver: zodResolver(loginSchema),
+  const togglePasswordType = () => {
+    setPasswordType((prev) => (prev === "password" ? "text" : "password"));
+  };
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
+    mode: "all",
     defaultValues: {
-      email: 'wowdash@gmail.com',
-      password: 'Pa$$w0rd!',
+      email: "recruiter@enfycon.com",
+      password: "enfycon123",
     },
-  })
+  });
 
-  const onSubmit = (values: z.infer<typeof loginSchema>) => {
-    setLoading(true)
-    setIsSubmitting(true)
-
+  const onSubmit = (data: z.infer<typeof schema>) => {
     startTransition(async () => {
       try {
-        if (!formRef.current) return
+        if (!formRef.current) return;
 
-        const formData = new FormData(formRef.current)
-        const res = await handleLoginAction(formData)
+        const formData = new FormData(formRef.current);
+        const res = await handleLoginAction(formData);
 
         if (res?.error) {
-          toast.error(res.error)
+          toast.error(res.error);
         } else {
-          await signIn('credentials', {
+          // Sync with NestJS Backend API to retrieve/store JWT token
+          try {
+            await atsApi.auth.login(data.email, data.password);
+          } catch (apiErr: any) {
+            console.error("Backend auth session sync failed:", apiErr);
+          }
+
+          await signIn("credentials", {
             redirect: true,
-            email: values.email,
-            password: values.password,
-            callbackUrl: '/dashboard',
-          })
-          toast.success('Login successful!')
+            email: data.email,
+            password: data.password,
+            callbackUrl: "/dashboard",
+          });
+          toast.success("Successfully logged in");
         }
-      } catch (error) {
-        toast.error('Something went wrong. Please try again.')
-      } finally {
-        setLoading(false)
+      } catch (err: any) {
+        toast.error(err.message || "Failed to sign in.");
       }
     });
-
-    setTimeout(() => {
-      setIsSubmitting(false)
-    }, 2000);
-  }
+  };
 
   return (
-    <>
-      <Form {...form}>
-        <form
-          ref={formRef}
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-5"
-        >
-          {/* Email Field */}
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormControl>
-                  <div className="relative">
-                    <Mail className="absolute start-5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-neutral-700 dark:text-neutral-200" />
-                    <Input
-                      {...field}
-                      type="email"
-                      placeholder="Email"
-                      name="email"
-                      className="ps-13 pe-12 h-14 rounded-xl bg-neutral-100 dark:bg-slate-800 border border-neutral-300 dark:border-slate-700 focus:border-primary dark:focus:border-primary focus-visible:border-primary !shadow-none !ring-0"
-                      disabled={loading}
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+    <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="mt-5 2xl:mt-7 space-y-4">
+      {/* Email Field */}
+      <div className="space-y-2">
+        <Label htmlFor="email" className="font-medium text-default-600">
+          Email{" "}
+        </Label>
+        <Input
+          disabled={isPending}
+          {...register("email")}
+          type="email"
+          id="email"
+          name="email"
+          className={cn("h-12 text-sm", {
+            "border-destructive": errors.email,
+          })}
+        />
+      </div>
+      {errors.email && (
+        <div className="text-destructive mt-2 text-sm">
+          {errors.email.message}
+        </div>
+      )}
 
-          {/* Password Field */}
-          <FormField
-            control={form.control}
+      {/* Password Field */}
+      <div className="mt-3.5 space-y-2">
+        <Label htmlFor="password" className="mb-2 font-medium text-default-600">
+          Password{" "}
+        </Label>
+        <div className="relative">
+          <Input
+            disabled={isPending}
+            {...register("password")}
+            type={passwordType}
+            id="password"
             name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormControl>
-                  <div className="relative">
-                    <Lock className="absolute start-5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-neutral-700 dark:text-neutral-200" />
-                    <Input
-                      {...field}
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Password"
-                      name="password"
-                      className="ps-13 pe-12 h-14 rounded-xl bg-neutral-100 dark:bg-slate-800 border border-neutral-300 dark:border-slate-700 focus:border-primary dark:focus:border-primary focus-visible:border-primary !shadow-none !ring-0"
-                      disabled={loading}
-                    />
-                    <Button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 !p-0 bg-transparent hover:bg-transparent text-muted-foreground h-[unset]"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="w-5 h-5" />
-                      ) : (
-                        <Eye className="w-5 h-5" />
-                      )}
-                    </Button>
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+            className="peer h-12 text-sm"
+            placeholder=" "
           />
 
-          {/* Remember Me & Forgot Password */}
-          <div className="mt-2 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="remember"
-                className="border border-neutral-500 w-4.5 h-4.5"
-              />
-              <label htmlFor="remember" className="text-sm">
-                Remember me
-              </label>
-            </div>
-            <Link
-              href="/auth/forgot-password"
-              className="text-primary font-medium hover:underline text-sm"
-            >
-              Forgot Password?
-            </Link>
-          </div>
-
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            className="w-full rounded-lg h-[52px] text-sm mt-2"
-            disabled={loading || isPending}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 right-4 cursor-pointer"
+            onClick={togglePasswordType}
           >
-            {isSubmitting || isPending ? (
-              <>
-                <Loader2 className="animate-spin h-4.5 w-4.5 mr-2" />
-                Signing in...
-              </>
+            {passwordType === "password" ? (
+              <Eye className="w-5 h-5 text-default-400" />
             ) : (
-              'Sign In'
+              <EyeOff className="w-5 h-5 text-default-400" />
             )}
-          </Button>
-        </form>
-      </Form>
+          </div>
+        </div>
+      </div>
+      {errors.password && (
+        <div className="text-destructive mt-2 text-sm">
+          {errors.password.message}
+        </div>
+      )}
 
-      {/* Divider */}
-      <div className="mt-8 relative text-center before:absolute before:w-full before:h-px before:bg-neutral-300 dark:before:bg-slate-600 before:top-1/2 before:left-0">
-        <span className="relative z-10 px-4 bg-white dark:bg-slate-900 text-base">
-          Or sign in with
-        </span>
+      {/* Remember Me & Forgot Password */}
+      <div className="flex justify-between items-center pt-2">
+        <div className="flex gap-2 items-center">
+          <Checkbox id="checkbox" defaultChecked />
+          <Label htmlFor="checkbox" className="text-default-600 cursor-pointer">Keep Me Signed In</Label>
+        </div>
+        <Link
+          href="/auth/forgot-password"
+          className="text-sm text-default-800 dark:text-default-400 leading-6 font-medium hover:underline"
+        >
+          Forgot Password?
+        </Link>
       </div>
 
-      {/* Social Login */}
-      <SocialLogin />
+      {/* Submit Button */}
+      <Button disabled={isPending} className="w-full mt-4">
+        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {isPending ? "Loading..." : "Sign In"}
+      </Button>
+    </form>
+  );
+};
 
-      {/* Signup Prompt */}
-      <div className="mt-8 text-center text-sm">
-        <p>
-          Don&apos;t have an account?{' '}
-          <Link
-            href="/auth/register"
-            className="text-primary font-semibold hover:underline"
-          >
-            Sign Up
-          </Link>
-        </p>
-      </div>
-    </>
-  )
-}
-
-export default LoginForm
+export default LoginForm;

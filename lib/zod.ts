@@ -19,7 +19,7 @@ const emailField = z
 // Login Schema
 export const loginSchema = z.object({
   email: emailField,
-  password: passwordField,
+  password: z.string().min(4, { message: "Password must be at least 4 characters" }),
 });
 
 // Register Schema

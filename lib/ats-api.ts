@@ -6,10 +6,16 @@
  * - Auto-attaching Bearer token on every request
  * - Login/logout flow
  * - Typed request/response for Jobs, Auth, etc.
+ *
+ * Usage:
+ *   import { atsApi } from '@/lib/ats-api';
+ *   const jobs = await atsApi.jobs.list();
+ *   await atsApi.auth.login('admin@enfycon.com', 'Admin@123');
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('localhost', '127.0.0.1');
 
+// ─── Token Management ──────────────────────────────────────────────
 const TOKEN_KEY = 'ats_access_token';
 const USER_KEY = 'ats_current_user';
 
@@ -44,6 +50,7 @@ function getCurrentUser(): any | null {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+// ─── HTTP Helper ────────────────────────────────────────────────────
 async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {},
@@ -68,11 +75,13 @@ async function apiFetch<T = any>(
     throw new Error(body.message || `API Error: ${res.status}`);
   }
 
+  // Handle 204 No Content
   if (res.status === 204) return undefined as T;
 
   return res.json();
 }
 
+// ─── Auth API ───────────────────────────────────────────────────────
 const auth = {
   async login(email: string, password: string) {
     const data = await apiFetch<{
@@ -107,10 +116,96 @@ const auth = {
   getToken,
   getCurrentUser,
   isAuthenticated(): boolean {
-    return typeof window !== 'undefined' && !!getToken();
+    return !!getToken();
+  },
+
+  async listPendingApprovals(): Promise<any[]> {
+    return apiFetch<any[]>('/api/auth/approvals/pending');
+  },
+
+  async approveUser(userId: string, market: string, subdomain?: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/approvals/approve/${userId}`, {
+      method: 'POST',
+      body: JSON.stringify({ market, subdomain }),
+    });
+  },
+
+  async listTenants(): Promise<any[]> {
+    return apiFetch<any[]>('/api/auth/tenants');
+  },
+
+  async updateTenantMarket(tenantId: string, market: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/tenants/${tenantId}/market`, {
+      method: 'PATCH',
+      body: JSON.stringify({ market }),
+    });
+  },
+
+  async updateMySubdomain(subdomain: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/tenants/my-subdomain`, {
+      method: 'PATCH',
+      body: JSON.stringify({ subdomain }),
+    });
+  },
+
+  async listUsers(): Promise<any[]> {
+    return apiFetch<any[]>('/api/auth/users');
+  },
+
+  async registerTenant(data: {
+    companyName: string;
+    subdomain: string;
+    email: string;
+    fullName: string;
+    password: string;
+  }): Promise<any> {
+    return apiFetch<any>('/api/auth/register-tenant', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async listAllPermissions(): Promise<any[]> {
+    return apiFetch<any[]>('/api/auth/rbac/permissions');
+  },
+
+  async listRoles(): Promise<any[]> {
+    return apiFetch<any[]>('/api/auth/rbac/roles');
+  },
+
+  async createCustomRole(data: {
+    name: string;
+    description: string;
+    permissions: string[];
+  }): Promise<any> {
+    return apiFetch<any>('/api/auth/rbac/roles', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateRolePermissions(roleId: string, permissions: string[]): Promise<any> {
+    return apiFetch<any>(`/api/auth/rbac/roles/${roleId}/permissions`, {
+      method: 'PATCH',
+      body: JSON.stringify({ permissions }),
+    });
+  },
+
+  async deleteCustomRole(roleId: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/rbac/roles/${roleId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async assignUserRole(userId: string, roleId: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/rbac/users/${userId}/role`, {
+      method: 'POST',
+      body: JSON.stringify({ roleId }),
+    });
   },
 };
 
+// ─── Jobs API ───────────────────────────────────────────────────────
 export interface JobPayload {
   id: string;
   jobCode: string;
@@ -175,6 +270,7 @@ const jobs = {
   },
 };
 
+// ─── Export ─────────────────────────────────────────────────────────
 export const atsApi = {
   auth,
   jobs,

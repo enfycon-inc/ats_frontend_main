@@ -174,6 +174,8 @@ export const MORE_NAV_ITEMS: NavItem[] = [
   { id: "documents", label: "Documents", href: "/documents", icon: FileText },
   { id: "database", label: "Database", href: "/database", icon: Database },
   { id: "integrations", label: "Integrations", href: "/integrations", icon: Globe },
+  { id: "tenant-management", label: "Tenant Management", href: "/utility/approvals", icon: Building2 },
+  { id: "role-management", label: "Role Management", href: "/utility/roles-permissions", icon: UserCheck },
   { id: "settings", label: "Settings", href: "/company", icon: Settings },
   { id: "help", label: "Help & Support", href: "/help", icon: HelpCircle },
 ];
@@ -199,6 +201,8 @@ export const APP_LAUNCHER_ITEMS: AppLauncherItem[] = [
   { id: "jobs", label: "Jobs", href: "/job-posting", icon: Briefcase, color: "#0d6efd" },
   { id: "candidates", label: "Candidates", href: "/applicants", icon: Users, color: "#198754" },
   { id: "clients", label: "Clients", href: "/clients", icon: Building2, color: "#6f42c1" },
+  { id: "tenants", label: "Tenants", href: "/utility/approvals", icon: Building2, color: "#0dcaf0" },
+  { id: "roles", label: "Roles", href: "/utility/roles-permissions", icon: UserCheck, color: "#fd7e14" },
   { id: "reports", label: "Reports", href: "/reports", icon: BarChart3, color: "#fd7e14" },
   { id: "calendar", label: "Calendar", href: "/calendar", icon: Calendar, color: "#0dcaf0" },
   { id: "email", label: "Email", href: "/email", icon: Mail, color: "#d63384" },
