@@ -134,6 +134,20 @@ const auth = {
     return apiFetch<any[]>('/api/auth/tenants');
   },
 
+  async updateTenantStatus(tenantId: string, status: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/tenants/${tenantId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  async updateTenantUserLimit(tenantId: string, limit: number): Promise<any> {
+    return apiFetch<any>(`/api/auth/tenants/${tenantId}/user-limit`, {
+      method: 'PATCH',
+      body: JSON.stringify({ limit }),
+    });
+  },
+
   async updateTenantMarket(tenantId: string, market: string): Promise<any> {
     return apiFetch<any>(`/api/auth/tenants/${tenantId}/market`, {
       method: 'PATCH',
@@ -148,8 +162,29 @@ const auth = {
     });
   },
 
+  async registerUser(data: {
+    email: string;
+    fullName: string;
+    password: string;
+    role: string;
+    tenantId: string;
+    isApproved: boolean;
+  }): Promise<any> {
+    return apiFetch<any>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   async listUsers(): Promise<any[]> {
     return apiFetch<any[]>('/api/auth/users');
+  },
+
+  async setUserStatus(userId: string, isActive: boolean): Promise<any> {
+    return apiFetch<any>(`/api/auth/users/${userId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive }),
+    });
   },
 
   async registerTenant(data: {
@@ -177,6 +212,7 @@ const auth = {
     name: string;
     description: string;
     permissions: string[];
+    systemRole?: string;
   }): Promise<any> {
     return apiFetch<any>('/api/auth/rbac/roles', {
       method: 'POST',
@@ -197,10 +233,10 @@ const auth = {
     });
   },
 
-  async assignUserRole(userId: string, roleId: string): Promise<any> {
-    return apiFetch<any>(`/api/auth/rbac/users/${userId}/role`, {
+  async assignUserRoles(userId: string, roleIds: string[]): Promise<any> {
+    return apiFetch<any>(`/api/auth/rbac/users/${userId}/roles`, {
       method: 'POST',
-      body: JSON.stringify({ roleId }),
+      body: JSON.stringify({ roleIds }),
     });
   },
 };
@@ -270,9 +306,95 @@ const jobs = {
   },
 };
 
+const candidates = {
+  async list(): Promise<any[]> {
+    return apiFetch<any[]>('/api/candidates');
+  },
+
+  async get(id: string | number): Promise<any> {
+    return apiFetch<any>(`/api/candidates/${id}`);
+  },
+
+  async create(data: Record<string, any>): Promise<any> {
+    return apiFetch<any>('/api/candidates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async delete(id: string | number): Promise<any> {
+    return apiFetch<any>(`/api/candidates/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async parseResume(file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${API_BASE}/api/candidates/parse`, {
+      method: 'POST',
+      body: formData,
+      headers,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(body.message || `API Error: ${res.status}`);
+    }
+    return res.json();
+  },
+
+  dictionary: {
+    async listPending(): Promise<any[]> {
+      return apiFetch<any[]>('/api/candidates/dictionary/pending');
+    },
+
+    async approve(payload: {
+      category: string;
+      rawValue: string;
+      action: 'canonical' | 'alias';
+      canonicalId?: number;
+      country?: string;
+      state?: string;
+      seniorityLevel?: string;
+    }): Promise<any> {
+      return apiFetch<any>('/api/candidates/dictionary/approve', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    async listCategory(category: string): Promise<any[]> {
+      return apiFetch<any[]>(`/api/candidates/dictionary/${category}`);
+    },
+
+    async addCategory(category: string, data: any): Promise<any> {
+      return apiFetch<any>(`/api/candidates/dictionary/${category}`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+
+    async deleteCategory(category: string, id: number, type: 'canonical' | 'alias'): Promise<any> {
+      return apiFetch<any>(`/api/candidates/dictionary/${category}/${id}?type=${type}`, {
+        method: 'DELETE',
+      });
+    },
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────
 export const atsApi = {
   auth,
   jobs,
+  candidates,
   fetch: apiFetch,
 };
+

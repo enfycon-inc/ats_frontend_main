@@ -84,6 +84,7 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
     href: "/applicants",
     icon: Users,
     children: [
+      { label: "Add Candidate", href: "/applicants/new" },
       { label: "All Candidates", href: "/applicants/all" },
       { label: "Pipeline View", href: "/applicants/pipeline" },
       { label: "Resume Search", href: "/applicants/resume-search" },
@@ -176,6 +177,7 @@ export const MORE_NAV_ITEMS: NavItem[] = [
   { id: "integrations", label: "Integrations", href: "/integrations", icon: Globe },
   { id: "tenant-management", label: "Tenant Management", href: "/utility/approvals", icon: Building2 },
   { id: "role-management", label: "Role Management", href: "/utility/roles-permissions", icon: UserCheck },
+  { id: "dictionaries", label: "Master Dictionaries", href: "/utility/dictionaries", icon: Database },
   { id: "settings", label: "Settings", href: "/company", icon: Settings },
   { id: "help", label: "Help & Support", href: "/help", icon: HelpCircle },
 ];

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 
@@ -31,6 +32,7 @@ interface TenantUser {
   fullName: string;
   roleId: string | null;
   roleName: string;
+  roles?: string[];
   isActive: boolean;
   createdAt: string;
 }
@@ -40,6 +42,16 @@ export default function RolesPermissionsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+
+  const currentUser = typeof window !== 'undefined' ? atsApi.auth.getCurrentUser() : null;
+  const getDomainSuffix = () => {
+    if (currentUser?.email?.toLowerCase().endsWith("@csm.com")) {
+      return "csm";
+    }
+    const rawDomain = currentUser?.tenantDomain || "enfycon";
+    return rawDomain.toLowerCase().endsWith(".com") ? rawDomain.slice(0, -4) : rawDomain;
+  };
+  const tenantDomain = getDomainSuffix();
 
   // Core Dynamic RBAC state
   const [roles, setRoles] = useState<CustomRole[]>([]);
@@ -55,6 +67,19 @@ export default function RolesPermissionsPage() {
   const [showAddRole, setShowAddRole] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleDesc, setNewRoleDesc] = useState("");
+  const [newRoleSystemRole, setNewRoleSystemRole] = useState("RECRUITER");
+
+  // Add Member Modal State
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [memberName, setMemberName] = useState("");
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberPassword, setMemberPassword] = useState("");
+  const [memberRole, setMemberRole] = useState("RECRUITER");
+
+  // Multi-select dropdown active user state
+  const [activeDropdownUserId, setActiveDropdownUserId] = useState<string | null>(null);
+  const [tempSelectedRoleIds, setTempSelectedRoleIds] = useState<Record<string, string[]>>({});
+  const [userLimit, setUserLimit] = useState<number>(5);
 
   useEffect(() => {
     const user = atsApi.auth.getCurrentUser();
@@ -72,15 +97,19 @@ export default function RolesPermissionsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [rolesData, permsData, usersData] = await Promise.all([
+      const [rolesData, permsData, usersData, profileData] = await Promise.all([
         atsApi.auth.listRoles(),
         atsApi.auth.listAllPermissions(),
-        atsApi.auth.listUsers()
+        atsApi.auth.listUsers(),
+        atsApi.auth.me()
       ]);
 
       setRoles(rolesData);
       setPermissions(permsData);
       setUsers(usersData);
+      if (profileData && profileData.userLimit) {
+        setUserLimit(profileData.userLimit);
+      }
 
       // Default select the first role
       if (rolesData.length > 0) {
@@ -135,7 +164,8 @@ export default function RolesPermissionsPage() {
       const newRole = await atsApi.auth.createCustomRole({
         name: newRoleName.trim(),
         description: newRoleDesc.trim(),
-        permissions: ["job:view", "candidate:view"] // Default initial permissions
+        permissions: ["job:view", "candidate:view"], // Default initial permissions
+        systemRole: newRoleSystemRole
       });
 
       toast.success(`Custom role "${newRole.name}" successfully created!`);
@@ -146,6 +176,7 @@ export default function RolesPermissionsPage() {
       // Reset form
       setNewRoleName("");
       setNewRoleDesc("");
+      setNewRoleSystemRole("RECRUITER");
       setShowAddRole(false);
     } catch (err: any) {
       toast.error("Failed to create role: " + err.message);
@@ -170,19 +201,106 @@ export default function RolesPermissionsPage() {
     }
   };
 
-  const handleAssignUserRole = async (userId: string, roleId: string) => {
+  const handleCreateMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!memberName.trim() || !memberEmail.trim() || !memberPassword.trim()) {
+      return toast.error("Please fill in all required fields.");
+    }
+
+    const activeCount = users.filter(u => u.isActive).length;
+    if (activeCount >= userLimit) {
+      return toast.error(`Seat limit reached! You have used all ${userLimit} licenses. Deactivate a user first or contact support to purchase more seats.`);
+    }
+    
+    try {
+      setSubmitting(true);
+      const currentUser = atsApi.auth.getCurrentUser();
+      const tenantId = currentUser?.tenantId;
+      const fullEmail = `${memberEmail.trim()}@${tenantDomain}.com`;
+      
+      await atsApi.auth.registerUser({
+        email: fullEmail,
+        fullName: memberName.trim(),
+        password: memberPassword,
+        role: memberRole,
+        tenantId: tenantId || "",
+        isApproved: true, // Auto-approved by tenant admin
+      });
+      
+      toast.success(`Successfully added ${memberName} as ${memberRole}!`);
+      
+      // Clear form & close modal
+      setMemberName("");
+      setMemberEmail("");
+      setMemberPassword("");
+      setMemberRole("RECRUITER");
+      setShowAddMember(false);
+      
+      // Reload data
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add member.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAssignUserRoles = async (userId: string, selectedRoleIds: string[]) => {
+    if (selectedRoleIds.length === 0) {
+      return toast.error("A user must have at least one role assigned.");
+    }
     try {
       setSubmittingId(userId);
-      const res = await atsApi.auth.assignUserRole(userId, roleId);
-      toast.success(res.message || "User role assigned successfully.");
+      const res = await atsApi.auth.assignUserRoles(userId, selectedRoleIds);
+      toast.success(res.message || "User roles assigned successfully.");
       
-      // Update local state
-      const assignedRoleName = roles.find((r) => r.id === roleId)?.name || "User";
+      // Update local state: find the names of the assigned roles
+      const assignedRoleNames = roles
+        .filter((r) => selectedRoleIds.includes(r.id))
+        .map((r) => r.name);
+      
+      const primaryRoleId = selectedRoleIds[0];
+      const primaryRoleName = assignedRoleNames[0] || "User";
+
       setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, roleId, roleName: assignedRoleName } : u))
+        prev.map((u) =>
+          u.id === userId
+            ? {
+                ...u,
+                roleId: primaryRoleId,
+                roleName: primaryRoleName,
+                roles: assignedRoleNames,
+              }
+            : u
+        )
       );
     } catch (err: any) {
-      toast.error("Failed to assign role: " + err.message);
+      toast.error("Failed to assign roles: " + err.message);
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  const handleUserStatusToggle = async (userId: string, currentActive: boolean) => {
+    // Protect against self-deactivation (Ceipal rule)
+    const currentUser = atsApi.auth.getCurrentUser();
+    if (currentUser?.id === userId && currentActive) {
+      toast.error("You cannot deactivate your own account.");
+      return;
+    }
+
+    try {
+      setSubmittingId(userId);
+      const nextActive = !currentActive;
+      await atsApi.auth.setUserStatus(userId, nextActive);
+      toast.success(`User status updated to ${nextActive ? "Active" : "Inactive"}!`);
+      
+      // Update local state
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, isActive: nextActive } : u))
+      );
+    } catch (err: any) {
+      toast.error("Failed to update user status: " + err.message);
     } finally {
       setSubmittingId(null);
     }
@@ -268,6 +386,20 @@ export default function RolesPermissionsPage() {
                       onChange={(e) => setNewRoleName(e.target.value)}
                       required
                     />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-default-700">Base Role Template ⚙️</label>
+                    <select
+                      value={newRoleSystemRole}
+                      onChange={(e) => setNewRoleSystemRole(e.target.value)}
+                      className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md p-2 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 font-semibold"
+                    >
+                      <option value="RECRUITER">Recruiter Template</option>
+                      <option value="ACCOUNT_MANAGER">Account Manager Template (BDM)</option>
+                      <option value="ADMIN">Admin Template</option>
+                      <option value="DELIVERY_HEAD">Delivery Head Template</option>
+                      <option value="TRACKER">Tracker Template</option>
+                    </select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-default-700">Description</label>
@@ -461,12 +593,56 @@ export default function RolesPermissionsPage() {
                      SUB TAB 2: STAFF ROLE ASSIGNMENTS
                      ======================================================== */
                   <div className="p-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border border-default-100 bg-slate-50 dark:bg-slate-800/20 p-3.5 rounded-xl">
+                      <div>
+                        <h3 className="text-sm font-semibold text-default-900">Manage Tenant Staff</h3>
+                        <p className="text-xs text-default-500 mt-0.5">
+                          Configure user access credentials and assign custom roles.
+                        </p>
+                      </div>
+                      
+                      {/* License Usage indicator */}
+                      <div className="flex items-center gap-4 bg-white dark:bg-slate-900 border border-default-200 px-3.5 py-2 rounded-lg shadow-xs">
+                        <div className="flex items-center gap-2">
+                          <Icon icon="heroicons:key" className="text-indigo-600 h-5 w-5" />
+                          <div>
+                            <div className="text-[10px] text-default-500 font-bold uppercase tracking-wider">Seats/Licenses</div>
+                            <div className="text-sm font-bold text-default-900">
+                              {users.filter(u => u.isActive).length} / {userLimit} Active
+                            </div>
+                          </div>
+                        </div>
+                        <div className="h-8 w-[1px] bg-default-200" />
+                        <div>
+                          <div className="text-[10px] text-default-500 font-bold uppercase tracking-wider">Remaining</div>
+                          <div className="text-sm font-bold text-emerald-600">
+                            {Math.max(0, userLimit - users.filter(u => u.isActive).length)} Available
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const activeCount = users.filter(u => u.isActive).length;
+                          if (activeCount >= userLimit) {
+                            toast.error(`Seat limit reached! You have used all ${userLimit} licenses. Deactivate a user first or contact support to purchase more seats.`);
+                            return;
+                          }
+                          setShowAddMember(true);
+                        }}
+                        className="bg-indigo-600 hover:bg-indigo-750 text-white font-semibold flex items-center gap-1 shrink-0"
+                      >
+                        <Icon icon="heroicons:user-plus" className="h-4 w-4" /> Add Member
+                      </Button>
+                    </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="bg-default-50 dark:bg-slate-800/50 border-b border-default-100">
                             <th className="py-3 px-4 text-xs font-semibold text-default-700">Staff Member</th>
                             <th className="py-3 px-4 text-xs font-semibold text-default-700">Current Role</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-default-700">Status</th>
                             <th className="py-3 px-4 text-xs font-semibold text-default-700 text-right">Assign Custom Role</th>
                           </tr>
                         </thead>
@@ -481,23 +657,117 @@ export default function RolesPermissionsPage() {
                                   </div>
                                 </td>
                                 <td className="py-3 px-4">
-                                  <Badge className="border border-indigo-100 bg-indigo-50/30 text-indigo-700 capitalize text-[10px] border-0 px-2 py-0.5">
-                                    {user.roleName}
-                                  </Badge>
+                                  <div className="flex flex-wrap gap-1">
+                                    {(user.roles && user.roles.length > 0 ? user.roles : [user.roleName]).map((roleName) => (
+                                      <Badge 
+                                        key={roleName} 
+                                        className="border border-indigo-100 bg-indigo-50/30 text-indigo-700 capitalize text-[10px] border-0 px-2 py-0.5"
+                                      >
+                                        {roleName}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <Switch
+                                      checked={user.isActive}
+                                      onCheckedChange={() => handleUserStatusToggle(user.id, user.isActive)}
+                                      disabled={submittingId === user.id}
+                                    />
+                                    <span className={`text-[11px] font-semibold ${user.isActive ? 'text-emerald-600' : 'text-default-450'}`}>
+                                      {user.isActive ? 'Active' : 'Inactive'}
+                                    </span>
+                                  </div>
                                 </td>
                                 <td className="py-3 px-4 text-right">
                                   <div className="inline-flex items-center gap-2">
-                                    <select
-                                      value={user.roleId || roles.find(r => r.name === user.roleName)?.id || ""}
-                                      onChange={(e) => handleAssignUserRole(user.id, e.target.value)}
-                                      disabled={submittingId === user.id}
-                                      className="bg-transparent border border-default-250 dark:border-slate-700 rounded-md px-2 py-1 text-xs text-default-800 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 font-semibold"
-                                    >
-                                      <option value="" disabled>Select Role</option>
-                                      {roles.map((r) => (
-                                        <option key={r.id} value={r.id}>{r.name}</option>
-                                      ))}
-                                    </select>
+                                    <div className="relative inline-block text-left">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (activeDropdownUserId === user.id) {
+                                            setActiveDropdownUserId(null);
+                                          } else {
+                                            setActiveDropdownUserId(user.id);
+                                            // Initialize temp selected role ids
+                                            const currentRoleIds = roles
+                                              .filter((r) => user.roles ? user.roles.includes(r.name) : (user.roleName === r.name || user.roleId === r.id))
+                                              .map((r) => r.id);
+                                            setTempSelectedRoleIds((prev) => ({ ...prev, [user.id]: currentRoleIds }));
+                                          }
+                                        }}
+                                        disabled={submittingId === user.id}
+                                        className="inline-flex justify-between items-center gap-1.5 border border-default-250 dark:border-slate-700 rounded-md px-2 py-1.5 text-xs text-default-850 focus:outline-none bg-transparent hover:bg-default-50 dark:hover:bg-slate-800 font-semibold cursor-pointer w-48 text-left"
+                                      >
+                                        <span className="truncate">
+                                          {user.roles && user.roles.length > 0 ? user.roles.join(", ") : user.roleName}
+                                        </span>
+                                        <Icon icon="heroicons:chevron-down" className="h-3.5 w-3.5 text-default-500 flex-shrink-0" />
+                                      </button>
+                                      
+                                      {activeDropdownUserId === user.id && (
+                                        <>
+                                          <div className="fixed inset-0 z-10" onClick={() => setActiveDropdownUserId(null)} />
+                                          <div className="absolute right-0 mt-1 w-56 rounded-md shadow-lg bg-white dark:bg-slate-900 border border-default-200 dark:border-slate-800 z-20 overflow-hidden">
+                                            <div className="py-1 max-h-48 overflow-y-auto">
+                                              {roles.map((role) => {
+                                                const currentSelected = tempSelectedRoleIds[user.id] || [];
+                                                const isAssigned = currentSelected.includes(role.id);
+                                                  
+                                                return (
+                                                  <label
+                                                    key={role.id}
+                                                    className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-default-880 hover:bg-default-50 dark:hover:bg-slate-800 cursor-pointer select-none"
+                                                  >
+                                                    <input
+                                                      type="checkbox"
+                                                      checked={isAssigned}
+                                                      onChange={() => {
+                                                        const currentIds = tempSelectedRoleIds[user.id] || [];
+                                                        let nextIds;
+                                                        if (isAssigned) {
+                                                          nextIds = currentIds.filter((id) => id !== role.id);
+                                                        } else {
+                                                          nextIds = [...currentIds, role.id];
+                                                        }
+                                                        setTempSelectedRoleIds((prev) => ({ ...prev, [user.id]: nextIds }));
+                                                      }}
+                                                      className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
+                                                    />
+                                                    <span className="truncate">{role.name}</span>
+                                                  </label>
+                                                );
+                                              })}
+                                            </div>
+                                            <div className="border-t border-default-100 p-2 flex justify-end gap-1.5 bg-default-50/50">
+                                              <button
+                                                type="button"
+                                                onClick={() => setActiveDropdownUserId(null)}
+                                                className="px-2 py-1 text-[10px] font-bold text-default-500 hover:bg-default-100 rounded cursor-pointer border border-default-200 bg-white dark:bg-slate-900"
+                                              >
+                                                Cancel
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={async () => {
+                                                  const selectedIds = tempSelectedRoleIds[user.id] || [];
+                                                  if (selectedIds.length === 0) {
+                                                    toast.error("A user must have at least one role.");
+                                                    return;
+                                                  }
+                                                  await handleAssignUserRoles(user.id, selectedIds);
+                                                  setActiveDropdownUserId(null);
+                                                }}
+                                                className="px-2.5 py-1 text-[10px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-750 cursor-pointer"
+                                              >
+                                                Apply
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
                                     {submittingId === user.id && (
                                       <div className="h-4.5 w-4.5 border-2 border-indigo-600 border-t-transparent animate-spin rounded-full shrink-0"></div>
                                     )}
@@ -520,6 +790,84 @@ export default function RolesPermissionsPage() {
           )}
         </div>
       </div>
+
+      {/* ==========================================
+         ADD MEMBER MODAL (Ceipal style)
+         ========================================== */}
+      {showAddMember && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <Card className="w-full max-w-md border border-default-100 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
+            <CardHeader className="border-b border-default-100 p-4">
+              <CardTitle className="text-base font-semibold flex items-center gap-1.5">
+                <Icon icon="heroicons:user-plus" className="text-indigo-600 h-5 w-5" />
+                Add New Staff Member
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Create a new user account under your company workspace.
+              </CardDescription>
+            </CardHeader>
+            <form onSubmit={handleCreateMember}>
+              <CardContent className="p-4 space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-default-700">Full Name</label>
+                  <Input
+                    placeholder="e.g. John Doe"
+                    value={memberName}
+                    onChange={(e) => setMemberName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-default-700">Work Email</label>
+                  <div className="flex items-center border border-default-250 dark:border-slate-700 rounded-md overflow-hidden bg-transparent">
+                    <Input
+                      type="text"
+                      placeholder="e.g. john"
+                      value={memberEmail}
+                      onChange={(e) => setMemberEmail(e.target.value.trim().toLowerCase().replace(/[^a-z0-9._-]/g, ""))}
+                      required
+                      className="border-0 shadow-none focus-visible:ring-0 focus-visible:border-0 focus-visible:ring-offset-0 bg-transparent text-default-850 w-full"
+                    />
+                    <span className="text-xs font-semibold text-default-500 bg-default-100 dark:bg-slate-800 px-3 py-2 border-l border-default-200 whitespace-nowrap">
+                      @{tenantDomain}.com
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-default-700">Login Password</label>
+                  <Input
+                    type="password"
+                    placeholder="Min. 8 characters"
+                    value={memberPassword}
+                    onChange={(e) => setMemberPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-default-700">Workspace Role</label>
+                  <select
+                    value={memberRole}
+                    onChange={(e) => setMemberRole(e.target.value)}
+                    className="w-full text-sm border border-default-250 dark:border-slate-700 rounded-md p-2 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 font-semibold"
+                  >
+                    {roles.map((r) => (
+                      <option key={r.id} value={r.name}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </CardContent>
+              <div className="border-t border-default-100 p-4 bg-default-50/50 dark:bg-slate-800/10 flex justify-end gap-2">
+                <Button size="sm" variant="outline" type="button" onClick={() => setShowAddMember(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-750 text-white font-semibold">
+                  {submitting ? "Adding..." : "Add Member"}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

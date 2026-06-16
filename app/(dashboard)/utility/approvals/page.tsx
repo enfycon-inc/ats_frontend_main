@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
 
@@ -26,6 +27,7 @@ interface Tenant {
   domain: string;
   status: string;
   defaultMarket: "US" | "IN";
+  userLimit: number;
   createdAt: string;
 }
 
@@ -122,6 +124,34 @@ export default function ApprovalsPage() {
       await fetchTenants();
     } catch (err: any) {
       toast.error("Failed to update tenant market: " + err.message);
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  const handleTenantStatusToggle = async (tenantId: string, currentStatus: string) => {
+    const nextStatus = currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+    try {
+      setSubmittingId(tenantId);
+      await atsApi.auth.updateTenantStatus(tenantId, nextStatus);
+      toast.success(`Tenant status changed to ${nextStatus}!`);
+      await fetchTenants();
+    } catch (err: any) {
+      toast.error("Failed to update tenant status: " + err.message);
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  const handleTenantUserLimitChange = async (tenantId: string, limit: number) => {
+    if (isNaN(limit) || limit < 1) return;
+    try {
+      setSubmittingId(tenantId);
+      await atsApi.auth.updateTenantUserLimit(tenantId, limit);
+      toast.success(`Tenant user limit updated to ${limit}!`);
+      await fetchTenants();
+    } catch (err: any) {
+      toast.error("Failed to update user limit: " + err.message);
     } finally {
       setSubmittingId(null);
     }
@@ -378,6 +408,7 @@ export default function ApprovalsPage() {
                       <th className="py-4 px-6 text-sm font-semibold text-default-700">Company Details</th>
                       <th className="py-4 px-6 text-sm font-semibold text-default-700">Domain Domain</th>
                       <th className="py-4 px-6 text-sm font-semibold text-default-700">Status</th>
+                      <th className="py-4 px-6 text-sm font-semibold text-default-700">Seats Limit</th>
                       <th className="py-4 px-6 text-sm font-semibold text-default-700">Staffing Market Layout Configuration</th>
                     </tr>
                   </thead>
@@ -402,9 +433,44 @@ export default function ApprovalsPage() {
                             </span>
                           </td>
                           <td className="py-4 px-6">
-                            <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 capitalize font-medium text-xs px-2 py-0.5">
-                              {tenant.status.toLowerCase()}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                id={`tenant-status-${tenant.id}`}
+                                checked={tenant.status === "ACTIVE"}
+                                onCheckedChange={() => handleTenantStatusToggle(tenant.id, tenant.status)}
+                                disabled={submittingId === tenant.id}
+                              />
+                              <span className={`text-xs font-semibold ${
+                                tenant.status === "ACTIVE" ? "text-emerald-600" : "text-rose-600"
+                              }`}>
+                                {tenant.status === "ACTIVE" ? "Active" : "Inactive"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                min="1"
+                                defaultValue={tenant.userLimit || 5}
+                                onBlur={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  if (val !== tenant.userLimit) {
+                                    handleTenantUserLimitChange(tenant.id, val);
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const val = parseInt((e.target as HTMLInputElement).value, 10);
+                                    if (val !== tenant.userLimit) {
+                                      handleTenantUserLimitChange(tenant.id, val);
+                                    }
+                                  }
+                                }}
+                                className="w-16 border border-default-250 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-indigo-600 bg-transparent text-default-850"
+                              />
+                              <span className="text-[11px] text-default-500 font-medium">seats</span>
+                            </div>
                           </td>
                           <td className="py-4 px-6">
                             <div className="flex items-center gap-4">

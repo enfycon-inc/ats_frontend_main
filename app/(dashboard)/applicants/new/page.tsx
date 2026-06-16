@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { atsApi } from "@/lib/ats-api";
 
 // ── Wizard Steps ─────────────────────────────────────────────────
 const STEPS = [
@@ -113,6 +114,8 @@ export default function NewApplicantPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState<FormData>(INITIAL_FORM);
   const [isDragging, setIsDragging] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
 
   const updateForm = (field: keyof FormData, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -126,18 +129,126 @@ export default function NewApplicantPage() {
     if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
 
-  const handleSubmit = () => {
-    // TODO: wire to API
-    console.log("Submitting applicant:", form);
-    router.push("/applicants");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      const payload = {
+        fullName: `${form.firstName} ${form.middleName ? form.middleName + " " : ""}${form.lastName}`.trim(),
+        email: form.email,
+        phone: form.mobile || form.phone || "N/A",
+        location: `${form.city}, ${form.state}`.trim(),
+        experienceYears: form.experience ? parseInt(form.experience.split("-")[0]) || 0 : 0,
+        jobTitle: form.jobTitle || "Software Engineer",
+        source: form.source || "Direct Upload",
+        workAuthorization: form.workAuthorization || "US Citizen",
+        skills: form.skills ? form.skills.split(/,\s*/).map(s => s.trim()).filter(Boolean) : [],
+        rawText: form.resumeText || `Manual Entry Candidate: ${form.firstName} ${form.lastName}`,
+      };
+      
+      await atsApi.candidates.create(payload);
+      router.push("/applicants");
+    } catch (err) {
+      console.error("Failed to create candidate:", err);
+      alert("Failed to create candidate. Please check your data and try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleFileDrop = (e: React.DragEvent) => {
+  const processResumeFile = async (file: File) => {
+    setIsParsing(true);
+    setParseError(null);
+    try {
+      const parsed = await atsApi.candidates.parseResume(file);
+      
+      const name = parsed.candidate_name || parsed.name || "";
+      let first = "";
+      let last = "";
+      if (name) {
+        const parts = name.trim().split(/\s+/);
+        first = parts[0] || "";
+        if (parts.length > 1) {
+          last = parts.slice(1).join(" ");
+        }
+      }
+
+      const email = parsed.email || (parsed.contact?.emails?.[0]) || "";
+      const phone = parsed.phone || (parsed.contact?.phones?.[0]) || "";
+
+      let city = "";
+      let state = "";
+      const rawLoc = parsed.location || parsed.raw_current_location || "";
+      if (typeof rawLoc === "string" && rawLoc) {
+        const parts = rawLoc.split(/,\s*/);
+        city = parts[0] || "";
+        state = parts[1] || "";
+      } else if (rawLoc && typeof rawLoc === "object") {
+        city = rawLoc.city || "";
+        state = rawLoc.state || "";
+      }
+
+      const skills = Array.isArray(parsed.skills) ? parsed.skills.join(", ") : (parsed.skills || "");
+      const jobTitle = parsed.designation || parsed.job_title || parsed.raw_current_designation || "";
+      const expYears = Number(parsed.experience_years || parsed.total_experience_years || parsed.experience || 0);
+
+      let expRange = "";
+      if (expYears <= 1) expRange = "0-1";
+      else if (expYears <= 3) expRange = "1-3";
+      else if (expYears <= 5) expRange = "3-5";
+      else if (expYears <= 8) expRange = "5-8";
+      else if (expYears <= 12) expRange = "8-12";
+      else if (expYears <= 15) expRange = "12-15";
+      else expRange = "15+";
+
+      const workAuthRaw = parsed.work_authorization || parsed.workAuthorization || "";
+      let matchedWorkAuth = "";
+      if (workAuthRaw) {
+        const lowerAuth = workAuthRaw.toLowerCase();
+        const found = WORK_AUTH_OPTIONS.find(opt => lowerAuth.includes(opt.toLowerCase()) || opt.toLowerCase().includes(lowerAuth));
+        matchedWorkAuth = found || "US Authorized";
+      }
+
+      const rawText = parsed.raw_text || parsed.rawText || "";
+
+      setForm((prev) => ({
+        ...prev,
+        firstName: first || prev.firstName,
+        lastName: last || prev.lastName,
+        email: email || prev.email,
+        mobile: phone || prev.mobile,
+        city: city || prev.city,
+        state: state || prev.state,
+        workAuthorization: matchedWorkAuth || prev.workAuthorization,
+        jobTitle: jobTitle || prev.jobTitle,
+        skills: skills || prev.skills,
+        experience: expRange || prev.experience,
+        resumeText: rawText || `Parsed Resume File: ${file.name}`,
+      }));
+
+      setCurrentStep(1);
+    } catch (err: any) {
+      console.error("Failed to parse resume:", err);
+      setParseError(err.message || "Failed to parse resume file.");
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await processResumeFile(file);
+    }
+  };
+
+  const handleFileDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file) {
-      updateForm("resumeText", `[Resume file: ${file.name}]`);
+      await processResumeFile(file);
     }
   };
 
@@ -175,6 +286,26 @@ export default function NewApplicantPage() {
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
               Enter the applicant&apos;s basic personal information.
             </p>
+            
+            <div className="border border-dashed border-primary/40 bg-primary/5 dark:bg-slate-800/40 rounded-sm p-4 text-center mb-5">
+              <p className="text-xs font-semibold text-primary dark:text-primary-400 mb-1">
+                ⚡ Have a Resume? Auto-Fill this wizard!
+              </p>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-2.5">
+                Drop the CV file here or click below to parse details instantly.
+              </p>
+              <label className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold bg-primary text-white rounded-sm cursor-pointer hover:bg-primary/90 transition-colors">
+                <Upload className="h-3 w-3" />
+                Upload & Autofill
+                <input type="file" className="hidden" accept=".pdf,.doc,.docx,.txt" onChange={handleFileChange} />
+              </label>
+              {parseError && (
+                <p className="text-[10px] text-red-500 font-semibold mt-2">
+                  ⚠️ {parseError}
+                </p>
+              )}
+            </div>
+
             <div className="grid grid-cols-3 gap-4">
               <Field label="First Name" required>
                 <input
@@ -401,7 +532,7 @@ export default function NewApplicantPage() {
               <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary text-white rounded-sm cursor-pointer hover:bg-primary/90 transition-colors">
                 <Upload className="h-3.5 w-3.5" />
                 Browse File
-                <input type="file" className="hidden" accept=".pdf,.doc,.docx,.txt" />
+                <input type="file" className="hidden" accept=".pdf,.doc,.docx,.txt" onChange={handleFileChange} />
               </label>
             </div>
 
@@ -519,7 +650,7 @@ export default function NewApplicantPage() {
           variant="outline"
           size="sm"
           onClick={handleBack}
-          disabled={currentStep === 1}
+          disabled={currentStep === 1 || submitting}
           className="gap-1.5 text-xs font-semibold cursor-pointer"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
@@ -531,6 +662,7 @@ export default function NewApplicantPage() {
             variant="ghost"
             size="sm"
             onClick={() => router.push("/applicants")}
+            disabled={submitting}
             className="text-xs font-semibold text-neutral-500 cursor-pointer"
           >
             Cancel
@@ -540,6 +672,7 @@ export default function NewApplicantPage() {
             <Button
               size="sm"
               onClick={handleNext}
+              disabled={submitting}
               className="gap-1.5 text-xs font-bold bg-primary text-white hover:bg-primary/90 border-none cursor-pointer"
             >
               Next
@@ -549,14 +682,41 @@ export default function NewApplicantPage() {
             <Button
               size="sm"
               onClick={handleSubmit}
+              disabled={submitting}
               className="gap-1.5 text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 border-none cursor-pointer"
             >
-              <Check className="h-3.5 w-3.5" />
-              Create Applicant
+              {submitting ? (
+                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <Check className="h-3.5 w-3.5" />
+              )}
+              {submitting ? "Creating..." : "Create Applicant"}
             </Button>
           )}
         </div>
       </div>
+
+      {isParsing && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-xl p-8 max-w-sm w-full text-center space-y-4">
+            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+              <FileText className="h-6 w-6 text-primary animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-100">
+                Parsing Resume
+              </h3>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                Our parsing agent is reading and mapping skills, contact, and experience data...
+              </p>
+            </div>
+            <div className="w-full bg-neutral-100 dark:bg-slate-800 rounded-full h-1 overflow-hidden">
+              <div className="bg-primary h-1 rounded-full animate-pulse w-1/2 mx-auto" />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
