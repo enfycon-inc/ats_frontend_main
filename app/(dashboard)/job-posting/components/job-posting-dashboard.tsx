@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { mockJobs, mapApiJobToJob, Job } from "../data/mock-jobs";
+import { mockJobs, mockJobsIN, mapApiJobToJob, Job } from "../data/mock-jobs";
 import { atsApi } from "@/lib/ats-api";
 import DataTable from "./data-table";
 import FilterDrawer, { SelectedFilters } from "./filter-drawer";
@@ -19,33 +19,29 @@ import {
   Loader2,
 } from "lucide-react";
 
-const ALL_COLUMNS = [
-  { id: "jobCode", label: "Job Code" },
-  { id: "jobTitle", label: "Job Title" },
-  { id: "businessUnit", label: "Business Unit" },
-  { id: "client", label: "Client" },
-  { id: "clientJobId", label: "Client Job ID" },
-  { id: "location", label: "Location" },
-  { id: "states", label: "States" },
-  { id: "jobStatus", label: "Job Status" },
-  { id: "clientBillRate", label: "Client Bill Rate / Salary" },
-  { id: "payRate", label: "Pay Rate / Salary" },
-  { id: "recruitmentManager", label: "Recruitment Manager" },
-  { id: "primaryRecruiter", label: "Primary Recruiter" },
-  { id: "assignedTo", label: "Assigned To" },
-  { id: "createdBy", label: "Job Posting Created By" },
-  { id: "createdOn", label: "Job Created" },
-  { id: "modifiedOn", label: "Job Modified On" },
-  { id: "submissionsCount", label: "Submissions & Pipeline" },
-];
+
+
+const matchStatus = (jobStatus: string, filter: string) => {
+  if (filter === "All") return true;
+  if (filter === "Close" || filter === "Closed") {
+    return jobStatus === "Close" || jobStatus === "Closed";
+  }
+  if (filter === "Hold" || filter === "Hold by Client") {
+    return jobStatus === "Hold" || jobStatus === "Hold by Client";
+  }
+  return jobStatus === filter;
+};
 
 interface JobPostingDashboardProps {
-  initialStatusFilter?: "Active" | "Closed" | "Hold" | "Draft" | "All";
+  initialStatusFilter?: "Active" | "Close" | "Closed" | "Filled" | "Hold" | "Hold by Client" | "Draft" | "All";
 }
 
 export default function JobPostingDashboard({
   initialStatusFilter = "All",
 }: JobPostingDashboardProps) {
+  // Market State (US or India)
+  const [market, setMarket] = useState<"US" | "IN">("US");
+
   // Drawer States
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isColumnOpen, setIsColumnOpen] = useState(false);
@@ -85,6 +81,24 @@ export default function JobPostingDashboard({
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Load user profile on mount to get default market
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        if (!atsApi.auth.isAuthenticated()) {
+          await atsApi.auth.login("recruiter@enfycon.com", "enfycon123");
+        }
+        const prof = await atsApi.auth.me();
+        if (prof && prof.defaultMarket) {
+          setMarket(prof.defaultMarket);
+        }
+      } catch (err) {
+        console.warn("[Dashboard] Failed to fetch profile on mount:", err);
+      }
+    }
+    loadProfile();
+  }, []);
+
   // Fetch jobs from backend API
   const fetchJobs = useCallback(async () => {
     setIsLoading(true);
@@ -97,37 +111,57 @@ export default function JobPostingDashboard({
       if (apiJobs && apiJobs.length > 0) {
         const mapped = apiJobs.map(mapApiJobToJob);
         // Pre-filter by status if required
-        const filteredByRoute =
-          initialStatusFilter === "All"
-            ? mapped
-            : mapped.filter((job) => job.jobStatus === initialStatusFilter);
+        const filteredByRoute = mapped.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
 
         setAllJobs(mapped);
         setJobsData(filteredByRoute);
       } else {
-        const filteredByRoute =
-          initialStatusFilter === "All"
-            ? mockJobs
-            : mockJobs.filter((job) => job.jobStatus === initialStatusFilter);
-        setAllJobs(mockJobs);
+        const fallbackJobs = market === "IN" ? mockJobsIN : mockJobs;
+        const filteredByRoute = fallbackJobs.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
+        setAllJobs(fallbackJobs);
         setJobsData(filteredByRoute);
       }
     } catch (err) {
       console.warn("[Jobs] API fetch failed, using mock data:", err);
-      const filteredByRoute =
-        initialStatusFilter === "All"
-          ? mockJobs
-          : mockJobs.filter((job) => job.jobStatus === initialStatusFilter);
-      setAllJobs(mockJobs);
+      const fallbackJobs = market === "IN" ? mockJobsIN : mockJobs;
+      const filteredByRoute = fallbackJobs.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
+      setAllJobs(fallbackJobs);
       setJobsData(filteredByRoute);
     } finally {
       setIsLoading(false);
     }
-  }, [initialStatusFilter]);
+  }, [initialStatusFilter, market]);
 
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
+
+  const allColumns = useMemo(() => [
+    { id: "jobCode", label: "Job Code" },
+    { id: "jobTitle", label: "Job Title" },
+    { id: "businessUnit", label: "Business Unit" },
+    { id: "client", label: "Client" },
+    { id: "clientJobId", label: "Client Job ID" },
+    { id: "location", label: "Location" },
+    { id: "states", label: "States" },
+    { id: "jobStatus", label: "Job Status" },
+    { id: "priority", label: "Priority" },
+    {
+      id: "clientBillRate",
+      label: market === "IN" ? "Client Bill Rate / CTC" : "Client Bill Rate / Salary",
+    },
+    {
+      id: "payRate",
+      label: market === "IN" ? "Pay Rate / CTC" : "Pay Rate / Salary",
+    },
+    { id: "recruitmentManager", label: "Recruitment Manager" },
+    { id: "primaryRecruiter", label: "Primary Recruiter" },
+    { id: "assignedTo", label: "Assigned To" },
+    { id: "createdBy", label: "Job Posting Created By" },
+    { id: "createdOn", label: "Job Created" },
+    { id: "modifiedOn", label: "Job Modified On" },
+    { id: "submissionsCount", label: "Submissions & Pipeline" },
+  ], [market]);
 
   const handleApplyFilters = (filters: SelectedFilters) => {
     setCurrentFilters(filters);
@@ -136,7 +170,7 @@ export default function JobPostingDashboard({
 
     // Status Filter if set on route level
     if (initialStatusFilter !== "All") {
-      filtered = filtered.filter((job) => job.jobStatus === initialStatusFilter);
+      filtered = filtered.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
     }
 
     // Business Unit filter
@@ -151,7 +185,7 @@ export default function JobPostingDashboard({
       filtered = filtered.filter((job) => {
         return filters.predefined.some((pref) => {
           if (pref === "Active Jobs") return job.jobStatus === "Active";
-          if (pref === "Closed Jobs") return job.jobStatus === "Closed";
+          if (pref === "Closed Jobs") return job.jobStatus === "Closed" || job.jobStatus === "Close";
           if (pref === "My Jobs") return job.primaryRecruiter === "Sahadeb Sen";
           if (pref === "Jobs with submissions") return job.submissionsCount > 0;
           if (pref === "Jobs without submissions") return job.submissionsCount === 0;
@@ -180,7 +214,7 @@ export default function JobPostingDashboard({
     
     let baseData = [...allJobs];
     if (initialStatusFilter !== "All") {
-      baseData = baseData.filter((job) => job.jobStatus === initialStatusFilter);
+      baseData = baseData.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
     }
 
     if (viewName === "All Jobs") {
@@ -203,6 +237,15 @@ export default function JobPostingDashboard({
     }
   };
 
+  const handleUpdateJob = useCallback((jobId: string, updatedFields: Partial<Job>) => {
+    setAllJobs((prev) =>
+      prev.map((job) => (job.id === jobId ? { ...job, ...updatedFields } : job))
+    );
+    setJobsData((prev) =>
+      prev.map((job) => (job.id === jobId ? { ...job, ...updatedFields } : job))
+    );
+  }, []);
+
   const handleRefresh = () => {
     setCurrentFilters({ businessUnit: "All selected", predefined: [] });
     setActiveView("All Jobs");
@@ -214,7 +257,7 @@ export default function JobPostingDashboard({
   const stats = useMemo(() => {
     const total = jobsData.length;
     const active = jobsData.filter((j) => j.jobStatus === "Active").length;
-    const closed = jobsData.filter((j) => j.jobStatus === "Closed").length;
+    const closed = jobsData.filter((j) => j.jobStatus === "Closed" || j.jobStatus === "Close").length;
     const totalSubmissions = jobsData.reduce(
       (sum, j) => sum + j.submissionsCount,
       0
@@ -230,7 +273,7 @@ export default function JobPostingDashboard({
   return (
     <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
       {/* Recruiter Metrics KPI Strip (CEIPAL style) */}
-      <div className="flex flex-wrap items-center gap-3 shrink-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 px-4 py-1.5 rounded-sm select-none shadow-xs text-[11px] divide-x divide-neutral-200 dark:divide-slate-800">
+      <div className="w-full flex items-center justify-between shrink-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 px-6 py-1.5 rounded-sm select-none shadow-xs text-[11px]">
         {/* Total Jobs */}
         <div className="flex items-center gap-1.5">
           <Briefcase className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
@@ -238,29 +281,61 @@ export default function JobPostingDashboard({
           <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs">{stats.total}</span>
         </div>
 
+        {/* Divider */}
+        <div className="h-4 w-px bg-neutral-200 dark:bg-slate-700" />
+
         {/* Active Jobs */}
-        <div className="flex items-center gap-1.5 pl-3">
+        <div className="flex items-center gap-1.5">
           <Activity className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
           <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Active:</span>
           <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs">{stats.active}</span>
         </div>
 
+        {/* Divider */}
+        <div className="h-4 w-px bg-neutral-200 dark:bg-slate-700" />
+
         {/* Submissions */}
-        <div className="flex items-center gap-1.5 pl-3">
+        <div className="flex items-center gap-1.5">
           <Users className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
           <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Submissions:</span>
           <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs">{stats.totalSubmissions}</span>
         </div>
 
+        {/* Divider */}
+        <div className="h-4 w-px bg-neutral-200 dark:bg-slate-700" />
+
+        {/* Avg Aging */}
+        <div className="flex items-center gap-1.5">
+          <TrendingUp className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+          <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Avg Aging:</span>
+          <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs">{stats.avgAging}d</span>
+        </div>
+
+        {/* Divider */}
+        <div className="h-4 w-px bg-neutral-200 dark:bg-slate-700" />
+
+        {/* Closed */}
+        <div className="flex items-center gap-1.5">
+          <CheckCircle className="h-3.5 w-3.5 text-neutral-500 dark:text-neutral-400" />
+          <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Closed:</span>
+          <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs">{stats.closed}</span>
+        </div>
+
+        {/* Divider */}
+        <div className="h-4 w-px bg-neutral-200 dark:bg-slate-700" />
+
         {/* Placements */}
-        <div className="flex items-center gap-1.5 pl-3">
+        <div className="flex items-center gap-1.5">
           <FileCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
           <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Placements:</span>
           <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs">14</span>
         </div>
 
+        {/* Divider */}
+        <div className="h-4 w-px bg-neutral-200 dark:bg-slate-700" />
+
         {/* SLA Alerts */}
-        <div className="flex items-center gap-1.5 pl-3">
+        <div className="flex items-center gap-1.5">
           <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
           <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">SLA Alerts:</span>
           <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs flex items-center gap-1">
@@ -282,7 +357,7 @@ export default function JobPostingDashboard({
         <DataTable
           data={jobsData}
           selectedColumns={selectedColumns}
-          allColumns={ALL_COLUMNS}
+          allColumns={allColumns}
           onOpenFilters={() => setIsFilterOpen(true)}
           onOpenColumns={() => setIsColumnOpen(true)}
           onRefresh={handleRefresh}
@@ -290,6 +365,7 @@ export default function JobPostingDashboard({
           savedViews={savedViews}
           activeView={activeView}
           onSelectView={handleSelectView}
+          onUpdateJob={handleUpdateJob}
         />
       )}
 
@@ -305,7 +381,7 @@ export default function JobPostingDashboard({
       <ColumnDrawer
         isOpen={isColumnOpen}
         onClose={() => setIsColumnOpen(false)}
-        allColumns={ALL_COLUMNS}
+        allColumns={allColumns}
         selectedColumns={selectedColumns}
         onApply={(newCols) => setSelectedColumns(newCols)}
       />

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,6 +28,8 @@ import {
   Minimize2,
   Maximize2,
   Cloud,
+  Search,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +39,55 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
+
+const WORK_AUTHORIZATION_OPTIONS = [
+  "B1",
+  "Can work for any employer",
+  "Canada Authorized",
+  "Canadian",
+  "Canadian Citizen",
+  "Citizen",
+  "CPT EAD",
+  "Employment Auth. Document",
+  "Employment Authorization Document",
+  "GC",
+  "GC EAD",
+  "GC-EAD",
+  "Green Card",
+  "Green Card Holder",
+  "H EAD",
+  "H1-B",
+  "H4 EAD",
+  "H4EAD",
+  "Have H1 Visa",
+  "HB Work Permit",
+  "L1-A",
+  "L1-B",
+  "L2",
+  "L2 EAD",
+  "L2-EAD",
+  "Need H1 Visa",
+  "Need H1 Visa Sponsor",
+  "Not specified",
+  "OPT",
+  "OPT EAD",
+  "OPT-EAD",
+  "Security Clearance",
+  "TN EAD",
+  "TN Permit Holder",
+  "TN Visa",
+  "Unspecified",
+  "US Authorized",
+  "US"
+];
+
+const INDIAN_WORK_AUTHORIZATION_OPTIONS = [
+  "Indian Citizen",
+  "OCI Card Holder",
+  "Employment Visa",
+  "Work Permit (PR)",
+  "Not specified"
+];
 
 // Zod Validation Schema matching all manual form fields
 const formSchema = zod.object({
@@ -57,11 +108,11 @@ const formSchema = zod.object({
   jobStatus: zod.string(),
   client: zod.string().min(1, "Client is required"),
   clientJobId: zod.string().optional(),
-  priority: zod.enum(["High", "Medium", "Low"]),
+  priority: zod.enum(["Hot", "Warm", "Cold"]),
   additionalDetails: zod.string().optional(),
   ceipalRefNum: zod.string().optional(),
   duration: zod.string().optional(),
-  workAuthorization: zod.string().min(1, "Work Authorization is required"),
+  workAuthorization: zod.string().min(1, "At least one Work Authorization is required"),
   applicationForm: zod.string().optional(),
   placementFeePercent: zod.number().min(0).max(100).optional(),
   address: zod.string().optional(),
@@ -138,12 +189,32 @@ export default function NewJobPostingPage() {
   // WYSIWYG Editor custom HTML state / source mode state
   const [isHtmlMode, setIsHtmlMode] = useState(false);
   const [respondByType, setRespondByType] = useState("Open Until Filled");
+  const [workAuthSearch, setWorkAuthSearch] = useState("");
+  const [isWorkAuthOpen, setIsWorkAuthOpen] = useState(false);
+  const workAuthDropdownRef = useRef<HTMLDivElement>(null);
+  
+  const [market, setMarket] = useState<"US" | "IN">("US");
+  const currentWorkAuthOptions = market === "IN" ? INDIAN_WORK_AUTHORIZATION_OPTIONS : WORK_AUTHORIZATION_OPTIONS;
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        workAuthDropdownRef.current &&
+        !workAuthDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsWorkAuthOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // React Hook Form setup
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors, isDirty },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -155,8 +226,8 @@ export default function NewJobPostingPage() {
       remoteJob: "Hybrid",
       hoursPerWeek: 40,
       jobStatus: "Active",
-      priority: "Medium",
-      workAuthorization: "US Citizen / Green Card",
+      priority: "Warm",
+      workAuthorization: "US Authorized",
       taxTerms: "C2C",
       expMin: 3,
       expMax: 8,
@@ -167,6 +238,44 @@ export default function NewJobPostingPage() {
       jobDescription: "",
     },
   });
+
+  useEffect(() => {
+    async function fetchProfile() {
+      try {
+        const prof = await atsApi.auth.me();
+        if (prof && prof.defaultMarket) {
+          const m = prof.defaultMarket as "US" | "IN";
+          setMarket(m);
+          
+          // Dynamically set defaults for the form depending on the market
+          if (m === "IN") {
+            setValue("country", "India");
+            setValue("states", "Karnataka");
+            setValue("workAuthorization", "Indian Citizen");
+            setValue("taxTerms", "Permanent");
+          } else {
+            setValue("country", "United States");
+            setValue("states", "Texas");
+            setValue("workAuthorization", "US Authorized");
+            setValue("taxTerms", "C2C");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load user profile:", err);
+      }
+    }
+    fetchProfile();
+  }, [setValue]);
+
+  const getSelectedDisplayText = () => {
+    const selected = watch("workAuthorization") || "";
+    const list = selected.split(", ").filter(Boolean);
+    const currentOptions = market === "IN" ? INDIAN_WORK_AUTHORIZATION_OPTIONS : WORK_AUTHORIZATION_OPTIONS;
+    if (list.length === 0) return "Select Work Authorization...";
+    if (list.length === 1) return list[0];
+    if (list.length === currentOptions.length) return "All Selected";
+    return `${list[0]} (+${list.length - 1} others)`;
+  };
 
   // Autocomplete auto-save simulation
   useEffect(() => {
@@ -318,7 +427,10 @@ export default function NewJobPostingPage() {
             [sectionKey]: !isCollapsed,
           })
         }
-        className="flex items-center justify-between bg-neutral-100 dark:bg-slate-800/80 px-4 py-2 cursor-pointer select-none hover:bg-neutral-200 dark:hover:bg-slate-700/80 border-y border-neutral-200 dark:border-slate-800 first:border-t-0 font-sans transition-colors"
+        className={cn(
+          "flex items-center justify-between bg-neutral-100 dark:bg-slate-800/80 px-4 py-2 cursor-pointer select-none hover:bg-neutral-200 dark:hover:bg-slate-700/80 border-y border-neutral-200 dark:border-slate-800 first:border-t-0 first:rounded-t-lg font-sans transition-colors",
+          isCollapsed && "rounded-b-lg border-b-0"
+        )}
       >
         <span className="text-[10px] font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
           {title}
@@ -506,7 +618,7 @@ export default function NewJobPostingPage() {
                   New Job Requirement Form
                 </h2>
                 <p className="text-[10px] text-neutral-500 font-semibold mt-0.5">
-                  Enfycon US IT Recruitment Workspace
+                  {market === "IN" ? "Enfycon India IT Recruitment Workspace" : "Enfycon US IT Recruitment Workspace"}
                 </p>
               </div>
             </div>
@@ -557,7 +669,7 @@ export default function NewJobPostingPage() {
               )}
 
               {/* -------------------- BUSINESS INFORMATION -------------------- */}
-              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
                 <SectionHeader title="Business Information" sectionKey="businessInfo" />
                 {!collapsedSections.businessInfo && (
                   <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
@@ -623,25 +735,64 @@ export default function NewJobPostingPage() {
                       </div>
                       <div className="flex gap-1 items-center">
                         <select className="w-16 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0">
-                          <option value="USD">USD</option>
-                          <option value="CAD">CAD</option>
-                          <option value="GBP">GBP</option>
+                          {market === "IN" ? (
+                            <>
+                              <option value="INR">INR</option>
+                              <option value="USD">USD</option>
+                            </>
+                          ) : (
+                            <>
+                              <option value="USD">USD</option>
+                              <option value="CAD">CAD</option>
+                            </>
+                          )}
                         </select>
                         <Input
                           type="text"
                           {...register("clientBillRate")}
-                          className="h-8 text-xs bg-white dark:bg-slate-950 border-neutral-300 dark:border-slate-700"
+                          className="h-8 w-24 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700"
                           placeholder="Rate"
                         />
-                        <select className="w-20 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0">
-                          <option value="Hour">Hour</option>
-                          <option value="Day">Day</option>
-                          <option value="Year">Year</option>
+                        <select className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0">
+                          {market === "IN" ? (
+                            <>
+                              <option value="LPA">LPA</option>
+                              <option value="Monthly">Monthly</option>
+                              <option value="Hourly">Hourly</option>
+                            </>
+                          ) : (
+                            <>
+                              <option value="Hourly">Hourly</option>
+                              <option value="Daily">Daily</option>
+                              <option value="Weekly">Weekly</option>
+                              <option value="Bi-Weekly">Bi-Weekly</option>
+                              <option value="Monthly">Monthly</option>
+                              <option value="Yearly">Yearly</option>
+                            </>
+                          )}
                         </select>
-                        <select className="w-20 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0">
-                          <option value="C2C">C2C</option>
-                          <option value="W2">W2</option>
-                          <option value="1099">1099</option>
+                        <select className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0">
+                          {market === "IN" ? (
+                            <>
+                              <option value="Permanent">Permanent</option>
+                              <option value="Contract">Contract</option>
+                              <option value="C2H">C2H</option>
+                              <option value="Freelance">Freelance</option>
+                            </>
+                          ) : (
+                            <>
+                              <option value="W-2">W-2</option>
+                              <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
+                              <option value="C2C">C2C</option>
+                              <option value="1099">1099</option>
+                              <option value="C2H">C2H</option>
+                              <option value="Full Time">Full Time</option>
+                              <option value="Part Time">Part Time</option>
+                              <option value="Intern">Intern</option>
+                              <option value="Seasonal">Seasonal</option>
+                              <option value="Other">Other</option>
+                            </>
+                          )}
                         </select>
                       </div>
                       {errors.clientBillRate && (
@@ -656,26 +807,66 @@ export default function NewJobPostingPage() {
                         <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Pay rate information">?</span>
                       </div>
                       <div className="flex gap-1 items-center">
-                        <select className="w-16 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0">
-                          <option value="USD">USD</option>
-                          <option value="CAD">CAD</option>
-                          <option value="GBP">GBP</option>
+                        <select className="w-16 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0">
+                          {market === "IN" ? (
+                            <>
+                              <option value="INR">INR</option>
+                              <option value="USD">USD</option>
+                            </>
+                          ) : (
+                            <>
+                              <option value="USD">USD</option>
+                              <option value="CAD">CAD</option>
+                              <option value="GBP">GBP</option>
+                            </>
+                          )}
                         </select>
                         <input
                           type="text"
                           {...register("payRate")}
-                          className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
+                          className="h-8 w-24 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
                           placeholder="Pay Rate"
                         />
-                        <select className="w-20 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0">
-                          <option value="Hour">Hour</option>
-                          <option value="Day">Day</option>
-                          <option value="Year">Year</option>
+                        <select className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0">
+                          {market === "IN" ? (
+                            <>
+                              <option value="LPA">LPA</option>
+                              <option value="Monthly">Monthly</option>
+                              <option value="Hourly">Hourly</option>
+                            </>
+                          ) : (
+                            <>
+                              <option value="Hourly">Hourly</option>
+                              <option value="Daily">Daily</option>
+                              <option value="Weekly">Weekly</option>
+                              <option value="Bi-Weekly">Bi-Weekly</option>
+                              <option value="Monthly">Monthly</option>
+                              <option value="Yearly">Yearly</option>
+                            </>
+                          )}
                         </select>
-                        <select className="w-20 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0">
-                          <option value="C2C">C2C</option>
-                          <option value="W2">W2</option>
-                          <option value="1099">1099</option>
+                        <select className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0">
+                          {market === "IN" ? (
+                            <>
+                              <option value="Permanent">Permanent</option>
+                              <option value="Contract">Contract</option>
+                              <option value="C2H">C2H</option>
+                              <option value="Freelance">Freelance</option>
+                            </>
+                          ) : (
+                            <>
+                              <option value="W-2">W-2</option>
+                              <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
+                              <option value="C2C">C2C</option>
+                              <option value="1099">1099</option>
+                              <option value="C2H">C2H</option>
+                              <option value="Full Time">Full Time</option>
+                              <option value="Part Time">Part Time</option>
+                              <option value="Intern">Intern</option>
+                              <option value="Seasonal">Seasonal</option>
+                              <option value="Other">Other</option>
+                            </>
+                          )}
                         </select>
                       </div>
                       {errors.payRate && (
@@ -733,11 +924,20 @@ export default function NewJobPostingPage() {
                       <label className="font-bold text-neutral-700 dark:text-neutral-300">Country *</label>
                       <select
                         {...register("country")}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
                       >
-                        <option value="United States">United States</option>
-                        <option value="Canada">Canada</option>
-                        <option value="United Kingdom">United Kingdom</option>
+                        {market === "IN" ? (
+                          <>
+                            <option value="India">India</option>
+                            <option value="United States">United States</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="United States">United States</option>
+                            <option value="Canada">Canada</option>
+                            <option value="United Kingdom">United Kingdom</option>
+                          </>
+                        )}
                       </select>
                     </div>
 
@@ -746,27 +946,62 @@ export default function NewJobPostingPage() {
                       <label className="font-bold text-neutral-700 dark:text-neutral-300">States *</label>
                       <select
                         {...register("states")}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
                       >
-                        <option value="Texas">Texas</option>
-                        <option value="California">California</option>
-                        <option value="New York">New York</option>
-                        <option value="New Jersey">New Jersey</option>
-                        <option value="Georgia">Georgia</option>
+                        {market === "IN" ? (
+                          <>
+                            <option value="Karnataka">Karnataka (Bengaluru)</option>
+                            <option value="Maharashtra">Maharashtra (Mumbai/Pune)</option>
+                            <option value="Telangana">Telangana (Hyderabad)</option>
+                            <option value="Tamil Nadu">Tamil Nadu (Chennai)</option>
+                            <option value="Delhi NCR">Delhi NCR (Noida/Gurgaon)</option>
+                            <option value="Haryana">Haryana</option>
+                            <option value="Gujarat">Gujarat</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="Texas">Texas</option>
+                            <option value="California">California</option>
+                            <option value="New York">New York</option>
+                            <option value="New Jersey">New Jersey</option>
+                            <option value="Georgia">Georgia</option>
+                          </>
+                        )}
                       </select>
                     </div>
 
                     {/* Remote Job */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Remote Job</label>
-                      <select
-                        {...register("remoteJob")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                      >
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                        <option value="Hybrid">Hybrid</option>
-                      </select>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Remote Job *</label>
+                      <div className="flex items-center gap-4 h-8 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            value="Yes"
+                            {...register("remoteJob")}
+                            className="w-3.5 h-3.5 text-primary focus:ring-primary border-neutral-300 dark:border-slate-700 cursor-pointer"
+                          />
+                          Yes
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            value="No"
+                            {...register("remoteJob")}
+                            className="w-3.5 h-3.5 text-primary focus:ring-primary border-neutral-300 dark:border-slate-700 cursor-pointer"
+                          />
+                          No
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            value="Hybrid"
+                            {...register("remoteJob")}
+                            className="w-3.5 h-3.5 text-primary focus:ring-primary border-neutral-300 dark:border-slate-700 cursor-pointer"
+                          />
+                          Hybrid
+                        </label>
+                      </div>
                     </div>
 
                     {/* Required Hours/Week */}
@@ -778,8 +1013,6 @@ export default function NewJobPostingPage() {
                         className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
                       />
                     </div>
-
-                    {/* Job Status */}
                     <div className="space-y-1">
                       <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Status</label>
                       <select
@@ -787,8 +1020,9 @@ export default function NewJobPostingPage() {
                         className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-green-700 dark:text-green-400 font-bold cursor-pointer"
                       >
                         <option value="Active">Active</option>
-                        <option value="Closed">Closed</option>
-                        <option value="Hold">Hold</option>
+                        <option value="Close">Close</option>
+                        <option value="Filled">Filled</option>
+                        <option value="Hold by Client">Hold by Client</option>
                       </select>
                     </div>
 
@@ -816,7 +1050,7 @@ export default function NewJobPostingPage() {
                       <input
                         type="text"
                         {...register("clientJobId")}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
+                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
                         placeholder="e.g. REQ-9941"
                       />
                     </div>
@@ -828,24 +1062,196 @@ export default function NewJobPostingPage() {
                         {...register("priority")}
                         className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 cursor-pointer"
                       >
-                        <option value="High">High</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Low">Low</option>
+                        <option value="Hot">Hot</option>
+                        <option value="Warm">Warm</option>
+                        <option value="Cold">Cold</option>
                       </select>
                     </div>
 
                     {/* Work Auth */}
-                    <div className="space-y-1">
+                    <div className="space-y-1 relative" ref={workAuthDropdownRef}>
                       <label className="font-bold text-neutral-700 dark:text-neutral-300">Work Authorization *</label>
-                      <select
-                        {...register("workAuthorization")}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                      
+                      {/* Trigger Input (styled like standard select field) */}
+                      <div
+                        onClick={() => setIsWorkAuthOpen(!isWorkAuthOpen)}
+                        className={cn(
+                          "w-full bg-white dark:bg-slate-955 border rounded px-2.5 py-1 text-xs text-neutral-800 dark:text-neutral-200 flex items-center justify-between cursor-pointer select-none transition-colors min-h-[32px]",
+                          isWorkAuthOpen
+                            ? "border-primary ring-1 ring-primary/20"
+                            : "border-neutral-300 dark:border-slate-700 hover:border-neutral-400 dark:hover:border-slate-600"
+                        )}
                       >
-                        <option value="US Citizen / Green Card">US Citizen / Green Card</option>
-                        <option value="US Citizen / GC / H1B">US Citizen / GC / H1B</option>
-                        <option value="H1B / EAD / OPT">H1B / EAD / OPT</option>
-                        <option value="All authorized to work">All authorized to work</option>
-                      </select>
+                        <div className="flex flex-wrap gap-1 items-center max-w-[88%] py-0.5">
+                          {(() => {
+                            const selected = watch("workAuthorization") || "";
+                            const list = selected.split(", ").filter(Boolean);
+                            if (list.length === 0) {
+                              return <span className="text-neutral-400 dark:text-slate-500 font-medium">Select Work Authorization...</span>;
+                            }
+                            if (list.length === currentWorkAuthOptions.length) {
+                              return (
+                                <span className="font-bold text-primary dark:text-blue-400 bg-primary/10 dark:bg-primary/20 px-1.5 py-0.5 rounded text-[10px]">
+                                  All Selected
+                                </span>
+                              );
+                            }
+                            
+                            const limit = 2;
+                            const visibleItems = list.slice(0, limit);
+                            const hiddenCount = list.length - limit;
+                            
+                            return (
+                              <>
+                                {visibleItems.map((opt) => (
+                                  <span
+                                    key={opt}
+                                    className="bg-neutral-100 dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 text-neutral-800 dark:text-neutral-200 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-neutral-200 dark:hover:bg-slate-700 transition-colors"
+                                  >
+                                    {opt}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const newList = list.filter((item) => item !== opt).join(", ");
+                                        setValue("workAuthorization", newList, { shouldDirty: true });
+                                      }}
+                                      className="text-neutral-400 hover:text-red-500 dark:hover:text-red-400 font-bold ml-0.5 rounded-full p-0.5 hover:bg-neutral-300/35"
+                                    >
+                                      <X className="h-2.5 w-2.5" />
+                                    </button>
+                                  </span>
+                                ))}
+                                {hiddenCount > 0 && (
+                                  <span className="bg-primary/15 dark:bg-primary/25 text-primary dark:text-blue-400 border border-primary/20 text-[10px] font-extrabold px-1.5 py-0.5 rounded">
+                                    +{hiddenCount} more
+                                  </span>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                        
+                        <div className="flex items-center gap-1 text-neutral-400 dark:text-slate-500 shrink-0">
+                          {((watch("workAuthorization") || "").split(", ").filter(Boolean).length > 0) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setValue("workAuthorization", "", { shouldDirty: true });
+                              }}
+                              className="p-0.5 rounded-full hover:bg-neutral-100 dark:hover:bg-slate-800 hover:text-red-500 transition-colors"
+                              title="Clear all selections"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </div>
+                      </div>
+
+                      {/* Dropdown Overlay Container */}
+                      {isWorkAuthOpen && (
+                        <div className="absolute left-0 right-0 z-30 mt-1 bg-white dark:bg-slate-900 border border-neutral-250 dark:border-slate-800 rounded-md shadow-xl p-2.5 space-y-2">
+                          <div className="relative flex items-center">
+                            <input
+                              type="text"
+                              placeholder="Search Auth..."
+                              value={workAuthSearch}
+                              onChange={(e) => setWorkAuthSearch(e.target.value)}
+                              className="w-full bg-neutral-50 dark:bg-slate-955 border border-neutral-200 dark:border-slate-800 rounded pl-7 pr-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-855 dark:text-neutral-200"
+                              autoFocus
+                            />
+                            <Search className="absolute left-2.5 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
+                          </div>
+                          
+                          <div className="w-full max-h-60 overflow-y-auto space-y-1.5 text-xs select-none pr-1 scrollbar-thin">
+                            {/* Select All Checkbox */}
+                            {workAuthSearch === "" && (
+                              <label className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800/60 rounded-md cursor-pointer font-bold text-neutral-700 dark:text-neutral-300 transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    (watch("workAuthorization") || "").split(", ").filter(Boolean).length === currentWorkAuthOptions.length
+                                  }
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setValue("workAuthorization", currentWorkAuthOptions.join(", "), { shouldDirty: true });
+                                    } else {
+                                      setValue("workAuthorization", "", { shouldDirty: true });
+                                    }
+                                  }}
+                                  className="sr-only"
+                                />
+                                <div className={cn(
+                                  "h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0",
+                                  (watch("workAuthorization") || "").split(", ").filter(Boolean).length === currentWorkAuthOptions.length
+                                    ? "bg-primary border-primary text-white"
+                                    : "border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-955"
+                                )}>
+                                  {((watch("workAuthorization") || "").split(", ").filter(Boolean).length === currentWorkAuthOptions.length) && (
+                                    <Check className="h-3 w-3 stroke-[3]" />
+                                  )}
+                                </div>
+                                <span>[Select all]</span>
+                              </label>
+                            )}
+                            
+                            {/* Option Checkboxes */}
+                            {currentWorkAuthOptions.filter((opt) =>
+                              opt.toLowerCase().includes(workAuthSearch.toLowerCase())
+                            ).map((opt) => {
+                              const selectedList = (watch("workAuthorization") || "").split(", ").filter(Boolean);
+                              const isSelected = selectedList.includes(opt);
+                              return (
+                                <label
+                                  key={opt}
+                                  className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800/60 rounded-md cursor-pointer font-medium text-neutral-700 dark:text-neutral-300 transition-colors"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      let newList;
+                                      if (e.target.checked) {
+                                        newList = (current: string) => {
+                                          const currentList = current ? current.split(", ").filter(Boolean) : [];
+                                          return [...currentList.filter((x) => x !== opt), opt].join(", ");
+                                        };
+                                      } else {
+                                        newList = (current: string) => {
+                                          const currentList = current ? current.split(", ").filter(Boolean) : [];
+                                          return currentList.filter((item) => item !== opt).join(", ");
+                                        };
+                                      }
+                                      const currentVal = watch("workAuthorization") || "";
+                                      setValue("workAuthorization", newList(currentVal), { shouldDirty: true });
+                                    }}
+                                    className="sr-only"
+                                  />
+                                  <div className={cn(
+                                    "h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0",
+                                    isSelected
+                                      ? "bg-primary border-primary text-white"
+                                      : "border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-955"
+                                  )}>
+                                    {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
+                                  </div>
+                                  <span className={cn(
+                                    "truncate transition-colors text-xs",
+                                    isSelected ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-700 dark:text-neutral-300"
+                                  )}>
+                                    {opt}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {errors.workAuthorization && (
+                        <p className="text-[10px] text-red-655 font-bold">{errors.workAuthorization.message}</p>
+                      )}
                     </div>
 
                     {/* Tax Terms */}
@@ -853,11 +1259,29 @@ export default function NewJobPostingPage() {
                       <label className="font-bold text-neutral-700 dark:text-neutral-300">Tax Terms *</label>
                       <select
                         {...register("taxTerms")}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
                       >
-                        <option value="C2C">C2C</option>
-                        <option value="W2">W2</option>
-                        <option value="1099">1099</option>
+                        {market === "IN" ? (
+                          <>
+                            <option value="Permanent">Permanent</option>
+                            <option value="Contract">Contract</option>
+                            <option value="C2H">C2H (Contract-to-Hire)</option>
+                            <option value="Freelance">Freelance</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="W-2">W-2</option>
+                            <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
+                            <option value="C2C">C2C</option>
+                            <option value="1099">1099</option>
+                            <option value="C2H">C2H</option>
+                            <option value="Full Time">Full Time</option>
+                            <option value="Part Time">Part Time</option>
+                            <option value="Intern">Intern</option>
+                            <option value="Seasonal">Seasonal</option>
+                            <option value="Other">Other</option>
+                          </>
+                        )}
                       </select>
                     </div>
 
@@ -876,7 +1300,7 @@ export default function NewJobPostingPage() {
               </div>
 
               {/* -------------------- SKILLS SECTION -------------------- */}
-              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
                 <SectionHeader title="Skills" sectionKey="skills" />
                 {!collapsedSections.skills && (
                   <div className="p-4 space-y-4 text-xs">
@@ -991,7 +1415,7 @@ export default function NewJobPostingPage() {
               </div>
 
               {/* -------------------- ORGANIZATIONAL INFORMATION -------------------- */}
-              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
                 <SectionHeader title="Organizational Information" sectionKey="orgInfo" />
                 {!collapsedSections.orgInfo && (
                   <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
@@ -1044,7 +1468,7 @@ export default function NewJobPostingPage() {
               </div>
 
               {/* -------------------- JOB DESCRIPTION -------------------- */}
-              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
                 <SectionHeader title="Job Description & Editor" sectionKey="jobDescription" />
                 {!collapsedSections.jobDescription && (
                   <div className="p-4 space-y-3">
@@ -1120,7 +1544,7 @@ export default function NewJobPostingPage() {
               </div>
 
               {/* -------------------- CAREER PORTAL SETTINGS -------------------- */}
-              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
                 <SectionHeader title="Career Portal Settings" sectionKey="portalSettings" />
                 {!collapsedSections.portalSettings && (
                   <div className="p-4 space-y-3 text-xs select-none">
@@ -1146,7 +1570,7 @@ export default function NewJobPostingPage() {
               </div>
 
               {/* -------------------- DOCUMENTS -------------------- */}
-              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
                 <SectionHeader title="Documents & Templates" sectionKey="documents" />
                 {!collapsedSections.documents && (
                   <div className="p-4 space-y-4 text-xs">

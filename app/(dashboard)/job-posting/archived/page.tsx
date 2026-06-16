@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function ArchivedJobsPage() {
-  return <JobPostingDashboard initialStatusFilter="Closed" />;
+  return <JobPostingDashboard initialStatusFilter="Close" />;
 }

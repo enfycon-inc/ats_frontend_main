@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown,
@@ -23,6 +23,7 @@ import {
   ChevronRight,
   RefreshCw,
   FolderPlus,
+  Pencil,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { atsApi } from "@/lib/ats-api";
 import { Job } from "../data/mock-jobs";
 
 interface DataTableProps {
@@ -46,6 +48,7 @@ interface DataTableProps {
   savedViews: string[];
   activeView: string;
   onSelectView: (viewName: string) => void;
+  onUpdateJob?: (jobId: string, updatedFields: Partial<Job>) => void;
 }
 
 export default function DataTable({
@@ -59,6 +62,7 @@ export default function DataTable({
   savedViews,
   activeView,
   onSelectView,
+  onUpdateJob,
 }: DataTableProps) {
   const router = useRouter();
   
@@ -81,9 +85,14 @@ export default function DataTable({
   const [newViewName, setNewViewName] = useState("");
   const [isSavingView, setIsSavingView] = useState(false);
 
-  // Row edit state
-  const [editingRowId, setEditingRowId] = useState<string | null>(null);
-  const [editFields, setEditFields] = useState<{ [key: string]: string }>({});
+  // Cell-level inline edit state
+  const [editingCell, setEditingCell] = useState<{ rowId: string; colId: string } | null>(null);
+  const [editCellValue, setEditCellValue] = useState<string>("");
+
+  // Columns editable via double-click text input
+  const EDITABLE_TEXT_COLS = ["jobTitle", "client", "location", "states", "clientBillRate", "payRate", "recruitmentManager"];
+  // Columns editable via inline select
+  const PRIORITY_OPTIONS = ["Hot", "Urgent", "High", "Warm", "Medium", "Low"];
 
   // Context Menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -91,6 +100,94 @@ export default function DataTable({
     y: number;
     jobId: string;
   } | null>(null);
+
+  // Job Status Modal States
+  const [statusModalJob, setStatusModalJob] = useState<Job | null>(null);
+  const [statusModalValue, setStatusModalValue] = useState("");
+  const [statusModalComment, setStatusModalComment] = useState("");
+
+  // Assigned To / Primary Recruiter Modal States
+  const [assignModalJob, setAssignModalJob] = useState<Job | null>(null);
+  const [assignModalType, setAssignModalType] = useState<"assignedTo" | "primaryRecruiter">("assignedTo");
+  const [assignModalSearch, setAssignModalSearch] = useState("");
+  const [assignModalSelected, setAssignModalSelected] = useState<string[]>([]);
+  const [assignModalComment, setAssignModalComment] = useState("");
+  const [assignActiveTab, setAssignActiveTab] = useState<"users" | "teams">("users");
+
+  // Users List State
+  const [usersList, setUsersList] = useState<any[]>([]);
+
+  // Load users list for assignedTo selection on mount
+  useEffect(() => {
+    async function loadUsers() {
+      try {
+        const users = await atsApi.auth.listUsers();
+        if (users && users.length > 0) {
+          setUsersList(users);
+        } else {
+          throw new Error("No users found");
+        }
+      } catch (err) {
+        console.warn("[DataTable] Failed to fetch users, using mock users:", err);
+        setUsersList([
+          { id: "u1", fullName: "Abhinav Mohanty", email: "abhinav.m@enfycon.com" },
+          { id: "u2", fullName: "Abhishek Bohidar", email: "abhishek@enfycon.com" },
+          { id: "u3", fullName: "Arijit Kar", email: "arijit.k@enfycon.com" },
+          { id: "u4", fullName: "Ashutosh Dash", email: "ashutosh@enfycon.com" },
+          { id: "u5", fullName: "Baljayanti Sahoo", email: "bj@enfycon.com" },
+          { id: "u6", fullName: "Bhavani Shankar", email: "bhavani@enfycon.com" },
+          { id: "u7", fullName: "Bighnesh Mohapatra", email: "bighnesh@enfycon.com" },
+          { id: "u8", fullName: "Debashish Samal", email: "debashish.s@enfycon.com" },
+          { id: "u9", fullName: "Debidutta Dash", email: "debidutta@enfycon.com" },
+          { id: "u10", fullName: "Deeptimeyee Nayak", email: "deeptimeyee@enfycon.com" },
+          { id: "u11", fullName: "Dibyaranjan Sahoo", email: "dibya@enfycon.com" },
+          { id: "u12", fullName: "Haraprasad Tripathy", email: "haraprasad@enfycon.com" },
+          { id: "u13", fullName: "Janaki Bhoi", email: "janaki@enfycon.com" }
+        ]);
+      }
+    }
+    loadUsers();
+  }, []);
+
+  const openStatusModal = (job: Job) => {
+    setStatusModalJob(job);
+    setStatusModalValue(job.jobStatus);
+    setStatusModalComment("");
+  };
+
+  const handleStatusUpdate = () => {
+    if (statusModalJob && onUpdateJob) {
+      onUpdateJob(statusModalJob.id, { jobStatus: statusModalValue as any });
+      console.log(`Status comment for ${statusModalJob.jobCode}: ${statusModalComment}`);
+    }
+    setStatusModalJob(null);
+  };
+
+  const openAssignModal = (job: Job, type: "assignedTo" | "primaryRecruiter") => {
+    setAssignModalJob(job);
+    setAssignModalType(type);
+    setAssignModalSearch("");
+    setAssignModalComment("");
+    setAssignActiveTab("users");
+
+    const currentValue = String(job[type] || "");
+    if (currentValue && currentValue !== "N/A") {
+      setAssignModalSelected(currentValue.split(", ").map(x => x.trim()));
+    } else {
+      setAssignModalSelected([]);
+    }
+  };
+
+  const handleAssignSave = () => {
+    if (assignModalJob && onUpdateJob) {
+      const newValue = assignModalSelected.length > 0 ? assignModalSelected.join(", ") : "N/A";
+      onUpdateJob(assignModalJob.id, { [assignModalType]: newValue });
+      console.log(`Assign comment for ${assignModalJob.jobCode}: ${assignModalComment}`);
+    }
+    setAssignModalJob(null);
+  };
+
+  const mockTeams = ["Recruitment Team A", "Recruitment Team B", "Delivery Team", "Sourcing Team"];
 
   // Handle Sort
   const handleSort = (column: keyof Job) => {
@@ -228,25 +325,31 @@ export default function DataTable({
     document.body.removeChild(link);
   };
 
-  // Inline Edit
-  const startInlineEdit = (job: Job) => {
-    setEditingRowId(job.id);
-    setEditFields({
-      jobTitle: job.jobTitle,
-      client: job.client,
-      location: job.location,
-    });
+  // Cell-level double-click edit handlers
+  const handleCellDoubleClick = (rowId: string, colId: string, currentValue: string) => {
+    if (EDITABLE_TEXT_COLS.includes(colId) || colId === "priority") {
+      setEditingCell({ rowId, colId });
+      setEditCellValue(currentValue === "N/A" ? "" : currentValue);
+    }
   };
 
-  const saveInlineEdit = (jobId: string) => {
-    const jobIndex = data.findIndex((j) => j.id === jobId);
-    if (jobIndex > -1) {
-      data[jobIndex] = {
-        ...data[jobIndex],
-        ...editFields,
-      } as Job;
+  const handleCellSave = () => {
+    if (editingCell && onUpdateJob) {
+      onUpdateJob(editingCell.rowId, { [editingCell.colId]: editCellValue || "N/A" } as Partial<Job>);
     }
-    setEditingRowId(null);
+    setEditingCell(null);
+    setEditCellValue("");
+  };
+
+  const handleCellCancel = () => {
+    setEditingCell(null);
+    setEditCellValue("");
+  };
+
+  // Also keep Quick Edit from dropdown - focuses jobTitle cell
+  const startQuickEdit = (job: Job) => {
+    setEditingCell({ rowId: job.id, colId: "jobTitle" });
+    setEditCellValue(job.jobTitle);
   };
 
   return (
@@ -364,10 +467,10 @@ export default function DataTable({
       <div className="flex-1 overflow-auto relative min-h-0 bg-neutral-50/20 dark:bg-slate-950/10">
         <table className="w-full border-collapse text-left table-auto border-neutral-200 dark:border-slate-800">
           {/* Table Header */}
-          <thead className="sticky top-0 z-10 bg-neutral-100 dark:bg-slate-800 border-b border-neutral-200 dark:border-slate-700 shadow-xs select-none">
+          <thead className="sticky top-0 z-10 bg-blue-50 dark:bg-slate-800 border-b border-neutral-200 dark:border-slate-700 shadow-xs select-none">
             <tr>
-              {/* Checkbox Header */}
-              <th className="w-8 p-1 text-center bg-neutral-100 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700">
+              {/* Checkbox Header (Sticky Left) */}
+              <th className="sticky left-0 z-20 w-[36px] min-w-[36px] p-1 text-center bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700">
                 <input
                   type="checkbox"
                   checked={
@@ -386,7 +489,7 @@ export default function DataTable({
                 return (
                   <th
                     key={colId}
-                    className="p-1.5 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 hover:bg-neutral-200 dark:hover:bg-slate-750 transition-colors cursor-pointer relative whitespace-nowrap"
+                    className="p-1.5 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 hover:bg-blue-100 dark:hover:bg-slate-750 transition-colors cursor-pointer relative whitespace-nowrap"
                     onClick={() => handleSort(colId as keyof Job)}
                   >
                     <div className="flex items-center justify-between gap-1 pr-3">
@@ -406,7 +509,11 @@ export default function DataTable({
                   </th>
                 );
               })}
-              <th className="w-10 bg-neutral-100 dark:bg-slate-800 border-b border-neutral-250 dark:border-slate-700"></th>
+
+              {/* Actions Header (Sticky Right) */}
+              <th className="sticky right-0 z-20 w-[56px] min-w-[56px] p-1 text-center bg-blue-50 dark:bg-slate-800 border-l border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] font-bold text-neutral-700 dark:text-neutral-200">
+                Action
+              </th>
             </tr>
           </thead>
 
@@ -424,19 +531,30 @@ export default function DataTable({
             ) : (
               paginatedData.map((job, idx) => {
                 const isSelected = selectedRowIds.includes(job.id);
-                const isEditing = editingRowId === job.id;
+                const isRowEditing = editingCell?.rowId === job.id;
                 return (
                   <tr
                     key={job.id}
                     onContextMenu={(e) => handleContextMenu(e, job.id)}
                     className={cn(
-                      "hover:bg-primary/5 dark:hover:bg-primary/5 transition-colors cursor-default bg-white dark:bg-slate-900 border-b border-neutral-150 dark:border-slate-800/60",
-                      idx % 2 === 1 ? "bg-neutral-50/20 dark:bg-slate-900/10" : "",
-                      isSelected ? "bg-primary/10 hover:bg-primary/10 dark:bg-primary/15 dark:hover:bg-primary/15" : ""
+                      "group transition-colors cursor-default border-b border-neutral-200 dark:border-slate-800/80",
+                      isSelected
+                        ? "bg-primary/10 hover:bg-primary/10 dark:bg-primary/15 dark:hover:bg-primary/15"
+                        : idx % 2 === 0
+                        ? "bg-white dark:bg-slate-900 hover:bg-blue-50/40 dark:hover:bg-slate-800/60"
+                        : "bg-slate-50 dark:bg-slate-800/40 hover:bg-blue-50/40 dark:hover:bg-slate-800/60",
+                      isRowEditing ? "ring-1 ring-inset ring-primary/30" : ""
                     )}
                   >
-                    {/* Checkbox */}
-                    <td className="p-1 text-center border-r border-neutral-200 dark:border-slate-800">
+                    {/* Checkbox (Sticky Left) */}
+                    <td className={cn(
+                      "sticky left-0 z-10 w-[36px] min-w-[36px] p-1.5 text-center border-r border-neutral-200 dark:border-slate-800 transition-colors duration-150",
+                      isSelected
+                        ? "bg-blue-50/95 dark:bg-blue-950/95"
+                        : idx % 2 === 0
+                        ? "bg-white dark:bg-slate-900 group-hover:bg-blue-50/40 dark:group-hover:bg-slate-800/60"
+                        : "bg-slate-50 dark:bg-slate-800/40 group-hover:bg-blue-50/40 dark:group-hover:bg-slate-800/60"
+                    )}>
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -447,34 +565,86 @@ export default function DataTable({
 
                     {/* Columns */}
                     {selectedColumns.map((colId) => {
+                      const isCellEditing = editingCell?.rowId === job.id && editingCell?.colId === colId;
+                      const isEditable = EDITABLE_TEXT_COLS.includes(colId) || colId === "priority";
+                      const rawValue = String(job[colId as keyof Job] || "");
                       return (
-                        <td key={colId} className="py-1 px-1.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap font-normal text-neutral-800 dark:text-neutral-200">
-                          {isEditing && ["jobTitle", "client", "location"].includes(colId) ? (
-                            <input
-                              type="text"
-                              value={editFields[colId]}
-                              onChange={(e) =>
-                                setEditFields({ ...editFields, [colId]: e.target.value })
-                              }
-                              className="w-full bg-white dark:bg-slate-955 border border-primary rounded-xs px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-primary outline-hidden"
+                        <td
+                          key={colId}
+                          onDoubleClick={() => isEditable && handleCellDoubleClick(job.id, colId, rawValue)}
+                          className={cn(
+                            "py-2 px-2 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap font-normal text-neutral-800 dark:text-neutral-200 transition-colors",
+                            isEditable && !isCellEditing ? "hover:bg-yellow-50/60 dark:hover:bg-yellow-950/10 cursor-cell" : "",
+                            isCellEditing ? "p-0 bg-blue-50/40 dark:bg-blue-950/20" : ""
+                          )}
+                          title={isEditable && !isCellEditing ? "Double-click to edit" : undefined}
+                        >
+                          {/* === INLINE EDIT MODE === */}
+                          {isCellEditing && colId === "priority" ? (
+                            <select
+                              autoFocus
+                              value={editCellValue}
+                              onChange={(e) => setEditCellValue(e.target.value)}
+                              onBlur={handleCellSave}
+                              onKeyDown={(e) => { if (e.key === "Enter") handleCellSave(); if (e.key === "Escape") handleCellCancel(); }}
                               onClick={(e) => e.stopPropagation()}
+                              className="w-full h-full px-1.5 py-1 text-xs bg-white dark:bg-slate-900 border-0 outline-none focus:ring-2 focus:ring-primary rounded-none text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                            >
+                              {PRIORITY_OPTIONS.map((opt) => (
+                                <option key={opt} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          ) : isCellEditing ? (
+                            <input
+                              autoFocus
+                              type="text"
+                              value={editCellValue}
+                              onChange={(e) => setEditCellValue(e.target.value)}
+                              onBlur={handleCellSave}
+                              onKeyDown={(e) => { if (e.key === "Enter") handleCellSave(); if (e.key === "Escape") handleCellCancel(); }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full px-2 py-1 text-xs bg-white dark:bg-slate-900 border-0 outline-none focus:ring-2 focus:ring-inset focus:ring-primary rounded-none text-neutral-800 dark:text-neutral-200"
                             />
                           ) : colId === "jobCode" ? (
                             <span className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
                               {job.jobCode}
                             </span>
                           ) : colId === "jobStatus" ? (
+                            <div className="flex items-center gap-1.5 justify-between w-full">
+                              <Badge
+                                className={cn(
+                                  "text-[10px] font-semibold px-1.5 py-0.2 rounded-xs border shadow-none",
+                                  job.jobStatus === "Active"
+                                    ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800/30"
+                                    : job.jobStatus === "Close" || job.jobStatus === "Closed"
+                                    ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800/30"
+                                    : job.jobStatus === "Filled"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800/30"
+                                    : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800/30"
+                                )}
+                              >
+                                {job.jobStatus}
+                              </Badge>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openStatusModal(job); }}
+                                className="text-neutral-400 hover:text-blue-500 hover:bg-neutral-100 dark:hover:bg-slate-800 p-0.5 rounded transition-colors cursor-pointer"
+                                title="Change Job Status"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : colId === "priority" ? (
                             <Badge
                               className={cn(
-                                "text-[10px] font-semibold px-1.5 py-0.2 rounded-xs border shadow-none",
-                                job.jobStatus === "Active"
-                                  ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800/30"
-                                  : job.jobStatus === "Closed"
-                                  ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800/30"
-                                  : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800/30"
+                                "text-[10px] font-semibold px-1.5 py-0.2 rounded-xs border shadow-none cursor-cell",
+                                job.priority === "Hot" || job.priority === "High" || job.priority === "Urgent"
+                                  ? "bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-450 dark:border-rose-800/30"
+                                  : job.priority === "Warm" || job.priority === "Medium"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800/30"
+                                  : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800/30"
                               )}
                             >
-                              {job.jobStatus}
+                              {job.priority || "Warm"}
                             </Badge>
                           ) : colId === "jobTitle" ? (
                             <div className="flex items-center gap-1">
@@ -498,6 +668,17 @@ export default function DataTable({
                                 <span className="text-green-600 dark:text-green-400 font-semibold" title="Offered">{job.pipeline.offered}O</span>
                               </div>
                             </div>
+                          ) : (colId === "assignedTo" || colId === "primaryRecruiter") ? (
+                            <div className="flex items-center justify-between gap-1.5 w-full">
+                              <span>{String(job[colId as keyof Job] || "N/A")}</span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openAssignModal(job, colId as "assignedTo" | "primaryRecruiter"); }}
+                                className="text-neutral-400 hover:text-blue-500 hover:bg-neutral-100 dark:hover:bg-slate-800 p-0.5 rounded transition-colors cursor-pointer"
+                                title={`Change ${colId === "assignedTo" ? "Assigned To" : "Primary Recruiter"}`}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            </div>
                           ) : (
                             String(job[colId as keyof Job] || "N/A")
                           )}
@@ -505,21 +686,30 @@ export default function DataTable({
                       );
                     })}
 
-                    {/* Actions Column */}
-                    <td className="p-0.5 text-center">
-                      {isEditing ? (
+                    {/* Actions Column (Sticky Right) */}
+                    <td className={cn(
+                      "sticky right-0 z-10 w-[56px] min-w-[56px] p-0.5 text-center border-l border-neutral-200 dark:border-slate-800 transition-colors duration-150",
+                      isSelected
+                        ? "bg-blue-50/95 dark:bg-blue-950/95"
+                        : idx % 2 === 0
+                        ? "bg-white dark:bg-slate-900 group-hover:bg-blue-50/40 dark:group-hover:bg-slate-800/60"
+                        : "bg-slate-50 dark:bg-slate-800/40 group-hover:bg-blue-50/40 dark:group-hover:bg-slate-800/60"
+                    )}>
+                      {isRowEditing ? (
                         <div className="flex items-center gap-0.5 justify-center">
                           <button
-                            onClick={() => saveInlineEdit(job.id)}
-                            className="bg-green-600 text-white rounded-xs p-0.5 hover:bg-green-750 text-[9.5px] px-1 font-bold cursor-pointer"
+                            onMouseDown={(e) => { e.preventDefault(); handleCellSave(); }}
+                            className="bg-green-600 text-white rounded-xs p-0.5 hover:bg-green-700 text-[9.5px] px-1 font-bold cursor-pointer"
+                            title="Save (Enter)"
                           >
-                            Save
+                            ✓
                           </button>
                           <button
-                            onClick={() => setEditingRowId(null)}
-                            className="bg-neutral-200 dark:bg-slate-805 text-neutral-800 dark:text-neutral-200 rounded-xs p-0.5 hover:bg-neutral-300 dark:hover:bg-slate-700 text-[9.5px] px-1 cursor-pointer"
+                            onMouseDown={(e) => { e.preventDefault(); handleCellCancel(); }}
+                            className="bg-neutral-200 dark:bg-slate-700 text-neutral-700 dark:text-neutral-200 rounded-xs p-0.5 hover:bg-neutral-300 dark:hover:bg-slate-600 text-[9.5px] px-1 cursor-pointer"
+                            title="Cancel (Esc)"
                           >
-                            X
+                            ✕
                           </button>
                         </div>
                       ) : (
@@ -529,8 +719,8 @@ export default function DataTable({
                               <MoreHorizontal className="h-3.5 w-3.5" />
                             </button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-32 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 py-0.5">
-                            <DropdownMenuItem onClick={() => startInlineEdit(job)} className="cursor-pointer text-xs py-1 px-2">
+                          <DropdownMenuContent align="end" className="w-36 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 py-0.5">
+                            <DropdownMenuItem onClick={() => startQuickEdit(job)} className="cursor-pointer text-xs py-1 px-2">
                               <Edit className="h-3 w-3 mr-1.5 text-neutral-500" /> Quick Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem className="cursor-pointer text-xs py-1 px-2">
@@ -658,7 +848,7 @@ export default function DataTable({
             <button
               onClick={() => {
                 const job = data.find((j) => j.id === contextMenu.jobId);
-                if (job) startInlineEdit(job);
+                if (job) startQuickEdit(job);
                 closeContextMenu();
               }}
               className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer font-medium"
@@ -679,6 +869,286 @@ export default function DataTable({
             >
               <Trash2 className="h-3 w-3" /> Delete Job
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Job Status Modal Dialog */}
+      {statusModalJob && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center font-sans">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 w-[450px] shadow-2xl rounded overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-2 bg-neutral-100 dark:bg-slate-800 border-b border-neutral-200 dark:border-slate-700">
+              <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Job Status</h3>
+              <button onClick={() => setStatusModalJob(null)} className="text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-250 font-bold text-lg select-none">×</button>
+            </div>
+            {/* Body */}
+            <div className="p-4 space-y-4 text-xs">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="col-span-1 text-neutral-600 dark:text-neutral-400 font-semibold text-right">Job Status</span>
+                <select
+                  value={statusModalValue}
+                  onChange={(e) => setStatusModalValue(e.target.value)}
+                  className="col-span-3 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2 py-1.5 outline-hidden text-neutral-805 dark:text-neutral-200 focus:border-primary text-xs cursor-pointer font-medium"
+                >
+                  <option value="Select Status">Select Status</option>
+                  <option value="Active">Active</option>
+                  <option value="Closed">Closed</option>
+                  <option value="Filled">Filled</option>
+                  <option value="Hold by Client">Hold by Client</option>
+                  <option value="On Hold">On Hold</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <span className="col-span-1 text-neutral-600 dark:text-neutral-400 font-semibold text-right pt-1.5">Comment</span>
+                <textarea
+                  placeholder="Comment"
+                  value={statusModalComment}
+                  onChange={(e) => setStatusModalComment(e.target.value)}
+                  className="col-span-3 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden text-neutral-850 dark:text-neutral-200 focus:border-primary h-20 text-xs"
+                />
+              </div>
+            </div>
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 px-4 py-2 bg-neutral-50 dark:bg-slate-900 border-t border-neutral-200 dark:border-slate-800 text-xs">
+              <Button
+                size="sm"
+                onClick={handleStatusUpdate}
+                disabled={statusModalValue === "Select Status"}
+                className="h-8 bg-blue-600 hover:bg-blue-750 text-white font-bold cursor-pointer rounded-sm"
+              >
+                Update
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setStatusModalJob(null)}
+                className="h-8 border border-neutral-300 dark:border-slate-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-slate-800 font-bold cursor-pointer rounded-sm"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assigned To Modal Dialog */}
+      {assignModalJob && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center font-sans">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 w-[620px] shadow-2xl rounded overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-2 bg-neutral-100 dark:bg-slate-800 border-b border-neutral-200 dark:border-slate-700">
+              <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
+                {assignModalType === "assignedTo" ? "Assigned To" : "Primary Recruiter"}
+              </h3>
+              <button onClick={() => setAssignModalJob(null)} className="text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-250 font-bold text-lg select-none">×</button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-4 space-y-4 text-xs">
+              <div className="grid grid-cols-12 border border-neutral-200 dark:border-slate-800 rounded min-h-[260px] max-h-[300px]">
+                {/* Left Tabs/Sidebar - 3 cols */}
+                <div className="col-span-3 border-r border-neutral-200 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-950/20 p-2 flex flex-col gap-1 select-none">
+                  <button
+                    onClick={() => setAssignActiveTab("users")}
+                    className={cn(
+                      "text-left px-2 py-1.5 rounded-sm font-semibold transition-colors cursor-pointer text-[11px]",
+                      assignActiveTab === "users"
+                        ? "text-blue-600 bg-blue-50/60 dark:text-blue-400 dark:bg-blue-950/20"
+                        : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-slate-850"
+                    )}
+                  >
+                    All Users
+                  </button>
+                  <button
+                    onClick={() => setAssignActiveTab("teams")}
+                    className={cn(
+                      "text-left px-2 py-1.5 rounded-sm font-semibold transition-colors cursor-pointer text-[11px]",
+                      assignActiveTab === "teams"
+                        ? "text-blue-600 bg-blue-50/60 dark:text-blue-400 dark:bg-blue-950/20"
+                        : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-slate-850"
+                    )}
+                  >
+                    Teams
+                  </button>
+                </div>
+
+                {/* Center Selection Pane - 5 cols */}
+                <div className="col-span-5 border-r border-neutral-200 dark:border-slate-800 p-2.5 flex flex-col min-h-0">
+                  {/* Search Input */}
+                  <div className="relative mb-2 shrink-0">
+                    <input
+                      type="text"
+                      placeholder="Search"
+                      value={assignModalSearch}
+                      onChange={(e) => setAssignModalSearch(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs outline-hidden text-neutral-850 dark:text-neutral-150 focus:border-primary placeholder:text-neutral-400"
+                    />
+                  </div>
+
+                  {/* Options List */}
+                  <div className="flex-1 overflow-y-auto space-y-1 pr-1">
+                    {assignActiveTab === "users" ? (
+                      <>
+                        {/* Select All Users Option */}
+                        <label className="flex items-center gap-2 px-1.5 py-1 hover:bg-neutral-50 dark:hover:bg-slate-800/50 rounded cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={
+                              usersList.length > 0 &&
+                              usersList.every((u) => assignModalSelected.includes(u.fullName))
+                            }
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setAssignModalSelected(usersList.map((u) => u.fullName));
+                              } else {
+                                setAssignModalSelected([]);
+                              }
+                            }}
+                            className="h-3 w-3 accent-primary rounded-xs cursor-pointer"
+                          />
+                          <span className="font-bold text-neutral-850 dark:text-neutral-200">Select Users</span>
+                        </label>
+
+                        {/* List of Users */}
+                        {usersList
+                          .filter((u) =>
+                            u.fullName.toLowerCase().includes(assignModalSearch.toLowerCase()) ||
+                            u.email.toLowerCase().includes(assignModalSearch.toLowerCase())
+                          )
+                          .map((u) => {
+                            const isChecked = assignModalSelected.includes(u.fullName);
+                            return (
+                              <label
+                                key={u.id}
+                                className="flex items-center gap-2 px-1.5 py-0.5 hover:bg-neutral-50 dark:hover:bg-slate-800/50 rounded cursor-pointer select-none text-neutral-700 dark:text-neutral-300"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setAssignModalSelected((prev) => [...prev, u.fullName]);
+                                    } else {
+                                      setAssignModalSelected((prev) => prev.filter((name) => name !== u.fullName));
+                                    }
+                                  }}
+                                  className="h-3 w-3 accent-primary rounded-xs cursor-pointer"
+                                />
+                                <span className="truncate">{u.fullName} <span className="text-[9.5px] text-neutral-400 dark:text-neutral-500 font-medium">({u.email})</span></span>
+                              </label>
+                            );
+                          })}
+                      </>
+                    ) : (
+                      <>
+                        {/* Select All Teams Option */}
+                        <label className="flex items-center gap-2 px-1.5 py-1 hover:bg-neutral-50 dark:hover:bg-slate-800/50 rounded cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={
+                              mockTeams.every((t) => assignModalSelected.includes(t))
+                            }
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setAssignModalSelected(mockTeams);
+                              } else {
+                                setAssignModalSelected([]);
+                              }
+                            }}
+                            className="h-3 w-3 accent-primary rounded-xs cursor-pointer"
+                          />
+                          <span className="font-bold text-neutral-850 dark:text-neutral-200">Select Teams</span>
+                        </label>
+
+                        {/* List of Teams */}
+                        {mockTeams
+                          .filter((t) => t.toLowerCase().includes(assignModalSearch.toLowerCase()))
+                          .map((teamName) => {
+                            const isChecked = assignModalSelected.includes(teamName);
+                            return (
+                              <label
+                                key={teamName}
+                                className="flex items-center gap-2 px-1.5 py-1 hover:bg-neutral-50 dark:hover:bg-slate-800/50 rounded cursor-pointer select-none text-neutral-700 dark:text-neutral-300"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setAssignModalSelected((prev) => [...prev, teamName]);
+                                    } else {
+                                      setAssignModalSelected((prev) => prev.filter((name) => name !== teamName));
+                                    }
+                                  }}
+                                  className="h-3 w-3 accent-primary rounded-xs cursor-pointer"
+                                />
+                                <span>{teamName}</span>
+                              </label>
+                            );
+                          })}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Pane (Selected Users) - 4 cols */}
+                <div className="col-span-4 p-2.5 flex flex-col min-h-0 bg-neutral-50/20 dark:bg-slate-905/30 border-l border-neutral-200 dark:border-slate-800">
+                  <h4 className="font-bold text-neutral-805 dark:text-neutral-200 mb-1.5 border-b border-neutral-200 dark:border-slate-800 pb-1 uppercase tracking-wider text-[9.5px]">
+                    Selected {assignActiveTab === "users" ? "Users" : "Teams"}
+                  </h4>
+                  <div className="flex-1 overflow-y-auto space-y-1 pr-1">
+                    {assignModalSelected.map((name) => (
+                      <div
+                        key={name}
+                        className="flex items-center justify-between bg-neutral-100 dark:bg-slate-800 text-neutral-800 dark:text-neutral-250 px-2 py-0.5 rounded-xs text-[10px] border border-neutral-200/50 dark:border-slate-700/50"
+                      >
+                        <span className="truncate pr-1 font-medium">{name}</span>
+                        <button
+                          onClick={() => setAssignModalSelected((prev) => prev.filter((x) => x !== name))}
+                          className="text-neutral-500 hover:text-red-500 font-bold text-sm cursor-pointer select-none px-1"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {assignModalSelected.length === 0 && (
+                      <span className="text-[10px] text-neutral-400 italic">None selected</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Comment Area */}
+              <div className="grid grid-cols-12 items-start gap-3">
+                <span className="col-span-2 text-neutral-600 dark:text-neutral-400 font-semibold pt-1 text-right">Comment</span>
+                <textarea
+                  placeholder="Comment"
+                  value={assignModalComment}
+                  onChange={(e) => setAssignModalComment(e.target.value)}
+                  className="col-span-10 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden text-neutral-850 dark:text-neutral-200 focus:border-primary h-12 text-xs resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 px-4 py-2 bg-neutral-50 dark:bg-slate-900 border-t border-neutral-200 dark:border-slate-800 text-xs">
+              <Button
+                size="sm"
+                onClick={handleAssignSave}
+                className="h-8 bg-blue-600 hover:bg-blue-755 text-white font-bold cursor-pointer rounded-sm"
+              >
+                Save
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAssignModalJob(null)}
+                className="h-8 border border-neutral-300 dark:border-slate-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-slate-800 font-bold cursor-pointer rounded-sm"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         </div>
       )}

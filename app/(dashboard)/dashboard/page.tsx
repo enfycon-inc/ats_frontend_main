@@ -47,7 +47,7 @@ export default function DashboardPage() {
 
   // Metric calculation helpers
   const activeJobs = jobs.filter(j => j.jobStatus === "Active");
-  const highPriorityJobs = activeJobs.filter(j => j.priority === "High" || j.priority === "Urgent");
+  const highPriorityJobs = activeJobs.filter(j => j.priority === "Hot" || j.priority === "High" || j.priority === "Urgent");
 
   return (
     <div className="space-y-6">
@@ -340,9 +340,11 @@ function AccountManagerDashboardView({ profile, jobs, activeJobs, highPriorityJo
                           </td>
                           <td className="py-2.5 px-4">
                             <Badge className={`px-2 py-0.5 text-[9px] font-bold ${
-                              job.priority === "High" || job.priority === "Urgent" 
+                              job.priority === "Hot" || job.priority === "High" || job.priority === "Urgent" 
                                 ? "bg-rose-50 text-rose-700 border-rose-100" 
-                                : "bg-default-100 text-default-700 border-default-200"
+                                : job.priority === "Cold" || job.priority === "Low"
+                                ? "bg-blue-50 text-blue-700 border-blue-100"
+                                : "bg-amber-50 text-amber-700 border-amber-100"
                             }`}>
                               {job.priority}
                             </Badge>
