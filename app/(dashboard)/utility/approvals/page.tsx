@@ -19,6 +19,7 @@ interface PendingUser {
   tenantId: string;
   tenantName: string;
   defaultMarket: string;
+  tenantSubdomain: string;
 }
 
 interface Tenant {

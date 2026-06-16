@@ -13,6 +13,8 @@
  *   await atsApi.auth.login('admin@enfycon.com', 'Admin@123');
  */
 
+import { getTenantIdentifier } from '@/utils/subdomain-helper';
+
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('localhost', '127.0.0.1');
 
 // ─── Token Management ──────────────────────────────────────────────
@@ -84,6 +86,7 @@ async function apiFetch<T = any>(
 // ─── Auth API ───────────────────────────────────────────────────────
 const auth = {
   async login(email: string, password: string) {
+    const subdomain = getTenantIdentifier();
     const data = await apiFetch<{
       accessToken: string;
       expiresIn: number;
@@ -94,10 +97,11 @@ const auth = {
         fullName: string;
         roles: string[];
         tenantId: string;
+        tenantDomain: string;
       };
     }>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, subdomain }),
     });
 
     setToken(data.accessToken);
@@ -237,6 +241,23 @@ const auth = {
     return apiFetch<any>(`/api/auth/rbac/users/${userId}/roles`, {
       method: 'POST',
       body: JSON.stringify({ roleIds }),
+    });
+  },
+
+  async listMyDomains(): Promise<any[]> {
+    return apiFetch<any[]>('/api/auth/tenants/my-domains');
+  },
+
+  async addMyDomain(domainName: string): Promise<any> {
+    return apiFetch<any>('/api/auth/tenants/my-domains', {
+      method: 'POST',
+      body: JSON.stringify({ domainName }),
+    });
+  },
+
+  async deleteMyDomain(domainId: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/tenants/my-domains/${domainId}`, {
+      method: 'DELETE',
     });
   },
 };

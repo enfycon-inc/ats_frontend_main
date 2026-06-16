@@ -15,6 +15,7 @@ import { signIn } from "next-auth/react";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
 import { handleLoginAction } from "./actions/login";
+import { getCurrentSubdomain, getBaseDomain, getTenantIdentifier } from "@/utils/subdomain-helper";
 
 const schema = z.object({
   email: z.string().email({ message: "Your email is invalid." }),
@@ -55,19 +56,43 @@ const LoginForm = () => {
           toast.error(res.error);
         } else {
           // Sync with NestJS Backend API to retrieve/store JWT token
+          let syncRes;
           try {
-            await atsApi.auth.login(data.email, data.password);
+            syncRes = await atsApi.auth.login(data.email, data.password);
           } catch (apiErr: any) {
-            console.error("Backend auth session sync failed:", apiErr);
+            toast.error(apiErr.message || "Backend authentication failed.");
+            return;
           }
 
-          await signIn("credentials", {
-            redirect: true,
+          const signInRes = await signIn("credentials", {
+            redirect: false,
             email: data.email,
             password: data.password,
+            subdomain: getTenantIdentifier(),
             callbackUrl: "/dashboard",
           });
+
+          if (signInRes?.error) {
+            toast.error("Sign in failed. Please check credentials.");
+            return;
+          }
+
           toast.success("Successfully logged in");
+
+          // Redirection logic
+          const isSuperAdmin = syncRes?.user?.roles?.includes("SUPER_ADMIN");
+          const userTenantDomain = syncRes?.user?.tenantDomain;
+          const currentSubdomain = getCurrentSubdomain();
+
+          if (!isSuperAdmin && userTenantDomain && currentSubdomain !== userTenantDomain) {
+            // Redirect to correct subdomain (e.g. tenant1.localhost:3000)
+            const base = getBaseDomain();
+            const protocol = window.location.protocol;
+            window.location.href = `${protocol}//${userTenantDomain}.${base}/dashboard`;
+          } else {
+            // Already on correct subdomain (or super_admin) -> proceed to dashboard
+            window.location.href = "/dashboard";
+          }
         }
       } catch (err: any) {
         toast.error(err.message || "Failed to sign in.");

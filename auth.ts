@@ -10,16 +10,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "jwt",
   },
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        domain: process.env.NODE_ENV === "production" ? ".enfycon.com" : undefined,
+      },
+    },
+  },
   providers: [
     Credentials({
       credentials: {
         email: {},
         password: {},
+        subdomain: {},
       },
       authorize: async (credentials) => {
         try {
           const parsed = await loginSchema.parseAsync(credentials)
           const { email, password } = parsed
+          const subdomain = credentials?.subdomain || ""
 
           // 1. Try to authenticate against the NestJS Backend first
           try {
@@ -27,17 +41,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             let res
 
             try {
+              const controller = new AbortController()
+              const timeoutId = setTimeout(() => controller.abort(), 1000)
               res = await fetch(`${apiBase}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email, password, subdomain }),
+                signal: controller.signal,
               })
+              clearTimeout(timeoutId)
             } catch (dockerErr) {
               apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('localhost', '127.0.0.1')
               res = await fetch(`${apiBase}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email, password, subdomain }),
               })
             }
 
@@ -51,6 +69,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   image: '/images/users/user-1.jpg',
                   permissions: data.user.permissions || [],
                   roles: data.user.roles || [],
+                  accessToken: data.accessToken,
+                  tenantDomain: data.user.tenantDomain || '',
                 }
               }
             }
@@ -68,6 +88,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               image: user.image,
               permissions: ['job:create', 'job:edit', 'job:view', 'candidate:create', 'candidate:view', 'submission:create', 'submission:edit', 'tenant:settings', 'user:manage'],
               roles: [user.name.toUpperCase().includes('ADMIN') ? 'ADMIN' : 'RECRUITER'],
+              accessToken: 'mock-jwt-token',
+              tenantDomain: '',
             }
           }
 
@@ -107,6 +129,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id
         token.permissions = (user as any).permissions || []
         token.roles = (user as any).roles || []
+        token.accessToken = (user as any).accessToken
+        token.tenantDomain = (user as any).tenantDomain
       }
       return token
     },
@@ -115,6 +139,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as any).id = token.id;
         (session.user as any).permissions = token.permissions || [];
         (session.user as any).roles = token.roles || [];
+        (session.user as any).accessToken = token.accessToken;
+        (session.user as any).tenantDomain = token.tenantDomain;
       }
       return session
     }

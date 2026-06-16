@@ -4,9 +4,10 @@ import Footer from "@/components/layout/footer";
 import { TopNavbar } from "@/components/layout/top-navbar";
 import ThemeCustomizer from "@/components/theme-customizer/theme-customizer";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { Toaster } from "react-hot-toast";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 export function ClientRoot({
   children,
@@ -15,6 +16,29 @@ export function ClientRoot({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  useEffect(() => {
+    if (session && (session as any).user) {
+      const u = (session as any).user;
+      if (u.accessToken) {
+        const localToken = typeof window !== "undefined" ? localStorage.getItem("ats_access_token") : null;
+        if (localToken !== u.accessToken && typeof window !== "undefined") {
+          localStorage.setItem("ats_access_token", u.accessToken);
+          localStorage.setItem(
+            "ats_current_user",
+            JSON.stringify({
+              id: u.id,
+              email: u.email,
+              fullName: u.name,
+              roles: u.roles,
+              tenantId: u.tenantId,
+            })
+          );
+        }
+      }
+    }
+  }, [session]);
   const isViewportLocked = 
     (pathname?.startsWith("/job-posting") && !pathname.endsWith("/new")) ||
     (pathname?.startsWith("/applicants") && !pathname.endsWith("/new"));
