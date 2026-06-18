@@ -47,6 +47,7 @@ import { AddClientModal } from "../components/add-client-modal";
 
 
 
+import { Country, State, City } from "country-state-city";
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
 
@@ -113,6 +114,7 @@ const formSchema = zod.object({
   respondBy: zod.string().optional(),
   country: zod.string().min(1, "Country is required"),
   states: zod.string().min(1, "State is required"),
+  city: zod.string().optional(),
   remoteJob: zod.enum(["Yes", "No", "Hybrid"]),
   hoursPerWeek: zod.number().min(1).max(168),
   jobStatus: zod.string(),
@@ -167,6 +169,53 @@ const formSchema = zod.object({
 });
 
 type FormValues = zod.infer<typeof formSchema>;
+
+
+// India states with cities
+const INDIA_STATES_CITIES: Record<string, string[]> = {
+  "Karnataka": ["Bengaluru", "Mysuru", "Hubli-Dharwad", "Mangaluru", "Belagavi", "Ballari"],
+  "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Nashik", "Aurangabad", "Solapur", "Thane", "Navi Mumbai"],
+  "Telangana": ["Hyderabad", "Warangal", "Nizamabad", "Karimnagar", "Khammam"],
+  "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli"],
+  "Delhi NCR": ["New Delhi", "Noida", "Gurugram", "Faridabad", "Ghaziabad", "Greater Noida"],
+  "Haryana": ["Gurugram", "Faridabad", "Panipat", "Ambala", "Rohtak", "Sonipat"],
+  "Gujarat": ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Gandhinagar"],
+  "Uttar Pradesh": ["Lucknow", "Kanpur", "Agra", "Varanasi", "Noida", "Prayagraj", "Ghaziabad"],
+  "Rajasthan": ["Jaipur", "Jodhpur", "Udaipur", "Ajmer", "Kota", "Bikaner"],
+  "Punjab": ["Chandigarh", "Ludhiana", "Amritsar", "Jalandhar", "Patiala"],
+  "West Bengal": ["Kolkata", "Howrah", "Durgapur", "Asansol", "Siliguri"],
+  "Andhra Pradesh": ["Visakhapatnam", "Vijayawada", "Guntur", "Tirupati", "Nellore"],
+  "Madhya Pradesh": ["Bhopal", "Indore", "Gwalior", "Jabalpur", "Ujjain"],
+  "Kerala": ["Thiruvananthapuram", "Kochi", "Kozhikode", "Thrissur", "Kollam"],
+  "Bihar": ["Patna", "Gaya", "Bhagalpur", "Muzaffarpur"],
+  "Jharkhand": ["Ranchi", "Jamshedpur", "Dhanbad", "Bokaro"],
+  "Odisha": ["Bhubaneswar", "Cuttack", "Rourkela", "Puri"],
+  "Assam": ["Guwahati", "Silchar", "Dibrugarh", "Jorhat"],
+  "Chandigarh": ["Chandigarh"],
+  "Goa": ["Panaji", "Margao", "Vasco da Gama"],
+};
+
+// US states with cities
+const US_STATES_CITIES: Record<string, string[]> = {
+  "Texas": ["Dallas", "Houston", "Austin", "San Antonio", "Fort Worth", "Plano", "Irving", "Frisco"],
+  "California": ["Los Angeles", "San Francisco", "San Jose", "San Diego", "Sacramento", "Irvine", "Fremont"],
+  "New York": ["New York City", "Buffalo", "Rochester", "Albany", "Syracuse", "Yonkers"],
+  "New Jersey": ["Newark", "Jersey City", "Trenton", "Edison", "Woodbridge", "Parsippany"],
+  "Georgia": ["Atlanta", "Augusta", "Columbus", "Savannah", "Sandy Springs", "Alpharetta"],
+  "Illinois": ["Chicago", "Aurora", "Naperville", "Joliet", "Rockford", "Springfield"],
+  "Florida": ["Miami", "Orlando", "Tampa", "Jacksonville", "St. Petersburg", "Fort Lauderdale"],
+  "Washington": ["Seattle", "Spokane", "Tacoma", "Bellevue", "Kirkland", "Redmond"],
+  "Virginia": ["Virginia Beach", "Norfolk", "Chesapeake", "Richmond", "Arlington", "McLean"],
+  "North Carolina": ["Charlotte", "Raleigh", "Greensboro", "Durham", "Winston-Salem"],
+  "Pennsylvania": ["Philadelphia", "Pittsburgh", "Allentown", "Erie", "Reading"],
+  "Ohio": ["Columbus", "Cleveland", "Cincinnati", "Toledo", "Akron"],
+  "Michigan": ["Detroit", "Grand Rapids", "Warren", "Sterling Heights", "Ann Arbor"],
+  "Massachusetts": ["Boston", "Worcester", "Springfield", "Cambridge", "Lowell"],
+  "Arizona": ["Phoenix", "Tucson", "Scottsdale", "Tempe", "Chandler", "Mesa"],
+  "Colorado": ["Denver", "Colorado Springs", "Aurora", "Fort Collins", "Lakewood"],
+  "Minnesota": ["Minneapolis", "Saint Paul", "Rochester", "Duluth", "Bloomington"],
+  "Tennessee": ["Nashville", "Memphis", "Knoxville", "Chattanooga", "Clarksville"],
+};
 
 export default function NewJobPostingPage() {
   const router = useRouter();
@@ -237,6 +286,7 @@ export default function NewJobPostingPage() {
       jobCode: "ENFY-" + Math.floor(1000 + Math.random() * 9000),
       country: "United States",
       states: "Texas",
+      city: "",
       remoteJob: "Hybrid",
       hoursPerWeek: undefined,
       jobStatus: "Active",
@@ -442,6 +492,7 @@ export default function NewJobPostingPage() {
         secondarySkills: secondarySkills,
         businessUnit: data.businessUnit,
         state: data.states,
+        city: data.city || undefined,
         country: data.country,
         clientJobId: data.clientJobId || undefined,
         status: data.jobStatus,
