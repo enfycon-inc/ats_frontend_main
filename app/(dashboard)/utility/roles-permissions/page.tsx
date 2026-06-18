@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
+import { getTenantIdentifier } from "@/utils/subdomain-helper";
 
 interface Permission {
   id: string;
@@ -42,13 +43,16 @@ export default function RolesPermissionsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<any>(null);
 
   const currentUser = typeof window !== 'undefined' ? atsApi.auth.getCurrentUser() : null;
   const getDomainSuffix = () => {
-    if (currentUser?.email?.toLowerCase().endsWith("@csm.com")) {
+    const userEmail = profile?.email || currentUser?.email;
+    if (userEmail?.toLowerCase().endsWith("@csm.com")) {
       return "csm";
     }
-    const rawDomain = currentUser?.tenantDomain || "enfycon";
+    const currentSub = typeof window !== 'undefined' ? getTenantIdentifier() : "";
+    const rawDomain = currentSub || profile?.tenantDomain || currentUser?.tenantDomain || "enfycon";
     return rawDomain.toLowerCase().endsWith(".com") ? rawDomain.slice(0, -4) : rawDomain;
   };
   const tenantDomain = getDomainSuffix();
@@ -76,9 +80,9 @@ export default function RolesPermissionsPage() {
   const [memberPassword, setMemberPassword] = useState("");
   const [memberRole, setMemberRole] = useState("RECRUITER");
 
-  // Multi-select dropdown active user state
-  const [activeDropdownUserId, setActiveDropdownUserId] = useState<string | null>(null);
-  const [tempSelectedRoleIds, setTempSelectedRoleIds] = useState<Record<string, string[]>>({});
+  // Assign Roles Modal State
+  const [assigningUser, setAssigningUser] = useState<TenantUser | null>(null);
+  const [modalRoleIds, setModalRoleIds] = useState<string[]>([]);
   const [userLimit, setUserLimit] = useState<number>(5);
 
   useEffect(() => {
@@ -107,6 +111,7 @@ export default function RolesPermissionsPage() {
       setRoles(rolesData);
       setPermissions(permsData);
       setUsers(usersData);
+      setProfile(profileData);
       if (profileData && profileData.userLimit) {
         setUserLimit(profileData.userLimit);
       }
@@ -214,8 +219,7 @@ export default function RolesPermissionsPage() {
     
     try {
       setSubmitting(true);
-      const currentUser = atsApi.auth.getCurrentUser();
-      const tenantId = currentUser?.tenantId;
+      const tenantId = profile?.tenantId || currentUser?.tenantId;
       const fullEmail = `${memberEmail.trim()}@${tenantDomain}.com`;
       
       await atsApi.auth.registerUser({
@@ -283,8 +287,8 @@ export default function RolesPermissionsPage() {
 
   const handleUserStatusToggle = async (userId: string, currentActive: boolean) => {
     // Protect against self-deactivation (Ceipal rule)
-    const currentUser = atsApi.auth.getCurrentUser();
-    if (currentUser?.id === userId && currentActive) {
+    const currentUserId = profile?.id || currentUser?.id;
+    if (currentUserId === userId && currentActive) {
       toast.error("You cannot deactivate your own account.");
       return;
     }
@@ -681,93 +685,23 @@ export default function RolesPermissionsPage() {
                                   </div>
                                 </td>
                                 <td className="py-3 px-4 text-right">
-                                  <div className="inline-flex items-center gap-2">
-                                    <div className="relative inline-block text-left">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (activeDropdownUserId === user.id) {
-                                            setActiveDropdownUserId(null);
-                                          } else {
-                                            setActiveDropdownUserId(user.id);
-                                            // Initialize temp selected role ids
-                                            const currentRoleIds = roles
-                                              .filter((r) => user.roles ? user.roles.includes(r.name) : (user.roleName === r.name || user.roleId === r.id))
-                                              .map((r) => r.id);
-                                            setTempSelectedRoleIds((prev) => ({ ...prev, [user.id]: currentRoleIds }));
-                                          }
-                                        }}
-                                        disabled={submittingId === user.id}
-                                        className="inline-flex justify-between items-center gap-1.5 border border-default-250 dark:border-slate-700 rounded-md px-2 py-1.5 text-xs text-default-850 focus:outline-none bg-transparent hover:bg-default-50 dark:hover:bg-slate-800 font-semibold cursor-pointer w-48 text-left"
-                                      >
-                                        <span className="truncate">
-                                          {user.roles && user.roles.length > 0 ? user.roles.join(", ") : user.roleName}
-                                        </span>
-                                        <Icon icon="heroicons:chevron-down" className="h-3.5 w-3.5 text-default-500 flex-shrink-0" />
-                                      </button>
-                                      
-                                      {activeDropdownUserId === user.id && (
-                                        <>
-                                          <div className="fixed inset-0 z-10" onClick={() => setActiveDropdownUserId(null)} />
-                                          <div className="absolute right-0 mt-1 w-56 rounded-md shadow-lg bg-white dark:bg-slate-900 border border-default-200 dark:border-slate-800 z-20 overflow-hidden">
-                                            <div className="py-1 max-h-48 overflow-y-auto">
-                                              {roles.map((role) => {
-                                                const currentSelected = tempSelectedRoleIds[user.id] || [];
-                                                const isAssigned = currentSelected.includes(role.id);
-                                                  
-                                                return (
-                                                  <label
-                                                    key={role.id}
-                                                    className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-default-880 hover:bg-default-50 dark:hover:bg-slate-800 cursor-pointer select-none"
-                                                  >
-                                                    <input
-                                                      type="checkbox"
-                                                      checked={isAssigned}
-                                                      onChange={() => {
-                                                        const currentIds = tempSelectedRoleIds[user.id] || [];
-                                                        let nextIds;
-                                                        if (isAssigned) {
-                                                          nextIds = currentIds.filter((id) => id !== role.id);
-                                                        } else {
-                                                          nextIds = [...currentIds, role.id];
-                                                        }
-                                                        setTempSelectedRoleIds((prev) => ({ ...prev, [user.id]: nextIds }));
-                                                      }}
-                                                      className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
-                                                    />
-                                                    <span className="truncate">{role.name}</span>
-                                                  </label>
-                                                );
-                                              })}
-                                            </div>
-                                            <div className="border-t border-default-100 p-2 flex justify-end gap-1.5 bg-default-50/50">
-                                              <button
-                                                type="button"
-                                                onClick={() => setActiveDropdownUserId(null)}
-                                                className="px-2 py-1 text-[10px] font-bold text-default-500 hover:bg-default-100 rounded cursor-pointer border border-default-200 bg-white dark:bg-slate-900"
-                                              >
-                                                Cancel
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={async () => {
-                                                  const selectedIds = tempSelectedRoleIds[user.id] || [];
-                                                  if (selectedIds.length === 0) {
-                                                    toast.error("A user must have at least one role.");
-                                                    return;
-                                                  }
-                                                  await handleAssignUserRoles(user.id, selectedIds);
-                                                  setActiveDropdownUserId(null);
-                                                }}
-                                                className="px-2.5 py-1 text-[10px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-750 cursor-pointer"
-                                              >
-                                                Apply
-                                              </button>
-                                            </div>
-                                          </div>
-                                        </>
-                                      )}
-                                    </div>
+                                  <div className="inline-flex items-center gap-2 justify-end">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setAssigningUser(user);
+                                        const currentRoleIds = roles
+                                          .filter((r) => user.roles ? user.roles.includes(r.name) : (user.roleName === r.name || user.roleId === r.id))
+                                          .map((r) => r.id);
+                                        setModalRoleIds(currentRoleIds);
+                                      }}
+                                      disabled={submittingId === user.id}
+                                      className="text-xs font-semibold cursor-pointer border-indigo-100 text-indigo-600 hover:bg-indigo-50/50"
+                                    >
+                                      <Icon icon="heroicons:pencil-square" className="h-3.5 w-3.5 mr-1" />
+                                      Manage Roles
+                                    </Button>
                                     {submittingId === user.id && (
                                       <div className="h-4.5 w-4.5 border-2 border-indigo-600 border-t-transparent animate-spin rounded-full shrink-0"></div>
                                     )}
@@ -865,6 +799,70 @@ export default function RolesPermissionsPage() {
                 </Button>
               </div>
             </form>
+          </Card>
+        </div>
+      )}
+
+      {assigningUser && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <Card className="w-full max-w-md border border-default-100 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
+            <CardHeader className="border-b border-default-100 p-4">
+              <CardTitle className="text-base font-semibold flex items-center gap-1.5">
+                <Icon icon="heroicons:shield-check" className="text-indigo-600 h-5 w-5" />
+                Assign Roles: {assigningUser.fullName}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Select one or more roles to assign to this staff member.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 space-y-3 max-h-60 overflow-y-auto">
+              {roles.map((role) => {
+                const isAssigned = modalRoleIds.includes(role.id);
+                return (
+                  <label
+                    key={role.id}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-default-100 hover:bg-default-50/50 cursor-pointer select-none transition"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isAssigned}
+                      onChange={() => {
+                        if (isAssigned) {
+                          setModalRoleIds(prev => prev.filter(id => id !== role.id));
+                        } else {
+                          setModalRoleIds(prev => [...prev, role.id]);
+                        }
+                      }}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
+                    />
+                    <div>
+                      <div className="text-xs font-semibold text-default-900">{role.name}</div>
+                      {role.description && <div className="text-[10px] text-default-500">{role.description}</div>}
+                    </div>
+                  </label>
+                );
+              })}
+            </CardContent>
+            <div className="border-t border-default-100 p-4 bg-default-50/50 dark:bg-slate-800/10 flex justify-end gap-2">
+              <Button size="sm" variant="outline" type="button" onClick={() => setAssigningUser(null)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={async () => {
+                  if (modalRoleIds.length === 0) {
+                    toast.error("A user must have at least one role assigned.");
+                    return;
+                  }
+                  await handleAssignUserRoles(assigningUser.id, modalRoleIds);
+                  setAssigningUser(null);
+                }}
+                disabled={submitting}
+                className="bg-indigo-600 hover:bg-indigo-750 text-white font-semibold"
+              >
+                Apply Roles
+              </Button>
+            </div>
           </Card>
         </div>
       )}

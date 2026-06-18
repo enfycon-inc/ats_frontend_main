@@ -212,7 +212,9 @@ function AdminDashboardView({ profile, jobs, activeJobs }: { profile: any; jobs:
           <CardContent className="p-5 space-y-3.5 text-xs">
             <div className="flex justify-between items-center">
               <span className="font-semibold text-default-500">Corporate Domain</span>
-              <span className="font-bold text-default-900 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded border border-default-200">{profile?.tenantDomain || "N/A"}.com</span>
+              <span className="font-bold text-default-900 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded border border-default-200">
+                {profile?.tenantDomain ? (profile.tenantDomain.toLowerCase().endsWith('.com') ? profile.tenantDomain : `${profile.tenantDomain}.com`) : "N/A"}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-semibold text-default-500">India Recruitment Mode</span>
