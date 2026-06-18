@@ -232,7 +232,7 @@ export default function NewClientPage() {
                 className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
               >
                 <option value="">Select Country</option>
-                {countries.map((c) => (
+                {countries.map((c: any) => (
                   <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
                 ))}
               </select>
@@ -248,7 +248,7 @@ export default function NewClientPage() {
                 className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer disabled:opacity-50"
               >
                 <option value="">{states.length === 0 && formData.countryIso ? "No states found" : "Select State"}</option>
-                {states.map((s) => (
+                {states.map((s: any) => (
                   <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
                 ))}
               </select>
@@ -264,7 +264,7 @@ export default function NewClientPage() {
                 className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer disabled:opacity-50"
               >
                 <option value="">{cities.length === 0 && formData.stateIso ? "No cities found" : "Select City"}</option>
-                {cities.map((c) => (
+                {cities.map((c: any) => (
                   <option key={c.name} value={c.name}>{c.name}</option>
                 ))}
               </select>

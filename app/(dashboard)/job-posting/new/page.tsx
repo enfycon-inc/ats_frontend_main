@@ -290,13 +290,13 @@ export default function NewJobPostingPage() {
             if (res && res.code) {
               setValue("jobCode", res.code);
             } else {
-              const prefix = `${tenantPrefix}JOB`;
+              const prefix = `${tenantPrefix}-JOB`;
               const yy = new Date().getFullYear().toString().slice(-2);
               const mm = String(new Date().getMonth() + 1).padStart(2, '0');
               setValue("jobCode", `${prefix}-${yy}${mm}-XXXXX (Auto-generated)`);
             }
           } catch (e) {
-            const prefix = `${tenantPrefix}JOB`;
+            const prefix = `${tenantPrefix}-JOB`;
             const yy = new Date().getFullYear().toString().slice(-2);
             const mm = String(new Date().getMonth() + 1).padStart(2, '0');
             setValue("jobCode", `${prefix}-${yy}${mm}-XXXXX (Auto-generated)`);

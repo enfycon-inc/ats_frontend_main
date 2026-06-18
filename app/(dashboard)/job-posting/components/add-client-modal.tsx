@@ -73,7 +73,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
         ownership: data.ownership, // For now, passing as string
         practice: data.practice,
         country: Country.getCountryByCode(data.country)?.name || data.country,
-        state: states.find(s => s.isoCode === data.state)?.name || data.state,
+        state: states.find((s: any) => s.isoCode === data.state)?.name || data.state,
         city: data.city,
         address: data.address,
         postal_code: data.zipCode,
@@ -150,7 +150,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
                   {...register("state")}
                 >
                   <option value="">Select State</option>
-                  {states.map(s => (
+                  {states.map((s: any) => (
                     <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
                   ))}
                 </select>
@@ -214,7 +214,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
                   className="w-full h-10 px-3 py-2 border rounded-md text-sm bg-background border-input"
                   {...register("country")}
                 >
-                  {countries.map(c => (
+                  {countries.map((c: any) => (
                     <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
                   ))}
                 </select>
