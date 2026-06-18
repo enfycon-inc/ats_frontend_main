@@ -1032,49 +1032,64 @@ export default function NewJobPostingPage() {
                       <label className="font-bold text-neutral-700 dark:text-neutral-300">Country <span className="text-red-500">*</span></label>
                       <select
                         {...register("country")}
+                        onChange={(e) => {
+                          setValue("country", e.target.value, { shouldValidate: true });
+                          setValue("states", "");
+                          setValue("city", "");
+                        }}
                         className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
                       >
-                        {market === "IN" ? (
-                          <>
-                            <option value="India">India</option>
-                            <option value="United States">United States</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="United States">United States</option>
-                            <option value="Canada">Canada</option>
-                            <option value="United Kingdom">United Kingdom</option>
-                          </>
-                        )}
+                        <option value="">-- Select Country --</option>
+                        {Country.getAllCountries().map((co) => (
+                          <option key={co.isoCode} value={co.name}>{co.flag} {co.name}</option>
+                        ))}
                       </select>
                     </div>
 
                     {/* States */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">States <span className="text-red-500">*</span></label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">State <span className="text-red-500">*</span></label>
                       <select
                         {...register("states")}
+                        onChange={(e) => {
+                          setValue("states", e.target.value, { shouldValidate: true });
+                          setValue("city", "");
+                        }}
                         className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
                       >
-                        {market === "IN" ? (
-                          <>
-                            <option value="Karnataka">Karnataka (Bengaluru)</option>
-                            <option value="Maharashtra">Maharashtra (Mumbai/Pune)</option>
-                            <option value="Telangana">Telangana (Hyderabad)</option>
-                            <option value="Tamil Nadu">Tamil Nadu (Chennai)</option>
-                            <option value="Delhi NCR">Delhi NCR (Noida/Gurgaon)</option>
-                            <option value="Haryana">Haryana</option>
-                            <option value="Gujarat">Gujarat</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="Texas">Texas</option>
-                            <option value="California">California</option>
-                            <option value="New York">New York</option>
-                            <option value="New Jersey">New Jersey</option>
-                            <option value="Georgia">Georgia</option>
-                          </>
-                        )}
+                        <option value="">-- Select State --</option>
+                        {(() => {
+                          const selectedCountry = watch("country");
+                          if (!selectedCountry) return null;
+                          const countryObj = Country.getAllCountries().find(co => co.name === selectedCountry);
+                          if (!countryObj) return null;
+                          return State.getStatesOfCountry(countryObj.isoCode).map((st) => (
+                            <option key={st.isoCode} value={st.name}>{st.name}</option>
+                          ));
+                        })()}
+                      </select>
+                    </div>
+
+                    {/* City */}
+                    <div className="space-y-1">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">City</label>
+                      <select
+                        {...register("city")}
+                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                      >
+                        <option value="">-- Select City --</option>
+                        {(() => {
+                          const selectedCountry = watch("country");
+                          const selectedState = watch("states");
+                          if (!selectedCountry || !selectedState) return null;
+                          const countryObj = Country.getAllCountries().find(co => co.name === selectedCountry);
+                          if (!countryObj) return null;
+                          const stateObj = State.getStatesOfCountry(countryObj.isoCode).find(st => st.name === selectedState);
+                          if (!stateObj) return null;
+                          return City.getCitiesOfState(countryObj.isoCode, stateObj.isoCode).map((city) => (
+                            <option key={city.name} value={city.name}>{city.name}</option>
+                          ));
+                        })()}
                       </select>
                     </div>
 
