@@ -319,6 +319,10 @@ const jobs = {
     return apiFetch<JobPayload>(`/api/jobs/${id}`);
   },
 
+  async getNextCode(): Promise<{ code: string }> {
+    return apiFetch<{ code: string }>('/api/jobs/next-code');
+  },
+
   async create(data: Record<string, any>): Promise<JobPayload> {
     return apiFetch<JobPayload>('/api/jobs', {
       method: 'POST',

@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
+import { getTenantIdentifier } from "@/utils/subdomain-helper";
 
 const WORK_AUTHORIZATION_OPTIONS = [
   "B1",
@@ -193,6 +194,7 @@ export default function NewJobPostingPage() {
   const [isWorkAuthOpen, setIsWorkAuthOpen] = useState(false);
   const workAuthDropdownRef = useRef<HTMLDivElement>(null);
   
+  const [tenantName, setTenantName] = useState("enfycon Inc");
   const [market, setMarket] = useState<"US" | "IN">("US");
   const currentWorkAuthOptions = market === "IN" ? INDIAN_WORK_AUTHORIZATION_OPTIONS : WORK_AUTHORIZATION_OPTIONS;
 
@@ -220,7 +222,7 @@ export default function NewJobPostingPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       businessUnit: "enfycon Inc",
-      jobCode: "JPC-" + Math.floor(1000 + Math.random() * 9000),
+      jobCode: "ENFY-" + Math.floor(1000 + Math.random() * 9000),
       country: "United States",
       states: "Texas",
       remoteJob: "Hybrid",
@@ -243,21 +245,66 @@ export default function NewJobPostingPage() {
     async function fetchProfile() {
       try {
         const prof = await atsApi.auth.me();
-        if (prof && prof.defaultMarket) {
-          const m = prof.defaultMarket as "US" | "IN";
-          setMarket(m);
+        if (prof) {
+          let tName = prof.tenant?.name || prof.tenantDomain || "";
+          if (!tName) {
+            tName = typeof window !== 'undefined' ? getTenantIdentifier() : "";
+          }
           
-          // Dynamically set defaults for the form depending on the market
-          if (m === "IN") {
-            setValue("country", "India");
-            setValue("states", "Karnataka");
-            setValue("workAuthorization", "Indian Citizen");
-            setValue("taxTerms", "Permanent");
+          if (!tName || tName === "temp") {
+            tName = "enfycon Inc";
+          } else if (tName.toLowerCase() === "deb") {
+            tName = "deb saas tenant";
           } else {
-            setValue("country", "United States");
-            setValue("states", "Texas");
-            setValue("workAuthorization", "US Authorized");
-            setValue("taxTerms", "C2C");
+            if (tName.toLowerCase().endsWith(".com")) {
+              tName = tName.slice(0, -4);
+            }
+            if (/^[a-z0-9-]+$/.test(tName)) {
+              tName = tName.charAt(0).toUpperCase() + tName.slice(1);
+            }
+          }
+
+          setTenantName(tName);
+          setValue("businessUnit", tName);
+
+          // Fetch dynamic next jobCode from the backend
+          const domain = prof.tenantDomain || (typeof window !== 'undefined' ? getTenantIdentifier() : "");
+          const cleanDomain = domain.toLowerCase().endsWith(".com") ? domain.slice(0, -4) : domain;
+          const tenantPrefix = (cleanDomain === 'temp' || !cleanDomain) ? 'ENFY' : cleanDomain.substring(0, 4).toUpperCase();
+          
+          try {
+            const res = await atsApi.jobs.getNextCode();
+            if (res && res.code) {
+              setValue("jobCode", res.code);
+            } else {
+              const prefix = `${tenantPrefix}JOB`;
+              const yy = new Date().getFullYear().toString().slice(-2);
+              const mm = String(new Date().getMonth() + 1).padStart(2, '0');
+              setValue("jobCode", `${prefix}-${yy}${mm}-XXXXX (Auto-generated)`);
+            }
+          } catch (e) {
+            const prefix = `${tenantPrefix}JOB`;
+            const yy = new Date().getFullYear().toString().slice(-2);
+            const mm = String(new Date().getMonth() + 1).padStart(2, '0');
+            setValue("jobCode", `${prefix}-${yy}${mm}-XXXXX (Auto-generated)`);
+          }
+
+          if (prof.defaultMarket) {
+            const m = prof.defaultMarket as "US" | "IN";
+            setMarket(m);
+            
+            // Dynamically set defaults for the form depending on the market
+            if (m === "IN") {
+              setValue("country", "India");
+              setValue("states", "Karnataka");
+              setValue("workAuthorization", "Indian Citizen");
+              setValue("taxTerms", "Permanent");
+            } else {
+              setValue("country", "United States");
+              setValue("states", "Texas");
+              setValue("workAuthorization", "US Authorized");
+              setValue("taxTerms", "C2C");
+            }
           }
         }
       } catch (err) {
@@ -676,14 +723,12 @@ export default function NewJobPostingPage() {
                     {/* BU */}
                     <div className="space-y-1">
                       <Label className="font-bold text-neutral-700 dark:text-neutral-300">Business Unit *</Label>
-                      <select
+                      <Input
+                        type="text"
+                        readOnly
                         {...register("businessUnit")}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                      >
-                        <option value="enfycon Inc">enfycon Inc</option>
-                        <option value="US Staffing">US Staffing</option>
-                        <option value="RPO Division">RPO Division</option>
-                      </select>
+                        className="h-8 text-xs bg-neutral-100 dark:bg-slate-800 border-neutral-300 dark:border-slate-700 font-semibold cursor-not-allowed"
+                      />
                       {errors.businessUnit && (
                         <p className="text-[10px] text-red-650 font-bold">{errors.businessUnit.message}</p>
                       )}
@@ -694,8 +739,9 @@ export default function NewJobPostingPage() {
                       <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Code *</Label>
                       <Input
                         type="text"
+                        readOnly
                         {...register("jobCode")}
-                        className="h-8 text-xs bg-white dark:bg-slate-950 border-neutral-300 dark:border-slate-700 font-semibold"
+                        className="h-8 text-xs bg-neutral-100 dark:bg-slate-800 border-neutral-300 dark:border-slate-700 font-semibold cursor-not-allowed"
                       />
                       {errors.jobCode && (
                         <p className="text-[10px] text-red-655 font-bold">{errors.jobCode.message}</p>
