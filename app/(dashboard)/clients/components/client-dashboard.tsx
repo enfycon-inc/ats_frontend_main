@@ -195,6 +195,18 @@ export default function ClientDashboard() {
     }
   }, [fetchClients]);
 
+  const handleBulkDelete = useCallback(async (selectedIds: string[]) => {
+    const loadingToast = toast.loading(`Deleting ${selectedIds.length} client(s)...`);
+    try {
+      await Promise.all(selectedIds.map(id => atsApi.clients.delete(id)));
+      toast.success("Selected clients deleted successfully.", { id: loadingToast });
+      fetchClients();
+    } catch (err) {
+      toast.error("Failed to delete some clients.", { id: loadingToast });
+      fetchClients();
+    }
+  }, [fetchClients]);
+
   const handleRefresh = () => {
     setCurrentFilters({ primary: "All selected", predefined: [] });
     setActiveView("All Clients");
@@ -293,6 +305,7 @@ export default function ClientDashboard() {
             activeView={activeView}
             onSelectView={handleSelectView}
             onUpdateRecord={handleUpdateRecord}
+            onBulkDelete={handleBulkDelete}
             searchFilterOptions={[
               { label: "Search Any", value: "All" },
               { label: "Client ID", value: "clientId" },
