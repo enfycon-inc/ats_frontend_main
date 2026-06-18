@@ -1847,23 +1847,6 @@ export default function NewJobPostingPage() {
                       />
                     </div>
 
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => toast.success("Connected to Dropbox catalog")}
-                        className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-300 dark:border-slate-700 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
-                      >
-                        Connect Dropbox
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toast.success("Connected to OneDrive catalog")}
-                        className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-300 dark:border-slate-700 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
-                      >
-                        Connect OneDrive
-                      </button>
-                    </div>
-
                     {/* Uploaded List */}
                     {uploadedFiles.length > 0 && (
                       <div className="space-y-1.5 pt-2 border-t border-neutral-200 dark:border-slate-800">
