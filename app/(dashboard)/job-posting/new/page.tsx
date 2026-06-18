@@ -38,10 +38,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
-
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { AddClientModal } from "../components/add-client-modal";
+
+
+
+
+
 
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
@@ -192,14 +196,10 @@ export default function NewJobPostingPage() {
 
   // Documents file state
   const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: string }[]>([]);
-
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const [addClientModalOpen, setAddClientModalOpen] = useState(false);
   const [clientList, setClientList] = useState<any[]>([]);
   const [clientSearchText, setClientSearchText] = useState("");
-
-
-  // WYSIWYG Editor custom HTML state / source mode state
   const [isHtmlMode, setIsHtmlMode] = useState(false);
   const [respondByType, setRespondByType] = useState("Open Until Filled");
   const [workAuthSearch, setWorkAuthSearch] = useState("");
@@ -325,16 +325,12 @@ export default function NewJobPostingPage() {
       }
     }
 
-    async function fetchClients() {
-      try {
-        const res = await atsApi.clients.list();
-        setClientList(res || []);
-      } catch (e) {
-        console.error("Failed to fetch clients:", e);
-      }
-    }
+    
+
+    async function fetchClients() { try { const res = await atsApi.clients.list(); setClientList(res || []); } catch(e) { console.error("Failed", e); } }
 
     fetchProfile();
+    fetchClients();
     fetchClients();
   }, [setValue]);
 
@@ -512,15 +508,7 @@ export default function NewJobPostingPage() {
           <ChevronUp className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
         )}
   
-      <AddClientModal 
-        open={addClientModalOpen} 
-        onOpenChange={setAddClientModalOpen} 
-        onClientAdded={(name) => {
-          setValue("client", name, { shouldValidate: true });
-          atsApi.clients.list().then(res => setClientList(res || []));
-        }} 
-      />
-    </div>
+      </div>
   );
 };
 
@@ -1112,18 +1100,13 @@ export default function NewJobPostingPage() {
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0" align="start">
                           <Command>
-                            <CommandInput 
-                              placeholder="Search for a Client" 
-                              className="h-9 text-xs" 
-                              value={clientSearchText}
-                              onValueChange={setClientSearchText}
-                            />
+                            <CommandInput placeholder="Search for a Client" className="h-9 text-xs" />
                             <CommandList>
                               <CommandEmpty className="py-6 text-center text-xs text-neutral-500">
-                                {clientSearchText.trim().length === 0 ? "Start typing to search..." : "No client found."}
+                                No client found.
                               </CommandEmpty>
                               <CommandGroup>
-                                {clientSearchText.trim().length > 0 && clientList.map((cl) => (
+                                {clientList.map((cl) => (
                                   <CommandItem
                                     key={cl.id}
                                     value={cl.client_name}
@@ -1774,14 +1757,6 @@ export default function NewJobPostingPage() {
         </form>
       )}
 
-      <AddClientModal 
-        open={addClientModalOpen} 
-        onOpenChange={setAddClientModalOpen} 
-        onClientAdded={(name) => {
-          setValue("client", name, { shouldValidate: true });
-          atsApi.clients.list().then(res => setClientList(res || []));
-        }} 
-      />
-    </div>
+      </div>
   );
 }
