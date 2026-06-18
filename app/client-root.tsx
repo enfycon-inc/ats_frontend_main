@@ -41,7 +41,8 @@ export function ClientRoot({
   }, [session]);
   const isViewportLocked = 
     (pathname?.startsWith("/job-posting") && !pathname.endsWith("/new")) ||
-    (pathname?.startsWith("/applicants") && !pathname.endsWith("/new"));
+    (pathname?.startsWith("/applicants") && !pathname.endsWith("/new")) ||
+    (pathname?.startsWith("/clients") && !pathname.endsWith("/new"));
 
   return (
     <ThemeProvider

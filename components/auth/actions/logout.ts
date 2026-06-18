@@ -6,9 +6,9 @@ export type LogoutResponse = { success: true } | { error: string };
 
 export async function doLogout(): Promise<LogoutResponse> {
   try {
-    const cookieStore = await cookies(); 
+    const cookieStore = await cookies();
 
-    cookieStore.delete("authjs.session-token"); 
+    cookieStore.delete("authjs.session-token");
 
     return { success: true };
   } catch (error) {

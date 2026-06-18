@@ -411,11 +411,42 @@ const candidates = {
   },
 };
 
+const clients = {
+  async list(): Promise<any[]> {
+    return apiFetch<any[]>('/api/clients');
+  },
+
+  async get(id: string): Promise<any> {
+    return apiFetch<any>(`/api/clients/${id}`);
+  },
+
+  async create(data: Record<string, any>): Promise<any> {
+    return apiFetch<any>('/api/clients', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async update(id: string, data: Record<string, any>): Promise<any> {
+    return apiFetch<any>(`/api/clients/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async delete(id: string): Promise<any> {
+    return apiFetch<any>(`/api/clients/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────
 export const atsApi = {
   auth,
   jobs,
   candidates,
+  clients,
   fetch: apiFetch,
 };
 
