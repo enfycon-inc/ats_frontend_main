@@ -24,6 +24,7 @@ export interface Job {
     offered: number;
   };
   agingDays: number;
+  market?: "US" | "IN";
 }
 
 /**
@@ -53,6 +54,7 @@ export function mapApiJobToJob(api: any): Job {
     submissionsCount: api.submissionsCount || 0,
     pipeline: api.pipeline || { applied: 0, interviewing: 0, offered: 0 },
     agingDays: api.agingDays || 0,
+    market: api.market || "US",
   };
 }
 

@@ -110,10 +110,12 @@ export default function JobPostingDashboard({
       const apiJobs = await atsApi.jobs.list();
       if (apiJobs && apiJobs.length > 0) {
         const mapped = apiJobs.map(mapApiJobToJob);
+        // Filter by the current market shift (defaulting to "US" if not present)
+        const shiftJobs = mapped.filter((job) => (job.market || "US") === market);
         // Pre-filter by status if required
-        const filteredByRoute = mapped.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
+        const filteredByRoute = shiftJobs.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
 
-        setAllJobs(mapped);
+        setAllJobs(shiftJobs);
         setJobsData(filteredByRoute);
       } else {
         const fallbackJobs = market === "IN" ? mockJobsIN : mockJobs;

@@ -308,6 +308,7 @@ export interface JobPayload {
   submissionsCount: number;
   agingDays: number;
   pipeline: { applied: number; interviewing: number; offered: number };
+  market?: string;
 }
 
 const jobs = {
