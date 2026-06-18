@@ -48,6 +48,15 @@ import { AddClientModal } from "../components/add-client-modal";
 
 
 import { Country, State, City } from "country-state-city";
+
+// Convert ISO code to emoji flag using Unicode regional indicator characters
+const getFlagEmoji = (isoCode: string): string => {
+  if (!isoCode || isoCode.length !== 2) return "🌐";
+  return isoCode.toUpperCase().split("").map((c) =>
+    String.fromCodePoint(0x1f1e0 - 65 + c.charCodeAt(0))
+  ).join("");
+};
+
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
 
@@ -1060,7 +1069,7 @@ export default function NewJobPostingPage() {
                                     className="text-xs cursor-pointer"
                                   >
                                     <Check className={cn("mr-2 h-3 w-3", watch("country") === co.name ? "opacity-100" : "opacity-0")} />
-                                    {co.flag} {co.name}
+                                    <span className="mr-1.5">{getFlagEmoji(co.isoCode)}</span>{co.name}
                                   </CommandItem>
                                 ))}
                               </CommandGroup>
