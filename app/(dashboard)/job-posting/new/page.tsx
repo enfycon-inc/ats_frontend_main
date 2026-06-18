@@ -48,6 +48,8 @@ import { AddClientModal } from "../components/add-client-modal";
 
 
 import { Country, State, City } from "country-state-city";
+import ReactCountryFlag from "react-country-flag";
+
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
 
@@ -1030,52 +1032,140 @@ export default function NewJobPostingPage() {
                     {/* Country */}
                     <div className="space-y-1">
                       <label className="font-bold text-neutral-700 dark:text-neutral-300">Country <span className="text-red-500">*</span></label>
-                      <select
-                        {...register("country")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                      >
-                        {market === "IN" ? (
-                          <>
-                            <option value="India">India</option>
-                            <option value="United States">United States</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="United States">United States</option>
-                            <option value="Canada">Canada</option>
-                            <option value="United Kingdom">United Kingdom</option>
-                          </>
-                        )}
-                      </select>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-955"
+                          >
+                            <span className="truncate">{watch("country") || "Select Country..."}</span>
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[280px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search country..." className="h-9 text-xs" />
+                            <CommandList className="max-h-[220px]">
+                              <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No country found.</CommandEmpty>
+                              <CommandGroup>
+                                {Country.getAllCountries().map((co) => (
+                                  <CommandItem
+                                    key={co.isoCode}
+                                    value={co.name}
+                                    onSelect={() => {
+                                      setValue("country", co.name, { shouldValidate: true });
+                                      setValue("states", "");
+                                      setValue("city", "");
+                                    }}
+                                    className="text-xs cursor-pointer"
+                                  >
+                                    <Check className={cn("mr-2 h-3 w-3", watch("country") === co.name ? "opacity-100" : "opacity-0")} />
+                                    <ReactCountryFlag countryCode={co.isoCode} svg className="mr-1.5" style={{ width: "1.1em", height: "1.1em" }} />
+                                    {co.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      {errors.country && <p className="text-[10px] text-red-655 font-bold">{errors.country.message}</p>}
                     </div>
 
                     {/* States */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">States <span className="text-red-500">*</span></label>
-                      <select
-                        {...register("states")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                      >
-                        {market === "IN" ? (
-                          <>
-                            <option value="Karnataka">Karnataka (Bengaluru)</option>
-                            <option value="Maharashtra">Maharashtra (Mumbai/Pune)</option>
-                            <option value="Telangana">Telangana (Hyderabad)</option>
-                            <option value="Tamil Nadu">Tamil Nadu (Chennai)</option>
-                            <option value="Delhi NCR">Delhi NCR (Noida/Gurgaon)</option>
-                            <option value="Haryana">Haryana</option>
-                            <option value="Gujarat">Gujarat</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="Texas">Texas</option>
-                            <option value="California">California</option>
-                            <option value="New York">New York</option>
-                            <option value="New Jersey">New Jersey</option>
-                            <option value="Georgia">Georgia</option>
-                          </>
-                        )}
-                      </select>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">State <span className="text-red-500">*</span></label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            role="combobox"
+                            disabled={!watch("country")}
+                            className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-955 disabled:opacity-50"
+                          >
+                            <span className="truncate">{watch("states") || "Select State..."}</span>
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[280px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search state..." className="h-9 text-xs" />
+                            <CommandList className="max-h-[220px]">
+                              <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No state found.</CommandEmpty>
+                              <CommandGroup>
+                                {(() => {
+                                  const countryObj = Country.getAllCountries().find(co => co.name === watch("country"));
+                                  if (!countryObj) return null;
+                                  return State.getStatesOfCountry(countryObj.isoCode).map((st) => (
+                                    <CommandItem
+                                      key={st.isoCode}
+                                      value={st.name}
+                                      onSelect={() => {
+                                        setValue("states", st.name, { shouldValidate: true });
+                                        setValue("city", "");
+                                      }}
+                                      className="text-xs cursor-pointer"
+                                    >
+                                      <Check className={cn("mr-2 h-3 w-3", watch("states") === st.name ? "opacity-100" : "opacity-0")} />
+                                      {st.name}
+                                    </CommandItem>
+                                  ));
+                                })()}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      {errors.states && <p className="text-[10px] text-red-655 font-bold">{errors.states.message}</p>}
+                    </div>
+
+                    {/* City */}
+                    <div className="space-y-1">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">City</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            role="combobox"
+                            disabled={!watch("states")}
+                            className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-955 disabled:opacity-50"
+                          >
+                            <span className="truncate">{watch("city") || "Select City..."}</span>
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[280px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search city..." className="h-9 text-xs" />
+                            <CommandList className="max-h-[220px]">
+                              <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No city found.</CommandEmpty>
+                              <CommandGroup>
+                                {(() => {
+                                  const countryObj = Country.getAllCountries().find(co => co.name === watch("country"));
+                                  if (!countryObj) return null;
+                                  const stateObj = State.getStatesOfCountry(countryObj.isoCode).find(st => st.name === watch("states"));
+                                  if (!stateObj) return null;
+                                  return City.getCitiesOfState(countryObj.isoCode, stateObj.isoCode).map((city) => (
+                                    <CommandItem
+                                      key={city.name}
+                                      value={city.name}
+                                      onSelect={() => setValue("city", city.name, { shouldValidate: true })}
+                                      className="text-xs cursor-pointer"
+                                    >
+                                      <Check className={cn("mr-2 h-3 w-3", watch("city") === city.name ? "opacity-100" : "opacity-0")} />
+                                      {city.name}
+                                    </CommandItem>
+                                  ));
+                                })()}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
 
                     {/* Remote Job */}
