@@ -38,6 +38,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
+
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { AddClientModal } from "../components/add-client-modal";
+
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
 
@@ -122,6 +127,7 @@ const formSchema = zod.object({
   locationAutocomplete: zod.string().optional(),
   employmentTestTemplate: zod.string().optional(),
   turnaroundTime: zod.string().optional(),
+  jobType: zod.string().min(1, "Job Type is required"),
   taxTerms: zod.string().min(1, "Tax Terms are required"),
   domain: zod.string().optional(),
   noticePeriod: zod.string().optional(),
@@ -179,13 +185,19 @@ export default function NewJobPostingPage() {
   const [isParsing, setIsParsing] = useState(false);
 
   // Skill tags state
-  const [primarySkills, setPrimarySkills] = useState<string[]>(["Java", "Spring Boot", "React"]);
+  const [primarySkills, setPrimarySkills] = useState<string[]>([]);
   const [newPrimarySkill, setNewPrimarySkill] = useState("");
-  const [secondarySkills, setSecondarySkills] = useState<string[]>(["Docker", "AWS", "Git"]);
+  const [secondarySkills, setSecondarySkills] = useState<string[]>([]);
   const [newSecondarySkill, setNewSecondarySkill] = useState("");
 
   // Documents file state
   const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: string }[]>([]);
+
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
+  const [addClientModalOpen, setAddClientModalOpen] = useState(false);
+  const [clientList, setClientList] = useState<any[]>([]);
+  const [clientSearchText, setClientSearchText] = useState("");
+
 
   // WYSIWYG Editor custom HTML state / source mode state
   const [isHtmlMode, setIsHtmlMode] = useState(false);
@@ -226,13 +238,14 @@ export default function NewJobPostingPage() {
       country: "United States",
       states: "Texas",
       remoteJob: "Hybrid",
-      hoursPerWeek: 40,
+      hoursPerWeek: undefined,
       jobStatus: "Active",
       priority: "Warm",
-      workAuthorization: "US Authorized",
+      workAuthorization: undefined,
+      jobType: "Contract",
       taxTerms: "C2C",
-      expMin: 3,
-      expMax: 8,
+      expMin: undefined,
+      expMax: undefined,
       numPositions: 1,
       maxSubmissions: 5,
       postToPortal: true,
@@ -311,7 +324,18 @@ export default function NewJobPostingPage() {
         console.error("Failed to load user profile:", err);
       }
     }
+
+    async function fetchClients() {
+      try {
+        const res = await atsApi.clients.list();
+        setClientList(res || []);
+      } catch (e) {
+        console.error("Failed to fetch clients:", e);
+      }
+    }
+
     fetchProfile();
+    fetchClients();
   }, [setValue]);
 
   const getSelectedDisplayText = () => {
@@ -416,7 +440,7 @@ export default function NewJobPostingPage() {
         title: data.jobTitle,
         client: data.client,
         location: data.locationAutocomplete || data.states || "Remote",
-        type: data.taxTerms || "Contract",
+        type: data.jobType || "Contract",
         description: data.jobDescription,
         skillsRequired: primarySkills,
         secondarySkills: secondarySkills,
@@ -487,9 +511,18 @@ export default function NewJobPostingPage() {
         ) : (
           <ChevronUp className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
         )}
-      </div>
-    );
-  };
+  
+      <AddClientModal 
+        open={addClientModalOpen} 
+        onOpenChange={setAddClientModalOpen} 
+        onClientAdded={(name) => {
+          setValue("client", name, { shouldValidate: true });
+          atsApi.clients.list().then(res => setClientList(res || []));
+        }} 
+      />
+    </div>
+  );
+};
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-neutral-50/50 dark:bg-slate-900/10 font-sans">
@@ -722,7 +755,7 @@ export default function NewJobPostingPage() {
                   <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
                     {/* BU */}
                     <div className="space-y-1">
-                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Business Unit *</Label>
+                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Business Unit <span className="text-red-500">*</span></Label>
                       <Input
                         type="text"
                         readOnly
@@ -736,7 +769,7 @@ export default function NewJobPostingPage() {
 
                     {/* Job Code */}
                     <div className="space-y-1">
-                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Code *</Label>
+                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Code <span className="text-red-500">*</span></Label>
                       <Input
                         type="text"
                         readOnly
@@ -761,7 +794,7 @@ export default function NewJobPostingPage() {
 
                     {/* Job Title */}
                     <div className="space-y-1">
-                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Title *</Label>
+                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Title <span className="text-red-500">*</span></Label>
                       <Input
                         type="text"
                         {...register("jobTitle")}
@@ -776,7 +809,7 @@ export default function NewJobPostingPage() {
                     {/* Bill Rate */}
                     <div className="space-y-1 md:col-span-2">
                       <div className="flex items-center gap-1">
-                        <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Bill Rate / Salary *</Label>
+                        <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Bill Rate / Salary <span className="text-red-500">*</span></Label>
                         <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Bill rate information">?</span>
                       </div>
                       <div className="flex gap-1 items-center">
@@ -822,8 +855,7 @@ export default function NewJobPostingPage() {
                             <>
                               <option value="Permanent">Permanent</option>
                               <option value="Contract">Contract</option>
-                              <option value="C2H">C2H</option>
-                              <option value="Freelance">Freelance</option>
+                              
                             </>
                           ) : (
                             <>
@@ -831,11 +863,7 @@ export default function NewJobPostingPage() {
                               <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
                               <option value="C2C">C2C</option>
                               <option value="1099">1099</option>
-                              <option value="C2H">C2H</option>
-                              <option value="Full Time">Full Time</option>
-                              <option value="Part Time">Part Time</option>
-                              <option value="Intern">Intern</option>
-                              <option value="Seasonal">Seasonal</option>
+                              
                               <option value="Other">Other</option>
                             </>
                           )}
@@ -849,7 +877,7 @@ export default function NewJobPostingPage() {
                     {/* Pay Rate */}
                     <div className="space-y-1 md:col-span-2">
                       <div className="flex items-center gap-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Pay Rate / Salary *</label>
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Pay Rate / Salary <span className="text-red-500">*</span></label>
                         <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Pay rate information">?</span>
                       </div>
                       <div className="flex gap-1 items-center">
@@ -896,8 +924,7 @@ export default function NewJobPostingPage() {
                             <>
                               <option value="Permanent">Permanent</option>
                               <option value="Contract">Contract</option>
-                              <option value="C2H">C2H</option>
-                              <option value="Freelance">Freelance</option>
+                              
                             </>
                           ) : (
                             <>
@@ -905,11 +932,7 @@ export default function NewJobPostingPage() {
                               <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
                               <option value="C2C">C2C</option>
                               <option value="1099">1099</option>
-                              <option value="C2H">C2H</option>
-                              <option value="Full Time">Full Time</option>
-                              <option value="Part Time">Part Time</option>
-                              <option value="Intern">Intern</option>
-                              <option value="Seasonal">Seasonal</option>
+                              
                               <option value="Other">Other</option>
                             </>
                           )}
@@ -922,7 +945,7 @@ export default function NewJobPostingPage() {
 
                     {/* Job Start Date */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Start Date *</label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Start Date <span className="text-red-500">*</span></label>
                       <input
                         type="date"
                         {...register("startDate")}
@@ -967,7 +990,7 @@ export default function NewJobPostingPage() {
 
                     {/* Country */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Country *</label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Country <span className="text-red-500">*</span></label>
                       <select
                         {...register("country")}
                         className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
@@ -989,7 +1012,7 @@ export default function NewJobPostingPage() {
 
                     {/* States */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">States *</label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">States <span className="text-red-500">*</span></label>
                       <select
                         {...register("states")}
                         className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
@@ -1018,7 +1041,7 @@ export default function NewJobPostingPage() {
 
                     {/* Remote Job */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Remote Job *</label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Remote Job <span className="text-red-500">*</span></label>
                       <div className="flex items-center gap-4 h-8 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                         <label className="flex items-center gap-1.5 cursor-pointer">
                           <input
@@ -1060,7 +1083,7 @@ export default function NewJobPostingPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Status</label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Status <span className="text-red-500">*</span></label>
                       <select
                         {...register("jobStatus")}
                         className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-green-700 dark:text-green-400 font-bold cursor-pointer"
@@ -1073,18 +1096,69 @@ export default function NewJobPostingPage() {
                     </div>
 
                     {/* Client */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Client *</label>
-                      <select
-                        {...register("client")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                      >
-                        <option value="">-- Select Client --</option>
-                        <option value="A2C Consulting">A2C Consulting</option>
-                        <option value="Cleo Consulting INC">Cleo Consulting INC</option>
-                        <option value="Zen & Art">Zen & Art</option>
-                        <option value="Morph Enterprise">Morph Enterprise</option>
-                      </select>
+                    <div className="space-y-1 flex flex-col">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Client <span className="text-red-500">*</span></label>
+                      <Popover open={clientDropdownOpen} onOpenChange={setClientDropdownOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={clientDropdownOpen}
+                            className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-955"
+                          >
+                            {watch("client") ? watch("client") : "Search for a Client"}
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0" align="start">
+                          <Command>
+                            <CommandInput 
+                              placeholder="Search for a Client" 
+                              className="h-9 text-xs" 
+                              value={clientSearchText}
+                              onValueChange={setClientSearchText}
+                            />
+                            <CommandList>
+                              <CommandEmpty className="py-6 text-center text-xs text-neutral-500">
+                                {clientSearchText.trim().length === 0 ? "Start typing to search..." : "No client found."}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {clientSearchText.trim().length > 0 && clientList.map((cl) => (
+                                  <CommandItem
+                                    key={cl.id}
+                                    value={cl.client_name}
+                                    onSelect={(currentValue) => {
+                                      setValue("client", cl.client_name, { shouldValidate: true });
+                                      setClientDropdownOpen(false);
+                                    }}
+                                    className="text-xs cursor-pointer"
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        watch("client") === cl.client_name ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {cl.client_name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                            <div className="p-2 border-t">
+                              <button
+                                type="button"
+                                className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer w-full text-xs"
+                                onClick={() => {
+                                  setClientDropdownOpen(false);
+                                  setAddClientModalOpen(true);
+                                }}
+                              >
+                                + Add Client
+                              </button>
+                            </div>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       {errors.client && (
                         <p className="text-[10px] text-red-655 font-bold">{errors.client.message}</p>
                       )}
@@ -1103,7 +1177,7 @@ export default function NewJobPostingPage() {
 
                     {/* Priority */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Priority</label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Priority <span className="text-red-500">*</span></label>
                       <select
                         {...register("priority")}
                         className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 cursor-pointer"
@@ -1116,7 +1190,7 @@ export default function NewJobPostingPage() {
 
                     {/* Work Auth */}
                     <div className="space-y-1 relative" ref={workAuthDropdownRef}>
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Work Authorization *</label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Work Authorization <span className="text-red-500">*</span></label>
                       
                       {/* Trigger Input (styled like standard select field) */}
                       <div
@@ -1300,9 +1374,26 @@ export default function NewJobPostingPage() {
                       )}
                     </div>
 
+                                        {/* Job Type */}
+                    <div className="space-y-1">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Type <span className="text-red-500">*</span></label>
+                      <select
+                        {...register("jobType")}
+                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                      >
+                        <option value="Full Time">Full Time</option>
+                        <option value="Part Time">Part Time</option>
+                        <option value="Contract">Contract</option>
+                        <option value="C2H">C2H</option>
+                        <option value="Intern">Intern</option>
+                        <option value="Seasonal">Seasonal</option>
+                        <option value="Freelance">Freelance</option>
+                      </select>
+                    </div>
+
                     {/* Tax Terms */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Tax Terms *</label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Tax Terms <span className="text-red-500">*</span></label>
                       <select
                         {...register("taxTerms")}
                         className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
@@ -1311,8 +1402,7 @@ export default function NewJobPostingPage() {
                           <>
                             <option value="Permanent">Permanent</option>
                             <option value="Contract">Contract</option>
-                            <option value="C2H">C2H (Contract-to-Hire)</option>
-                            <option value="Freelance">Freelance</option>
+                            
                           </>
                         ) : (
                           <>
@@ -1320,11 +1410,7 @@ export default function NewJobPostingPage() {
                             <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
                             <option value="C2C">C2C</option>
                             <option value="1099">1099</option>
-                            <option value="C2H">C2H</option>
-                            <option value="Full Time">Full Time</option>
-                            <option value="Part Time">Part Time</option>
-                            <option value="Intern">Intern</option>
-                            <option value="Seasonal">Seasonal</option>
+                            
                             <option value="Other">Other</option>
                           </>
                         )}
@@ -1467,7 +1553,7 @@ export default function NewJobPostingPage() {
                   <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
                     {/* Positions */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Number of Positions</label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Number of Positions <span className="text-red-500">*</span></label>
                       <input
                         type="number"
                         {...register("numPositions", { valueAsNumber: true })}
@@ -1477,7 +1563,7 @@ export default function NewJobPostingPage() {
 
                     {/* Max Submissions */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Maximum Allowed Submissions</label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Maximum Allowed Submissions <span className="text-red-500">*</span></label>
                       <input
                         type="number"
                         {...register("maxSubmissions", { valueAsNumber: true })}
@@ -1687,6 +1773,15 @@ export default function NewJobPostingPage() {
           </div>
         </form>
       )}
+
+      <AddClientModal 
+        open={addClientModalOpen} 
+        onOpenChange={setAddClientModalOpen} 
+        onClientAdded={(name) => {
+          setValue("client", name, { shouldValidate: true });
+          atsApi.clients.list().then(res => setClientList(res || []));
+        }} 
+      />
     </div>
   );
 }
