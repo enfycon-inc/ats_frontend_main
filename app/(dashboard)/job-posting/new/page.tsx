@@ -686,7 +686,7 @@ export default function NewJobPostingPage() {
                   New Job Requirement Form
                 </h2>
                 <p className="text-[10px] text-neutral-500 font-semibold mt-0.5">
-                  {market === "IN" ? "Enfycon India IT Recruitment Workspace" : "Enfycon US IT Recruitment Workspace"}
+                  {market === "IN" ? `${tenantName} India IT Recruitment Workspace` : `${tenantName} US IT Recruitment Workspace`}
                 </p>
               </div>
             </div>
