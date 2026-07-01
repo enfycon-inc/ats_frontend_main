@@ -362,6 +362,11 @@ export const data = {
           circleColor: "bg-emerald-500",
         },
         {
+          title: "Recruitment Pods",
+          url: "/utility/pods",
+          circleColor: "bg-violet-500",
+        },
+        {
           title: "Notification",
           url: "/settings-notification",
           circleColor: "bg-yellow-500",

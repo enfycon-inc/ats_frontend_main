@@ -403,6 +403,7 @@ export default function RolesPermissionsPage() {
                       <option value="ADMIN">Admin Template</option>
                       <option value="DELIVERY_HEAD">Delivery Head Template</option>
                       <option value="TRACKER">Tracker Template</option>
+                      <option value="POD_LEAD">Pod Lead Template</option>
                     </select>
                   </div>
                   <div className="space-y-1">

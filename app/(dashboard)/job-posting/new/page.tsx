@@ -107,7 +107,6 @@ const formSchema = zod.object({
   // Business Info
   businessUnit: zod.string().min(1, "Business Unit is required"),
   jobCode: zod.string().min(2, "Job Code is required"),
-  facility: zod.string().optional(),
   jobTitle: zod.string().min(3, "Job Title must be at least 3 characters"),
   clientBillRate: zod.string().min(1, "Client Bill Rate is required"),
   payRate: zod.string().min(1, "Pay Rate is required"),
@@ -257,6 +256,10 @@ export default function NewJobPostingPage() {
   const [isWorkAuthOpen, setIsWorkAuthOpen] = useState(false);
   const workAuthDropdownRef = useRef<HTMLDivElement>(null);
   
+  // Pod selection (optional override — defaults to auto round-robin)
+  const [podsList, setPodsList] = useState<any[]>([]);
+  const [selectedPodId, setSelectedPodId] = useState("");
+  
   const [tenantName, setTenantName] = useState("enfycon Inc");
   const [market, setMarket] = useState<"US" | "IN">("US");
   const currentWorkAuthOptions = market === "IN" ? INDIAN_WORK_AUTHORIZATION_OPTIONS : WORK_AUTHORIZATION_OPTIONS;
@@ -303,6 +306,7 @@ export default function NewJobPostingPage() {
       postToPortal: true,
       displayContactOnPortal: false,
       jobDescription: "",
+      noticePeriod: "",
     },
   });
 
@@ -380,10 +384,11 @@ export default function NewJobPostingPage() {
     
 
     async function fetchClients() { try { const res = await atsApi.clients.list(); setClientList(res || []); } catch(e) { console.error("Failed", e); } }
+    async function fetchPods() { try { const res = await atsApi.pods.list(); setPodsList(res || []); } catch(e) { console.warn("Could not load pods", e); } }
 
     fetchProfile();
     fetchClients();
-    fetchClients();
+    fetchPods();
   }, [setValue]);
 
   const getSelectedDisplayText = () => {
@@ -518,6 +523,10 @@ export default function NewJobPostingPage() {
         degree: data.degree || undefined,
         expMin: data.expMin,
         expMax: data.expMax,
+        respondBy: respondByType === "Date Option" ? (data.respondBy || undefined) : undefined,
+        noticePeriod: data.noticePeriod || undefined,
+        // Pod assignment override — if empty, backend auto-assigns via round-robin
+        podId: selectedPodId || undefined,
       };
 
       const created = await atsApi.jobs.create(payload);
@@ -822,19 +831,8 @@ export default function NewJobPostingPage() {
                       )}
                     </div>
 
-                    {/* Facility */}
-                    <div className="space-y-1">
-                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Facility</Label>
-                      <Input
-                        type="text"
-                        {...register("facility")}
-                        className="h-8 text-xs bg-white dark:bg-slate-950 border-neutral-300 dark:border-slate-700"
-                        placeholder="e.g. HQ Office"
-                      />
-                    </div>
-
                     {/* Job Title */}
-                    <div className="space-y-1">
+                    <div className="space-y-1 md:col-span-2">
                       <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Title <span className="text-red-500">*</span></Label>
                       <Input
                         type="text"
@@ -1541,6 +1539,23 @@ export default function NewJobPostingPage() {
                       </select>
                     </div>
 
+                    {/* Notice Period */}
+                    <div className="space-y-1">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Notice Period</label>
+                      <select
+                        {...register("noticePeriod")}
+                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                      >
+                        <option value="">Select Notice Period</option>
+                        <option value="Immediate">Immediate</option>
+                        <option value="15 Days">15 Days</option>
+                        <option value="30 Days">30 Days</option>
+                        <option value="45 Days">45 Days</option>
+                        <option value="60 Days">60 Days</option>
+                        <option value="90 Days">90 Days</option>
+                      </select>
+                    </div>
+
                     {/* Location Autocomplete */}
                     <div className="space-y-1">
                       <label className="font-bold text-neutral-700 dark:text-neutral-300">Location Autocomplete</label>
@@ -1719,7 +1734,35 @@ export default function NewJobPostingPage() {
                         <option value="Kunal Sharma">Kunal Sharma</option>
                       </select>
                     </div>
+
+                    {/* Recruitment Pod Assignment */}
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
+                        <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-violet-100 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400">
+                          <User className="h-2.5 w-2.5" />
+                        </span>
+                        Recruitment Pod Assignment
+                      </label>
+                      <select
+                        value={selectedPodId}
+                        onChange={(e) => setSelectedPodId(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                      >
+                        <option value="">🔄 Auto — Round-Robin (Recommended)</option>
+                        {podsList.map((pod: any) => (
+                          <option key={pod.id} value={pod.id}>
+                            {pod.name}{pod.podHeadName ? ` — Lead: ${pod.podHeadName}` : ""}{" "}
+                            {pod.isAvailableForAssignment ? "✅" : "⏳"}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-neutral-400 leading-relaxed">
+                        Leave as <strong>Auto</strong> to let the system route via round-robin. Select a specific pod to override.{" "}
+                        {podsList.length === 0 && <span className="text-amber-500 font-semibold">No pods configured — create pods first in Utility → Recruitment Pods.</span>}
+                      </p>
+                    </div>
                   </div>
+
                 )}
               </div>
 

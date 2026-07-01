@@ -71,6 +71,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   roles: data.user.roles || [],
                   accessToken: data.accessToken,
                   tenantDomain: data.user.tenantDomain || '',
+                  systemRole: data.user.systemRole || 'RECRUITER',
+                  podId: data.user.podId || null,
                 }
               }
             }
@@ -81,15 +83,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           // 2. Fallback: Authenticate using hardcoded local mock data
           const user = await getUserFromDb(email, password)
           if (user) {
+            const resolvedRole = user.name.toUpperCase().includes('ADMIN') ? 'ADMIN' : 'RECRUITER';
             return {
               id: user.email,
               name: user.name,
               email: user.email,
               image: user.image,
               permissions: ['job:create', 'job:edit', 'job:view', 'candidate:create', 'candidate:view', 'submission:create', 'submission:edit', 'tenant:settings', 'user:manage'],
-              roles: [user.name.toUpperCase().includes('ADMIN') ? 'ADMIN' : 'RECRUITER'],
+              roles: [resolvedRole],
               accessToken: 'mock-jwt-token',
               tenantDomain: '',
+              systemRole: resolvedRole,
+              podId: null,
             }
           }
 
@@ -131,6 +136,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.roles = (user as any).roles || []
         token.accessToken = (user as any).accessToken
         token.tenantDomain = (user as any).tenantDomain
+        token.systemRole = (user as any).systemRole
+        token.podId = (user as any).podId
       }
       return token
     },
@@ -141,6 +148,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as any).roles = token.roles || [];
         (session.user as any).accessToken = token.accessToken;
         (session.user as any).tenantDomain = token.tenantDomain;
+        (session.user as any).systemRole = token.systemRole;
+        (session.user as any).podId = token.podId;
       }
       return session
     }

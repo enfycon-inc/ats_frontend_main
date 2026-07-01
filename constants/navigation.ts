@@ -93,6 +93,18 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
     ],
   },
   {
+    id: "placements",
+    label: "Placements",
+    href: "/placements",
+    icon: MapPin,
+    children: [
+      { label: "Active Placements", href: "/placements/active" },
+      { label: "Ended Placements", href: "/placements/ended" },
+      { label: "Timesheets", href: "/placements/timesheets" },
+      { label: "Expenses", href: "/placements/expenses" },
+    ],
+  },
+  {
     id: "clients",
     label: "Clients",
     href: "/clients",
@@ -102,17 +114,6 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
       { label: "Contacts", href: "/clients/contacts" },
       { label: "Agreements", href: "/clients/agreements" },
       { label: "Invoices", href: "/clients/invoices" },
-    ],
-  },
-  {
-    id: "vendors",
-    label: "Vendors",
-    href: "/vendors",
-    icon: Store,
-    children: [
-      { label: "Vendor List", href: "/vendors/list" },
-      { label: "Vendor Portal", href: "/vendors/portal" },
-      { label: "Submissions", href: "/vendors/submissions" },
     ],
   },
   {
@@ -127,6 +128,17 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
     ],
   },
   {
+    id: "vendors",
+    label: "Vendors",
+    href: "/vendors",
+    icon: Store,
+    children: [
+      { label: "Vendor List", href: "/vendors/list" },
+      { label: "Vendor Portal", href: "/vendors/portal" },
+      { label: "Submissions", href: "/vendors/submissions" },
+    ],
+  },
+  {
     id: "onboarding",
     label: "Onboarding",
     href: "/onboarding",
@@ -136,18 +148,6 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
       { label: "Documents", href: "/onboarding/documents" },
       { label: "Checklists", href: "/onboarding/checklists" },
       { label: "Background Checks", href: "/onboarding/background-checks" },
-    ],
-  },
-  {
-    id: "placements",
-    label: "Placements",
-    href: "/placements",
-    icon: MapPin,
-    children: [
-      { label: "Active Placements", href: "/placements/active" },
-      { label: "Ended Placements", href: "/placements/ended" },
-      { label: "Timesheets", href: "/placements/timesheets" },
-      { label: "Expenses", href: "/placements/expenses" },
     ],
   },
   {
@@ -177,6 +177,7 @@ export const MORE_NAV_ITEMS: NavItem[] = [
   { id: "integrations", label: "Integrations", href: "/integrations", icon: Globe },
   { id: "tenant-management", label: "Tenant Management", href: "/utility/approvals", icon: Building2 },
   { id: "role-management", label: "Role Management", href: "/utility/roles-permissions", icon: UserCheck },
+  { id: "pod-management", label: "Recruitment Pods", href: "/utility/pods", icon: Users },
   { id: "dictionaries", label: "Master Dictionaries", href: "/utility/dictionaries", icon: Database },
   { id: "settings", label: "Settings", href: "/company", icon: Settings },
   { id: "help", label: "Help & Support", href: "/help", icon: HelpCircle },
@@ -205,6 +206,7 @@ export const APP_LAUNCHER_ITEMS: AppLauncherItem[] = [
   { id: "clients", label: "Clients", href: "/clients", icon: Building2, color: "#6f42c1" },
   { id: "tenants", label: "Tenants", href: "/utility/approvals", icon: Building2, color: "#0dcaf0" },
   { id: "roles", label: "Roles", href: "/utility/roles-permissions", icon: UserCheck, color: "#fd7e14" },
+  { id: "pods", label: "Pods", href: "/utility/pods", icon: Users, color: "#6f42c1" },
   { id: "reports", label: "Reports", href: "/reports", icon: BarChart3, color: "#fd7e14" },
   { id: "calendar", label: "Calendar", href: "/calendar", icon: Calendar, color: "#0dcaf0" },
   { id: "email", label: "Email", href: "/email", icon: Mail, color: "#d63384" },

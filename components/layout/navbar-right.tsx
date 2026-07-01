@@ -15,6 +15,7 @@ import {
   ChevronDown,
   CircleCheck,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
@@ -595,10 +596,128 @@ function ProfileDropdownNav() {
   );
 }
 
+// ─── Sandbox Switcher dropdown ────────────────────────────────────────────────
+function SandboxSwitcher() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handle = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open]);
+
+  const currentOverride = typeof window !== "undefined" ? localStorage.getItem("override_role") : null;
+
+  const handleSelectRole = (role: string | null) => {
+    if (typeof window !== "undefined") {
+      if (role) {
+        localStorage.setItem("override_role", role);
+      } else {
+        localStorage.removeItem("override_role");
+      }
+      window.location.reload();
+    }
+    setOpen(false);
+  };
+
+  const displayLabel = currentOverride ? `View: ${currentOverride.replace("_", " ")}` : "Switch View";
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="
+          flex items-center gap-1.5
+          h-7 px-2.5 rounded
+          text-[11px] font-bold uppercase tracking-wider
+          bg-amber-500 hover:bg-amber-600 text-white
+          transition-colors duration-150
+          cursor-pointer whitespace-nowrap select-none
+          shadow-sm
+        "
+      >
+        <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
+        <span>{displayLabel}</span>
+        <ChevronDown className={`w-3 h-3 opacity-80 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="Sandbox role override"
+          className="
+            absolute top-full right-0 mt-1.5 z-[350]
+            w-[180px]
+            bg-white dark:bg-[#1e2d50]
+            border border-neutral-200 dark:border-white/10
+            rounded shadow-xl shadow-black/25
+            py-1
+            animate-in fade-in-0 slide-in-from-top-2
+          "
+        >
+          <p className="px-3 pt-1 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-neutral-400 dark:text-white/30">
+            Select Dashboard View
+          </p>
+          <button
+            onClick={() => handleSelectRole(null)}
+            role="menuitem"
+            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
+          >
+            🔄 System Default
+          </button>
+          <button
+            onClick={() => handleSelectRole("SUPER_ADMIN")}
+            role="menuitem"
+            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
+          >
+            🛡️ Global Admin
+          </button>
+          <button
+            onClick={() => handleSelectRole("ADMIN")}
+            role="menuitem"
+            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
+          >
+            ⚙️ Tenant Admin
+          </button>
+          <button
+            onClick={() => handleSelectRole("ACCOUNT_MANAGER")}
+            role="menuitem"
+            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
+          >
+            💼 Account Manager
+          </button>
+          <button
+            onClick={() => handleSelectRole("POD_LEAD")}
+            role="menuitem"
+            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
+          >
+            👑 Pod Lead
+          </button>
+          <button
+            onClick={() => handleSelectRole("RECRUITER")}
+            role="menuitem"
+            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
+          >
+            👤 Recruiter
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Exported Right Section ───────────────────────────────────────────────────
 export function NavbarRight() {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1.5">
+      <SandboxSwitcher />
+
+      {/* Divider */}
+      <div className="w-px h-5 bg-white/15 mx-0.5 flex-shrink-0" />
+
       <QuickActionsDropdown />
 
       {/* Divider */}

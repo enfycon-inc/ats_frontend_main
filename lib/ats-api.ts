@@ -308,6 +308,8 @@ export interface JobPayload {
   submissionsCount: number;
   agingDays: number;
   pipeline: { applied: number; interviewing: number; offered: number };
+  podId?: string;
+  podName?: string;
 }
 
 const jobs = {
@@ -326,6 +328,13 @@ const jobs = {
   async create(data: Record<string, any>): Promise<JobPayload> {
     return apiFetch<JobPayload>('/api/jobs', {
       method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async update(id: string, data: Record<string, any>): Promise<JobPayload> {
+    return apiFetch<JobPayload>(`/api/jobs/${id}`, {
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   },
@@ -445,12 +454,81 @@ const clients = {
   },
 };
 
+const pods = {
+  async list(): Promise<any[]> {
+    return apiFetch<any[]>('/api/pods');
+  },
+  async get(id: string): Promise<any> {
+    return apiFetch<any>(`/api/pods/${id}`);
+  },
+  async getAvailableRecruiters(): Promise<any[]> {
+    return apiFetch<any[]>('/api/pods/available-recruiters');
+  },
+  async getMyTeam(): Promise<any> {
+    return apiFetch<any>('/api/pods/my-team');
+  },
+  async create(data: Record<string, any>): Promise<any> {
+    return apiFetch<any>('/api/pods', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async update(id: string, data: Record<string, any>): Promise<any> {
+    return apiFetch<any>(`/api/pods/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  async delete(id: string): Promise<any> {
+    return apiFetch<any>(`/api/pods/${id}`, {
+      method: 'DELETE',
+    });
+  },
+  async resetCycle(): Promise<any> {
+    return apiFetch<any>('/api/pods/reset-cycle', {
+      method: 'POST',
+    });
+  },
+};
+
+const submissions = {
+  async list(filters?: Record<string, any>): Promise<any> {
+    const query = new URLSearchParams(filters as any).toString();
+    return apiFetch<any>(`/api/recruiter-submissions${query ? `?${query}` : ''}`);
+  },
+  async get(id: number): Promise<any> {
+    return apiFetch<any>(`/api/recruiter-submissions/${id}`);
+  },
+  async create(data: Record<string, any>): Promise<any> {
+    return apiFetch<any>('/api/recruiter-submissions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async update(id: number, data: Record<string, any>): Promise<any> {
+    return apiFetch<any>(`/api/recruiter-submissions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  async delete(id: number): Promise<any> {
+    return apiFetch<any>(`/api/recruiter-submissions/${id}`, {
+      method: 'DELETE',
+    });
+  },
+  async getTrackerStats(): Promise<any> {
+    return apiFetch<any>('/api/recruiter-submissions/stats/tracker');
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────
 export const atsApi = {
   auth,
   jobs,
   candidates,
   clients,
+  pods,
+  submissions,
   fetch: apiFetch,
 };
 

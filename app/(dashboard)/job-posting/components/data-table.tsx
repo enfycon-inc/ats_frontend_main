@@ -65,6 +65,34 @@ export default function DataTable({
   onUpdateJob,
 }: DataTableProps) {
   const router = useRouter();
+
+  // User details & permission controls
+  const currentUser = useMemo(() => atsApi.auth.getCurrentUser(), []);
+  const hasEditPermission = useMemo(() => {
+    if (!currentUser) return false;
+    const permissions = currentUser.permissions || [];
+    return permissions.includes("job:edit") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("ADMIN");
+  }, [currentUser]);
+
+  const hasCreatePermission = useMemo(() => {
+    if (!currentUser) return false;
+    const permissions = currentUser.permissions || [];
+    return permissions.includes("job:create") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("ADMIN");
+  }, [currentUser]);
+
+  const activeSelectedColumns = useMemo(() => {
+    if (!hasEditPermission) {
+      return selectedColumns.filter((colId) => colId !== "clientBillRate");
+    }
+    return selectedColumns;
+  }, [selectedColumns, hasEditPermission]);
+
+  const activeAllColumns = useMemo(() => {
+    if (!hasEditPermission) {
+      return allColumns.filter((col) => col.id !== "clientBillRate");
+    }
+    return allColumns;
+  }, [allColumns, hasEditPermission]);
   
   // Sorting State
   const [sortColumn, setSortColumn] = useState<keyof Job | null>(null);
@@ -299,11 +327,11 @@ export default function DataTable({
 
   // CSV Export
   const exportToCSV = () => {
-    const headers = selectedColumns.map(
-      (colId) => allColumns.find((c) => c.id === colId)?.label || colId
+    const headers = activeSelectedColumns.map(
+      (colId) => activeAllColumns.find((c) => c.id === colId)?.label || colId
     );
     const rows = processedData.map((job) =>
-      selectedColumns.map((colId) => {
+      activeSelectedColumns.map((colId) => {
         const value = job[colId as keyof Job];
         if (typeof value === "object") {
           return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
@@ -327,6 +355,7 @@ export default function DataTable({
 
   // Cell-level double-click edit handlers
   const handleCellDoubleClick = (rowId: string, colId: string, currentValue: string) => {
+    if (!hasEditPermission) return;
     if (EDITABLE_TEXT_COLS.includes(colId) || colId === "priority") {
       setEditingCell({ rowId, colId });
       setEditCellValue(currentValue === "N/A" ? "" : currentValue);
@@ -348,6 +377,7 @@ export default function DataTable({
 
   // Also keep Quick Edit from dropdown - focuses jobTitle cell
   const startQuickEdit = (job: Job) => {
+    if (!hasEditPermission) return;
     setEditingCell({ rowId: job.id, colId: "jobTitle" });
     setEditCellValue(job.jobTitle);
   };
@@ -412,12 +442,14 @@ export default function DataTable({
             <Download className="h-3 w-3" /> Export CSV
           </button>
 
-          <button
-            onClick={() => router.push("/job-posting/new")}
-            className="flex items-center gap-1 px-2.5 py-1 rounded bg-primary hover:bg-primary/95 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus className="h-3 w-3" /> New Job
-          </button>
+          {hasCreatePermission && (
+            <button
+              onClick={() => router.push("/job-posting/new")}
+              className="flex items-center gap-1 px-2.5 py-1 rounded bg-primary hover:bg-primary/95 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus className="h-3 w-3" /> New Job
+            </button>
+          )}
 
           {/* Right side settings icons */}
           <div className="flex items-center border-l border-neutral-200 dark:border-slate-800 pl-1.5 gap-0.5">
@@ -483,8 +515,8 @@ export default function DataTable({
               </th>
 
               {/* Column Headers */}
-              {selectedColumns.map((colId) => {
-                const col = allColumns.find((c) => c.id === colId);
+              {activeSelectedColumns.map((colId) => {
+                const col = activeAllColumns.find((c) => c.id === colId);
                 const isSorted = sortColumn === colId;
                 return (
                   <th
@@ -522,7 +554,7 @@ export default function DataTable({
             {paginatedData.length === 0 ? (
               <tr>
                 <td
-                  colSpan={selectedColumns.length + 2}
+                  colSpan={activeSelectedColumns.length + 2}
                   className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900"
                 >
                   No matching jobs found. Try resetting your search or filters.
@@ -564,7 +596,7 @@ export default function DataTable({
                     </td>
 
                     {/* Columns */}
-                    {selectedColumns.map((colId) => {
+                    {activeSelectedColumns.map((colId) => {
                       const isCellEditing = editingCell?.rowId === job.id && editingCell?.colId === colId;
                       const isEditable = EDITABLE_TEXT_COLS.includes(colId) || colId === "priority";
                       const rawValue = String(job[colId as keyof Job] || "");
@@ -625,13 +657,15 @@ export default function DataTable({
                               >
                                 {job.jobStatus}
                               </Badge>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); openStatusModal(job); }}
-                                className="text-neutral-400 hover:text-blue-500 hover:bg-neutral-100 dark:hover:bg-slate-800 p-0.5 rounded transition-colors cursor-pointer"
-                                title="Change Job Status"
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </button>
+                              {hasEditPermission && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openStatusModal(job); }}
+                                  className="text-neutral-400 hover:text-blue-500 hover:bg-neutral-100 dark:hover:bg-slate-800 p-0.5 rounded transition-colors cursor-pointer"
+                                  title="Change Job Status"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              )}
                             </div>
                           ) : colId === "priority" ? (
                             <Badge
@@ -646,6 +680,17 @@ export default function DataTable({
                             >
                               {job.priority || "Warm"}
                             </Badge>
+                          ) : colId === "podName" ? (
+                            job.podName ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 bg-violet-50 dark:bg-violet-950/20 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-800/30 rounded-xs px-1.5 py-0.2 text-[10px] font-semibold whitespace-nowrap">
+                                  <Users className="h-2.5 w-2.5 shrink-0" />
+                                  {job.podName}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-neutral-400 dark:text-neutral-600 italic text-[10px]">Unassigned</span>
+                            )
                           ) : colId === "jobTitle" ? (
                             <div className="flex items-center gap-1">
                               <span className="whitespace-nowrap">{job.jobTitle}</span>
@@ -671,13 +716,15 @@ export default function DataTable({
                           ) : (colId === "assignedTo" || colId === "primaryRecruiter") ? (
                             <div className="flex items-center justify-between gap-1.5 w-full">
                               <span>{String(job[colId as keyof Job] || "N/A")}</span>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); openAssignModal(job, colId as "assignedTo" | "primaryRecruiter"); }}
-                                className="text-neutral-400 hover:text-blue-500 hover:bg-neutral-100 dark:hover:bg-slate-800 p-0.5 rounded transition-colors cursor-pointer"
-                                title={`Change ${colId === "assignedTo" ? "Assigned To" : "Primary Recruiter"}`}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </button>
+                              {hasEditPermission && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openAssignModal(job, colId as "assignedTo" | "primaryRecruiter"); }}
+                                  className="text-neutral-400 hover:text-blue-500 hover:bg-neutral-100 dark:hover:bg-slate-800 p-0.5 rounded transition-colors cursor-pointer"
+                                  title={`Change ${colId === "assignedTo" ? "Assigned To" : "Primary Recruiter"}`}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              )}
                             </div>
                           ) : (
                             String(job[colId as keyof Job] || "N/A")
@@ -720,15 +767,19 @@ export default function DataTable({
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-36 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 py-0.5">
-                            <DropdownMenuItem onClick={() => startQuickEdit(job)} className="cursor-pointer text-xs py-1 px-2">
-                              <Edit className="h-3 w-3 mr-1.5 text-neutral-500" /> Quick Edit
-                            </DropdownMenuItem>
+                            {hasEditPermission && (
+                              <DropdownMenuItem onClick={() => startQuickEdit(job)} className="cursor-pointer text-xs py-1 px-2">
+                                <Edit className="h-3 w-3 mr-1.5 text-neutral-500" /> Quick Edit
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem className="cursor-pointer text-xs py-1 px-2">
                               <Users className="h-3 w-3 mr-1.5 text-neutral-500" /> Pipeline
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600 hover:text-red-700 cursor-pointer text-xs py-1 px-2">
-                              <Trash2 className="h-3 w-3 mr-1.5 text-red-500" /> Delete
-                            </DropdownMenuItem>
+                            {hasEditPermission && (
+                              <DropdownMenuItem className="text-red-600 hover:text-red-700 cursor-pointer text-xs py-1 px-2">
+                                <Trash2 className="h-3 w-3 mr-1.5 text-red-500" /> Delete
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
@@ -989,57 +1040,76 @@ export default function DataTable({
                   {/* Options List */}
                   <div className="flex-1 overflow-y-auto space-y-1 pr-1">
                     {assignActiveTab === "users" ? (
-                      <>
-                        {/* Select All Users Option */}
-                        <label className="flex items-center gap-2 px-1.5 py-1 hover:bg-neutral-50 dark:hover:bg-slate-800/50 rounded cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={
-                              usersList.length > 0 &&
-                              usersList.every((u) => assignModalSelected.includes(u.fullName))
-                            }
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setAssignModalSelected(usersList.map((u) => u.fullName));
-                              } else {
-                                setAssignModalSelected([]);
-                              }
-                            }}
-                            className="h-3 w-3 accent-primary rounded-xs cursor-pointer"
-                          />
-                          <span className="font-bold text-neutral-850 dark:text-neutral-200">Select Users</span>
-                        </label>
+                      (() => {
+                        const currentUser = atsApi.auth.getCurrentUser();
+                        const isPodLead = currentUser?.systemRole === "POD_LEAD" || currentUser?.roles?.includes("POD_LEAD");
+                        const hasBypass = currentUser?.permissions?.includes("pod:edit") || currentUser?.roles?.includes("SUPER_ADMIN") || currentUser?.roles?.includes("ADMIN");
+                        
+                        let listToShow = usersList;
+                        if (!hasBypass && isPodLead && currentUser?.podId) {
+                          listToShow = usersList.filter((u) => u.podId === currentUser.podId);
+                        }
 
-                        {/* List of Users */}
-                        {usersList
-                          .filter((u) =>
-                            u.fullName.toLowerCase().includes(assignModalSearch.toLowerCase()) ||
-                            u.email.toLowerCase().includes(assignModalSearch.toLowerCase())
-                          )
-                          .map((u) => {
-                            const isChecked = assignModalSelected.includes(u.fullName);
-                            return (
-                              <label
-                                key={u.id}
-                                className="flex items-center gap-2 px-1.5 py-0.5 hover:bg-neutral-50 dark:hover:bg-slate-800/50 rounded cursor-pointer select-none text-neutral-700 dark:text-neutral-300"
-                              >
+                        return (
+                          <>
+                            {/* Select All Users Option */}
+                            {assignModalType !== "primaryRecruiter" && (
+                              <label className="flex items-center gap-2 px-1.5 py-1 hover:bg-neutral-50 dark:hover:bg-slate-800/50 rounded cursor-pointer select-none">
                                 <input
                                   type="checkbox"
-                                  checked={isChecked}
+                                  checked={
+                                    listToShow.length > 0 &&
+                                    listToShow.every((u) => assignModalSelected.includes(u.fullName))
+                                  }
                                   onChange={(e) => {
                                     if (e.target.checked) {
-                                      setAssignModalSelected((prev) => [...prev, u.fullName]);
+                                      setAssignModalSelected(listToShow.map((u) => u.fullName));
                                     } else {
-                                      setAssignModalSelected((prev) => prev.filter((name) => name !== u.fullName));
+                                      setAssignModalSelected([]);
                                     }
                                   }}
                                   className="h-3 w-3 accent-primary rounded-xs cursor-pointer"
                                 />
-                                <span className="truncate">{u.fullName} <span className="text-[9.5px] text-neutral-400 dark:text-neutral-500 font-medium">({u.email})</span></span>
+                                <span className="font-bold text-neutral-850 dark:text-neutral-200">Select Users</span>
                               </label>
-                            );
-                          })}
-                      </>
+                            )}
+
+                            {/* List of Users */}
+                            {listToShow
+                              .filter((u) =>
+                                u.fullName.toLowerCase().includes(assignModalSearch.toLowerCase()) ||
+                                u.email.toLowerCase().includes(assignModalSearch.toLowerCase())
+                              )
+                              .map((u) => {
+                                const isChecked = assignModalSelected.includes(u.fullName);
+                                return (
+                                  <label
+                                    key={u.id}
+                                    className="flex items-center gap-2 px-1.5 py-0.5 hover:bg-neutral-50 dark:hover:bg-slate-800/50 rounded cursor-pointer select-none text-neutral-700 dark:text-neutral-300"
+                                  >
+                                    <input
+                                      type={assignModalType === "primaryRecruiter" ? "radio" : "checkbox"}
+                                      checked={isChecked}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          if (assignModalType === "primaryRecruiter") {
+                                            setAssignModalSelected([u.fullName]);
+                                          } else {
+                                            setAssignModalSelected((prev) => [...prev, u.fullName]);
+                                          }
+                                        } else {
+                                          setAssignModalSelected((prev) => prev.filter((name) => name !== u.fullName));
+                                        }
+                                      }}
+                                      className="h-3 w-3 accent-primary rounded-xs cursor-pointer"
+                                    />
+                                    <span className="truncate">{u.fullName} <span className="text-[9.5px] text-neutral-400 dark:text-neutral-500 font-medium">({u.email})</span></span>
+                                  </label>
+                                );
+                              })}
+                          </>
+                        );
+                      })()
                     ) : (
                       <>
                         {/* Select All Teams Option */}

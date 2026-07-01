@@ -46,6 +46,20 @@ export default function JobPostingDashboard({
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isColumnOpen, setIsColumnOpen] = useState(false);
 
+  // User details & permission controls
+  const currentUser = useMemo(() => {
+    if (typeof window !== "undefined") {
+      return atsApi.auth.getCurrentUser();
+    }
+    return null;
+  }, []);
+
+  const hasEditPermission = useMemo(() => {
+    if (!currentUser) return false;
+    const permissions = currentUser.permissions || [];
+    return permissions.includes("job:edit") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("ADMIN");
+  }, [currentUser]);
+
   // Table Configuration States
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     "jobCode",
@@ -55,12 +69,20 @@ export default function JobPostingDashboard({
     "location",
     "states",
     "jobStatus",
+    "podName",
     "clientBillRate",
     "payRate",
     "recruitmentManager",
     "primaryRecruiter",
     "submissionsCount",
   ]);
+
+  const activeSelectedColumns = useMemo(() => {
+    if (!hasEditPermission) {
+      return selectedColumns.filter((colId) => colId !== "clientBillRate");
+    }
+    return selectedColumns;
+  }, [selectedColumns, hasEditPermission]);
 
   // Saved Views State
   const [savedViews, setSavedViews] = useState<string[]>([
@@ -136,32 +158,39 @@ export default function JobPostingDashboard({
     fetchJobs();
   }, [fetchJobs]);
 
-  const allColumns = useMemo(() => [
-    { id: "jobCode", label: "Job Code" },
-    { id: "jobTitle", label: "Job Title" },
-    { id: "businessUnit", label: "Business Unit" },
-    { id: "client", label: "Client" },
-    { id: "clientJobId", label: "Client Job ID" },
-    { id: "location", label: "Location" },
-    { id: "states", label: "States" },
-    { id: "jobStatus", label: "Job Status" },
-    { id: "priority", label: "Priority" },
-    {
-      id: "clientBillRate",
-      label: market === "IN" ? "Client Bill Rate / CTC" : "Client Bill Rate / Salary",
-    },
-    {
-      id: "payRate",
-      label: market === "IN" ? "Pay Rate / CTC" : "Pay Rate / Salary",
-    },
-    { id: "recruitmentManager", label: "Recruitment Manager" },
-    { id: "primaryRecruiter", label: "Primary Recruiter" },
-    { id: "assignedTo", label: "Assigned To" },
-    { id: "createdBy", label: "Job Posting Created By" },
-    { id: "createdOn", label: "Job Created" },
-    { id: "modifiedOn", label: "Job Modified On" },
-    { id: "submissionsCount", label: "Submissions & Pipeline" },
-  ], [market]);
+  const allColumns = useMemo(() => {
+    const cols = [
+      { id: "jobCode", label: "Job Code" },
+      { id: "jobTitle", label: "Job Title" },
+      { id: "businessUnit", label: "Business Unit" },
+      { id: "client", label: "Client" },
+      { id: "clientJobId", label: "Client Job ID" },
+      { id: "location", label: "Location" },
+      { id: "states", label: "States" },
+      { id: "jobStatus", label: "Job Status" },
+      { id: "priority", label: "Priority" },
+      { id: "podName", label: "Assigned Pod" },
+      {
+        id: "clientBillRate",
+        label: market === "IN" ? "Client Bill Rate / CTC" : "Client Bill Rate / Salary",
+      },
+      {
+        id: "payRate",
+        label: market === "IN" ? "Pay Rate / CTC" : "Pay Rate / Salary",
+      },
+      { id: "recruitmentManager", label: "Recruitment Manager" },
+      { id: "primaryRecruiter", label: "Primary Recruiter" },
+      { id: "assignedTo", label: "Assigned To" },
+      { id: "createdBy", label: "Job Posting Created By" },
+      { id: "createdOn", label: "Job Created" },
+      { id: "modifiedOn", label: "Job Modified On" },
+      { id: "submissionsCount", label: "Submissions & Pipeline" },
+    ];
+    if (!hasEditPermission) {
+      return cols.filter((col) => col.id !== "clientBillRate");
+    }
+    return cols;
+  }, [market, hasEditPermission]);
 
   const handleApplyFilters = (filters: SelectedFilters) => {
     setCurrentFilters(filters);
@@ -237,14 +266,50 @@ export default function JobPostingDashboard({
     }
   };
 
-  const handleUpdateJob = useCallback((jobId: string, updatedFields: Partial<Job>) => {
+  const handleUpdateJob = useCallback(async (jobId: string, updatedFields: Partial<Job>) => {
+    // 1. Instantly update local state for optimistic UI responsiveness
     setAllJobs((prev) =>
       prev.map((job) => (job.id === jobId ? { ...job, ...updatedFields } : job))
     );
     setJobsData((prev) =>
       prev.map((job) => (job.id === jobId ? { ...job, ...updatedFields } : job))
     );
-  }, []);
+
+    // 2. Prepare payload and persist to database
+    try {
+      const apiPayload: Record<string, any> = {};
+
+      if (updatedFields.jobTitle !== undefined) apiPayload.title = updatedFields.jobTitle;
+      if (updatedFields.client !== undefined) apiPayload.client = updatedFields.client;
+      if (updatedFields.location !== undefined) apiPayload.location = updatedFields.location;
+      if (updatedFields.jobStatus !== undefined) apiPayload.status = updatedFields.jobStatus;
+      if (updatedFields.priority !== undefined) apiPayload.priority = updatedFields.priority;
+      if (updatedFields.assignedTo !== undefined) apiPayload.assignedTo = updatedFields.assignedTo;
+
+      // Handle recruiter name resolution to user UUID
+      if (updatedFields.primaryRecruiter !== undefined) {
+        const recruiterName = updatedFields.primaryRecruiter;
+        if (recruiterName === "N/A" || !recruiterName) {
+          apiPayload.primaryRecruiterId = null;
+        } else {
+          const users = await atsApi.auth.listUsers();
+          const foundUser = users.find((u: any) => u.fullName === recruiterName);
+          if (foundUser) {
+            apiPayload.primaryRecruiterId = foundUser.id;
+          } else {
+            apiPayload.primaryRecruiterId = null;
+          }
+        }
+      }
+
+      await atsApi.jobs.update(jobId, apiPayload);
+      toast.success("Job updated successfully.");
+    } catch (err: any) {
+      toast.error("Failed to update job: " + err.message);
+      // Revert local state by reloading from server
+      fetchJobs();
+    }
+  }, [fetchJobs]);
 
   const handleRefresh = () => {
     setCurrentFilters({ businessUnit: "All selected", predefined: [] });
@@ -356,7 +421,7 @@ export default function JobPostingDashboard({
       ) : (
         <DataTable
           data={jobsData}
-          selectedColumns={selectedColumns}
+          selectedColumns={activeSelectedColumns}
           allColumns={allColumns}
           onOpenFilters={() => setIsFilterOpen(true)}
           onOpenColumns={() => setIsColumnOpen(true)}
@@ -382,7 +447,7 @@ export default function JobPostingDashboard({
         isOpen={isColumnOpen}
         onClose={() => setIsColumnOpen(false)}
         allColumns={allColumns}
-        selectedColumns={selectedColumns}
+        selectedColumns={activeSelectedColumns}
         onApply={(newCols) => setSelectedColumns(newCols)}
       />
     </div>

@@ -24,6 +24,11 @@ export interface Job {
     offered: number;
   };
   agingDays: number;
+  /** Recruitment pod assigned via round-robin on job creation */
+  podId?: string;
+  podName?: string;
+  respondBy?: string;
+  noticePeriod?: string;
 }
 
 /**
@@ -53,6 +58,10 @@ export function mapApiJobToJob(api: any): Job {
     submissionsCount: api.submissionsCount || 0,
     pipeline: api.pipeline || { applied: 0, interviewing: 0, offered: 0 },
     agingDays: api.agingDays || 0,
+    podId: api.podId || undefined,
+    podName: api.podName || undefined,
+    respondBy: api.respondBy || "",
+    noticePeriod: api.noticePeriod || "",
   };
 }
 
