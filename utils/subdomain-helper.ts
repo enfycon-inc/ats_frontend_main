@@ -11,9 +11,11 @@ export function getBaseDomain(host?: string): string {
   const hostname = activeHost.split(':')[0];
   
   if (hostname.includes('localhost')) {
-    return 'localhost:3000';
+    // Preserve the actual dev-server port so this works off port 3000 too.
+    const port = activeHost.split(':')[1];
+    return port ? `localhost:${port}` : 'localhost:3000';
   }
-  
+
   const parts = hostname.split('.');
   if (parts.length > 2) {
     return parts.slice(1).join('.');

@@ -312,6 +312,34 @@ export interface JobPayload {
   podName?: string;
 }
 
+export interface CandidateMatch {
+  candidateId: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  location: string;
+  currentTitle: string;
+  source: string;
+  workAuthorization: string;
+  experienceYears: number;
+  matchScore: number;
+  matchTier: 'Strong' | 'Good' | 'Fair' | 'Low';
+  matchedSkills: string[];
+  missingSkills: string[];
+  breakdown: {
+    primarySkills: string;
+    secondarySkills: string;
+    experienceFit: number;
+    semantic: number | null;
+  };
+}
+
+export interface JobMatchesResponse {
+  job: JobPayload;
+  matches: CandidateMatch[];
+  parserOnline: boolean;
+}
+
 const jobs = {
   async list(): Promise<JobPayload[]> {
     return apiFetch<JobPayload[]>('/api/jobs');
@@ -319,6 +347,15 @@ const jobs = {
 
   async get(id: string): Promise<JobPayload> {
     return apiFetch<JobPayload>(`/api/jobs/${id}`);
+  },
+
+  /** AI-ranked candidate matches for a job (skill overlap + experience + semantic). */
+  async matches(id: string, opts: { limit?: number; minScore?: number } = {}): Promise<JobMatchesResponse> {
+    const qs = new URLSearchParams();
+    if (opts.limit != null) qs.set('limit', String(opts.limit));
+    if (opts.minScore != null) qs.set('minScore', String(opts.minScore));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return apiFetch<JobMatchesResponse>(`/api/jobs/${id}/matches${suffix}`);
   },
 
   async getNextCode(): Promise<{ code: string }> {
@@ -383,6 +420,38 @@ const candidates = {
       throw new Error(body.message || `API Error: ${res.status}`);
     }
     return res.json();
+  },
+
+  /** Upload a CV: parses (best-effort), stores the file, and creates the candidate. */
+  async uploadCv(file: File, source = 'CV Upload'): Promise<{ candidate: any; duplicate: boolean; parsed: boolean }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('source', source);
+
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/api/candidates/upload`, {
+      method: 'POST',
+      body: formData,
+      headers,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(body.message || `Upload failed: ${res.status}`);
+    }
+    return res.json();
+  },
+
+  /** Fetch the stored CV as a blob (auth-aware) so it can be opened or downloaded. */
+  async fetchResumeBlob(candidateId: string | number): Promise<Blob> {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/api/candidates/${candidateId}/resume`, { headers });
+    if (!res.ok) throw new Error(res.status === 404 ? 'No CV on file for this candidate.' : `Download failed: ${res.status}`);
+    return res.blob();
   },
 
   dictionary: {

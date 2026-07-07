@@ -19,6 +19,7 @@ import {
   Eye,
   CheckSquare,
   Users,
+  Sparkles,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
@@ -772,6 +773,12 @@ export default function DataTable({
                                 <Edit className="h-3 w-3 mr-1.5 text-neutral-500" /> Quick Edit
                               </DropdownMenuItem>
                             )}
+                            <DropdownMenuItem
+                              onClick={() => router.push(`/job-posting/${job.id}/matches`)}
+                              className="cursor-pointer text-xs py-1 px-2"
+                            >
+                              <Sparkles className="h-3 w-3 mr-1.5 text-violet-500" /> Find AI Matches
+                            </DropdownMenuItem>
                             <DropdownMenuItem className="cursor-pointer text-xs py-1 px-2">
                               <Users className="h-3 w-3 mr-1.5 text-neutral-500" /> Pipeline
                             </DropdownMenuItem>

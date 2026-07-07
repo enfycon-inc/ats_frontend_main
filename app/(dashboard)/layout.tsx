@@ -59,16 +59,19 @@ export default async function DashboardLayout({
     } else {
       const userSub = (user as any).tenantDomain;
       if (userSub) {
+        // Preserve the actual dev-server port so local dev works off port 3000 too.
+        const localBase = `localhost:${host.split(":")[1] || "3000"}`;
+
         // Redirect if current subdomain doesn't match user's tenant subdomain
         if (currentSub && currentSub !== userSub) {
-          const base = hostname.includes("localhost") ? "localhost:3000" : parts.slice(1).join(".");
+          const base = hostname.includes("localhost") ? localBase : parts.slice(1).join(".");
           const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
           redirect(`${protocol}://${userSub}.${base}/dashboard`);
         }
 
         // Redirect if user is at root domain but belongs to a tenant
         if (!currentSub) {
-          const base = hostname.includes("localhost") ? "localhost:3000" : hostname;
+          const base = hostname.includes("localhost") ? localBase : hostname;
           const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
           redirect(`${protocol}://${userSub}.${base}/dashboard`);
         }
