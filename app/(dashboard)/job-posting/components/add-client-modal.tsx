@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import * as zod from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,26 +17,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { atsApi } from "@/lib/ats-api";
 
 const addClientSchema = zod.object({
   clientName: zod.string().min(1, "Client Name is required"),
-  emailId: zod.string().optional(),
-  website: zod.string().min(1, "Website is required"),
+  emailId: zod.string().email("Invalid email").min(1, "Email is required"),
+  website: zod.string().optional(),
   status: zod.string().min(1, "Status is required"),
-  category: zod.string().optional(),
   ownership: zod.string().min(1, "Ownership is required"),
-  allowAllAccess: zod.boolean().optional(),
-  practice: zod.string().optional(),
   country: zod.string().min(1, "Country is required"),
   state: zod.string().optional(),
   city: zod.string().optional(),
-  address: zod.string().optional(),
-  zipCode: zod.string().optional(),
-  clientLead: zod.string().optional(),
   aboutCompany: zod.string().optional(),
-  stopNotifications: zod.boolean().optional(),
 });
 
 type AddClientFormValues = zod.infer<typeof addClientSchema>;
@@ -45,16 +37,15 @@ interface AddClientModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onClientAdded: (clientName: string) => void;
+  market?: "US" | "IN";
 }
 
-export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientModalProps) {
+export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US" }: AddClientModalProps) {
   const { register, handleSubmit, formState: { errors, isSubmitting }, watch, setValue, reset } = useForm<AddClientFormValues>({
     resolver: zodResolver(addClientSchema),
     defaultValues: {
       status: "Active",
-      country: "US",
-      allowAllAccess: false,
-      stopNotifications: false,
+      country: market === "IN" ? "IN" : "US",
     }
   });
 
@@ -62,25 +53,42 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
   const countries = Country.getAllCountries();
   const states = countryIso ? State.getStatesOfCountry(countryIso) : [];
 
+  // Pre-fill ownership with current logged-in user details
+  useEffect(() => {
+    if (open) {
+      const fetchProfile = async () => {
+        try {
+          const prof = await atsApi.auth.me();
+          if (prof) {
+            setValue("ownership", prof.full_name || prof.email || "");
+          }
+        } catch (e) {
+          console.error("Failed to load user profile in modal", e);
+        }
+      };
+      fetchProfile();
+      setValue("country", market === "IN" ? "IN" : "US");
+    }
+  }, [open, market, setValue]);
+
   const onSubmit = async (data: AddClientFormValues) => {
     try {
       const payload = {
         client_name: data.clientName,
         email_id: data.emailId,
-        website: data.website,
+        website: data.website || "",
         status: data.status,
-        category: data.category,
-        ownership: data.ownership, // For now, passing as string
-        practice: data.practice,
+        category: "",
+        ownership: data.ownership,
+        practice: "",
         country: Country.getCountryByCode(data.country)?.name || data.country,
         state: states.find((s: any) => s.isoCode === data.state)?.name || data.state,
-        city: data.city,
-        address: data.address,
-        postal_code: data.zipCode,
-        client_lead: data.clientLead,
-        about_company: data.aboutCompany,
-        stop_notifications: data.stopNotifications,
-        // Optional logic: map allowAllAccess if needed in ownership JSON
+        city: data.city || "",
+        address: "",
+        postal_code: "",
+        client_lead: "",
+        about_company: data.aboutCompany || "",
+        stop_notifications: false,
       };
 
       await atsApi.clients.create(payload);
@@ -95,163 +103,127 @@ export function AddClientModal({ open, onOpenChange, onClientAdded }: AddClientM
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">Add Client</DialogTitle>
+          <DialogTitle className="text-lg font-bold">Add Client</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             
-            {/* Left Column */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>Client Name <span className="text-red-500">*</span></Label>
-                <Input placeholder="Required" {...register("clientName")} />
-                {errors.clientName && <p className="text-xs text-red-500">{errors.clientName.message}</p>}
-              </div>
-
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>Website <span className="text-red-500">*</span></Label>
-                <Input placeholder="Required" {...register("website")} />
-                {errors.website && <p className="text-xs text-red-500">{errors.website.message}</p>}
-              </div>
-
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>Category</Label>
-                <select 
-                  className="w-full h-10 px-3 py-2 border rounded-md text-sm bg-background border-input"
-                  {...register("category")}
-                >
-                  <option value="">Select</option>
-                  <option value="IT">IT</option>
-                  <option value="Engineering">Engineering</option>
-                  <option value="Healthcare">Healthcare</option>
-                  <option value="Finance">Finance</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>Practice</Label>
-                <select 
-                  className="w-full h-10 px-3 py-2 border rounded-md text-sm bg-background border-input"
-                  {...register("practice")}
-                >
-                  <option value="">Select</option>
-                  <option value="Consulting">Consulting</option>
-                  <option value="Direct Hire">Direct Hire</option>
-                  <option value="Contract">Contract</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>State</Label>
-                <select 
-                  className="w-full h-10 px-3 py-2 border rounded-md text-sm bg-background border-input"
-                  {...register("state")}
-                >
-                  <option value="">Select State</option>
-                  {states.map((s: any) => (
-                    <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>Address</Label>
-                <Input placeholder="Address" {...register("address")} />
-              </div>
-
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>Client Lead</Label>
-                <Input placeholder="Search user..." {...register("clientLead")} />
-              </div>
-
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>About Company</Label>
-                <Textarea className="resize-none" rows={4} {...register("aboutCompany")} />
-              </div>
-
+            {/* Client Name */}
+            <div className="space-y-1">
+              <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Name <span className="text-red-500">*</span></Label>
+              <Input 
+                className="h-8 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700" 
+                placeholder="e.g. Acme Corp" 
+                {...register("clientName")} 
+              />
+              {errors.clientName && <p className="text-[10px] text-red-500 font-bold">{errors.clientName.message}</p>}
             </div>
 
-            {/* Right Column */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>Email ID</Label>
-                <Input placeholder="Required" {...register("emailId")} />
-              </div>
-
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>Status <span className="text-red-500">*</span></Label>
-                <select 
-                  className="w-full h-10 px-3 py-2 border rounded-md text-sm bg-background border-input"
-                  {...register("status")}
-                >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-                {errors.status && <p className="text-xs text-red-500">{errors.status.message}</p>}
-              </div>
-
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>Ownership <span className="text-red-500">*</span></Label>
-                <Input placeholder="Current user" {...register("ownership")} />
-                {errors.ownership && <p className="text-xs text-red-500">{errors.ownership.message}</p>}
-                <div className="flex items-center gap-2 mt-2">
-                  <Checkbox 
-                    id="allowAllAccess" 
-                    checked={watch("allowAllAccess")}
-                    onCheckedChange={(c) => setValue("allowAllAccess", !!c)} 
-                  />
-                  <label htmlFor="allowAllAccess" className="text-xs text-neutral-600 dark:text-neutral-400 cursor-pointer">
-                    Allow Access to All users
-                  </label>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>Country <span className="text-red-500">*</span></Label>
-                <select 
-                  className="w-full h-10 px-3 py-2 border rounded-md text-sm bg-background border-input"
-                  {...register("country")}
-                >
-                  {countries.map((c: any) => (
-                    <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
-                  ))}
-                </select>
-                {errors.country && <p className="text-xs text-red-500">{errors.country.message}</p>}
-              </div>
-
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>City</Label>
-                <Input placeholder="City" {...register("city")} />
-              </div>
-
-              <div className="grid grid-cols-[130px_1fr] items-center gap-4">
-                <Label>Zip Code</Label>
-                <Input placeholder="Zip Code" {...register("zipCode")} />
-              </div>
-
-              <div className="mt-8 space-y-2">
-                <div className="flex items-start gap-2 pt-16">
-                  <Checkbox 
-                    id="stopNotifications" 
-                    checked={watch("stopNotifications")}
-                    onCheckedChange={(c) => setValue("stopNotifications", !!c)} 
-                  />
-                  <label htmlFor="stopNotifications" className="text-xs text-neutral-600 dark:text-neutral-400 cursor-pointer leading-tight">
-                    You want to stop sending email notification to client contact while doing Submit to Client?
-                  </label>
-                </div>
-              </div>
-
+            {/* Email ID */}
+            <div className="space-y-1">
+              <Label className="font-bold text-neutral-700 dark:text-neutral-300">Email ID <span className="text-red-500">*</span></Label>
+              <Input 
+                type="email"
+                className="h-8 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700" 
+                placeholder="e.g. contact@acme.com" 
+                {...register("emailId")} 
+              />
+              {errors.emailId && <p className="text-[10px] text-red-500 font-bold">{errors.emailId.message}</p>}
             </div>
+
+            {/* Website */}
+            <div className="space-y-1">
+              <Label className="font-bold text-neutral-700 dark:text-neutral-300">Website</Label>
+              <Input 
+                className="h-8 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700" 
+                placeholder="e.g. www.acme.com" 
+                {...register("website")} 
+              />
+              {errors.website && <p className="text-[10px] text-red-500 font-bold">{errors.website.message}</p>}
+            </div>
+
+            {/* Status */}
+            <div className="space-y-1">
+              <Label className="font-bold text-neutral-700 dark:text-neutral-300">Status <span className="text-red-500">*</span></Label>
+              <select 
+                className="w-full h-8 px-2 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded text-xs text-neutral-800 dark:text-neutral-200 focus:border-primary outline-hidden cursor-pointer"
+                {...register("status")}
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+              {errors.status && <p className="text-[10px] text-red-500 font-bold">{errors.status.message}</p>}
+            </div>
+
+            {/* Country */}
+            <div className="space-y-1">
+              <Label className="font-bold text-neutral-700 dark:text-neutral-300">Country <span className="text-red-500">*</span></Label>
+              <select 
+                className="w-full h-8 px-2 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded text-xs text-neutral-800 dark:text-neutral-200 focus:border-primary outline-hidden cursor-pointer"
+                {...register("country")}
+              >
+                {countries.map((c: any) => (
+                  <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
+                ))}
+              </select>
+              {errors.country && <p className="text-[10px] text-red-500 font-bold">{errors.country.message}</p>}
+            </div>
+
+            {/* State */}
+            <div className="space-y-1">
+              <Label className="font-bold text-neutral-700 dark:text-neutral-300">State</Label>
+              <select 
+                className="w-full h-8 px-2 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded text-xs text-neutral-800 dark:text-neutral-200 focus:border-primary outline-hidden cursor-pointer"
+                {...register("state")}
+              >
+                <option value="">Select State</option>
+                {states.map((s: any) => (
+                  <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* City */}
+            <div className="space-y-1">
+              <Label className="font-bold text-neutral-700 dark:text-neutral-300">City</Label>
+              <Input 
+                className="h-8 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700" 
+                placeholder="City" 
+                {...register("city")} 
+              />
+            </div>
+
+            {/* Ownership */}
+            <div className="space-y-1">
+              <Label className="font-bold text-neutral-700 dark:text-neutral-300">Ownership <span className="text-red-500">*</span></Label>
+              <Input 
+                className="h-8 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700" 
+                placeholder="Ownership" 
+                {...register("ownership")} 
+              />
+              {errors.ownership && <p className="text-[10px] text-red-500 font-bold">{errors.ownership.message}</p>}
+            </div>
+
+            {/* About Company */}
+            <div className="md:col-span-2 space-y-1">
+              <Label className="font-bold text-neutral-700 dark:text-neutral-300">About Company</Label>
+              <Textarea 
+                className="resize-none text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 focus:border-primary" 
+                rows={3} 
+                placeholder="Company info..."
+                {...register("aboutCompany")} 
+              />
+            </div>
+
           </div>
 
-          <div className="flex justify-end gap-2 border-t pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex justify-end gap-2 border-t pt-4 mt-6">
+            <Button type="button" variant="outline" className="h-8 text-xs" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button type="submit" disabled={isSubmitting} className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold">
               Save
             </Button>
           </div>

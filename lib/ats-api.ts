@@ -310,6 +310,7 @@ export interface JobPayload {
   pipeline: { applied: number; interviewing: number; offered: number };
   podId?: string;
   podName?: string;
+  market?: string;
 }
 
 export interface CandidateMatch {

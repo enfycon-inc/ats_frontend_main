@@ -1,13 +1,14 @@
 "use client";
-
-import React, { useState } from "react";
+ 
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { atsApi } from "@/lib/ats-api";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Building, Save, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Country, State, City } from "country-state-city";
-
+import { getTenantIdentifier } from "@/utils/subdomain-helper";
+ 
 export default function NewClientPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,6 +26,36 @@ export default function NewClientPage() {
     category: "",
     emailId: "",
   });
+
+  useEffect(() => {
+    async function loadTenantName() {
+      try {
+        const prof = await atsApi.auth.me();
+        if (prof) {
+          let tName = prof.tenant?.name || prof.tenantDomain || "";
+          if (!tName) {
+            tName = typeof window !== 'undefined' ? getTenantIdentifier() : "";
+          }
+          if (!tName || tName === "temp") {
+            tName = "enfycon Inc";
+          } else if (tName.toLowerCase() === "deb") {
+            tName = "deb saas tenant";
+          } else {
+            if (tName.toLowerCase().endsWith(".com")) {
+              tName = tName.slice(0, -4);
+            }
+            if (/^[a-z0-9-]+$/.test(tName)) {
+              tName = tName.charAt(0).toUpperCase() + tName.slice(1);
+            }
+          }
+          setFormData((prev) => ({ ...prev, businessUnit: tName }));
+        }
+      } catch (err) {
+        console.warn("Failed to load tenant info for default business unit", err);
+      }
+    }
+    loadTenantName();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

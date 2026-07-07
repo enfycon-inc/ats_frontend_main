@@ -29,6 +29,7 @@ export interface Job {
   podName?: string;
   respondBy?: string;
   noticePeriod?: string;
+  market?: "US" | "IN";
 }
 
 /**
@@ -62,6 +63,7 @@ export function mapApiJobToJob(api: any): Job {
     podName: api.podName || undefined,
     respondBy: api.respondBy || "",
     noticePeriod: api.noticePeriod || "",
+    market: api.market || "US",
   };
 }
 

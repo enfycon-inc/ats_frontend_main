@@ -18,6 +18,7 @@ import {
   MoreHorizontal,
   Edit,
   Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -40,6 +41,7 @@ export interface DataTableProps<TData> {
   activeView: string;
   onSelectView: (viewName: string) => void;
   onUpdateRecord?: (recordId: string, updatedFields: Partial<TData>) => void;
+  onBulkDelete?: (selectedIds: string[]) => Promise<void> | void;
   
   // Generic Configuration
   getRowId?: (row: TData) => string;
@@ -83,6 +85,7 @@ export default function DataTable<TData extends Record<string, any>>({
   activeView,
   onSelectView,
   onUpdateRecord,
+  onBulkDelete,
   getRowId = (row) => row.id,
   searchFilterOptions = [{ label: "Search Any", value: "All" }],
   defaultSearchFilter = "All",
@@ -101,6 +104,7 @@ export default function DataTable<TData extends Record<string, any>>({
 
   // Selection State
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   // Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -330,6 +334,14 @@ export default function DataTable<TData extends Record<string, any>>({
               >
                 <Download className="h-3 w-3" /> Export
               </button>
+              {onBulkDelete && (
+                <button
+                  onClick={() => setIsDeleteConfirmOpen(true)}
+                  className="text-[10px] text-red-650 dark:text-red-400 font-bold flex items-center gap-1 hover:underline ml-2 cursor-pointer"
+                >
+                  <Trash2 className="h-3 w-3" /> Delete
+                </button>
+              )}
               <button
                 onClick={() => setSelectedRowIds([])}
                 className="text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 ml-1 cursor-pointer"
@@ -698,6 +710,50 @@ export default function DataTable<TData extends Record<string, any>>({
           onClick={(e) => e.stopPropagation()}
         >
           {contextMenuRenderer && contextMenuRenderer(data.find((r) => getRowId(r) === contextMenu.recordId) as TData, closeContextMenu)}
+        </div>
+      )}
+      {/* Delete Confirmation Modal */}
+      {isDeleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg p-5 w-96 shadow-2xl space-y-4 font-sans animate-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-red-50 dark:bg-red-950/30 rounded-full text-red-650 dark:text-red-400 shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-100">
+                  Delete Selected Records?
+                </h3>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Are you sure you want to delete the {selectedRowIds.length} selected record(s)? This action is permanent and cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 text-xs pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="h-8 cursor-pointer font-semibold text-neutral-500 hover:bg-neutral-100 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={async () => {
+                  if (onBulkDelete) {
+                    await onBulkDelete(selectedRowIds);
+                    setSelectedRowIds([]);
+                  }
+                  setIsDeleteConfirmOpen(false);
+                }}
+                className="h-8 cursor-pointer font-bold px-3"
+              >
+                Confirm Delete
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

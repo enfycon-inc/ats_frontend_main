@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -110,14 +110,14 @@ const formSchema = zod.object({
   jobTitle: zod.string().min(3, "Job Title must be at least 3 characters"),
   clientBillRate: zod.string().min(1, "Client Bill Rate is required"),
   payRate: zod.string().min(1, "Pay Rate is required"),
-  startDate: zod.string().min(1, "Start Date is required"),
+  startDate: zod.string().optional(),
   endDate: zod.string().optional(),
   respondBy: zod.string().optional(),
   country: zod.string().min(1, "Country is required"),
   states: zod.string().min(1, "State is required"),
   city: zod.string().optional(),
   remoteJob: zod.enum(["Yes", "No", "Hybrid"]),
-  hoursPerWeek: zod.number().min(1).max(168),
+  hoursPerWeek: zod.union([zod.number().min(1).max(168), zod.nan().transform(() => undefined)]).optional(),
   jobStatus: zod.string(),
   client: zod.string().min(1, "Client is required"),
   clientJobId: zod.string().optional(),
@@ -127,7 +127,7 @@ const formSchema = zod.object({
   duration: zod.string().optional(),
   workAuthorization: zod.string().min(1, "At least one Work Authorization is required"),
   applicationForm: zod.string().optional(),
-  placementFeePercent: zod.number().min(0).max(100).optional(),
+  placementFeePercent: zod.union([zod.number().min(0).max(100), zod.nan().transform(() => undefined)]).optional(),
   address: zod.string().optional(),
   projectType: zod.string().optional(),
   jobCategory: zod.string().optional(),
@@ -147,14 +147,14 @@ const formSchema = zod.object({
   // Skills Section
   industry: zod.string().optional(),
   degree: zod.string().optional(),
-  expMin: zod.number().min(0),
-  expMax: zod.number().min(0),
+  expMin: zod.union([zod.number().min(0), zod.nan().transform(() => undefined)]).optional(),
+  expMax: zod.union([zod.number().min(0), zod.nan().transform(() => undefined)]).optional(),
   languages: zod.string().optional(),
   evaluationTemplate: zod.string().optional(),
 
   // Org Info
-  numPositions: zod.number().min(1),
-  maxSubmissions: zod.number().min(1),
+  numPositions: zod.number({ invalid_type_error: "Number of Positions is required" }).min(1, "Number of Positions is required"),
+  maxSubmissions: zod.number({ invalid_type_error: "Maximum Allowed Submissions is required" }).min(1, "Maximum Allowed Submissions is required"),
   department: zod.string().optional(),
   salesManager: zod.string().optional(),
   secondarySalesManager: zod.string().optional(),
@@ -310,6 +310,15 @@ export default function NewJobPostingPage() {
     },
   });
 
+  const fetchClients = useCallback(async () => {
+    try {
+      const res = await atsApi.clients.list();
+      setClientList(res || []);
+    } catch (e) {
+      console.error("Failed to fetch clients", e);
+    }
+  }, []);
+
   useEffect(() => {
     async function fetchProfile() {
       try {
@@ -383,13 +392,12 @@ export default function NewJobPostingPage() {
 
     
 
-    async function fetchClients() { try { const res = await atsApi.clients.list(); setClientList(res || []); } catch(e) { console.error("Failed", e); } }
     async function fetchPods() { try { const res = await atsApi.pods.list(); setPodsList(res || []); } catch(e) { console.warn("Could not load pods", e); } }
 
     fetchProfile();
     fetchClients();
     fetchPods();
-  }, [setValue]);
+  }, [setValue, fetchClients]);
 
   const getSelectedDisplayText = () => {
     const selected = watch("workAuthorization") || "";
@@ -527,6 +535,7 @@ export default function NewJobPostingPage() {
         noticePeriod: data.noticePeriod || undefined,
         // Pod assignment override — if empty, backend auto-assigns via round-robin
         podId: selectedPodId || undefined,
+        market: market,
       };
 
       const created = await atsApi.jobs.create(payload);
@@ -831,6 +840,7 @@ export default function NewJobPostingPage() {
                       )}
                     </div>
 
+
                     {/* Job Title */}
                     <div className="space-y-1 md:col-span-2">
                       <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Title <span className="text-red-500">*</span></Label>
@@ -842,6 +852,26 @@ export default function NewJobPostingPage() {
                       />
                       {errors.jobTitle && (
                         <p className="text-[10px] text-red-655 font-bold">{errors.jobTitle.message}</p>
+                      )}
+                    </div>
+
+                    {/* Job Type */}
+                    <div className="space-y-1">
+                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Type <span className="text-red-500">*</span></Label>
+                      <select
+                        {...register("jobType")}
+                        className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
+                      >
+                        <option value="Full Time">Full Time</option>
+                        <option value="Part Time">Part Time</option>
+                        <option value="Contract">Contract</option>
+                        <option value="C2H">C2H</option>
+                        <option value="Intern">Intern</option>
+                        <option value="Seasonal">Seasonal</option>
+                        <option value="Freelance">Freelance</option>
+                      </select>
+                      {errors.jobType && (
+                        <p className="text-[10px] text-red-655 font-bold">{errors.jobType.message}</p>
                       )}
                     </div>
 
@@ -984,15 +1014,12 @@ export default function NewJobPostingPage() {
 
                     {/* Job Start Date */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Start Date <span className="text-red-500">*</span></label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Start Date</label>
                       <input
                         type="date"
                         {...register("startDate")}
                         className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
                       />
-                      {errors.startDate && (
-                        <p className="text-[10px] text-red-655 font-bold">{errors.startDate.message}</p>
-                      )}
                     </div>
 
                     {/* Job End Date */}
@@ -1003,28 +1030,6 @@ export default function NewJobPostingPage() {
                         {...register("endDate")}
                         className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
                       />
-                    </div>
-
-                    {/* Respond By */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Respond By</label>
-                      <div className="flex gap-2">
-                        <select
-                          value={respondByType}
-                          onChange={(e) => setRespondByType(e.target.value)}
-                          className="bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 flex-1 cursor-pointer"
-                        >
-                          <option value="Open Until Filled">Open Until Filled</option>
-                          <option value="Date Option">Date Option</option>
-                        </select>
-                        {respondByType === "Date Option" && (
-                          <input
-                            type="date"
-                            {...register("respondBy")}
-                            className="bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 w-1/2"
-                          />
-                        )}
-                      </div>
                     </div>
 
                     {/* Country */}
@@ -1215,7 +1220,7 @@ export default function NewJobPostingPage() {
                         {...register("jobStatus")}
                         className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-green-700 dark:text-green-400 font-bold cursor-pointer"
                       >
-                        <option value="Active">Active</option>
+                      <option value="Active">Active</option>
                         <option value="Close">Close</option>
                         <option value="Filled">Filled</option>
                         <option value="Hold by Client">Hold by Client</option>
@@ -1225,7 +1230,12 @@ export default function NewJobPostingPage() {
                     {/* Client */}
                     <div className="space-y-1 flex flex-col">
                       <label className="font-bold text-neutral-700 dark:text-neutral-300">Client <span className="text-red-500">*</span></label>
-                      <Popover open={clientDropdownOpen} onOpenChange={setClientDropdownOpen}>
+                      <Popover open={clientDropdownOpen} onOpenChange={(open) => {
+                        setClientDropdownOpen(open);
+                        if (!open) {
+                          setClientSearchText("");
+                        }
+                      }}>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
@@ -1239,32 +1249,40 @@ export default function NewJobPostingPage() {
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0" align="start">
                           <Command>
-                            <CommandInput placeholder="Search for a Client" className="h-9 text-xs" />
+                            <CommandInput
+                              placeholder="Search for a Client"
+                              className="h-9 text-xs"
+                              value={clientSearchText}
+                              onValueChange={setClientSearchText}
+                            />
                             <CommandList>
                               <CommandEmpty className="py-6 text-center text-xs text-neutral-500">
-                                No client found.
+                                {clientSearchText.trim() === "" ? "Enter client name" : "No client found."}
                               </CommandEmpty>
-                              <CommandGroup>
-                                {clientList.map((cl) => (
-                                  <CommandItem
-                                    key={cl.id}
-                                    value={cl.client_name}
-                                    onSelect={(currentValue) => {
-                                      setValue("client", cl.client_name, { shouldValidate: true });
-                                      setClientDropdownOpen(false);
-                                    }}
-                                    className="text-xs cursor-pointer"
-                                  >
-                                    <Check
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        watch("client") === cl.client_name ? "opacity-100" : "opacity-0"
-                                      )}
-                                    />
-                                    {cl.client_name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
+                              {clientSearchText.trim() !== "" && (
+                                <CommandGroup>
+                                  {clientList.filter(cl => cl.client_name.toLowerCase().includes(clientSearchText.toLowerCase())).map((cl) => (
+                                    <CommandItem
+                                      key={cl.id}
+                                      value={cl.client_name}
+                                      onSelect={(currentValue) => {
+                                        setValue("client", cl.client_name, { shouldValidate: true });
+                                        setClientDropdownOpen(false);
+                                        setClientSearchText("");
+                                      }}
+                                      className="text-xs cursor-pointer"
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          watch("client") === cl.client_name ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {cl.client_name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              )}
                             </CommandList>
                             <div className="p-2 border-t">
                               <button
@@ -1494,23 +1512,6 @@ export default function NewJobPostingPage() {
                       {errors.workAuthorization && (
                         <p className="text-[10px] text-red-655 font-bold">{errors.workAuthorization.message}</p>
                       )}
-                    </div>
-
-                                        {/* Job Type */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Type <span className="text-red-500">*</span></label>
-                      <select
-                        {...register("jobType")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                      >
-                        <option value="Full Time">Full Time</option>
-                        <option value="Part Time">Part Time</option>
-                        <option value="Contract">Contract</option>
-                        <option value="C2H">C2H</option>
-                        <option value="Intern">Intern</option>
-                        <option value="Seasonal">Seasonal</option>
-                        <option value="Freelance">Freelance</option>
-                      </select>
                     </div>
 
                     {/* Tax Terms */}
@@ -1924,6 +1925,15 @@ export default function NewJobPostingPage() {
         </form>
       )}
 
+      <AddClientModal
+        open={addClientModalOpen}
+        onOpenChange={setAddClientModalOpen}
+        onClientAdded={(clientName) => {
+          fetchClients();
+          setValue("client", clientName, { shouldValidate: true });
+        }}
+        market={market}
+      />
       </div>
   );
 }
