@@ -555,8 +555,13 @@ export default function EditJobPostingPage() {
       if (res && res.success) {
         const pSkills = res.primarySkills || [];
         const sSkills = res.secondarySkills || [];
-        setPrimarySkills(pSkills);
-        setSecondarySkills(sSkills);
+        
+        // Merge extracted skills with existing manually entered ones
+        const mergedPrimary = Array.from(new Set([...primarySkills, ...pSkills]));
+        const mergedSecondary = Array.from(new Set([...secondarySkills, ...sSkills]));
+        
+        setPrimarySkills(mergedPrimary);
+        setSecondarySkills(mergedSecondary);
         if (pSkills.length > 0 || sSkills.length > 0) {
           toast.success(`AI extracted ${pSkills.length + sSkills.length} skills successfully!`);
         } else {
