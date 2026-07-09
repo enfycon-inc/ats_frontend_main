@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
 
+import { useSession } from "next-auth/react";
+
 interface PendingUser {
   id: string;
   email: string;
@@ -33,6 +35,7 @@ interface Tenant {
 }
 
 export default function ApprovalsPage() {
+  const { data: session, status } = useSession();
   const [activeTab, setActiveTab] = useState<"pending" | "tenants">("pending");
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -44,17 +47,27 @@ export default function ApprovalsPage() {
   const [marketAssignments, setMarketAssignments] = useState<Record<string, "US" | "IN">>({});
   const [subdomainAssignments, setSubdomainAssignments] = useState<Record<string, string>>({}); 
 
+  // SaaS Tenant Details Modal state
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [tenantUsers, setTenantUsers] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false); 
+
   useEffect(() => {
-    const user = atsApi.auth.getCurrentUser();
-    const hasAdminRole = user?.roles?.includes("SUPER_ADMIN");
-    setIsAdmin(hasAdminRole);
+    if (status === "loading") return;
+
+    const user = session?.user || atsApi.auth.getCurrentUser();
+    const hasAdminRole =
+      (user as any)?.roles?.includes("SUPER_ADMIN") ||
+      (user as any)?.systemRole === "SUPER_ADMIN";
+    setIsAdmin(!!hasAdminRole);
 
     if (hasAdminRole) {
       loadData();
     } else {
       setLoading(false);
     }
-  }, []);
+  }, [session, status]);
 
   const loadData = async () => {
     try {
@@ -85,6 +98,21 @@ export default function ApprovalsPage() {
   const fetchTenants = async () => {
     const data = await atsApi.auth.listTenants();
     setTenants(data);
+  };
+
+  const handleViewTenantDetails = async (tenant: Tenant) => {
+    setSelectedTenant(tenant);
+    setIsModalOpen(true);
+    setTenantUsers([]);
+    try {
+      setUsersLoading(true);
+      const data = await atsApi.auth.listUsers(tenant.id);
+      setTenantUsers(data);
+    } catch (err: any) {
+      toast.error("Failed to load tenant users: " + err.message);
+    } finally {
+      setUsersLoading(false);
+    }
   };
 
   const handleMarketChange = (userId: string, market: "US" | "IN") => {
@@ -411,6 +439,7 @@ export default function ApprovalsPage() {
                       <th className="py-4 px-6 text-sm font-semibold text-default-700">Status</th>
                       <th className="py-4 px-6 text-sm font-semibold text-default-700">Seats Limit</th>
                       <th className="py-4 px-6 text-sm font-semibold text-default-700">Staffing Market Layout Configuration</th>
+                      <th className="py-4 px-6 text-sm font-semibold text-default-700 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-default-100">
@@ -504,6 +533,17 @@ export default function ApprovalsPage() {
                               )}
                             </div>
                           </td>
+                          <td className="py-4 px-6 text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleViewTenantDetails(tenant)}
+                              className="flex items-center gap-1.5 ml-auto cursor-pointer font-semibold border-indigo-200 hover:border-indigo-300 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50/40 dark:hover:bg-slate-800/40 dark:border-slate-700"
+                            >
+                              <Icon icon="heroicons:eye" className="h-4 w-4" />
+                              View Users
+                            </Button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -514,6 +554,140 @@ export default function ApprovalsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Tenant Details & Users Modal */}
+      {isModalOpen && selectedTenant && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div 
+            className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-md">
+                  <Icon icon="heroicons:building-office-2" className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-default-900">{selectedTenant.name}</h3>
+                  <p className="text-xs text-slate-500 font-medium">Workspace: {selectedTenant.domain}.enfycon.com</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+              >
+                <Icon icon="heroicons:x-mark" className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Tenant Parameters Summary Card */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-indigo-50/30 dark:bg-slate-900/20 border-b border-slate-100 dark:border-slate-800/80">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Tenant ID</span>
+                <span className="text-xs font-mono text-default-800 break-all select-all block mt-0.5">{selectedTenant.id}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Seats Capacity</span>
+                <span className="text-sm font-semibold text-default-800 block mt-0.5">{selectedTenant.userLimit} seats</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Staffing Market</span>
+                <span className="text-sm font-semibold text-default-800 block mt-0.5">
+                  {selectedTenant.defaultMarket === 'IN' ? '🇮🇳 Indian Staffing' : '🇺🇸 US IT Staffing'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Creation Date</span>
+                <span className="text-sm font-semibold text-default-800 block mt-0.5">
+                  {new Date(selectedTenant.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Body: Users List */}
+            <div className="p-6 overflow-y-auto flex-1 min-h-0">
+              <h4 className="text-sm font-bold text-default-900 mb-4 flex items-center gap-1.5">
+                <Icon icon="heroicons:users" className="h-4 w-4 text-indigo-600" />
+                Registered Workspace Users ({tenantUsers.length})
+              </h4>
+
+              {usersLoading ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                  <p className="mt-3 text-xs text-slate-500">Retrieving workspace staff members...</p>
+                </div>
+              ) : tenantUsers.length === 0 ? (
+                <div className="text-center py-16 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                  <div className="inline-flex h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 items-center justify-center text-xl mb-3">
+                    <Icon icon="heroicons:user-group" />
+                  </div>
+                  <p className="text-sm font-semibold text-default-950">No users found</p>
+                  <p className="text-xs text-slate-500 mt-0.5">There are no registered staff members in this company workspace.</p>
+                </div>
+              ) : (
+                <div className="border border-slate-150 dark:border-slate-850 rounded-xl overflow-hidden shadow-sm">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-850/80 border-b border-slate-150 dark:border-slate-800/80">
+                        <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Staff Member</th>
+                        <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Email Address</th>
+                        <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Workspace Role</th>
+                        <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-150 dark:divide-slate-800/80">
+                      {tenantUsers.map((user) => (
+                        <tr key={user.id} className="hover:bg-slate-50/30 dark:hover:bg-slate-850/20 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-2.5">
+                              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-indigo-655 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                                {user.fullName ? user.fullName.charAt(0).toUpperCase() : '?'}
+                              </div>
+                              <span className="font-semibold text-default-900 text-xs">{user.fullName}</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-400 font-mono">
+                            {user.email}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 uppercase tracking-wider">
+                              {user.roleName || user.roles?.join(', ') || 'Staff'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${
+                              user.isActive ? 'text-emerald-600' : 'text-slate-400'
+                            }`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                              {user.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/50 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsModalOpen(false)}
+                className="font-semibold cursor-pointer"
+              >
+                Close View
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -769,9 +769,14 @@ export default function DataTable({
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-36 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 py-0.5">
                             {hasEditPermission && (
-                              <DropdownMenuItem onClick={() => startQuickEdit(job)} className="cursor-pointer text-xs py-1 px-2">
-                                <Edit className="h-3 w-3 mr-1.5 text-neutral-500" /> Quick Edit
-                              </DropdownMenuItem>
+                              <>
+                                <DropdownMenuItem onClick={() => router.push(`/job-posting/${job.id}/edit`)} className="cursor-pointer text-xs py-1 px-2">
+                                  <Pencil className="h-3 w-3 mr-1.5 text-neutral-500" /> Edit Job
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => startQuickEdit(job)} className="cursor-pointer text-xs py-1 px-2">
+                                  <Edit className="h-3 w-3 mr-1.5 text-neutral-500" /> Quick Edit
+                                </DropdownMenuItem>
+                              </>
                             )}
                             <DropdownMenuItem
                               onClick={() => router.push(`/job-posting/${job.id}/matches`)}
@@ -903,16 +908,30 @@ export default function DataTable({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="py-1">
-            <button
-              onClick={() => {
-                const job = data.find((j) => j.id === contextMenu.jobId);
-                if (job) startQuickEdit(job);
-                closeContextMenu();
-              }}
-              className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer font-medium"
-            >
-              <Edit className="h-3 w-3 text-neutral-500" /> Quick Edit
-            </button>
+            {hasEditPermission && (
+              <>
+                <button
+                  onClick={() => {
+                    const job = data.find((j) => j.id === contextMenu.jobId);
+                    if (job) router.push(`/job-posting/${job.id}/edit`);
+                    closeContextMenu();
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer font-medium"
+                >
+                  <Pencil className="h-3 w-3 text-neutral-500" /> Edit Job
+                </button>
+                <button
+                  onClick={() => {
+                    const job = data.find((j) => j.id === contextMenu.jobId);
+                    if (job) startQuickEdit(job);
+                    closeContextMenu();
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer font-medium"
+                >
+                  <Edit className="h-3 w-3 text-neutral-500" /> Quick Edit
+                </button>
+              </>
+            )}
             <button
               onClick={closeContextMenu}
               className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer font-medium"

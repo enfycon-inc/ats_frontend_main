@@ -30,10 +30,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         subdomain: {},
       },
       authorize: async (credentials) => {
+        const fs = require('fs');
+        const path = require('path');
+        const logPath = path.join('C:', 'Users', 'enfyc', 'OneDrive', 'Desktop', 'ATS enfy', 'nextauth_debug.log');
+        const log = (msg) => fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`);
+        
         try {
+          log(`Authorize started for email: ${credentials?.email}`);
           const parsed = await loginSchema.parseAsync(credentials)
           const { email, password } = parsed
           const subdomain = credentials?.subdomain || ""
+          log(`Parsed credentials: email=${email}, subdomain=${subdomain}`);
 
           // 1. Try to authenticate against the NestJS Backend first
           try {
@@ -41,6 +48,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             let res
 
             try {
+              log(`Attempting fetch to Docker backend: ${apiBase}/api/auth/login`);
               const controller = new AbortController()
               const timeoutId = setTimeout(() => controller.abort(), 1000)
               res = await fetch(`${apiBase}/api/auth/login`, {
@@ -50,17 +58,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 signal: controller.signal,
               })
               clearTimeout(timeoutId)
+              log(`Docker backend response status: ${res?.status}`);
             } catch (dockerErr) {
+              log(`Docker backend failed: ${dockerErr.message}. Trying localhost fallback.`);
               apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('localhost', '127.0.0.1')
+              log(`Attempting fetch to localhost backend: ${apiBase}/api/auth/login`);
               res = await fetch(`${apiBase}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password, subdomain }),
               })
+              log(`Localhost backend response status: ${res?.status}`);
             }
 
             if (res && res.ok) {
               const data = await res.json()
+              log(`Backend login successful. User data: ${JSON.stringify(data.user)}`);
               if (data && data.user) {
                 return {
                   id: data.user.id,
@@ -73,33 +86,45 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   tenantDomain: data.user.tenantDomain || '',
                   systemRole: data.user.systemRole || 'RECRUITER',
                   podId: data.user.podId || null,
+                  tenantId: data.user.tenantId || DEFAULT_TENANT_ID,
+                  defaultMarket: data.user.defaultMarket || 'US',
                 }
               }
+            } else {
+              const errBody = res ? await res.text().catch(() => '') : '';
+              log(`Backend login failed with status ${res?.status}. Body: ${errBody}`);
             }
           } catch (apiErr) {
+            log(`Backend auth encountered exception: ${apiErr.message}\n${apiErr.stack}`);
             console.warn("Backend auth attempt encountered an error. Falling back to local mock data.", apiErr)
           }
 
           // 2. Fallback: Authenticate using hardcoded local mock data
+          log(`Falling back to local mock database for ${email}`);
           const user = await getUserFromDb(email, password)
           if (user) {
-            const resolvedRole = user.name.toUpperCase().includes('ADMIN') ? 'ADMIN' : 'RECRUITER';
+            const resolvedRole = email === 'admin@enfycon.com' ? 'SUPER_ADMIN' : (user.name.toUpperCase().includes('ADMIN') ? 'ADMIN' : 'RECRUITER');
+            log(`Found mock user: ${user.name}, resolvedRole: ${resolvedRole}`);
             return {
               id: user.email,
               name: user.name,
               email: user.email,
               image: user.image,
               permissions: ['job:create', 'job:edit', 'job:view', 'candidate:create', 'candidate:view', 'submission:create', 'submission:edit', 'tenant:settings', 'user:manage'],
-              roles: [resolvedRole],
+              roles: resolvedRole === 'SUPER_ADMIN' ? ['ADMIN', 'SUPER_ADMIN'] : [resolvedRole],
               accessToken: 'mock-jwt-token',
               tenantDomain: '',
               systemRole: resolvedRole,
               podId: null,
+              tenantId: DEFAULT_TENANT_ID,
+              defaultMarket: resolvedRole === 'SUPER_ADMIN' ? 'US' : 'IN',
             }
           }
 
+          log(`No mock user found for ${email}`);
           return null
         } catch (error) {
+          log(`Authorize caught global exception: ${error.message}\n${error.stack}`);
           return null
         }
       }
@@ -138,6 +163,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.tenantDomain = (user as any).tenantDomain
         token.systemRole = (user as any).systemRole
         token.podId = (user as any).podId
+        token.tenantId = (user as any).tenantId
+        token.defaultMarket = (user as any).defaultMarket
       }
       return token
     },
@@ -150,6 +177,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as any).tenantDomain = token.tenantDomain;
         (session.user as any).systemRole = token.systemRole;
         (session.user as any).podId = token.podId;
+        (session.user as any).tenantId = token.tenantId;
+        (session.user as any).defaultMarket = token.defaultMarket;
       }
       return session
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useSession } from "next-auth/react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,7 +41,7 @@ import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { AddClientModal } from "../components/add-client-modal";
+import { AddClientModal } from "../../components/add-client-modal";
 
 
 
@@ -219,12 +219,15 @@ const US_STATES_CITIES: Record<string, string[]> = {
   "Tennessee": ["Nashville", "Memphis", "Knoxville", "Chattanooga", "Clarksville"],
 };
 
-export default function NewJobPostingPage() {
+export default function EditJobPostingPage() {
   const router = useRouter();
+  const params = useParams();
+  const id = params.id as string;
   const { data: session, status } = useSession();
+  const [isJobLoading, setIsJobLoading] = useState(true);
 
   // Workflow active screen state: 'landing' | 'manual' | 'parse'
-  const [activeWorkflow, setActiveWorkflow] = useState<"landing" | "manual" | "parse">("landing");
+  const [activeWorkflow, setActiveWorkflow] = useState<"landing" | "manual" | "parse">("manual");
 
   // Collapse/Expand state for each form section
   const [collapsedSections, setCollapsedSections] = useState({
@@ -323,9 +326,9 @@ export default function NewJobPostingPage() {
   }, []);
 
   useEffect(() => {
-    if (status === "loading") return;
+    if (status === "loading" || !id) return;
 
-    async function fetchProfile() {
+    async function fetchProfileAndJob() {
       try {
         const prof = await atsApi.auth.me();
         if (prof) {
@@ -348,59 +351,79 @@ export default function NewJobPostingPage() {
           }
 
           setTenantName(tName);
-          setValue("businessUnit", tName);
+        }
 
-          // Fetch dynamic next jobCode from the backend
-          const domain = prof.tenantDomain || (typeof window !== 'undefined' ? getTenantIdentifier() : "");
-          const cleanDomain = domain.toLowerCase().endsWith(".com") ? domain.slice(0, -4) : domain;
-          const tenantPrefix = (cleanDomain === 'temp' || !cleanDomain) ? 'ENFY' : cleanDomain.substring(0, 4).toUpperCase();
-          
-          try {
-            const res = await atsApi.jobs.getNextCode();
-            if (res && res.code) {
-              setValue("jobCode", res.code);
-            } else {
-              const prefix = `${tenantPrefix}-JOB`;
-              const yy = new Date().getFullYear().toString().slice(-2);
-              const mm = String(new Date().getMonth() + 1).padStart(2, '0');
-              setValue("jobCode", `${prefix}-${yy}${mm}-XXXXX (Auto-generated)`);
-            }
-          } catch (e) {
-            const prefix = `${tenantPrefix}-JOB`;
-            const yy = new Date().getFullYear().toString().slice(-2);
-            const mm = String(new Date().getMonth() + 1).padStart(2, '0');
-            setValue("jobCode", `${prefix}-${yy}${mm}-XXXXX (Auto-generated)`);
+        // Fetch client lists and pods lists
+        try {
+          const clientsRes = await atsApi.clients.list();
+          setClientList(clientsRes || []);
+        } catch (e) {
+          console.warn("Failed to fetch clients", e);
+        }
+
+        try {
+          const podsRes = await atsApi.pods.list();
+          setPodsList(podsRes || []);
+        } catch (e) {
+          console.warn("Failed to fetch pods", e);
+        }
+
+        // Fetch job details to populate form
+        const jobData = await atsApi.jobs.get(id);
+        if (jobData) {
+          setValue("jobCode", jobData.jobCode || "");
+          setValue("jobTitle", jobData.jobTitle || "");
+          setValue("client", jobData.client || "");
+          setValue("locationAutocomplete", jobData.location || "");
+          setValue("jobType", jobData.type || "Contract");
+          setValue("jobDescription", jobData.description || "");
+          setPrimarySkills(jobData.skillsRequired || []);
+          setSecondarySkills(jobData.secondarySkills || []);
+          setValue("businessUnit", jobData.businessUnit || "enfycon Inc");
+          setValue("country", jobData.country || "United States");
+          setValue("states", jobData.state || "Texas");
+          setValue("city", jobData.city || "");
+          setValue("jobStatus", jobData.jobStatus || "Active");
+          setValue("workAuthorization", jobData.visaType || "");
+          setValue("clientBillRate", jobData.clientBillRate || "");
+          setValue("payRate", jobData.payRate || "");
+          setValue("numPositions", jobData.noOfPositions || 1);
+          setValue("maxSubmissions", jobData.submissionRequired || 5);
+          setValue("priority", (jobData.priority || "Warm") as any);
+          setValue("taxTerms", jobData.taxTerms || "C2C");
+          setValue("remoteJob", (jobData.remoteJob || "Hybrid") as any);
+          setValue("startDate", jobData.startDate ? jobData.startDate.split("T")[0] : "");
+          setValue("endDate", jobData.endDate ? jobData.endDate.split("T")[0] : "");
+          setValue("hoursPerWeek", jobData.hoursPerWeek || 40);
+          setValue("duration", jobData.duration || "");
+          setValue("recruitmentManager", jobData.recruitmentManagerId || "");
+          setValue("primaryRecruiter", jobData.primaryRecruiterId || "");
+          setValue("assignedTo", jobData.assignedTo || "");
+          setValue("accountManager", jobData.accountManagerId || "");
+          setValue("industry", jobData.industry || "");
+          setValue("degree", jobData.degree || "");
+          setValue("expMin", jobData.expMin);
+          setValue("expMax", jobData.expMax);
+          setValue("noticePeriod", jobData.noticePeriod || "");
+          if (jobData.respondBy) {
+            setRespondByType("Date Option");
+            setValue("respondBy", jobData.respondBy.split("T")[0]);
+          } else {
+            setRespondByType("Unlimited");
           }
-
-          if (prof.defaultMarket) {
-            const m = prof.defaultMarket as "US" | "IN";
-            setMarket(m);
-            
-            // Dynamically set defaults for the form depending on the market
-            if (m === "IN") {
-              setValue("country", "India");
-              setValue("states", "Karnataka");
-              setValue("workAuthorization", "Indian Citizen");
-              setValue("taxTerms", "Permanent");
-            } else {
-              setValue("country", "United States");
-              setValue("states", "Texas");
-              setValue("workAuthorization", "US Authorized");
-              setValue("taxTerms", "C2C");
-            }
+          if (jobData.market) {
+            setMarket(jobData.market as any);
           }
         }
       } catch (err) {
-        console.error("Failed to load user profile:", err);
+        toast.error("Failed to load job: " + err.message);
+      } finally {
+        setIsJobLoading(false);
       }
     }
 
-    async function fetchPods() { try { const res = await atsApi.pods.list(); setPodsList(res || []); } catch(e) { console.warn("Could not load pods", e); } }
-
-    fetchProfile();
-    fetchClients();
-    fetchPods();
-  }, [status, session, setValue, fetchClients]);
+    fetchProfileAndJob();
+  }, [id, status, session, setValue]);
 
   const getSelectedDisplayText = () => {
     const selected = watch("workAuthorization") || "";
@@ -598,13 +621,13 @@ export default function NewJobPostingPage() {
         market: market,
       };
 
-      const created = await atsApi.jobs.create(payload);
+      await atsApi.jobs.update(id, payload);
 
-      toast.success(`Job posting created successfully! Code: ${created.jobCode}`);
+      toast.success(`Job posting updated successfully!`);
       router.push("/job-posting");
     } catch (err: any) {
-      console.error("[NewJob] API error:", err);
-      toast.error("Failed to create job: " + (err.message || "Backend connection failed."));
+      console.error("[EditJob] API error:", err);
+      toast.error("Failed to update job: " + (err.message || "Backend connection failed."));
     }
   };
 
@@ -814,7 +837,7 @@ export default function NewJobPostingPage() {
               </button>
               <div>
                 <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-100 uppercase tracking-wider">
-                  New Job Requirement Form
+                  Edit Job Requirement Form
                 </h2>
                 <p className="text-[10px] text-neutral-500 font-semibold mt-0.5">
                   {market === "IN" ? `${tenantName} India IT Recruitment Workspace` : `${tenantName} US IT Recruitment Workspace`}
@@ -849,7 +872,7 @@ export default function NewJobPostingPage() {
                 size="sm"
                 className="h-8.5 font-bold bg-primary text-white shadow-xs hover:bg-primary/95 cursor-pointer text-xs"
               >
-                Save Posting
+                Update Posting
               </Button>
             </div>
           </div>

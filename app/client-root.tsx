@@ -28,7 +28,8 @@ export function ClientRoot({
       const u = (session as any).user;
       if (u.accessToken) {
         const localToken = typeof window !== "undefined" ? localStorage.getItem("ats_access_token") : null;
-        if (localToken !== u.accessToken && typeof window !== "undefined") {
+        const localUser = typeof window !== "undefined" ? localStorage.getItem("ats_current_user") : null;
+        if ((localToken !== u.accessToken || !localUser) && typeof window !== "undefined") {
           localStorage.setItem("ats_access_token", u.accessToken);
           localStorage.setItem(
             "ats_current_user",
@@ -38,6 +39,7 @@ export function ClientRoot({
               fullName: u.name,
               roles: u.roles,
               tenantId: u.tenantId,
+              defaultMarket: u.defaultMarket,
               permissions: u.permissions || [],
               systemRole: u.systemRole || "RECRUITER",
               podId: u.podId || null,

@@ -180,8 +180,12 @@ const auth = {
     });
   },
 
-  async listUsers(): Promise<any[]> {
-    return apiFetch<any[]>('/api/auth/users');
+  async listUsers(tenantId?: string): Promise<any[]> {
+    const headers: Record<string, string> = {};
+    if (tenantId) {
+      headers['x-tenant-id'] = tenantId;
+    }
+    return apiFetch<any[]>('/api/auth/users', { headers });
   },
 
   async setUserStatus(userId: string, isActive: boolean): Promise<any> {
@@ -374,6 +378,20 @@ const jobs = {
     return apiFetch<JobPayload>(`/api/jobs/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+  },
+
+  async parseJd(text: string): Promise<{
+    success: boolean;
+    primarySkills: string[];
+    secondarySkills: string[];
+    jobTitle: string;
+    workAuthorization: string;
+    roles: string[];
+  }> {
+    return apiFetch('/api/jobs/parse-jd', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
     });
   },
 };
