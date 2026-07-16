@@ -121,6 +121,7 @@ const formSchema = zod.object({
   hoursPerWeek: zod.union([zod.number().min(1).max(168), zod.nan().transform(() => undefined)]).optional(),
   jobStatus: zod.string(),
   client: zod.string().min(1, "Client is required"),
+  endClientName: zod.string().optional(),
   clientJobId: zod.string().optional(),
   priority: zod.enum(["Hot", "Warm", "Cold"]),
   additionalDetails: zod.string().optional(),
@@ -269,6 +270,16 @@ export default function EditJobPostingPage() {
   const [market, setMarket] = useState<"US" | "IN">("US");
   const currentWorkAuthOptions = market === "IN" ? INDIAN_WORK_AUTHORIZATION_OPTIONS : WORK_AUTHORIZATION_OPTIONS;
 
+  // Currency, Unit, and Term States for Bill Rate
+  const [billCurrency, setBillCurrency] = useState("USD");
+  const [billUnit, setBillUnit] = useState("Hourly");
+  const [billTerm, setBillTerm] = useState("C2C");
+
+  // Currency, Unit, and Term States for Pay Rate
+  const [payCurrency, setPayCurrency] = useState("USD");
+  const [payUnit, setPayUnit] = useState("Hourly");
+  const [payTerm, setPayTerm] = useState("C2C");
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -313,8 +324,38 @@ export default function EditJobPostingPage() {
       displayContactOnPortal: false,
       jobDescription: "",
       noticePeriod: "",
+      endClientName: "",
     },
   });
+
+  const selectedCountry = watch("country");
+  useEffect(() => {
+    if (selectedCountry === "India") {
+      setMarket("IN");
+      setBillCurrency("INR");
+      setBillUnit("LPA");
+      setBillTerm("Permanent");
+
+      setPayCurrency("INR");
+      setPayUnit("LPA");
+      setPayTerm("Permanent");
+      
+      setValue("taxTerms", "Permanent");
+      setValue("workAuthorization", "Indian Citizen");
+    } else if (selectedCountry === "United States") {
+      setMarket("US");
+      setBillCurrency("USD");
+      setBillUnit("Hourly");
+      setBillTerm("C2C");
+
+      setPayCurrency("USD");
+      setPayUnit("Hourly");
+      setPayTerm("C2C");
+      
+      setValue("taxTerms", "C2C");
+      setValue("workAuthorization", "US Authorized");
+    }
+  }, [selectedCountry, setValue]);
 
   const fetchClients = useCallback(async () => {
     try {
@@ -374,6 +415,7 @@ export default function EditJobPostingPage() {
           setValue("jobCode", jobData.jobCode || "");
           setValue("jobTitle", jobData.jobTitle || "");
           setValue("client", jobData.client || "");
+          setValue("endClientName", jobData.endClientName || "");
           setValue("locationAutocomplete", jobData.location || "");
           setValue("jobType", jobData.type || "Contract");
           setValue("jobDescription", jobData.description || "");
@@ -385,8 +427,39 @@ export default function EditJobPostingPage() {
           setValue("city", jobData.city || "");
           setValue("jobStatus", jobData.jobStatus || "Active");
           setValue("workAuthorization", jobData.visaType || "");
-          setValue("clientBillRate", jobData.clientBillRate || "");
-          setValue("payRate", jobData.payRate || "");
+
+          const parseRateString = (rateStr: string, defaultCurrency = "USD") => {
+            if (!rateStr || rateStr === "N/A") return { value: "", currency: defaultCurrency, unit: defaultCurrency === "INR" ? "LPA" : "Hourly", term: defaultCurrency === "INR" ? "Permanent" : "C2C" };
+            const cleanRate = rateStr.trim();
+            const matches = cleanRate.match(/(\d+(?:\.\d+)?)/);
+            const val = matches ? matches[1] : cleanRate;
+            
+            const isINR = /INR|₹/i.test(cleanRate);
+            const isLPA = /LPA|Lakh/i.test(cleanRate);
+            const isMonthly = /Monthly/i.test(cleanRate);
+            const isContract = /Contract/i.test(cleanRate);
+            const isPermanent = /Permanent/i.test(cleanRate);
+            const isW2 = /W-2|W2/i.test(cleanRate);
+            const is1099 = /1099/i.test(cleanRate);
+            
+            const currency = isINR ? "INR" : "USD";
+            const unit = isLPA ? "LPA" : isMonthly ? "Monthly" : "Hourly";
+            const term = isPermanent ? "Permanent" : isContract ? "Contract" : isW2 ? "W-2" : is1099 ? "1099" : "C2C";
+            return { value: val, currency, unit, term };
+          };
+
+          const billParsed = parseRateString(jobData.clientBillRate || "", jobData.market === "IN" ? "INR" : "USD");
+          setBillCurrency(billParsed.currency);
+          setBillUnit(billParsed.unit);
+          setBillTerm(billParsed.term);
+          setValue("clientBillRate", billParsed.value);
+
+          const payParsed = parseRateString(jobData.payRate || "", jobData.market === "IN" ? "INR" : "USD");
+          setPayCurrency(payParsed.currency);
+          setPayUnit(payParsed.unit);
+          setPayTerm(payParsed.term);
+          setValue("payRate", payParsed.value);
+
           setValue("numPositions", jobData.noOfPositions || 1);
           setValue("maxSubmissions", jobData.submissionRequired || 5);
           setValue("priority", (jobData.priority || "Warm") as any);
@@ -415,7 +488,7 @@ export default function EditJobPostingPage() {
             setMarket(jobData.market as any);
           }
         }
-      } catch (err) {
+      } catch (err: any) {
         toast.error("Failed to load job: " + err.message);
       } finally {
         setIsJobLoading(false);
@@ -530,7 +603,7 @@ export default function EditJobPostingPage() {
       } else {
         toast.error("Failed to parse Job Description.");
       }
-    } catch (err) {
+    } catch (err: any) {
       toast.error("AI parsing failed: " + err.message);
     } finally {
       setIsParsing(false);
@@ -565,12 +638,12 @@ export default function EditJobPostingPage() {
         if (pSkills.length > 0 || sSkills.length > 0) {
           toast.success(`AI extracted ${pSkills.length + sSkills.length} skills successfully!`);
         } else {
-          toast.warn("No skills found in description.");
+          toast("No skills found in description.", { icon: "⚠️" });
         }
       } else {
         toast.error("Failed to parse Job Description.");
       }
-    } catch (err) {
+    } catch (err: any) {
       toast.error("AI parsing failed: " + err.message);
     } finally {
       setIsExtractingSkills(false);
@@ -584,10 +657,26 @@ export default function EditJobPostingPage() {
         await atsApi.auth.login("recruiter@enfycon.com", "enfycon123");
       }
 
+      const formatRatePayload = (val: string, cur: string, unit: string, term: string) => {
+        if (!val || val === "N/A" || val === "Rate") return "N/A";
+        const cleanVal = val.replace(/[^0-9.]/g, "");
+        if (!cleanVal) return "N/A";
+        if (cur === "INR") {
+          return `INR - ${cleanVal} LPA`;
+        } else {
+          const unitLabel = unit === "Hourly" ? "hr" : unit === "Yearly" ? "yr" : "hr";
+          return `USD - $${cleanVal}/${unitLabel}`;
+        }
+      };
+
+      const assembledBillRate = formatRatePayload(data.clientBillRate, billCurrency, billUnit, billTerm);
+      const assembledPayRate = formatRatePayload(data.payRate, payCurrency, payUnit, payTerm);
+
       // Map frontend form fields → backend CreateJobDto
       const payload = {
         title: data.jobTitle,
         client: data.client,
+        endClientName: data.endClientName || undefined,
         location: data.locationAutocomplete || data.city || data.states || "Remote",
         type: data.jobType || "Contract",
         description: data.jobDescription,
@@ -600,8 +689,8 @@ export default function EditJobPostingPage() {
         clientJobId: data.clientJobId || undefined,
         status: data.jobStatus,
         visaType: data.workAuthorization,
-        clientBillRate: data.clientBillRate,
-        payRate: data.payRate,
+        clientBillRate: assembledBillRate,
+        payRate: assembledPayRate,
         noOfPositions: data.numPositions,
         submissionRequired: data.maxSubmissions,
         priority: data.priority,
@@ -970,7 +1059,11 @@ export default function EditJobPostingPage() {
                         <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Bill rate information">?</span>
                       </div>
                       <div className="flex gap-1 items-center">
-                        <select className="w-16 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0">
+                        <select
+                          value={billCurrency}
+                          onChange={(e) => setBillCurrency(e.target.value)}
+                          className="w-16 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0"
+                        >
                           {market === "IN" ? (
                             <>
                               <option value="INR">INR</option>
@@ -989,7 +1082,11 @@ export default function EditJobPostingPage() {
                           className="h-8 w-24 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700"
                           placeholder="Rate"
                         />
-                        <select className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0">
+                        <select
+                          value={billUnit}
+                          onChange={(e) => setBillUnit(e.target.value)}
+                          className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0"
+                        >
                           {market === "IN" ? (
                             <>
                               <option value="LPA">LPA</option>
@@ -1007,12 +1104,15 @@ export default function EditJobPostingPage() {
                             </>
                           )}
                         </select>
-                        <select className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0">
+                        <select
+                          value={billTerm}
+                          onChange={(e) => setBillTerm(e.target.value)}
+                          className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0"
+                        >
                           {market === "IN" ? (
                             <>
                               <option value="Permanent">Permanent</option>
                               <option value="Contract">Contract</option>
-                              
                             </>
                           ) : (
                             <>
@@ -1020,7 +1120,6 @@ export default function EditJobPostingPage() {
                               <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
                               <option value="C2C">C2C</option>
                               <option value="1099">1099</option>
-                              
                               <option value="Other">Other</option>
                             </>
                           )}
@@ -1038,7 +1137,11 @@ export default function EditJobPostingPage() {
                         <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Pay rate information">?</span>
                       </div>
                       <div className="flex gap-1 items-center">
-                        <select className="w-16 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0">
+                        <select
+                          value={payCurrency}
+                          onChange={(e) => setPayCurrency(e.target.value)}
+                          className="w-16 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0"
+                        >
                           {market === "IN" ? (
                             <>
                               <option value="INR">INR</option>
@@ -1058,7 +1161,11 @@ export default function EditJobPostingPage() {
                           className="h-8 w-24 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
                           placeholder="Pay Rate"
                         />
-                        <select className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0">
+                        <select
+                          value={payUnit}
+                          onChange={(e) => setPayUnit(e.target.value)}
+                          className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0"
+                        >
                           {market === "IN" ? (
                             <>
                               <option value="LPA">LPA</option>
@@ -1076,12 +1183,15 @@ export default function EditJobPostingPage() {
                             </>
                           )}
                         </select>
-                        <select className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0">
+                        <select
+                          value={payTerm}
+                          onChange={(e) => setPayTerm(e.target.value)}
+                          className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0"
+                        >
                           {market === "IN" ? (
                             <>
                               <option value="Permanent">Permanent</option>
                               <option value="Contract">Contract</option>
-                              
                             </>
                           ) : (
                             <>
@@ -1089,7 +1199,6 @@ export default function EditJobPostingPage() {
                               <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
                               <option value="C2C">C2C</option>
                               <option value="1099">1099</option>
-                              
                               <option value="Other">Other</option>
                             </>
                           )}
@@ -1390,6 +1499,17 @@ export default function EditJobPostingPage() {
                       {errors.client && (
                         <p className="text-[10px] text-red-655 font-bold">{errors.client.message}</p>
                       )}
+                    </div>
+
+                    {/* End Client */}
+                    <div className="space-y-1">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">End Client</label>
+                      <input
+                        type="text"
+                        {...register("endClientName")}
+                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
+                        placeholder="e.g. End Client Corp"
+                      />
                     </div>
 
                     {/* Client Job ID */}
@@ -1857,6 +1977,7 @@ export default function EditJobPostingPage() {
                         className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
                       >
                         <option value="">🔄 Auto — Round-Robin (Recommended)</option>
+                        <option value="none">📴 None — Keep Unassigned</option>
                         {podsList.map((pod: any) => (
                           <option key={pod.id} value={pod.id}>
                             {pod.name}{pod.podHeadName ? ` — Lead: ${pod.podHeadName}` : ""}{" "}

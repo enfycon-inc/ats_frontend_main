@@ -19,6 +19,7 @@ export interface SelectedFilters {
 
 const PREDEFINED_FILTERS = [
   "Active Jobs",
+  "Archived Jobs",
   "My Jobs",
   "Closed Jobs",
   "Shared Jobs",

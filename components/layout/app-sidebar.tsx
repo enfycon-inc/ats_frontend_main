@@ -20,9 +20,78 @@ import { NavbarLogo } from "./navbar-logo";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
 import { SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton } from "@/components/ui/sidebar";
+import { useSession } from "next-auth/react";
+import { useEffect, useState, useMemo } from "react";
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const [overrideRole, setOverrideRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOverrideRole(localStorage.getItem("override_role"));
+      const handleStorage = () => {
+        setOverrideRole(localStorage.getItem("override_role"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+  }, []);
+
+  const systemRole = useMemo(() => {
+    return overrideRole || (session as any)?.user?.systemRole || "RECRUITER";
+  }, [session, overrideRole]);
+
+  const filteredPrimaryNav = useMemo(() => {
+    return PRIMARY_NAV_ITEMS.filter(item => {
+      // Recruiter filters
+      if (systemRole === "RECRUITER") {
+        const allowed = ["dashboard", "job-posting", "applicants", "submissions-tracker"];
+        return allowed.includes(item.id);
+      }
+      
+      // Pod Lead filters
+      if (systemRole === "POD_LEAD") {
+        const allowed = ["dashboard", "job-posting", "applicants", "submissions-tracker", "reports"];
+        return allowed.includes(item.id);
+      }
+      
+      // Account Manager filters
+      if (systemRole === "ACCOUNT_MANAGER") {
+        const allowed = ["dashboard", "job-posting", "applicants", "submissions-tracker", "clients", "placements"];
+        return allowed.includes(item.id);
+      }
+
+      // Other roles (Admin, Delivery Head, etc.) see everything
+      return true;
+    });
+  }, [systemRole]);
+
+  const filteredMoreNav = useMemo(() => {
+    return MORE_NAV_ITEMS.filter(item => {
+      // Recruiter filters
+      if (systemRole === "RECRUITER") {
+        const allowed = ["email", "calendar", "documents", "settings", "help"];
+        return allowed.includes(item.id);
+      }
+      
+      // Pod Lead filters
+      if (systemRole === "POD_LEAD") {
+        const allowed = ["email", "calendar", "documents", "pod-management", "settings", "help"];
+        return allowed.includes(item.id);
+      }
+      
+      // Account Manager filters
+      if (systemRole === "ACCOUNT_MANAGER") {
+        const allowed = ["email", "calendar", "documents", "settings", "help"];
+        return allowed.includes(item.id);
+      }
+
+      // Other roles see everything
+      return true;
+    });
+  }, [systemRole]);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-default-200 dark:border-slate-800">
@@ -35,7 +104,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Main Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {PRIMARY_NAV_ITEMS.map((item) => (
+              {filteredPrimaryNav.map((item) => (
                 item.children ? (
                   <Collapsible
                     key={item.id}
@@ -85,7 +154,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>More Options</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {MORE_NAV_ITEMS.map((item) => (
+              {filteredMoreNav.map((item) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
                     <Link href={item.href}>

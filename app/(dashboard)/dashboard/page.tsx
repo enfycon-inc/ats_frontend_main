@@ -179,7 +179,6 @@ function PodLeadDashboardView({ profile, jobs, activeJobs }: { profile: any; job
     async function loadPending() {
       try {
         const res = await atsApi.submissions.list({ finalStatus: "PENDING_APPROVAL" });
-        // We only want submissions from this pod lead's team (handled by backend or we can filter here)
         setPendingSubmissions(res || []);
       } catch (err) {
         console.error("Failed to load pending submissions", err);
@@ -201,11 +200,9 @@ function PodLeadDashboardView({ profile, jobs, activeJobs }: { profile: any; job
   };
 
   const totalMembers = podTeam?.members?.length || 0;
-  const jobsInPod = podTeam?.jobsCount || 0;
 
   // Filter jobs assigned to this pod
   const podJobs = jobs.filter(j => j.podId && podTeam?.id && j.podId === podTeam.id);
-  const activePodJobs = podJobs.filter(j => j.jobStatus === "Active");
   const filledPodJobs = podJobs.filter(j => j.jobStatus === "Filled" || j.jobStatus === "Closed");
   
   const fillRate = podJobs.length ? Math.round((filledPodJobs.length / podJobs.length) * 100) : 0;
@@ -224,27 +221,6 @@ function PodLeadDashboardView({ profile, jobs, activeJobs }: { profile: any; job
       filled,
     };
   }) || [];
-
-  // Monthly active vs filled trend data
-  const monthLabels: string[] = [];
-  const activeByMonth: number[] = [];
-  const filledByMonth: number[] = [];
-  for (let i = 5; i >= 0; i -= 1) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    const month = d.getMonth();
-    const year = d.getFullYear();
-    monthLabels.push(d.toLocaleString("en-US", { month: "short" }));
-
-    const jobsInMonth = podJobs.filter((job) => {
-      if (!job.createdOn) return false;
-      const created = new Date(job.createdOn);
-      return created.getMonth() === month && created.getFullYear() === year;
-    });
-
-    activeByMonth.push(jobsInMonth.filter((j) => j.jobStatus === "Active").length);
-    filledByMonth.push(jobsInMonth.filter((j) => j.jobStatus === "Filled" || j.jobStatus === "Closed").length);
-  }
 
   // Job Status Distribution Data
   const statusSeries = [
@@ -272,37 +248,6 @@ function PodLeadDashboardView({ profile, jobs, activeJobs }: { profile: any; job
       enabled: false,
     },
   };
-
-  const areaOptions: any = {
-    chart: {
-      type: "area",
-      toolbar: { show: false },
-    },
-    colors: ["#487FFF", "#10B981"],
-    xaxis: {
-      categories: monthLabels,
-      labels: {
-        style: { colors: "#64748B" }
-      }
-    },
-    yaxis: {
-      labels: {
-        style: { colors: "#64748B" }
-      }
-    },
-    dataLabels: {
-      enabled: false,
-    },
-    stroke: {
-      curve: "smooth",
-      width: 2,
-    },
-  };
-
-  const areaSeries = [
-    { name: "Active Jobs", data: activeByMonth },
-    { name: "Filled Jobs", data: filledByMonth },
-  ];
 
   if (loadingTeam) {
     return (
@@ -343,280 +288,235 @@ function PodLeadDashboardView({ profile, jobs, activeJobs }: { profile: any; job
 
       {activeTab === "team" ? (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          {/* Pod Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-lg bg-indigo-50 dark:bg-slate-800 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-xl shadow-inner">
-              <Icon icon="heroicons:users" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Pod Name</p>
-              <h3 className="text-base font-bold text-default-850 mt-1 truncate max-w-[150px]">{podTeam?.name || "No Pod Assigned"}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-slate-800 text-emerald-605 dark:text-emerald-400 flex items-center justify-center text-xl shadow-inner">
-              <Icon icon="heroicons:briefcase" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Total Pod Jobs</p>
-              <h3 className="text-xl font-bold text-default-850 mt-1">{podJobs.length}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl shadow-inner">
-              <Icon icon="heroicons:user-group" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Team Size</p>
-              <h3 className="text-xl font-bold text-default-850 mt-1">{totalMembers} Recruiters</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-lg bg-amber-50 dark:bg-slate-800 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl shadow-inner">
-              <Icon icon="heroicons:trophy" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Pod Fill Rate</p>
-              <h3 className="text-xl font-bold text-default-850 mt-1">{fillRate}%</h3>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Visual Analytics Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card className="xl:col-span-2 border border-default-150 bg-white dark:bg-slate-900">
-          <CardHeader className="border-b border-default-100">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Icon icon="heroicons:chart-bar" className="text-indigo-600" />
-              Pod Delivery Trend (Active vs Filled)
-            </CardTitle>
-            <CardDescription className="text-xs">Month-by-month sourcing status overview inside your pod.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4">
-            <Chart
-              options={areaOptions}
-              series={areaSeries}
-              type="area"
-              height={300}
-            />
-          </CardContent>
-        </Card>
-
-        <Card className="border border-default-150 bg-white dark:bg-slate-900">
-          <CardHeader className="border-b border-default-100">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Icon icon="heroicons:chart-pie" className="text-amber-500" />
-              Pod Job Status Distribution
-            </CardTitle>
-            <CardDescription className="text-xs">Breakdown of requisitions currently assigned to your team.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 flex items-center justify-center min-h-[300px]">
-            {hasChartData ? (
-              <div className="w-full">
-                <Chart
-                  options={donutOptions}
-                  series={statusSeries}
-                  type="donut"
-                  height={280}
-                />
-              </div>
-            ) : (
-              <p className="text-xs text-default-400 font-medium">No distribution data available.</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recruiter Workload Analysis */}
-      <Card className="border border-default-150 bg-white dark:bg-slate-900">
-        <CardHeader className="border-b border-default-100">
-          <CardTitle className="text-base font-bold flex items-center gap-2">
-            <Icon icon="heroicons:chart-bar-square" className="text-emerald-600" />
-            Recruiter Workload Analysis
-          </CardTitle>
-          <CardDescription className="text-xs">Status of sourcing requisitions assigned to recruiters in your pod.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-6">
-          {recruiterWorkload.length === 0 ? (
-            <p className="text-xs text-default-400 text-center py-4">No team member workload to display.</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {recruiterWorkload.map((rec: any) => (
-                <div key={rec.email} className="rounded-xl border border-default-150 p-4 bg-default-50/50 hover:bg-default-50 transition-all shadow-sm">
-                  <div className="flex items-start justify-between min-w-0 gap-2">
-                    <div className="min-w-0">
-                      <p className="font-bold text-sm text-default-850 truncate">{rec.name}</p>
-                      <p className="text-[10px] text-default-400 font-mono truncate">{rec.email}</p>
-                    </div>
-                    <Badge className="bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-slate-800 dark:text-slate-300 font-semibold px-2 py-0.5 text-[8px] uppercase tracking-wider shrink-0">
-                      {rec.role === "POD_LEAD" ? "Head 👑" : "Recruiter"}
-                    </Badge>
-                  </div>
-                  <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-                    <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-default-100 shadow-inner">
-                      <p className="text-[10px] text-default-400 font-semibold uppercase">Total</p>
-                      <p className="font-bold text-default-800 mt-0.5">{rec.total}</p>
-                    </div>
-                    <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-default-100 shadow-inner">
-                      <p className="text-[10px] text-blue-500 font-semibold uppercase">Active</p>
-                      <p className="font-bold text-blue-600 mt-0.5">{rec.active}</p>
-                    </div>
-                    <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-default-100 shadow-inner">
-                      <p className="text-[10px] text-emerald-500 font-semibold uppercase">Filled</p>
-                      <p className="font-bold text-emerald-600 mt-0.5">{rec.filled}</p>
-                    </div>
-                  </div>
+          {/* Row 1: Pod Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="h-10 w-10 rounded-lg bg-indigo-50 dark:bg-slate-800 text-indigo-655 dark:text-indigo-400 flex items-center justify-center text-xl shadow-inner">
+                  <Icon icon="heroicons:users" />
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <div>
+                  <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Pod Name</p>
+                  <h3 className="text-base font-bold text-default-855 mt-1 truncate max-w-[150px]">{podTeam?.name || "No Pod Assigned"}</h3>
+                </div>
+              </CardContent>
+            </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Active Pod Requisitions */}
-        <Card className="lg:col-span-2 border border-default-150 bg-white dark:bg-slate-900">
-          <CardHeader className="border-b border-default-100 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Icon icon="heroicons:list-bullet" className="text-indigo-650" />
-                Pod Sourcing Requisitions ({podTeam?.name})
-              </CardTitle>
-              <CardDescription className="text-xs">Monitor assignments and submission quotas for jobs routed to your pod.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {podJobs.length === 0 ? (
-              <div className="p-8 text-center text-xs text-default-400">No job orders assigned to this pod yet.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-default-50 border-b border-default-100">
-                      <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Code / Title</th>
-                      <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Client Name</th>
-                      <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Priority</th>
-                      <th className="py-2.5 px-4 text-xs font-semibold text-default-700 text-center">Submissions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-default-100">
-                    {podJobs.slice(0, 10).map((job) => (
-                      <tr key={job.id} className="hover:bg-default-50/50 transition-colors text-xs">
-                        <td className="py-2.5 px-4">
-                          <div className="font-semibold text-default-900">{job.jobTitle}</div>
-                          <div className="text-[10px] text-default-400 font-mono">{job.jobCode}</div>
-                        </td>
-                        <td className="py-2.5 px-4 font-medium text-default-600">{job.client}</td>
-                        <td className="py-2.5 px-4">
-                          <Badge className={`px-2 py-0.5 text-[9px] font-bold ${
-                            job.priority === "Hot" || job.priority === "High" || job.priority === "Urgent" 
-                              ? "bg-rose-50 text-rose-700 border-rose-100" 
-                              : "bg-amber-50 text-amber-700 border-amber-100"
-                          }`}>
-                            {job.priority}
-                          </Badge>
-                        </td>
-                        <td className="py-2.5 px-4 text-center font-bold text-indigo-650">
-                          {job.submissionDone} / {job.submissionRequired}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-slate-800 text-emerald-605 dark:text-emerald-400 flex items-center justify-center text-xl shadow-inner">
+                  <Icon icon="heroicons:briefcase" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Total Pod Jobs</p>
+                  <h3 className="text-xl font-bold text-default-850 mt-1">{podJobs.length}</h3>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Pod Team Members Roster */}
-        <Card className="border border-default-150 bg-white dark:bg-slate-900">
-          <CardHeader className="border-b border-default-100">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Icon icon="heroicons:user-group" className="text-emerald-505" />
-              Pod Roster
-            </CardTitle>
-            <CardDescription className="text-xs">Recruiters assigned to your pod.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 space-y-4">
-            {totalMembers === 0 ? (
-              <p className="text-xs text-default-400 text-center py-6">No recruiters in this pod.</p>
-            ) : (
-              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
-                {podTeam.members.map((member: any) => (
-                  <div key={member.id} className="flex items-center justify-between p-2.5 rounded-lg border border-default-100 bg-default-50/50 hover:bg-default-50 transition-colors">
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-default-850 truncate">{member.fullName}</p>
-                      <p className="text-[10px] text-default-450 truncate font-mono">{member.email}</p>
-                    </div>
-                    <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-350 border-slate-200 font-semibold px-2 py-0.5 text-[9px] uppercase tracking-wider shrink-0 select-none">
-                      {member.systemRole === "POD_LEAD" ? "Head 👑" : "Recruiter"}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl shadow-inner">
+                  <Icon icon="heroicons:user-group" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Team Size</p>
+                  <h3 className="text-xl font-bold text-default-850 mt-1">{totalMembers} Recruiters</h3>
+                </div>
+              </CardContent>
+            </Card>
 
-      {/* Pending Approvals */}
-      <Card className="border border-default-150 bg-white dark:bg-slate-900 mt-6">
-        <CardHeader className="border-b border-default-100 flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Icon icon="heroicons:check-badge" className="text-amber-500" />
-              Pending Submissions Approval
-            </CardTitle>
-            <CardDescription className="text-xs">Review and approve submissions from your pod members.</CardDescription>
+            <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="h-10 w-10 rounded-lg bg-amber-50 dark:bg-slate-800 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl shadow-inner">
+                  <Icon icon="heroicons:trophy" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Pod Fill Rate</p>
+                  <h3 className="text-xl font-bold text-default-850 mt-1">{fillRate}%</h3>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loadingPending ? (
-            <div className="p-8 text-center text-xs text-default-400">Loading pending approvals...</div>
-          ) : pendingSubmissions.length === 0 ? (
-            <div className="p-8 text-center text-xs text-default-400">No pending submissions.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-default-50 border-b border-default-100">
-                    <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Candidate</th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Job Code</th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Submitted By</th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-default-100">
-                  {pendingSubmissions.map((sub) => (
-                    <tr key={sub.id} className="hover:bg-default-50/50 transition-colors text-xs">
-                      <td className="py-2.5 px-4 font-semibold text-default-900">{sub.candidate?.firstName} {sub.candidate?.lastName}</td>
-                      <td className="py-2.5 px-4 text-default-600 font-mono">{sub.job?.jobCode}</td>
-                      <td className="py-2.5 px-4 text-default-600">{sub.recruiter?.fullName}</td>
-                      <td className="py-2.5 px-4">
-                        <Button size="sm" onClick={() => handleApproveSubmission(sub.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 px-3 rounded">
-                          Approve
-                        </Button>
-                      </td>
-                    </tr>
+
+          {/* Row 2: High Priority Approvals */}
+          <Card className="border border-default-150 bg-white dark:bg-slate-900">
+            <CardHeader className="border-b border-default-100 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Icon icon="heroicons:check-badge" className="text-amber-500" />
+                  Pending Submissions Approval
+                </CardTitle>
+                <CardDescription className="text-xs">Review and approve submissions from your pod members.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {loadingPending ? (
+                <div className="p-8 text-center text-xs text-default-400">Loading pending approvals...</div>
+              ) : pendingSubmissions.length === 0 ? (
+                <div className="p-8 text-center text-xs text-default-400">No pending submissions.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-default-50 border-b border-default-100">
+                        <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Candidate</th>
+                        <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Job Code</th>
+                        <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Submitted By</th>
+                        <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-default-100">
+                      {pendingSubmissions.map((sub) => (
+                        <tr key={sub.id} className="hover:bg-default-50/50 transition-colors text-xs">
+                          <td className="py-2.5 px-4 font-semibold text-default-900">{sub.candidate?.firstName} {sub.candidate?.lastName}</td>
+                          <td className="py-2.5 px-4 text-default-600 font-mono">{sub.job?.jobCode}</td>
+                          <td className="py-2.5 px-4 text-default-600">{sub.recruiter?.fullName}</td>
+                          <td className="py-2.5 px-4">
+                            <Button size="sm" onClick={() => handleApproveSubmission(sub.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 px-3 rounded">
+                              Approve
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Row 3: Recruiter Workload Analysis */}
+          <Card className="border border-default-150 bg-white dark:bg-slate-900">
+            <CardHeader className="border-b border-default-100">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Icon icon="heroicons:chart-bar-square" className="text-emerald-600" />
+                Recruiter Workload Analysis
+              </CardTitle>
+              <CardDescription className="text-xs">Status of sourcing requisitions assigned to recruiters in your pod.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              {recruiterWorkload.length === 0 ? (
+                <p className="text-xs text-default-400 text-center py-4">No team member workload to display.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {recruiterWorkload.map((rec: any) => (
+                    <div key={rec.email} className="rounded-xl border border-default-150 p-4 bg-default-50/50 hover:bg-default-50 transition-all shadow-sm">
+                      <div className="flex items-start justify-between min-w-0 gap-2">
+                        <div className="min-w-0">
+                          <p className="font-bold text-sm text-default-855 truncate">{rec.name}</p>
+                          <p className="text-[10px] text-default-400 font-mono truncate">{rec.email}</p>
+                        </div>
+                        <Badge className="bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-slate-800 dark:text-slate-300 font-semibold px-2 py-0.5 text-[8px] uppercase tracking-wider shrink-0">
+                          {rec.role === "POD_LEAD" ? "Head 👑" : "Recruiter"}
+                        </Badge>
+                      </div>
+                      <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-default-100 shadow-inner">
+                          <p className="text-[10px] text-default-400 font-semibold uppercase">Total</p>
+                          <p className="font-bold text-default-800 mt-0.5">{rec.total}</p>
+                        </div>
+                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-default-100 shadow-inner">
+                          <p className="text-[10px] text-blue-500 font-semibold uppercase">Active</p>
+                          <p className="font-bold text-blue-600 mt-0.5">{rec.active}</p>
+                        </div>
+                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-default-100 shadow-inner">
+                          <p className="text-[10px] text-emerald-500 font-semibold uppercase">Filled</p>
+                          <p className="font-bold text-emerald-600 mt-0.5">{rec.filled}</p>
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Row 4: Requisitions & Status Distribution split */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Active Pod Requisitions */}
+            <div className="lg:col-span-8">
+              <Card className="border border-default-150 bg-white dark:bg-slate-900 h-full">
+                <CardHeader className="border-b border-default-100 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <Icon icon="heroicons:list-bullet" className="text-indigo-650" />
+                      Pod Sourcing Requisitions ({podTeam?.name})
+                    </CardTitle>
+                    <CardDescription className="text-xs">Monitor assignments and submission quotas for jobs routed to your pod.</CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {podJobs.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-default-400">No job orders assigned to this pod yet.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-default-50 border-b border-default-100">
+                            <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Code / Title</th>
+                            <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Client Name</th>
+                            <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Priority</th>
+                            <th className="py-2.5 px-4 text-xs font-semibold text-default-700 text-center">Submissions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-default-100">
+                          {podJobs.slice(0, 10).map((job) => (
+                            <tr key={job.id} className="hover:bg-default-50/50 transition-colors text-xs">
+                              <td className="py-2.5 px-4">
+                                <div className="font-semibold text-default-900">{job.jobTitle}</div>
+                                <div className="text-[10px] text-default-400 font-mono">{job.jobCode}</div>
+                              </td>
+                              <td className="py-2.5 px-4 font-medium text-default-600">{job.client}</td>
+                              <td className="py-2.5 px-4">
+                                <Badge className={`px-2 py-0.5 text-[9px] font-bold ${
+                                  job.priority === "Hot" || job.priority === "High" || job.priority === "Urgent" 
+                                    ? "bg-rose-50 text-rose-700 border-rose-100" 
+                                    : "bg-amber-50 text-amber-700 border-amber-100"
+                                }`}>
+                                  {job.priority}
+                                </Badge>
+                              </td>
+                              <td className="py-2.5 px-4 text-center font-bold text-indigo-655">
+                                {job.submissionDone} / {job.submissionRequired}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* Pod Job Status Distribution */}
+            <div className="lg:col-span-4">
+              <Card className="border border-default-150 bg-white dark:bg-slate-900 h-full">
+                <CardHeader className="border-b border-default-100">
+                  <CardTitle className="text-base font-bold flex items-center gap-2">
+                    <Icon icon="heroicons:chart-pie" className="text-amber-500" />
+                    Job Distribution
+                  </CardTitle>
+                  <CardDescription className="text-xs">Breakdown of requisitions currently assigned to your team.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 flex items-center justify-center min-h-[250px]">
+                  {hasChartData ? (
+                    <div className="w-full">
+                      <Chart
+                        options={donutOptions}
+                        series={statusSeries}
+                        type="donut"
+                        height={260}
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-xs text-default-400 font-medium">No distribution data available.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -1098,7 +998,22 @@ function AccountManagerDashboardView({
                         <div className="text-[10px] text-amber-600 font-semibold">{job.jobAge || "0"} days active</div>
                       </td>
                       <td className="py-3 px-4 text-default-800 font-medium">
-                        {job.clientBillRate || "N/A"} <span className="text-default-400 font-normal">/</span> {job.payRate || "N/A"}
+                        {(() => {
+                          const formatRate = (rate: string, market: string) => {
+                            if (!rate || rate === "N/A") return "N/A";
+                            if (/[a-zA-Z$₹]/.test(rate)) return rate;
+                            return market === "IN" ? `INR - ${rate} LPA` : `USD - $${rate}/hr`;
+                          };
+                          return (
+                            <>
+                              {formatRate(job.clientBillRate, job.market || "US")}
+                              {" "}
+                              <span className="text-default-400 font-normal">/</span>
+                              {" "}
+                              {formatRate(job.payRate, job.market || "US")}
+                            </>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 px-4 text-default-500 font-medium">
                         {job.createdOn ? new Date(job.createdOn).toLocaleDateString() : "N/A"}
@@ -1216,76 +1131,6 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
   const rejectedCount = mySubmissions.filter((sub) => sub.finalStatus === "REJECTED").length;
   const holdCount = jobs.filter((job) => job.jobStatus === "Hold" || job.jobStatus === "On Hold").length;
 
-  // Monthly Activity Trend (Last 6 Months)
-  const monthLabels: string[] = [];
-  const assignedByMonth: number[] = [];
-  const submittedByMonth: number[] = [];
-  
-  for (let i = 5; i >= 0; i -= 1) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    const month = d.getMonth();
-    const year = d.getFullYear();
-    monthLabels.push(d.toLocaleString("en-US", { month: "short" }));
-
-    assignedByMonth.push(
-      jobs.filter((job) => {
-        if (!job.createdOn) return false;
-        const created = new Date(job.createdOn);
-        return created.getMonth() === month && created.getFullYear() === year;
-      }).length
-    );
-
-    submittedByMonth.push(
-      mySubmissions.filter((sub) => {
-        if (!sub.createdAt && !sub.submittedAt) return false;
-        const submitted = new Date(sub.submittedAt || sub.createdAt);
-        return submitted.getMonth() === month && submitted.getFullYear() === year;
-      }).length
-    );
-  }
-
-  const activityOptions: any = {
-    chart: { type: "area", toolbar: { show: false } },
-    colors: ["#3B82F6", "#8B5CF6"], // Blue & Purple
-    stroke: { curve: "smooth", width: 2 },
-    xaxis: { categories: monthLabels, labels: { style: { colors: "#64748B" } } },
-    yaxis: { labels: { style: { colors: "#64748B" } } },
-    dataLabels: { enabled: false },
-    legend: { position: "top", horizontalAlign: "right" },
-  };
-
-  const activitySeries = [
-    { name: "Assigned Jobs", data: assignedByMonth },
-    { name: "Submissions", data: submittedByMonth },
-  ];
-
-  // Job Status Mix
-  const statusSeries = [
-    jobs.filter((j) => j.jobStatus === "Active").length,
-    jobs.filter((j) => j.jobStatus === "Hold" || j.jobStatus === "On Hold").length,
-    jobs.filter((j) => j.jobStatus === "Filled").length,
-    jobs.filter((j) => j.jobStatus === "Closed").length,
-  ];
-  
-  const donutOptions: any = {
-    chart: { type: "donut" },
-    colors: ["#10B981", "#F59E0B", "#3B82F6", "#EF4444"],
-    labels: ["Active", "On Hold", "Filled", "Closed"],
-    legend: { position: "bottom", labels: { colors: "#64748B" } },
-    dataLabels: { enabled: false },
-  };
-
-  // Top Clients
-  const clientBuckets = new Map<string, number>();
-  jobs.forEach((job) => {
-    const key = job.client || "Unknown";
-    clientBuckets.set(key, (clientBuckets.get(key) || 0) + 1);
-  });
-  const topClients = Array.from(clientBuckets.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4);
-
   return (
     <div className="space-y-6">
       {/* 1. Stat Cards (Enfysync Style) */}
@@ -1375,42 +1220,9 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
         </Card>
       </div>
 
-      {/* 2. Charts (Enfysync Style) */}
+      {/* 2. Workspace Split Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        <div className="xl:col-span-8">
-          <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl h-full">
-            <CardHeader className="border-b border-default-100 pb-4">
-              <CardTitle className="text-base font-bold text-default-900">Activity Trend (Assigned vs Submitted)</CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              {canViewJobs ? (
-                <Chart options={activityOptions} series={activitySeries} type="area" height={300} />
-              ) : (
-                <div className="p-8 text-center text-sm text-default-450">No posting data available.</div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-        <div className="xl:col-span-4">
-          <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl h-full">
-            <CardHeader className="border-b border-default-100 pb-4">
-              <CardTitle className="text-base font-bold text-default-900">Job Status Mix</CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 flex items-center justify-center min-h-[300px]">
-              {statusSeries.some((v) => v > 0) ? (
-                <div className="w-full">
-                  <Chart options={donutOptions} series={statusSeries} type="donut" height={280} />
-                </div>
-              ) : (
-                <p className="text-sm text-default-400 font-medium">No distribution parameters available.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* 3. Jobs Table & Client List */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+        {/* Left pane: My Assigned Jobs */}
         <div className="xl:col-span-8">
           <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl h-full overflow-hidden">
             <CardHeader className="border-b border-default-100 pb-4 flex flex-row items-center justify-between bg-slate-50/50 dark:bg-slate-800/20">
@@ -1454,7 +1266,14 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
                               )) || <span className="text-xs text-default-400">Not specified</span>}
                             </div>
                           </td>
-                          <td className="py-4 px-5 font-bold text-default-850">{job.payRate || "N/A"}</td>
+                          <td className="py-4 px-5 font-bold text-default-855">
+                            {(() => {
+                              const rate = job.payRate;
+                              if (!rate || rate === "N/A") return "N/A";
+                              if (/[a-zA-Z$₹]/.test(rate)) return rate;
+                              return (job.market || "US") === "IN" ? `INR - ${rate} LPA` : `USD - $${rate}/hr`;
+                            })()}
+                          </td>
                           <td className="py-4 px-5 text-right">
                             <Button 
                               size="sm" 
@@ -1475,28 +1294,10 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
             </CardContent>
           </Card>
         </div>
-        
-        <div className="xl:col-span-4 space-y-6">
-          <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl">
-            <CardHeader className="border-b border-default-100 pb-4">
-              <CardTitle className="text-base font-bold text-default-900">Top Client Demand</CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-3">
-                {(topClients.length ? topClients : [["No client data", 0]]).map(([client, count]) => (
-                  <div key={client} className="flex items-center justify-between rounded-lg border border-default-200 dark:border-slate-700 px-4 py-3 bg-default-50/50 hover:bg-default-50 transition-colors">
-                    <p className="text-sm font-semibold text-default-700 dark:text-default-200 truncate pr-2">
-                      {client}
-                    </p>
-                    <span className="text-sm font-bold text-indigo-600">{count}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Submissions Tracker (Mini View) */}
-          <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl">
+        {/* Right pane: My Submissions Tracker */}
+        <div className="xl:col-span-4">
+          <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl h-full">
             <CardHeader className="border-b border-default-100 pb-4 flex flex-row items-center justify-between">
               <CardTitle className="text-base font-bold text-default-900 flex items-center gap-2">
                 <Icon icon="heroicons:document-check" className="text-emerald-500" />
@@ -1509,7 +1310,7 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
               ) : mySubmissions.length === 0 ? (
                 <div className="p-8 text-center text-sm text-default-400">No submissions yet. Start sourcing!</div>
               ) : (
-                <div className="max-h-[300px] overflow-y-auto">
+                <div className="max-h-[500px] overflow-y-auto">
                   <table className="w-full text-left border-collapse">
                     <tbody className="divide-y divide-default-100">
                       {mySubmissions.map((sub) => (

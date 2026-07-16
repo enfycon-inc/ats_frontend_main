@@ -13,6 +13,7 @@ import {
   Mail,
   Phone,
   ExternalLink,
+  ClipboardList,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -21,8 +22,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Applicant } from "@/app/(dashboard)/applicants/data/mock-applicants";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { atsApi } from "@/lib/ats-api";
+import toast from "react-hot-toast";
 
 // ── Status badge colour map ─────────────────────────────────────
 const STATUS_STYLES: Record<string, string> = {
@@ -130,6 +136,7 @@ interface ApplicantsTableProps {
   onPageSizeChange: (size: number) => void;
   selectedRowIds: string[];
   onSelectionChange: (ids: string[]) => void;
+  isRecruiter?: boolean;
 }
 
 export default function ApplicantsTable({
@@ -144,6 +151,7 @@ export default function ApplicantsTable({
   onPageSizeChange,
   selectedRowIds,
   onSelectionChange,
+  isRecruiter = false,
 }: ApplicantsTableProps) {
   const [sortColumn, setSortColumn] = useState<keyof Applicant | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -155,6 +163,63 @@ export default function ApplicantsTable({
     y: number;
     applicantId: string;
   } | null>(null);
+
+  // Submit to Job State
+  const [submitModalOpen, setSubmitModalOpen] = useState(false);
+  const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
+  const [activeJobs, setActiveJobs] = useState<any[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState("");
+  const [submittingJob, setSubmittingJob] = useState(false);
+  const [submittedRate, setSubmittedRate] = useState("");
+  const [recruiterComment, setRecruiterComment] = useState("");
+
+  const handleOpenSubmitModal = async (applicant: Applicant) => {
+    setSelectedApplicant(applicant);
+    setSubmitModalOpen(true);
+    setSubmittedRate("");
+    setRecruiterComment("");
+    try {
+      const jobsList = await atsApi.jobs.list();
+      const active = jobsList.filter((j: any) => j.status === "ACTIVE" || j.jobStatus === "Active");
+      setActiveJobs(active);
+      if (active.length > 0) {
+        setSelectedJobId(active[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to load active jobs:", err);
+      toast.error("Failed to load active jobs.");
+    }
+  };
+
+  const handleConfirmSubmit = async () => {
+    if (!selectedApplicant || !selectedJobId) return;
+    setSubmittingJob(true);
+    try {
+      // Extract candidate integer ID
+      const parts = selectedApplicant.applicantId.split("-");
+      const candidateIdNum = parseInt(parts[parts.length - 1], 10);
+
+      const currentUser = atsApi.auth.getCurrentUser();
+      await atsApi.submissions.create({
+        candidateId: candidateIdNum,
+        jobId: selectedJobId,
+        recruiterId: currentUser?.id || "d2ec2da8-816c-410a-8c0c-4737b5ae21cf",
+        finalStatus: "PENDING_APPROVAL",
+        submittedRate: submittedRate.trim() || null,
+        recruiterComment: recruiterComment.trim() || null
+      });
+
+      toast.success(`Successfully submitted ${selectedApplicant.applicantName} to job!`);
+      setSubmitModalOpen(false);
+      setSelectedApplicant(null);
+      setSubmittedRate("");
+      setRecruiterComment("");
+    } catch (err: any) {
+      toast.error("Failed to submit candidate: " + err.message);
+    } finally {
+      setSubmittingJob(false);
+    }
+  };
 
   // ── Sort ────────────────────────────────────────────────────
   const handleSort = (column: keyof Applicant) => {
@@ -380,6 +445,11 @@ export default function ApplicantsTable({
     }
   };
 
+  const selectedJob = activeJobs.find((j) => String(j.id) === String(selectedJobId));
+  const isDomestic = selectedJob?.market === "IN";
+  const rateLabel = isDomestic ? "Expected Salary (Lakhs)" : "Submitted Pay Rate ($/hr or $/yr)";
+  const ratePlaceholder = isDomestic ? "e.g. 12.5" : "e.g. $70/hr";
+
   return (
     <div
       className="flex-1 flex flex-col min-h-0 min-w-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none overflow-hidden relative font-sans"
@@ -554,16 +624,23 @@ export default function ApplicantsTable({
                           <DropdownMenuItem className="text-xs cursor-pointer gap-2">
                             <Edit className="h-3.5 w-3.5" /> Edit Applicant
                           </DropdownMenuItem>
+                          <DropdownMenuItem className="text-xs cursor-pointer gap-2" onClick={() => handleOpenSubmitModal(applicant)}>
+                            <ClipboardList className="h-3.5 w-3.5" /> Submit to Job
+                          </DropdownMenuItem>
                           <DropdownMenuItem className="text-xs cursor-pointer gap-2">
                             <Mail className="h-3.5 w-3.5" /> Send Email
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-xs cursor-pointer gap-2">
                             <Phone className="h-3.5 w-3.5" /> Call
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-xs cursor-pointer gap-2 text-red-600 dark:text-red-400 focus:text-red-600">
-                            <Trash2 className="h-3.5 w-3.5" /> Delete
-                          </DropdownMenuItem>
+                          {!isRecruiter && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-xs cursor-pointer gap-2 text-red-650 dark:text-red-400 focus:text-red-650">
+                                <Trash2 className="h-3.5 w-3.5" /> Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -584,32 +661,116 @@ export default function ApplicantsTable({
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
             {[
-              { icon: Eye, label: "View Profile" },
-              { icon: Edit, label: "Edit Applicant" },
-              { icon: Mail, label: "Send Email" },
-              { icon: Phone, label: "Call" },
-              { icon: ExternalLink, label: "Open in New Tab" },
-            ].map(({ icon: Icon, label }) => (
+              { icon: Eye, label: "View Profile", action: () => {} },
+              { icon: Edit, label: "Edit Applicant", action: () => {} },
+              { icon: ClipboardList, label: "Submit to Job", action: () => {
+                const app = data.find((a) => a.applicantId === contextMenu.applicantId);
+                if (app) handleOpenSubmitModal(app);
+              }},
+              { icon: Mail, label: "Send Email", action: () => {} },
+              { icon: Phone, label: "Call", action: () => {} },
+              { icon: ExternalLink, label: "Open in New Tab", action: () => {} },
+            ].map(({ icon: Icon, label, action }) => (
               <button
                 key={label}
-                onClick={closeContextMenu}
+                onClick={(e) => {
+                  closeContextMenu();
+                  action();
+                }}
                 className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <Icon className="h-3.5 w-3.5 text-neutral-400" />
                 {label}
               </button>
             ))}
-            <div className="border-t border-neutral-100 dark:border-slate-800 my-1" />
-            <button
-              onClick={closeContextMenu}
-              className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete
-            </button>
+            {!isRecruiter && (
+              <>
+                <div className="border-t border-neutral-100 dark:border-slate-800 my-1" />
+                <button
+                  onClick={closeContextMenu}
+                  className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
+              </>
+            )}
           </div>
         </>
       )}
+
+      {/* Submit to Job Dialog Modal */}
+      <Dialog open={submitModalOpen} onOpenChange={setSubmitModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Submit Candidate to Job</DialogTitle>
+            <DialogDescription>
+              Select an active job requisition to submit <strong>{selectedApplicant?.applicantName}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="job-select" className="text-xs font-semibold text-default-700">Active Job Requisitions</label>
+              {activeJobs.length === 0 ? (
+                <div className="text-xs text-amber-600 italic">No active jobs found in the system.</div>
+              ) : (
+                <select
+                  id="job-select"
+                  value={selectedJobId}
+                  onChange={(e) => setSelectedJobId(e.target.value)}
+                  className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-3 h-9 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                >
+                  {activeJobs.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.jobCode} - {j.jobTitle} ({j.clientName})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {activeJobs.length > 0 && (
+              <>
+                <div className="flex flex-col gap-2 mt-1">
+                  <label htmlFor="modal-submitted-rate" className="text-xs font-semibold text-default-700">{rateLabel}</label>
+                  <Input
+                    id="modal-submitted-rate"
+                    placeholder={ratePlaceholder}
+                    value={submittedRate}
+                    onChange={(e) => setSubmittedRate(e.target.value)}
+                    className="h-9 text-xs"
+                  />
+                </div>
+                <div className="flex flex-col gap-2 mt-1">
+                  <label htmlFor="modal-recruiter-comment" className="text-xs font-semibold text-default-700">Comments</label>
+                  <textarea
+                    id="modal-recruiter-comment"
+                    placeholder="Recruiter comments or notes..."
+                    value={recruiterComment}
+                    onChange={(e) => setRecruiterComment(e.target.value)}
+                    className="min-h-16 text-xs bg-transparent border border-default-250 dark:border-slate-700 rounded-md p-2 outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setSubmitModalOpen(false)} className="text-xs">
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleConfirmSubmit}
+              disabled={submittingJob || activeJobs.length === 0}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+            >
+              {submittingJob ? "Submitting..." : "Submit to Job"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

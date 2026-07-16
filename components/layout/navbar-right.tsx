@@ -452,6 +452,18 @@ function ProfileDropdownNav() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const { data: session } = useSession();
+  const [overrideRole, setOverrideRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOverrideRole(localStorage.getItem("override_role"));
+      const handleStorage = () => {
+        setOverrideRole(localStorage.getItem("override_role"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+  }, []);
 
   useEffect(() => {
     const handle = (e: MouseEvent) => {
@@ -462,7 +474,18 @@ function ProfileDropdownNav() {
   }, [open]);
 
   const userName = session?.user?.name ?? "Sahadeb";
-  const userRole = "Recruitment Admin";
+  const systemRole = overrideRole || (session as any)?.user?.systemRole || "RECRUITER";
+
+  const roleLabels: Record<string, string> = {
+    SUPER_ADMIN: "Global Admin",
+    ADMIN: "Tenant Admin",
+    ACCOUNT_MANAGER: "Account Manager",
+    POD_LEAD: "Pod Lead",
+    DELIVERY_HEAD: "Delivery Head",
+    RECRUITER: "Recruiter",
+  };
+
+  const displayRole = roleLabels[systemRole] || systemRole.replace("_", " ");
 
   return (
     <div ref={ref} className="relative">
@@ -504,7 +527,7 @@ function ProfileDropdownNav() {
             {userName.split(" ")[0]}
           </span>
           <span className="text-[9.5px] text-white/50 truncate max-w-[100px]">
-            {userRole}
+            {displayRole}
           </span>
         </div>
         <ChevronDown
@@ -533,7 +556,7 @@ function ProfileDropdownNav() {
           {/* User header */}
           <div className="px-4 py-3 bg-[#1a4fa0] dark:bg-[#122f70]">
             <p className="text-[13.5px] font-semibold text-white">{userName}</p>
-            <p className="text-[11px] text-blue-200/80">{userRole}</p>
+            <p className="text-[11px] text-blue-200/80">{displayRole}</p>
           </div>
 
           {/* Menu items */}

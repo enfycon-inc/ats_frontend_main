@@ -47,7 +47,7 @@ const personas = [
   },
   {
     role: "Tenant Admin",
-    email: "deb@debt.com",
+    email: "deb@deb.com",
     desc: "Company admin (manages staff, custom roles, pods, and workspace settings).",
     icon: Settings,
     color: "border-amber-200 dark:border-amber-800/30 bg-amber-50/50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400"

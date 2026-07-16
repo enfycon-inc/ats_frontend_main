@@ -264,6 +264,13 @@ const auth = {
       method: 'DELETE',
     });
   },
+
+  async updateMySettings(settings: { podSystemEnabled?: boolean }): Promise<any> {
+    return apiFetch<any>('/api/auth/tenants/my-settings', {
+      method: 'PATCH',
+      body: JSON.stringify(settings),
+    });
+  },
 };
 
 // ─── Jobs API ───────────────────────────────────────────────────────
@@ -315,6 +322,9 @@ export interface JobPayload {
   podId?: string;
   podName?: string;
   market?: string;
+  city?: string;
+  noticePeriod?: string;
+  respondBy?: string;
 }
 
 export interface CandidateMatch {
@@ -331,6 +341,12 @@ export interface CandidateMatch {
   matchTier: 'Strong' | 'Good' | 'Fair' | 'Low';
   matchedSkills: string[];
   missingSkills: string[];
+  currentCTC?: number | null;
+  expectedCTC?: number | null;
+  noticePeriodDays?: number;
+  servingNotice?: boolean;
+  lastWorkingDay?: string | null;
+  preferredLocations?: string[];
   breakdown: {
     primarySkills: string;
     secondarySkills: string;
@@ -418,6 +434,46 @@ const candidates = {
     });
   },
 
+  async update(id: string | number, data: Record<string, any>): Promise<any> {
+    return apiFetch<any>(`/api/candidates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async uploadCvBulk(files: File[]): Promise<{ bulkUploadId: string }> {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('files', file);
+    });
+
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${API_BASE}/api/candidates/bulk-upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      throw new Error(`Bulk upload failed with status ${res.status}`);
+    }
+
+    return res.json();
+  },
+
+  async getBulkUploads(): Promise<any[]> {
+    return apiFetch<any[]>('/api/candidates/bulk-uploads');
+  },
+
+  async getBulkUpload(id: string): Promise<any> {
+    return apiFetch<any>(`/api/candidates/bulk-uploads/${id}`);
+  },
+
   async parseResume(file: File): Promise<any> {
     const formData = new FormData();
     formData.append('file', file);
@@ -442,10 +498,19 @@ const candidates = {
   },
 
   /** Upload a CV: parses (best-effort), stores the file, and creates the candidate. */
-  async uploadCv(file: File, source = 'CV Upload'): Promise<{ candidate: any; duplicate: boolean; parsed: boolean }> {
+  async uploadCv(
+    file: File, 
+    source = 'CV Upload',
+    overrides?: { fullName?: string; email?: string; phone?: string }
+  ): Promise<{ candidate: any; duplicate: boolean; parsed: boolean; updated?: boolean }> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('source', source);
+    if (overrides) {
+      if (overrides.fullName) formData.append('fullName', overrides.fullName);
+      if (overrides.email) formData.append('email', overrides.email);
+      if (overrides.phone) formData.append('phone', overrides.phone);
+    }
 
     const token = getToken();
     const headers: Record<string, string> = {};
@@ -581,7 +646,15 @@ const pods = {
 
 const submissions = {
   async list(filters?: Record<string, any>): Promise<any> {
-    const query = new URLSearchParams(filters as any).toString();
+    const cleanFilters: Record<string, string> = {};
+    if (filters) {
+      Object.entries(filters).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== "") {
+          cleanFilters[key] = String(val);
+        }
+      });
+    }
+    const query = new URLSearchParams(cleanFilters).toString();
     return apiFetch<any>(`/api/recruiter-submissions${query ? `?${query}` : ''}`);
   },
   async get(id: number): Promise<any> {
@@ -605,7 +678,7 @@ const submissions = {
     });
   },
   async getTrackerStats(): Promise<any> {
-    return apiFetch<any>('/api/recruiter-submissions/stats/tracker');
+    return apiFetch<any>('/api/recruiter-submissions/tracker-stats');
   },
 };
 

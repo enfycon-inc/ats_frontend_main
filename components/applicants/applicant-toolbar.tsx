@@ -32,6 +32,7 @@ interface ApplicantToolbarProps {
   onExport: () => void;
   selectedCount: number;
   onDeleteSelected: () => void;
+  isRecruiter?: boolean;
 }
 
 export default function ApplicantToolbar({
@@ -43,6 +44,7 @@ export default function ApplicantToolbar({
   onExport,
   selectedCount,
   onDeleteSelected,
+  isRecruiter = false,
 }: ApplicantToolbarProps) {
   const router = useRouter();
   const [isSavingView, setIsSavingView] = useState(false);
@@ -120,12 +122,14 @@ export default function ApplicantToolbar({
             <span className="text-[10px] font-bold text-primary">
               {selectedCount} Selected
             </span>
-            <button
-              onClick={onDeleteSelected}
-              className="text-[10px] text-red-600 hover:text-red-700 font-bold hover:underline cursor-pointer"
-            >
-              Delete
-            </button>
+            {!isRecruiter && (
+              <button
+                onClick={onDeleteSelected}
+                className="text-[10px] text-red-650 hover:text-red-755 font-bold hover:underline cursor-pointer"
+              >
+                Delete
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -180,13 +184,17 @@ export default function ApplicantToolbar({
             >
               <FolderPlus className="h-3.5 w-3.5" /> Save Current View
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-xs cursor-pointer gap-2 text-red-600 dark:text-red-400 focus:text-red-600"
-              onClick={onDeleteSelected}
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Delete Selected
-            </DropdownMenuItem>
+            {!isRecruiter && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-xs cursor-pointer gap-2 text-red-650 dark:text-red-400 focus:text-red-650"
+                  onClick={onDeleteSelected}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Delete Selected
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

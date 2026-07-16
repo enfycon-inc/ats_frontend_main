@@ -12,6 +12,7 @@ import {
   Users, X, CheckCircle2, AlertCircle, Loader2, Sparkles,
 } from "lucide-react";
 import { atsApi } from "@/lib/ats-api";
+import { Input } from "@/components/ui/input";
 
 interface Candidate {
   id: string;
@@ -274,6 +275,29 @@ function UploadCvModal({ onClose, onDone }: { onClose: () => void; onDone: (msg:
   const [err, setErr] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Submit to Job States
+  const [activeJobs, setActiveJobs] = useState<any[]>([]);
+  const [submitToJob, setSubmitToJob] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState("");
+  const [submittedRate, setSubmittedRate] = useState("");
+  const [recruiterComment, setRecruiterComment] = useState("");
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const jobsList = await atsApi.jobs.list();
+        const active = jobsList.filter((j: any) => j.status === "ACTIVE" || j.jobStatus === "Active");
+        setActiveJobs(active);
+        if (active.length > 0) {
+          setSelectedJobId(active[0].id);
+        }
+      } catch (err) {
+        console.error("Failed to load active jobs:", err);
+      }
+    };
+    fetchJobs();
+  }, []);
+
   const pick = (f: File | null) => { setErr(null); setFile(f); };
 
   const submit = async () => {
@@ -281,10 +305,48 @@ function UploadCvModal({ onClose, onDone }: { onClose: () => void; onDone: (msg:
     setBusy(true);
     setErr(null);
     try {
+      // 1. Upload CV to candidate pool
       const res = await atsApi.candidates.uploadCv(file);
-      const name = res.candidate?.fullName || file.name;
-      if (res.duplicate) onDone(`${name} is already in the pool (duplicate CV).`);
-      else onDone(res.parsed ? `Parsed & saved ${name}.` : `Saved ${name} (parser offline — basic details).`);
+      const candidate = res.candidate;
+      const name = candidate?.fullName || file.name;
+
+      // 2. Submit to Job if enabled
+      if (submitToJob && selectedJobId) {
+        let parsedCandidateId = candidate.id;
+        if (typeof parsedCandidateId === "string") {
+          const parts = parsedCandidateId.split("-");
+          const rawNum = parts[parts.length - 1];
+          parsedCandidateId = parseInt(rawNum, 10);
+        } else if (candidate.applicantId && typeof candidate.applicantId === "string") {
+          const parts = candidate.applicantId.split("-");
+          const rawNum = parts[parts.length - 1];
+          parsedCandidateId = parseInt(rawNum, 10);
+        }
+
+        const currentUser = atsApi.auth.getCurrentUser();
+        await atsApi.submissions.create({
+          candidateId: parsedCandidateId || candidate.id || 1,
+          jobId: selectedJobId,
+          recruiterId: currentUser?.id || "d2ec2da8-816c-410a-8c0c-4737b5ae21cf",
+          finalStatus: "PENDING_APPROVAL",
+          submittedRate: submittedRate.trim() || null,
+          recruiterComment: recruiterComment.trim() || null
+        });
+      }
+
+      if (res.duplicate) {
+        if (res.updated) {
+          onDone(`${name} already exists. Profile has been updated with the latest CV details!`);
+        } else {
+          onDone(submitToJob ? `${name} is a duplicate CV but was submitted to the job.` : `${name} is already in the pool (duplicate CV).`);
+        }
+      } else {
+        onDone(
+          res.parsed
+            ? (submitToJob ? `Parsed, saved & submitted ${name} to job.` : `Parsed & saved ${name}.`)
+            : (submitToJob ? `Saved & submitted ${name} to job (parser offline).` : `Saved ${name} (parser offline).`)
+        );
+      }
       onClose();
     } catch (e: any) {
       setErr(e?.message || "Upload failed");
@@ -292,6 +354,11 @@ function UploadCvModal({ onClose, onDone }: { onClose: () => void; onDone: (msg:
       setBusy(false);
     }
   };
+
+  const selectedJob = activeJobs.find((j) => String(j.id) === String(selectedJobId));
+  const isDomestic = selectedJob?.market === "IN";
+  const rateLabel = isDomestic ? "Expected Salary (Lakhs)" : "Submitted Pay Rate ($/hr or $/yr)";
+  const ratePlaceholder = isDomestic ? "e.g. 12.5" : "e.g. $70/hr";
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}>
@@ -330,6 +397,67 @@ function UploadCvModal({ onClose, onDone }: { onClose: () => void; onDone: (msg:
             <input ref={inputRef} type="file" accept=".pdf,.doc,.docx,.txt" className="hidden"
               onChange={(e) => pick(e.target.files?.[0] || null)} />
           </div>
+
+          {/* Submit to Job checkbox & selection */}
+          {activeJobs.length > 0 && (
+            <div className="mt-4 border-t border-neutral-100 dark:border-slate-800 pt-4 flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-xs font-semibold text-neutral-800 dark:text-neutral-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={submitToJob}
+                  onChange={(e) => setSubmitToJob(e.target.checked)}
+                  className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
+                />
+                Submit this candidate to a job immediately
+              </label>
+
+              {submitToJob && (
+                <div className="flex flex-col gap-2 mt-1.5 pl-5.5">
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="modal-job-select" className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
+                      Select Active Requisition
+                    </label>
+                    <select
+                      id="modal-job-select"
+                      value={selectedJobId}
+                      onChange={(e) => setSelectedJobId(e.target.value)}
+                      className="w-full text-xs border border-neutral-300 dark:border-slate-700 rounded-lg px-2.5 h-8.5 bg-transparent text-neutral-850 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    >
+                      {activeJobs.map((j) => (
+                        <option key={j.id} value={j.id}>
+                          {j.jobCode} - {j.jobTitle} ({j.clientName})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1 mt-1">
+                    <label htmlFor="modal-submitted-rate" className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
+                      {rateLabel}
+                    </label>
+                    <Input
+                      id="modal-submitted-rate"
+                      placeholder={ratePlaceholder}
+                      value={submittedRate}
+                      onChange={(e) => setSubmittedRate(e.target.value)}
+                      className="h-8.5 text-xs bg-transparent"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1 mt-1">
+                    <label htmlFor="modal-recruiter-comment" className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
+                      Comments
+                    </label>
+                    <textarea
+                      id="modal-recruiter-comment"
+                      placeholder="Recruiter comments or notes..."
+                      value={recruiterComment}
+                      onChange={(e) => setRecruiterComment(e.target.value)}
+                      className="min-h-16 text-xs bg-transparent border border-neutral-300 dark:border-slate-700 rounded-md p-2 outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <p className="mt-3 text-[11px] text-neutral-500 leading-relaxed">
             The CV is de-duplicated by content, parsed for skills &amp; experience, and stored so you can download it later.

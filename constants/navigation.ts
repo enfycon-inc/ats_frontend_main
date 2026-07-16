@@ -73,8 +73,8 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
       { label: "All Jobs", href: "/job-posting" },
       { label: "Active Jobs", href: "/job-posting/active" },
       { label: "Draft Jobs", href: "/job-posting/drafts" },
-      { label: "Archived Jobs", href: "/job-posting/archived" },
-      { label: "Job Templates", href: "/job-posting/templates" },
+
+
       { label: "Job Boards", href: "/job-posting/boards" },
     ],
   },
@@ -85,12 +85,19 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
     icon: Users,
     children: [
       { label: "Add Candidate", href: "/applicants/new" },
+      { label: "Bulk CV Upload", href: "/applicants/bulk" },
       { label: "All Candidates", href: "/applicants/all" },
       { label: "Pipeline View", href: "/applicants/pipeline" },
       { label: "Resume Search", href: "/applicants/resume-search" },
       { label: "Interviews", href: "/applicants/interviews" },
       { label: "Offers", href: "/applicants/offers" },
     ],
+  },
+  {
+    id: "submissions-tracker",
+    label: "Submissions Tracker",
+    href: "/utility/submissions",
+    icon: ClipboardList,
   },
   {
     id: "placements",

@@ -14,11 +14,32 @@ import FilterDrawer, {
 import ColumnManager from "@/components/applicants/column-manager";
 import { mockApplicants, Applicant } from "./data/mock-applicants";
 import { atsApi } from "@/lib/ats-api";
+import { useSession } from "next-auth/react";
 
 export default function ApplicantsPage() {
   // ── View state ────────────────────────────────────────────
   const [savedViews, setSavedViews] = useState<string[]>([]);
   const [activeView, setActiveView] = useState("All Applicants");
+
+  const { data: session } = useSession();
+  const [overrideRole, setOverrideRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOverrideRole(localStorage.getItem("override_role"));
+      const handleRoleChange = () => {
+        setOverrideRole(localStorage.getItem("override_role"));
+      };
+      window.addEventListener("overrideRoleChanged", handleRoleChange);
+      return () => window.removeEventListener("overrideRoleChanged", handleRoleChange);
+    }
+  }, []);
+
+  const systemRole = useMemo(() => {
+    return overrideRole || (session as any)?.user?.systemRole || "RECRUITER";
+  }, [session, overrideRole]);
+
+  const isRecruiter = systemRole === "RECRUITER";
 
   // ── Column state ─────────────────────────────────────────
   const [selectedColumns, setSelectedColumns] =
@@ -199,6 +220,7 @@ export default function ApplicantsPage() {
           onExport={handleExport}
           selectedCount={selectedRowIds.length}
           onDeleteSelected={handleDeleteSelected}
+          isRecruiter={isRecruiter}
         />
 
         {/* Search row */}
@@ -231,6 +253,7 @@ export default function ApplicantsPage() {
           }}
           selectedRowIds={selectedRowIds}
           onSelectionChange={setSelectedRowIds}
+          isRecruiter={isRecruiter}
         />
 
         {/* Pagination */}

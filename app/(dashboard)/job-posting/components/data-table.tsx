@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ChevronDown,
   ChevronUp,
@@ -14,7 +15,7 @@ import {
   AlertTriangle,
   Clock,
   Download,
-  Trash2,
+  Archive,
   Edit,
   Eye,
   CheckSquare,
@@ -25,6 +26,7 @@ import {
   RefreshCw,
   FolderPlus,
   Pencil,
+  UserPlus,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -37,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
 import { Job } from "../data/mock-jobs";
+import AddCandidateModal from "@/components/dashboard/AddCandidateModal";
 
 interface DataTableProps {
   data: Job[];
@@ -129,6 +132,15 @@ export default function DataTable({
     y: number;
     jobId: string;
   } | null>(null);
+
+  // Sourcing CV Modal State
+  const [sourceModalOpen, setSourceModalOpen] = useState(false);
+  const [selectedJobForSourcing, setSelectedJobForSourcing] = useState<Job | null>(null);
+
+  const handleOpenSourceModal = (job: Job) => {
+    setSelectedJobForSourcing(job);
+    setSourceModalOpen(true);
+  };
 
   // Job Status Modal States
   const [statusModalJob, setStatusModalJob] = useState<Job | null>(null);
@@ -639,9 +651,11 @@ export default function DataTable({
                               className="w-full px-2 py-1 text-xs bg-white dark:bg-slate-900 border-0 outline-none focus:ring-2 focus:ring-inset focus:ring-primary rounded-none text-neutral-800 dark:text-neutral-200"
                             />
                           ) : colId === "jobCode" ? (
-                            <span className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
-                              {job.jobCode}
-                            </span>
+                            <Link href={`/job-posting/${job.id}`}>
+                              <span className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
+                                {job.jobCode}
+                              </span>
+                            </Link>
                           ) : colId === "jobStatus" ? (
                             <div className="flex items-center gap-1.5 justify-between w-full">
                               <Badge
@@ -653,6 +667,8 @@ export default function DataTable({
                                     ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800/30"
                                     : job.jobStatus === "Filled"
                                     ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800/30"
+                                    : job.jobStatus === "Draft"
+                                    ? "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700/50"
                                     : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800/30"
                                 )}
                               >
@@ -694,7 +710,11 @@ export default function DataTable({
                             )
                           ) : colId === "jobTitle" ? (
                             <div className="flex items-center gap-1">
-                              <span className="whitespace-nowrap">{job.jobTitle}</span>
+                              <Link href={`/job-posting/${job.id}`}>
+                                <span className="whitespace-nowrap hover:underline cursor-pointer text-indigo-650 dark:text-indigo-400 font-medium">
+                                  {job.jobTitle}
+                                </span>
+                              </Link>
                               {job.agingDays > 30 && (
                                 <Badge className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/30 text-[9px] scale-90 flex items-center gap-0.5 shadow-none px-1 py-0">
                                   <AlertTriangle className="h-2.5 w-2.5" /> SLA
@@ -727,6 +747,17 @@ export default function DataTable({
                                 </button>
                               )}
                             </div>
+                          ) : (colId === "payRate" || colId === "clientBillRate") ? (
+                            (() => {
+                              const rateStr = String(job[colId as keyof Job] || "N/A");
+                              if (!rateStr || rateStr === "N/A") return "N/A";
+                              if (/[a-zA-Z$₹]/.test(rateStr)) return rateStr;
+                              if (job.market === "IN") {
+                                return `INR - ${rateStr} LPA`;
+                              } else {
+                                return `USD - $${rateStr}/hr`;
+                              }
+                            })()
                           ) : (
                             String(job[colId as keyof Job] || "N/A")
                           )}
@@ -770,6 +801,18 @@ export default function DataTable({
                           <DropdownMenuContent align="end" className="w-36 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 py-0.5">
                             {hasEditPermission && (
                               <>
+                                {job.jobStatus === "Draft" && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      if (onUpdateJob) {
+                                        onUpdateJob(job.id, { jobStatus: "Active" });
+                                      }
+                                    }}
+                                    className="cursor-pointer text-xs py-1 px-2 text-green-600 dark:text-green-400 font-semibold"
+                                  >
+                                    <CheckSquare className="h-3 w-3 mr-1.5 text-green-500" /> Publish Job
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={() => router.push(`/job-posting/${job.id}/edit`)} className="cursor-pointer text-xs py-1 px-2">
                                   <Pencil className="h-3 w-3 mr-1.5 text-neutral-500" /> Edit Job
                                 </DropdownMenuItem>
@@ -778,18 +821,31 @@ export default function DataTable({
                                 </DropdownMenuItem>
                               </>
                             )}
-                            <DropdownMenuItem
-                              onClick={() => router.push(`/job-posting/${job.id}/matches`)}
-                              className="cursor-pointer text-xs py-1 px-2"
-                            >
-                              <Sparkles className="h-3 w-3 mr-1.5 text-violet-500" /> Find AI Matches
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer text-xs py-1 px-2">
-                              <Users className="h-3 w-3 mr-1.5 text-neutral-500" /> Pipeline
-                            </DropdownMenuItem>
+                            {job.jobStatus !== "Draft" && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenSourceModal(job)}
+                                  className="cursor-pointer text-xs py-1 px-2 text-emerald-600 hover:text-emerald-750 dark:text-emerald-400 font-semibold"
+                                >
+                                  <UserPlus className="h-3 w-3 mr-1.5 text-emerald-500" /> Submit Candidate
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => router.push(`/job-posting/${job.id}/matches`)}
+                                  className="cursor-pointer text-xs py-1 px-2"
+                                >
+                                  <Sparkles className="h-3 w-3 mr-1.5 text-violet-500" /> Find AI Matches
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="cursor-pointer text-xs py-1 px-2">
+                                  <Users className="h-3 w-3 mr-1.5 text-neutral-500" /> Pipeline
+                                </DropdownMenuItem>
+                              </>
+                            )}
                             {hasEditPermission && (
-                              <DropdownMenuItem className="text-red-600 hover:text-red-700 cursor-pointer text-xs py-1 px-2">
-                                <Trash2 className="h-3 w-3 mr-1.5 text-red-500" /> Delete
+                              <DropdownMenuItem
+                                onClick={() => onUpdateJob?.(job.id, { jobStatus: "Archived" })}
+                                className="text-amber-600 hover:text-amber-700 cursor-pointer text-xs py-1 px-2"
+                              >
+                                <Archive className="h-3 w-3 mr-1.5 text-amber-500" /> Archive Job
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -933,6 +989,16 @@ export default function DataTable({
               </>
             )}
             <button
+              onClick={() => {
+                const job = data.find((j) => j.id === contextMenu.jobId);
+                if (job) handleOpenSourceModal(job);
+                closeContextMenu();
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 cursor-pointer font-semibold"
+            >
+              <UserPlus className="h-3 w-3 text-emerald-500" /> Submit Candidate
+            </button>
+            <button
               onClick={closeContextMenu}
               className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer font-medium"
             >
@@ -941,10 +1007,15 @@ export default function DataTable({
           </div>
           <div className="py-1">
             <button
-              onClick={closeContextMenu}
-              className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-red-600 hover:text-red-700 flex items-center gap-1.5 cursor-pointer font-semibold"
+              onClick={() => {
+                if (contextMenu?.job) {
+                  onUpdateJob?.(contextMenu.job.id, { jobStatus: "Archived" });
+                }
+                closeContextMenu();
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-amber-50 dark:hover:bg-amber-950/20 rounded text-amber-700 dark:text-amber-400 flex items-center gap-1.5 cursor-pointer font-semibold"
             >
-              <Trash2 className="h-3 w-3" /> Delete Job
+              <Archive className="h-3 w-3" /> Archive Job
             </button>
           </div>
         </div>
@@ -1247,6 +1318,17 @@ export default function DataTable({
             </div>
           </div>
         </div>
+      )}
+      {/* Source CV Modal */}
+      {sourceModalOpen && selectedJobForSourcing && (
+        <AddCandidateModal
+          isOpen={sourceModalOpen}
+          onClose={() => {
+            setSourceModalOpen(false);
+            setSelectedJobForSourcing(null);
+          }}
+          job={selectedJobForSourcing}
+        />
       )}
     </div>
   );

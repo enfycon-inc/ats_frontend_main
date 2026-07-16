@@ -81,9 +81,7 @@ export default function NewClientPage() {
 
     setIsSubmitting(true);
     try {
-      if (!atsApi.auth.isAuthenticated()) {
-        await atsApi.auth.login("recruiter@enfycon.com", "enfycon123");
-      }
+      // No auto-login fallback (prevent tenant hijacking)
       
       const finalCountry = Country.getCountryByCode(formData.countryIso)?.name || "";
       const finalState = State.getStateByCodeAndCountry(formData.stateIso, formData.countryIso)?.name || "";

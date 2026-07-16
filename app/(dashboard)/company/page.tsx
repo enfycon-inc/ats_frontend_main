@@ -205,7 +205,6 @@ export default function CompanySettingsPage() {
               </div>
             </CardContent>
           </Card>
-
           {/* Custom Domains settings card */}
           <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
             <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60">

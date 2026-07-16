@@ -86,9 +86,7 @@ export default function ClientDashboard() {
   const fetchClients = useCallback(async () => {
     setIsLoading(true);
     try {
-      if (!atsApi.auth.isAuthenticated()) {
-        await atsApi.auth.login("recruiter@enfycon.com", "enfycon123");
-      }
+      // No auto-login fallback (prevent tenant hijacking)
       const data = await atsApi.clients.list();
       const mappedData = (data || []).map((client: any) => ({
         id: client.id,

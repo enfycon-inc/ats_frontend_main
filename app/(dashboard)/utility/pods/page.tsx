@@ -215,19 +215,20 @@ export default function PodsPage() {
   }
 
   // ── Derived data ────────────────────────────────────────────────────
+  // Combine potential pod heads (active users who are not admins, or the current pod head of the selected pod)
   const recruiterUsersForHead = allUsers.filter(
-    (u) => u.roleName === "RECRUITER" || u.roles?.includes("RECRUITER") || u.roles?.includes("POD_LEAD")
+    (u) =>
+      (!u.roles?.includes("ADMIN") && !u.roles?.includes("SUPER_ADMIN") && u.roleName !== "ADMIN" && u.roleName !== "SUPER_ADMIN") ||
+      (selectedPod && selectedPod.podHeadId === u.id)
   );
 
-  // For edit panel: combine available + existing members
-  const recruitersForPanel = [...availableRecruiters];
-  if (panelMode === "edit" && selectedPod) {
-    selectedPod.members.forEach((m) => {
-      if (!recruitersForPanel.some((r) => r.id === m.id)) {
-        recruitersForPanel.push({ id: m.id, fullName: m.fullName, email: m.email, roleName: m.systemRole });
-      }
-    });
-  }
+  // Potential recruiters to assign (active users with role RECRUITER or POD_LEAD, excluding admins)
+  const recruitersForPanel = allUsers.filter(
+    (u) =>
+      (u.roleName === "RECRUITER" || u.roleName === "POD_LEAD" || u.roles?.includes("RECRUITER") || u.roles?.includes("POD_LEAD")) &&
+      !u.roles?.includes("ADMIN") &&
+      !u.roles?.includes("SUPER_ADMIN")
+  );
 
   const totalPodsCount = pods.length;
   const availablePodsCount = pods.filter((p) => p.isAvailableForAssignment).length;
@@ -587,14 +588,17 @@ export default function PodsPage() {
                 <span className="text-[10px] text-default-450 font-semibold">{selectedRecruiterIds.length} selected</span>
               </div>
 
-              {panelMode === "create" && availableRecruiters.length === 0 ? (
-                <div className="border border-dashed border-default-200 rounded-lg p-4 text-center text-[11px] text-default-400 italic">
-                  No unassigned recruiters available.
+              {recruitersForPanel.length === 0 ? (
+                <div className="border border-dashed border-default-200 rounded-lg p-4 text-center text-[11px] text-default-450 italic">
+                  No recruiters available in this workspace.
                 </div>
               ) : (
                 <div className="border border-default-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                  {(panelMode === "create" ? availableRecruiters : recruitersForPanel).map((r, idx) => {
+                  {recruitersForPanel.map((r, idx) => {
                     const isChecked = selectedRecruiterIds.includes(r.id);
+                    const assignedPod = pods.find((p) => p.id === r.podId);
+                    const inAnotherPod = assignedPod && (!selectedPod || selectedPod.id !== r.podId);
+
                     return (
                       <div
                         key={r.id}
@@ -611,10 +615,17 @@ export default function PodsPage() {
                           {isChecked && <Icon icon="heroicons:check" className="h-2.5 w-2.5 text-white" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-bold text-default-900 truncate">{r.fullName}</div>
+                          <div className="text-xs font-bold text-default-900 truncate flex items-center gap-2">
+                            <span>{r.fullName}</span>
+                            {inAnotherPod && (
+                              <Badge className="bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400 border-0 text-[9px] px-1 py-0 font-semibold">
+                                in {assignedPod.name}
+                              </Badge>
+                            )}
+                          </div>
                           <div className="text-[10px] text-default-450 truncate">{r.email}</div>
                         </div>
-                        <Badge className="text-[9px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-0 font-semibold shrink-0">
+                        <Badge className="text-[9px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 border-0 font-semibold shrink-0">
                           {r.roleName}
                         </Badge>
                       </div>

@@ -30,6 +30,12 @@ export interface Job {
   respondBy?: string;
   noticePeriod?: string;
   market?: "US" | "IN";
+  visaType?: string;
+  jobDescription?: string;
+  skillsRequired?: string[];
+  noOfPositions?: number;
+  submissionRequired?: number;
+  jobType?: string;
 }
 
 /**
@@ -42,20 +48,20 @@ export function mapApiJobToJob(api: any): Job {
     jobCode: api.jobCode || "",
     jobTitle: api.jobTitle || "",
     businessUnit: api.businessUnit || "enfysync Inc",
-    client: api.client || "",
+    client: api.client || api.clientName || "",
     clientJobId: api.clientJobId || "N/A",
-    location: api.location || "",
+    location: api.location || api.jobLocation || "",
     states: api.state || api.states || "",
-    jobStatus: (api.jobStatus || "Active") as any,
-    priority: api.priority || "Warm",
+    jobStatus: (api.jobStatus || api.status || "Active") as any,
+    priority: api.priority || api.urgency || "Warm",
     clientBillRate: api.clientBillRate || "N/A",
     payRate: api.payRate || "N/A",
     recruitmentManager: api.recruitmentManager || "N/A",
     primaryRecruiter: api.primaryRecruiter || "N/A",
     assignedTo: api.assignedTo || "N/A",
     createdBy: api.createdBy || "System",
-    createdOn: api.createdOn || new Date().toISOString().split("T")[0],
-    modifiedOn: api.modifiedOn || api.createdOn || new Date().toISOString().split("T")[0],
+    createdOn: api.createdOn || api.createdAt || new Date().toISOString().split("T")[0],
+    modifiedOn: api.modifiedOn || api.updatedAt || api.createdOn || new Date().toISOString().split("T")[0],
     submissionsCount: api.submissionsCount || 0,
     pipeline: api.pipeline || { applied: 0, interviewing: 0, offered: 0 },
     agingDays: api.agingDays || 0,
@@ -64,6 +70,12 @@ export function mapApiJobToJob(api: any): Job {
     respondBy: api.respondBy || "",
     noticePeriod: api.noticePeriod || "",
     market: api.market || "US",
+    visaType: api.visaType || "",
+    jobDescription: api.jobDescription || "",
+    skillsRequired: api.skillsRequired || [],
+    noOfPositions: api.noOfPositions || 1,
+    submissionRequired: api.submissionRequired || 5,
+    jobType: api.jobType || "Full-time",
   };
 }
 

@@ -78,7 +78,7 @@ export function ClientRoot({
   }, [session, overrideRole]);
 
   const isViewportLocked = 
-    (pathname?.startsWith("/job-posting") && !pathname.endsWith("/new")) ||
+    (pathname?.startsWith("/job-posting") && !pathname.endsWith("/new") && !pathname.includes("/matches")) ||
     (pathname?.startsWith("/applicants") && !pathname.endsWith("/new")) ||
     (pathname?.startsWith("/clients") && !pathname.endsWith("/new"));
 

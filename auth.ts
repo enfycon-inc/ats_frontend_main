@@ -6,6 +6,8 @@ import { ZodError } from "zod"
 import { loginSchema } from "./lib/zod"
 import { getUserFromDb } from "./utils/db"
 
+const DEFAULT_TENANT_ID = "d3b07384-d113-49c3-a555-9ee75c13ca33";
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "jwt",
@@ -33,7 +35,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const fs = require('fs');
         const path = require('path');
         const logPath = path.join('C:', 'Users', 'enfyc', 'OneDrive', 'Desktop', 'ATS enfy', 'nextauth_debug.log');
-        const log = (msg) => fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`);
+        const log = (msg: any) => fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`);
         
         try {
           log(`Authorize started for email: ${credentials?.email}`);
@@ -59,7 +61,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               })
               clearTimeout(timeoutId)
               log(`Docker backend response status: ${res?.status}`);
-            } catch (dockerErr) {
+            } catch (dockerErr: any) {
               log(`Docker backend failed: ${dockerErr.message}. Trying localhost fallback.`);
               apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('localhost', '127.0.0.1')
               log(`Attempting fetch to localhost backend: ${apiBase}/api/auth/login`);
@@ -94,7 +96,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               const errBody = res ? await res.text().catch(() => '') : '';
               log(`Backend login failed with status ${res?.status}. Body: ${errBody}`);
             }
-          } catch (apiErr) {
+          } catch (apiErr: any) {
             log(`Backend auth encountered exception: ${apiErr.message}\n${apiErr.stack}`);
             console.warn("Backend auth attempt encountered an error. Falling back to local mock data.", apiErr)
           }
@@ -123,7 +125,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           log(`No mock user found for ${email}`);
           return null
-        } catch (error) {
+        } catch (error: any) {
           log(`Authorize caught global exception: ${error.message}\n${error.stack}`);
           return null
         }

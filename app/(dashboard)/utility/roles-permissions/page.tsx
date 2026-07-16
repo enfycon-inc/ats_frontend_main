@@ -65,7 +65,9 @@ export default function RolesPermissionsPage() {
   // Selection states
   const [selectedRole, setSelectedRole] = useState<CustomRole | null>(null);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
-  const [activeSubTab, setActiveSubTab] = useState<"permissions" | "users">("permissions");
+  const [activeSubTab, setActiveSubTab] = useState<"permissions" | "users" | "settings">("permissions");
+  const [podSystemEnabled, setPodSystemEnabled] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // New Custom Role Form State
   const [showAddRole, setShowAddRole] = useState(false);
@@ -112,8 +114,11 @@ export default function RolesPermissionsPage() {
       setPermissions(permsData);
       setUsers(usersData);
       setProfile(profileData);
-      if (profileData && profileData.userLimit) {
-        setUserLimit(profileData.userLimit);
+      if (profileData) {
+        setPodSystemEnabled(profileData.podSystemEnabled !== false);
+        if (profileData.userLimit) {
+          setUserLimit(profileData.userLimit);
+        }
       }
 
       // Default select the first role
@@ -208,8 +213,30 @@ export default function RolesPermissionsPage() {
 
   const handleCreateMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!memberName.trim() || !memberEmail.trim() || !memberPassword.trim()) {
+    
+    const trimmedName = memberName.trim();
+    const trimmedEmail = memberEmail.trim().toLowerCase();
+    const password = memberPassword;
+
+    if (!trimmedName || !trimmedEmail || !password) {
       return toast.error("Please fill in all required fields.");
+    }
+
+    if (trimmedName.length < 2) {
+      return toast.error("Full Name must be at least 2 characters.");
+    }
+
+    if (trimmedEmail.length < 2) {
+      return toast.error("Work Email prefix must be at least 2 characters.");
+    }
+
+    const emailPrefixRegex = /^[a-z0-9._-]+$/;
+    if (!emailPrefixRegex.test(trimmedEmail)) {
+      return toast.error("Work Email prefix can only contain letters, numbers, dots, hyphens, and underscores.");
+    }
+
+    if (password.length < 8) {
+      return toast.error("Password must be at least 8 characters.");
     }
 
     const activeCount = users.filter(u => u.isActive).length;
@@ -220,12 +247,12 @@ export default function RolesPermissionsPage() {
     try {
       setSubmitting(true);
       const tenantId = profile?.tenantId || currentUser?.tenantId;
-      const fullEmail = `${memberEmail.trim()}@${tenantDomain}.com`;
+      const fullEmail = `${trimmedEmail}@${tenantDomain}.com`;
       
       await atsApi.auth.registerUser({
         email: fullEmail,
-        fullName: memberName.trim(),
-        password: memberPassword,
+        fullName: trimmedName,
+        password: password,
         role: memberRole,
         tenantId: tenantId || "",
         isApproved: true, // Auto-approved by tenant admin
@@ -307,6 +334,19 @@ export default function RolesPermissionsPage() {
       toast.error("Failed to update user status: " + err.message);
     } finally {
       setSubmittingId(null);
+    }
+  };
+
+  const handleTogglePodSystem = async (checked: boolean) => {
+    try {
+      setSavingSettings(true);
+      await atsApi.auth.updateMySettings({ podSystemEnabled: checked });
+      setPodSystemEnabled(checked);
+      toast.success(`Recruitment Pod system ${checked ? "enabled" : "disabled (unassigned mode)"} successfully!`);
+    } catch (err: any) {
+      toast.error("Failed to update pod settings: " + err.message);
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -520,11 +560,24 @@ export default function RolesPermissionsPage() {
                     <Icon icon="heroicons:users" className="h-3.5 w-3.5" />
                     Assign Staff ({users.filter(u => u.roleId === selectedRole.id || (selectedRole.isSystem && u.roleName === selectedRole.name)).length})
                   </button>
+                  {selectedRole?.name === "ADMIN" && (
+                    <button
+                      onClick={() => setActiveSubTab("settings")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                        activeSubTab === "settings"
+                          ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                          : "text-default-500 hover:text-default-800"
+                      }`}
+                    >
+                      <Icon icon="heroicons:cog-6-tooth" className="h-3.5 w-3.5" />
+                      Workspace Settings
+                    </button>
+                  )}
                 </div>
               </CardHeader>
               
               <CardContent className="p-0">
-                {activeSubTab === "permissions" ? (
+                {activeSubTab === "permissions" && (
                   /* ========================================================
                      SUB TAB 1: PERMISSION MATRIX GRID
                      ======================================================== */
@@ -593,7 +646,9 @@ export default function RolesPermissionsPage() {
                       </div>
                     )}
                   </div>
-                ) : (
+                )}
+
+                {activeSubTab === "users" && (
                   /* ========================================================
                      SUB TAB 2: STAFF ROLE ASSIGNMENTS
                      ======================================================== */
@@ -716,6 +771,41 @@ export default function RolesPermissionsPage() {
                     </div>
                   </div>
                 )}
+
+                {activeSubTab === "settings" && (
+                  /* ========================================================
+                     SUB TAB 3: WORKSPACE CONFIGURATIONS
+                     ======================================================== */
+                  <div className="p-6 space-y-6">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-default-900">Tenant Workspace Configurations</h3>
+                      <p className="text-xs text-default-500">
+                        Manage global operational preferences for this tenant workspace.
+                      </p>
+                    </div>
+
+                    <div className="flex items-start justify-between gap-4 p-4 border border-indigo-100 bg-indigo-50/20 dark:border-slate-800/80 rounded-xl">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-850 dark:text-neutral-200 block">
+                          Enable Recruitment Pod System
+                        </label>
+                        <span className="text-[10.5px] text-neutral-500 block leading-relaxed max-w-lg">
+                          When <strong>Enabled</strong>, all new job requirements must map to a pod, and unassigned jobs route automatically via round-robin. 
+                          When <strong>Disabled</strong>, job postings remain unassigned by default (shared recruiter pool). Only Delivery Heads or Administrators can override and assign them.
+                        </span>
+                      </div>
+                      <div className="flex items-center shrink-0 pt-1">
+                        <input
+                          type="checkbox"
+                          checked={podSystemEnabled}
+                          disabled={savingSettings}
+                          onChange={(e) => handleTogglePodSystem(e.target.checked)}
+                          className="h-4 w-4 rounded border-neutral-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-600/20 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -741,7 +831,7 @@ export default function RolesPermissionsPage() {
                 Create a new user account under your company workspace.
               </CardDescription>
             </CardHeader>
-            <form onSubmit={handleCreateMember}>
+            <form onSubmit={handleCreateMember} autoComplete="off">
               <CardContent className="p-4 space-y-4">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-default-700">Full Name</label>
@@ -750,6 +840,7 @@ export default function RolesPermissionsPage() {
                     value={memberName}
                     onChange={(e) => setMemberName(e.target.value)}
                     required
+                    autoComplete="off"
                   />
                 </div>
                 <div className="space-y-1">
@@ -762,6 +853,7 @@ export default function RolesPermissionsPage() {
                       onChange={(e) => setMemberEmail(e.target.value.trim().toLowerCase().replace(/[^a-z0-9._-]/g, ""))}
                       required
                       className="border-0 shadow-none focus-visible:ring-0 focus-visible:border-0 focus-visible:ring-offset-0 bg-transparent text-default-850 w-full"
+                      autoComplete="new-username"
                     />
                     <span className="text-xs font-semibold text-default-500 bg-default-100 dark:bg-slate-800 px-3 py-2 border-l border-default-200 whitespace-nowrap">
                       @{tenantDomain}.com
@@ -776,6 +868,7 @@ export default function RolesPermissionsPage() {
                     value={memberPassword}
                     onChange={(e) => setMemberPassword(e.target.value)}
                     required
+                    autoComplete="new-password"
                   />
                 </div>
                 <div className="space-y-1">
@@ -792,7 +885,13 @@ export default function RolesPermissionsPage() {
                 </div>
               </CardContent>
               <div className="border-t border-default-100 p-4 bg-default-50/50 dark:bg-slate-800/10 flex justify-end gap-2">
-                <Button size="sm" variant="outline" type="button" onClick={() => setShowAddMember(false)}>
+                <Button size="sm" variant="outline" type="button" onClick={() => {
+                  setMemberName("");
+                  setMemberEmail("");
+                  setMemberPassword("");
+                  setMemberRole("RECRUITER");
+                  setShowAddMember(false);
+                }}>
                   Cancel
                 </Button>
                 <Button size="sm" type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-750 text-white font-semibold">
