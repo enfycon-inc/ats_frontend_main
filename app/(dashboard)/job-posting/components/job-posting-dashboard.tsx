@@ -11,9 +11,7 @@ import toast from "react-hot-toast";
 import {
   Briefcase,
   Users,
-  CheckCircle,
   FileCheck,
-  TrendingUp,
   Activity,
   AlertCircle,
   Loader2,
