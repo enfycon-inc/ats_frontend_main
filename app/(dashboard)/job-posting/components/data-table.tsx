@@ -1008,8 +1008,8 @@ export default function DataTable({
           <div className="py-1">
             <button
               onClick={() => {
-                if (contextMenu?.job) {
-                  onUpdateJob?.(contextMenu.job.id, { jobStatus: "Archived" });
+                if (contextMenu?.jobId) {
+                  onUpdateJob?.(contextMenu.jobId, { jobStatus: "Archived" });
                 }
                 closeContextMenu();
               }}

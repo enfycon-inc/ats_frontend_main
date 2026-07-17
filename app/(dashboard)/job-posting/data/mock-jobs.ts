@@ -7,7 +7,7 @@ export interface Job {
   clientJobId: string;
   location: string;
   states: string;
-  jobStatus: "Active" | "Close" | "Filled" | "Hold by Client" | "Draft" | "Closed" | "Hold";
+  jobStatus: "Active" | "Close" | "Filled" | "Hold by Client" | "Draft" | "Closed" | "Hold" | "Archived";
   priority?: "Hot" | "Warm" | "Cold" | "High" | "Medium" | "Low" | "Urgent";
   clientBillRate: string;
   payRate: string;
