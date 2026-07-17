@@ -139,6 +139,7 @@ const formSchema = zod.object({
   jobType: zod.string().min(1, "Job Type is required"),
   taxTerms: zod.string().min(1, "Tax Terms are required"),
   domain: zod.string().optional(),
+  shiftTiming: zod.string().optional(),
   noticePeriod: zod.string().optional(),
   employmentLevel: zod.string().optional(),
   clientManager: zod.string().optional(),
@@ -272,6 +273,10 @@ export default function NewJobPostingPage() {
   const [billUnit, setBillUnit] = useState("Hourly");
   const [billTerm, setBillTerm] = useState("C2C");
 
+  // Commission States for Domestic Indian Permanent Roles
+  const [commissionType, setCommissionType] = useState<string>("8.33");
+  const [customCommission, setCustomCommission] = useState<string>("");
+
   // Currency, Unit, and Term States for Pay Rate
   const [payCurrency, setPayCurrency] = useState("USD");
   const [payUnit, setPayUnit] = useState("Hourly");
@@ -311,8 +316,8 @@ export default function NewJobPostingPage() {
       jobStatus: "Active",
       priority: "Warm",
       workAuthorization: undefined,
-      jobType: "Contract",
-      taxTerms: "C2C",
+      jobType: "Full Time",
+      taxTerms: "Permanent",
       expMin: undefined,
       expMax: undefined,
       numPositions: 1,
@@ -322,6 +327,7 @@ export default function NewJobPostingPage() {
       jobDescription: "",
       noticePeriod: "",
       endClientName: "",
+      shiftTiming: "General Shift",
     },
   });
 
@@ -417,8 +423,8 @@ export default function NewJobPostingPage() {
             const m = prof.defaultMarket as "US" | "IN";
             setMarket(m);
             
-            // Dynamically set defaults for the form depending on the market
             if (m === "IN") {
+              setValue("jobType", "Full Time");
               setValue("country", "India");
               setValue("states", "Karnataka");
               setValue("workAuthorization", "Indian Citizen");
@@ -430,6 +436,7 @@ export default function NewJobPostingPage() {
               setPayUnit("LPA");
               setPayTerm("Permanent");
             } else {
+              setValue("jobType", "Contract");
               setValue("country", "United States");
               setValue("states", "Texas");
               setValue("workAuthorization", "US Authorized");
@@ -540,6 +547,40 @@ export default function NewJobPostingPage() {
         } else {
           setValue("workAuthorization", market === "IN" ? "Indian Citizen" : "US Authorized");
         }
+
+        // Pre-fill location fields if returned
+        if (res.location) {
+          if (res.location.country) {
+            setValue("country", res.location.country);
+          }
+          if (res.location.state) {
+            setValue("states", res.location.state);
+          }
+          if (res.location.city) {
+            setValue("city", res.location.city);
+          }
+        }
+
+        // Pre-fill experience ranges
+        if (res.experienceMin !== undefined && res.experienceMin !== null) {
+          setValue("expMin", Number(res.experienceMin));
+        }
+        if (res.experienceMax !== undefined && res.experienceMax !== null) {
+          setValue("expMax", Number(res.experienceMax));
+        }
+
+        // Pre-fill notice period
+        if (res.noticePeriod) {
+          setValue("noticePeriod", res.noticePeriod);
+        }
+
+        // Pre-fill job type & remote mode
+        if (res.jobType) {
+          setValue("jobType", res.jobType);
+        }
+        if (res.remoteJob) {
+          setValue("remoteJob", res.remoteJob as "Yes" | "No" | "Hybrid");
+        }
         
         // Pre-fill primary/secondary skills
         setPrimarySkills(res.primarySkills || []);
@@ -624,8 +665,20 @@ export default function NewJobPostingPage() {
         }
       };
 
-      const assembledBillRate = formatRatePayload(data.clientBillRate, billCurrency, billUnit, billTerm);
+      let assembledBillRate = "";
+      if (market === "IN" && data.taxTerms === "Permanent") {
+        const commValue = commissionType === "custom" ? customCommission : commissionType;
+        assembledBillRate = `${commValue}% Placement Commission`;
+      } else {
+        assembledBillRate = formatRatePayload(data.clientBillRate, billCurrency, billUnit, billTerm);
+      }
+
       const assembledPayRate = formatRatePayload(data.payRate, payCurrency, payUnit, payTerm);
+
+      let finalDescription = data.jobDescription;
+      if (market === "IN" && data.shiftTiming) {
+        finalDescription = `<p><strong>Shift Timing:</strong> ${data.shiftTiming}</p>` + finalDescription;
+      }
 
       // Map frontend form fields → backend CreateJobDto
       const payload = {
@@ -634,7 +687,7 @@ export default function NewJobPostingPage() {
         endClientName: data.endClientName || undefined,
         location: data.locationAutocomplete || data.city || data.states || "Remote",
         type: data.jobType || "Contract",
-        description: data.jobDescription,
+        description: finalDescription,
         skillsRequired: primarySkills,
         secondarySkills: secondarySkills,
         businessUnit: data.businessUnit,
@@ -991,7 +1044,16 @@ export default function NewJobPostingPage() {
                     <div className="space-y-1">
                       <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Type <span className="text-red-500">*</span></Label>
                       <select
-                        {...register("jobType")}
+                        {...register("jobType", {
+                          onChange: (e) => {
+                            const val = e.target.value;
+                            if (val === "Full Time") {
+                              setValue("taxTerms", "Permanent");
+                            } else if (val === "Contract") {
+                              setValue("taxTerms", market === "IN" ? "Contract (3rd Party)" : "C2C");
+                            }
+                          }
+                        })}
                         className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
                       >
                         <option value="Full Time">Full Time</option>
@@ -1007,158 +1069,220 @@ export default function NewJobPostingPage() {
                       )}
                     </div>
 
-                    {/* Bill Rate */}
+                                     {/* Client Bill Rate / Commission */}
                     <div className="space-y-1 md:col-span-2">
-                      <div className="flex items-center gap-1">
-                        <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Bill Rate / Salary <span className="text-red-500">*</span></Label>
-                        <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Bill rate information">?</span>
-                      </div>
-                      <div className="flex gap-1 items-center">
-                        <select
-                          value={billCurrency}
-                          onChange={(e) => setBillCurrency(e.target.value)}
-                          className="w-16 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0"
-                        >
-                          {market === "IN" ? (
-                            <>
-                              <option value="INR">INR</option>
-                              <option value="USD">USD</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value="USD">USD</option>
-                              <option value="CAD">CAD</option>
-                            </>
-                          )}
-                        </select>
-                        <Input
-                          type="text"
-                          {...register("clientBillRate")}
-                          className="h-8 w-24 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700"
-                          placeholder="Rate"
-                        />
-                        <select
-                          value={billUnit}
-                          onChange={(e) => setBillUnit(e.target.value)}
-                          className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0"
-                        >
-                          {market === "IN" ? (
-                            <>
-                              <option value="LPA">LPA</option>
-                              <option value="Monthly">Monthly</option>
-                              <option value="Hourly">Hourly</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value="Hourly">Hourly</option>
-                              <option value="Daily">Daily</option>
-                              <option value="Weekly">Weekly</option>
-                              <option value="Bi-Weekly">Bi-Weekly</option>
-                              <option value="Monthly">Monthly</option>
-                              <option value="Yearly">Yearly</option>
-                            </>
-                          )}
-                        </select>
-                        <select
-                          value={billTerm}
-                          onChange={(e) => setBillTerm(e.target.value)}
-                          className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0"
-                        >
-                          {market === "IN" ? (
-                            <>
-                              <option value="Permanent">Permanent</option>
-                              <option value="Contract">Contract</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value="W-2">W-2</option>
-                              <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
-                              <option value="C2C">C2C</option>
-                              <option value="1099">1099</option>
-                              <option value="Other">Other</option>
-                            </>
-                          )}
-                        </select>
-                      </div>
+                      {market === "IN" && watch("taxTerms") === "Permanent" ? (
+                        <>
+                          <div className="flex items-center gap-1">
+                            <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Commission (%) <span className="text-red-500">*</span></Label>
+                            <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Permanent placement agency commission percentage">?</span>
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <select
+                              value={commissionType}
+                              onChange={(e) => setCommissionType(e.target.value)}
+                              className="w-full md:w-56 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
+                            >
+                              <option value="8.33">8.33% (1 Month Salary)</option>
+                              <option value="10">10.0%</option>
+                              <option value="12.5">12.5%</option>
+                              <option value="15">15.0%</option>
+                              <option value="custom">Custom Percentage...</option>
+                            </select>
+                            {commissionType === "custom" && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  max="100"
+                                  value={customCommission}
+                                  onChange={(e) => setCustomCommission(e.target.value)}
+                                  placeholder="e.g. 10.5"
+                                  className="h-8 w-24 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 rounded"
+                                />
+                                <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">%</span>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-1">
+                            <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Bill Rate / Salary <span className="text-red-500">*</span></Label>
+                            <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Bill rate information">?</span>
+                          </div>
+                          <div className="flex gap-1 items-center">
+                            <select
+                              value={billCurrency}
+                              onChange={(e) => setBillCurrency(e.target.value)}
+                              className="w-16 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                            >
+                              {market === "IN" ? (
+                                <>
+                                  <option value="INR">INR</option>
+                                  <option value="USD">USD</option>
+                                </>
+                              ) : (
+                                <>
+                                  <option value="USD">USD</option>
+                                  <option value="CAD">CAD</option>
+                                </>
+                              )}
+                            </select>
+                            <Input
+                              type="text"
+                              {...register("clientBillRate")}
+                              className="h-8 w-24 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 font-semibold"
+                              placeholder="Rate"
+                            />
+                            <select
+                              value={billUnit}
+                              onChange={(e) => setBillUnit(e.target.value)}
+                              className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                            >
+                              {market === "IN" ? (
+                                <>
+                                  <option value="LPA">LPA</option>
+                                  <option value="Monthly">Monthly</option>
+                                  <option value="Hourly">Hourly</option>
+                                </>
+                              ) : (
+                                <>
+                                  <option value="Hourly">Hourly</option>
+                                  <option value="Daily">Daily</option>
+                                  <option value="Weekly">Weekly</option>
+                                  <option value="Bi-Weekly">Bi-Weekly</option>
+                                  <option value="Monthly">Monthly</option>
+                                  <option value="Yearly">Yearly</option>
+                                </>
+                              )}
+                            </select>
+                            <select
+                              value={billTerm}
+                              onChange={(e) => setBillTerm(e.target.value)}
+                              className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                            >
+                              {market === "IN" ? (
+                                <>
+                                  <option value="Permanent">Permanent</option>
+                                  <option value="Contract">Contract</option>
+                                </>
+                              ) : (
+                                <>
+                                  <option value="W-2">W-2</option>
+                                  <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
+                                  <option value="C2C">C2C</option>
+                                  <option value="1099">1099</option>
+                                  <option value="Other">Other</option>
+                                </>
+                              )}
+                            </select>
+                          </div>
+                        </>
+                      )}
                       {errors.clientBillRate && (
                         <p className="text-[10px] text-red-655 font-bold">{errors.clientBillRate.message}</p>
                       )}
                     </div>
 
-                    {/* Pay Rate */}
+                    {/* Pay Rate / Candidate CTC */}
                     <div className="space-y-1 md:col-span-2">
-                      <div className="flex items-center gap-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Pay Rate / Salary <span className="text-red-500">*</span></label>
-                        <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Pay rate information">?</span>
-                      </div>
-                      <div className="flex gap-1 items-center">
-                        <select
-                          value={payCurrency}
-                          onChange={(e) => setPayCurrency(e.target.value)}
-                          className="w-16 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0"
-                        >
-                          {market === "IN" ? (
-                            <>
-                              <option value="INR">INR</option>
-                              <option value="USD">USD</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value="USD">USD</option>
-                              <option value="CAD">CAD</option>
-                              <option value="GBP">GBP</option>
-                            </>
-                          )}
-                        </select>
-                        <input
-                          type="text"
-                          {...register("payRate")}
-                          className="h-8 w-24 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
-                          placeholder="Pay Rate"
-                        />
-                        <select
-                          value={payUnit}
-                          onChange={(e) => setPayUnit(e.target.value)}
-                          className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0"
-                        >
-                          {market === "IN" ? (
-                            <>
-                              <option value="LPA">LPA</option>
-                              <option value="Monthly">Monthly</option>
-                              <option value="Hourly">Hourly</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value="Hourly">Hourly</option>
-                              <option value="Daily">Daily</option>
-                              <option value="Weekly">Weekly</option>
-                              <option value="Bi-Weekly">Bi-Weekly</option>
-                              <option value="Monthly">Monthly</option>
-                              <option value="Yearly">Yearly</option>
-                            </>
-                          )}
-                        </select>
-                        <select
-                          value={payTerm}
-                          onChange={(e) => setPayTerm(e.target.value)}
-                          className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0"
-                        >
-                          {market === "IN" ? (
-                            <>
-                              <option value="Permanent">Permanent</option>
-                              <option value="Contract">Contract</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value="W-2">W-2</option>
-                              <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
-                              <option value="C2C">C2C</option>
-                              <option value="1099">1099</option>
-                              <option value="Other">Other</option>
-                            </>
-                          )}
-                        </select>
-                      </div>
+                      {market === "IN" && watch("taxTerms") === "Permanent" ? (
+                        <>
+                          <div className="flex items-center gap-1">
+                            <label className="font-bold text-neutral-700 dark:text-neutral-300">Candidate CTC (LPA) <span className="text-red-500">*</span></label>
+                            <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Expected/Target Cost to Company (CTC) in Lakhs Per Annum">?</span>
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <div className="relative flex-1 max-w-[200px]">
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">INR</span>
+                              <input
+                                type="text"
+                                {...register("payRate")}
+                                placeholder="e.g. 12.0"
+                                className="w-full h-8 pl-10 pr-12 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 font-semibold"
+                              />
+                              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">LPA</span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-1">
+                            <label className="font-bold text-neutral-700 dark:text-neutral-300">Pay Rate / Salary <span className="text-red-500">*</span></label>
+                            <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Pay rate information">?</span>
+                          </div>
+                          <div className="flex gap-1 items-center">
+                            <select
+                              value={payCurrency}
+                              onChange={(e) => setPayCurrency(e.target.value)}
+                              className="w-16 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0 font-semibold"
+                            >
+                              {market === "IN" ? (
+                                <>
+                                  <option value="INR">INR</option>
+                                  <option value="USD">USD</option>
+                                </>
+                              ) : (
+                                <>
+                                  <option value="USD">USD</option>
+                                  <option value="CAD">CAD</option>
+                                  <option value="GBP">GBP</option>
+                                </>
+                              )}
+                            </select>
+                            <input
+                              type="text"
+                              {...register("payRate")}
+                              className="h-8 w-24 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 font-semibold"
+                              placeholder="Pay Rate"
+                            />
+                            <select
+                              value={payUnit}
+                              onChange={(e) => setPayUnit(e.target.value)}
+                              className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0 font-semibold"
+                            >
+                              {market === "IN" ? (
+                                <>
+                                  <option value="LPA">LPA</option>
+                                  <option value="Monthly">Monthly</option>
+                                  <option value="Hourly">Hourly</option>
+                                </>
+                              ) : (
+                                <>
+                                  <option value="Hourly">Hourly</option>
+                                  <option value="Daily">Daily</option>
+                                  <option value="Weekly">Weekly</option>
+                                  <option value="Bi-Weekly">Bi-Weekly</option>
+                                  <option value="Monthly">Monthly</option>
+                                  <option value="Yearly">Yearly</option>
+                                </>
+                              )}
+                            </select>
+                            <select
+                              value={payTerm}
+                              onChange={(e) => setPayTerm(e.target.value)}
+                              className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0 font-semibold"
+                            >
+                              {market === "IN" ? (
+                                <>
+                                  <option value="Permanent">Permanent</option>
+                                  <option value="Contract">Contract</option>
+                                </>
+                              ) : (
+                                <>
+                                  <option value="W-2">W-2</option>
+                                  <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
+                                  <option value="C2C">C2C</option>
+                                  <option value="1099">1099</option>
+                                  <option value="Other">Other</option>
+                                </>
+                              )}
+                            </select>
+                          </div>
+                        </>
+                      )}
                       {errors.payRate && (
                         <p className="text-[10px] text-red-655 font-bold">{errors.payRate.message}</p>
                       )}
@@ -1357,15 +1481,30 @@ export default function NewJobPostingPage() {
                       </div>
                     </div>
 
-                    {/* Required Hours/Week */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Required Hours/Week</label>
-                      <input
-                        type="number"
-                        {...register("hoursPerWeek", { valueAsNumber: true })}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
-                      />
-                    </div>
+                    {/* Shift Timings (India) or Required Hours/Week (US) */}
+                    {market === "IN" ? (
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Shift Timings</label>
+                        <select
+                          {...register("shiftTiming")}
+                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                        >
+                          <option value="General Shift">General Shift (Day)</option>
+                          <option value="Night Shift">Night Shift</option>
+                          <option value="Rotational Shift">Rotational Shift</option>
+                          <option value="UK/EMEA Shift">UK/EMEA Shift</option>
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Required Hours/Week</label>
+                        <input
+                          type="number"
+                          {...register("hoursPerWeek", { valueAsNumber: true })}
+                          className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
+                        />
+                      </div>
+                    )}
                     <div className="space-y-1">
                       <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Status <span className="text-red-500">*</span></label>
                       <select
@@ -1677,18 +1816,22 @@ export default function NewJobPostingPage() {
                       )}
                     </div>
 
-                    {/* Tax Terms */}
+                    {/* Engagement Type / Tax Terms */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Tax Terms <span className="text-red-500">*</span></label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">
+                        {market === "IN" ? "Engagement Type" : "Tax Terms"} <span className="text-red-500">*</span>
+                      </label>
                       <select
                         {...register("taxTerms")}
                         className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
                       >
                         {market === "IN" ? (
                           <>
-                            <option value="Permanent">Permanent</option>
-                            <option value="Contract">Contract</option>
-                            
+                            <option value="Permanent">Permanent / Direct Hire</option>
+                            <option value="Contract (3rd Party)">Contract (3rd Party Payroll)</option>
+                            <option value="Contract (Direct)">Contract (Direct Payroll)</option>
+                            <option value="C2H">Contract to Hire (C2H)</option>
+                            <option value="Freelancer">Freelancer / Consultant</option>
                           </>
                         ) : (
                           <>
@@ -1696,7 +1839,6 @@ export default function NewJobPostingPage() {
                             <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
                             <option value="C2C">C2C</option>
                             <option value="1099">1099</option>
-                            
                             <option value="Other">Other</option>
                           </>
                         )}

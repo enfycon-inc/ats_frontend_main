@@ -404,6 +404,12 @@ const jobs = {
     jobTitle: string;
     workAuthorization: string;
     roles: string[];
+    location?: { country?: string; state?: string; city?: string };
+    experienceMin?: number;
+    experienceMax?: number;
+    noticePeriod?: string;
+    jobType?: string;
+    remoteJob?: string;
   }> {
     return apiFetch('/api/jobs/parse-jd', {
       method: 'POST',
