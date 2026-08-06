@@ -440,6 +440,7 @@ export default function RolesPermissionsPage() {
                     >
                       <option value="RECRUITER">Recruiter Template</option>
                       <option value="ACCOUNT_MANAGER">Account Manager Template (BDM)</option>
+                      <option value="BRANCH_ADMIN">Branch Admin Template (Branch Head)</option>
                       <option value="ADMIN">Admin Template</option>
                       <option value="DELIVERY_HEAD">Delivery Head Template</option>
                       <option value="TRACKER">Tracker Template</option>
@@ -681,20 +682,29 @@ export default function RolesPermissionsPage() {
                         </div>
                       </div>
 
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          const activeCount = users.filter(u => u.isActive).length;
-                          if (activeCount >= userLimit) {
-                            toast.error(`Seat limit reached! You have used all ${userLimit} licenses. Deactivate a user first or contact support to purchase more seats.`);
-                            return;
-                          }
-                          setShowAddMember(true);
-                        }}
-                        className="bg-indigo-600 hover:bg-indigo-750 text-white font-semibold flex items-center gap-1 shrink-0"
-                      >
-                        <Icon icon="heroicons:user-plus" className="h-4 w-4" /> Add Member
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href="/utility/users"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 hover:bg-indigo-100 transition"
+                        >
+                          Open Full User Roster Page →
+                        </a>
+
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            const activeCount = users.filter(u => u.isActive).length;
+                            if (activeCount >= userLimit) {
+                              toast.error(`Seat limit reached! You have used all ${userLimit} licenses. Deactivate a user first or contact support to purchase more seats.`);
+                              return;
+                            }
+                            setShowAddMember(true);
+                          }}
+                          className="bg-indigo-600 hover:bg-indigo-750 text-white font-semibold flex items-center gap-1 shrink-0"
+                        >
+                          <Icon icon="heroicons:user-plus" className="h-4 w-4" /> Add Member
+                        </Button>
+                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
@@ -747,9 +757,15 @@ export default function RolesPermissionsPage() {
                                       size="sm"
                                       onClick={() => {
                                         setAssigningUser(user);
-                                        const currentRoleIds = roles
-                                          .filter((r) => user.roles ? user.roles.includes(r.name) : (user.roleName === r.name || user.roleId === r.id))
+                                        const userRoleNames = (user.roles && user.roles.length > 0 ? user.roles : [user.roleName]).map(r => (r || '').toLowerCase());
+                                        let currentRoleIds = roles
+                                          .filter((r) => userRoleNames.includes((r.name || '').toLowerCase()) || userRoleNames.includes((r.id || '').toLowerCase()) || user.roleId === r.id)
                                           .map((r) => r.id);
+                                        
+                                        if (currentRoleIds.length === 0 && roles.length > 0) {
+                                          const matched = roles.find(r => r.name.toLowerCase() === (user.roleName || '').toLowerCase()) || roles.find(r => r.name === 'ADMIN') || roles[0];
+                                          if (matched) currentRoleIds = [matched.id];
+                                        }
                                         setModalRoleIds(currentRoleIds);
                                       }}
                                       disabled={submittingId === user.id}

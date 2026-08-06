@@ -11,6 +11,7 @@ import {
   Trash2,
   FolderPlus,
   RefreshCw,
+  UploadCloud,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +34,7 @@ interface ApplicantToolbarProps {
   selectedCount: number;
   onDeleteSelected: () => void;
   isRecruiter?: boolean;
+  onUploadCv?: () => void;
 }
 
 export default function ApplicantToolbar({
@@ -45,6 +47,7 @@ export default function ApplicantToolbar({
   selectedCount,
   onDeleteSelected,
   isRecruiter = false,
+  onUploadCv,
 }: ApplicantToolbarProps) {
   const router = useRouter();
   const [isSavingView, setIsSavingView] = useState(false);
@@ -199,6 +202,17 @@ export default function ApplicantToolbar({
         </DropdownMenu>
 
         <div className="w-px h-4 bg-neutral-200 dark:bg-slate-700 mx-0.5" />
+
+        {/* Upload CV Button */}
+        {onUploadCv && (
+          <button
+            onClick={onUploadCv}
+            className="inline-flex items-center gap-1.5 rounded-sm bg-violet-600 hover:bg-violet-700 px-2.5 h-6.5 text-xs font-bold text-white transition-colors cursor-pointer shadow-xs"
+          >
+            <UploadCloud className="h-3.5 w-3.5" />
+            Upload CV
+          </button>
+        )}
 
         {/* New Applicant Button */}
         <Button

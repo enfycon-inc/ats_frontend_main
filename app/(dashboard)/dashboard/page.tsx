@@ -6,12 +6,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { atsApi } from "@/lib/ats-api";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import AddCandidateModal from "@/components/dashboard/AddCandidateModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -126,12 +135,29 @@ export default function DashboardPage() {
                 Template: {systemRole.replace("_", " ")}
               </Badge>
             )}
+            
+            <div className="ml-auto flex items-center gap-2">
+              <Link href="/job-posting/new">
+                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold gap-1 shadow-sm h-8">
+                  <Icon icon="heroicons:plus-circle" className="h-4 w-4" />
+                  + Create Requisition
+                </Button>
+              </Link>
+              <Link href="/utility/submissions">
+                <Button size="sm" variant="outline" className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs font-bold gap-1 h-8">
+                  <Icon icon="heroicons:clipboard-document-list" className="h-4 w-4" />
+                  Submissions Tracker
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Render Dashboard Widgets based on resolved systemRole */}
-      {systemRole === "SUPER_ADMIN" || systemRole === "ADMIN" || systemRole === "TENANT_ADMIN" ? (
+      {systemRole === "SUPER_ADMIN" ? (
+        <GlobalAdminDashboardView profile={profile} />
+      ) : systemRole === "ADMIN" || systemRole === "TENANT_ADMIN" ? (
         <AdminDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
       ) : systemRole === "ACCOUNT_MANAGER" ? (
         <AccountManagerDashboardView 
@@ -152,230 +178,380 @@ export default function DashboardPage() {
   );
 }
 
-// ─── POD LEAD DASHBOARD VIEW ──────────────────────────────────────────────────
-function PodLeadDashboardView({ profile, jobs, activeJobs }: { profile: any; jobs: any[]; activeJobs: any[] }) {
-  const [activeTab, setActiveTab] = useState<"team" | "workspace">("team");
-  const [podTeam, setPodTeam] = useState<any>(null);
-  const [loadingTeam, setLoadingTeam] = useState(true);
+// ─── GLOBAL ADMIN DASHBOARD VIEW (SUPER_ADMIN COMMAND CENTER) ────────────────
+function GlobalAdminDashboardView({ profile }: { profile: any }) {
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTenant, setSearchTenant] = useState("");
+
+  // Tenant Details Modal state
+  const [selectedTenantDetail, setSelectedTenantDetail] = useState<any | null>(null);
+  const [loadingTenantDetail, setLoadingTenantDetail] = useState(false);
+  const [isTenantModalOpen, setIsTenantModalOpen] = useState(false);
+
+  const handleOpenTenantDetails = (tenantId: string) => {
+    if (typeof window !== "undefined") {
+      window.location.href = `/utility/approvals?tab=tenants`;
+    }
+  };
+  // Approval state overrides
+  const [selectedMarket, setSelectedMarket] = useState<Record<string, string>>({});
+  const [selectedSubdomain, setSelectedSubdomain] = useState<Record<string, string>>({});
+  const [selectedLimit, setSelectedLimit] = useState<Record<string, number>>({});
+  const [submittingUser, setSubmittingUser] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadTeam() {
-      try {
-        const team = await atsApi.pods.getMyTeam();
-        setPodTeam(team);
-      } catch (err) {
-        console.error("Failed to load pod team details:", err);
-      } finally {
-        setLoadingTeam(false);
-      }
-    }
-    loadTeam();
+    loadGlobalData();
   }, []);
 
-  const [pendingSubmissions, setPendingSubmissions] = useState<any[]>([]);
-  const [loadingPending, setLoadingPending] = useState(true);
-
-  useEffect(() => {
-    async function loadPending() {
-      try {
-        const res = await atsApi.submissions.list({ finalStatus: "PENDING_APPROVAL" });
-        setPendingSubmissions(res || []);
-      } catch (err) {
-        console.error("Failed to load pending submissions", err);
-      } finally {
-        setLoadingPending(false);
-      }
-    }
-    loadPending();
-  }, []);
-
-  const handleApproveSubmission = async (id: number) => {
+  async function loadGlobalData() {
+    setLoading(true);
     try {
-      await atsApi.submissions.update(id, { finalStatus: "SUBMITTED" });
-      toast.success("Submission Approved");
-      setPendingSubmissions(prev => prev.filter(s => s.id !== id));
-    } catch (error: any) {
-      toast.error(error.message || "Failed to approve");
+      const [tenantsData, pendingData, logsData] = await Promise.all([
+        atsApi.auth.listTenants().catch(() => []),
+        atsApi.auth.listPendingApprovals().catch(() => []),
+        atsApi.auditLogs.list(5).catch(() => []),
+      ]);
+      setTenants(tenantsData);
+      setPendingApprovals(pendingData);
+      setAuditLogs(logsData);
+    } catch (err) {
+      console.error("Failed to load global admin data:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const handleApproveUser = async (user: any) => {
+    setSubmittingUser(user.id);
+    const market = selectedMarket[user.id] || user.defaultMarket || "US";
+    const subdomain = selectedSubdomain[user.id] || user.tenantSubdomain || "";
+    const userLimit = selectedLimit[user.id] || 5;
+
+    try {
+      await atsApi.auth.approveUser(user.id, market, subdomain, userLimit);
+      toast.success(`Approved ${user.fullName} and activated company workspace!`);
+      await loadGlobalData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to approve workspace");
+    } finally {
+      setSubmittingUser(null);
     }
   };
 
-  const totalMembers = podTeam?.members?.length || 0;
-
-  // Filter jobs assigned to this pod
-  const podJobs = jobs.filter(j => j.podId && podTeam?.id && j.podId === podTeam.id);
-  const filledPodJobs = podJobs.filter(j => j.jobStatus === "Filled" || j.jobStatus === "Closed");
-  
-  const fillRate = podJobs.length ? Math.round((filledPodJobs.length / podJobs.length) * 100) : 0;
-
-  // Recruiter workload calculations
-  const recruiterWorkload = podTeam?.members?.map((member: any) => {
-    const memberJobs = podJobs.filter(j => j.primaryRecruiterId === member.id);
-    const active = memberJobs.filter(j => j.jobStatus === "Active").length;
-    const filled = memberJobs.filter(j => j.jobStatus === "Filled" || j.jobStatus === "Closed").length;
-    return {
-      name: member.fullName,
-      email: member.email,
-      role: member.systemRole,
-      total: memberJobs.length,
-      active,
-      filled,
-    };
-  }) || [];
-
-  // Job Status Distribution Data
-  const statusSeries = [
-    podJobs.filter((j) => j.jobStatus === "Active").length,
-    podJobs.filter((j) => j.jobStatus === "Hold" || j.jobStatus === "On Hold").length,
-    podJobs.filter((j) => j.jobStatus === "Filled").length,
-    podJobs.filter((j) => j.jobStatus === "Closed").length,
-  ];
-
-  const hasChartData = statusSeries.some((v) => v > 0);
-
-  const donutOptions: any = {
-    chart: {
-      type: "donut",
-    },
-    colors: ["#10B981", "#F59E0B", "#487FFF", "#EF4444"],
-    labels: ["Active", "On Hold", "Filled", "Closed"],
-    legend: {
-      position: "bottom",
-      labels: {
-        colors: "#64748B",
-      }
-    },
-    dataLabels: {
-      enabled: false,
-    },
+  const handleToggleTenantStatus = async (tenantId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+    try {
+      await atsApi.auth.updateTenantStatus(tenantId, newStatus);
+      toast.success(`Tenant status updated to ${newStatus}`);
+      await loadGlobalData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update tenant status");
+    }
   };
 
-  if (loadingTeam) {
+  const activeTenants = tenants.filter((t) => t.status === "ACTIVE");
+  const pendingTenants = tenants.filter((t) => t.status === "PENDING");
+  const totalUsersEst = tenants.reduce((acc, t) => acc + (t.user_count || 1), 0);
+
+  const filteredTenantsList = tenants.filter(
+    (t) =>
+      !searchTenant ||
+      t.name?.toLowerCase().includes(searchTenant.toLowerCase()) ||
+      t.domain?.toLowerCase().includes(searchTenant.toLowerCase())
+  );
+
+  if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[200px] border border-default-150 bg-white dark:bg-slate-900 rounded-xl p-6">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-        <p className="mt-2 text-xs text-default-500 font-semibold">Loading pod team parameters...</p>
+      <div className="flex flex-col items-center justify-center min-h-[300px] border border-default-150 bg-white dark:bg-slate-900 rounded-2xl p-8">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+        <p className="mt-3 text-xs text-default-500 font-semibold">Initializing Platform Command Center...</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Pod Lead Tabs */}
-      <div className="flex items-center gap-2 border-b border-default-200 pb-0">
-        <button
-          onClick={() => setActiveTab("team")}
-          className={`px-4 py-2.5 text-xs font-bold rounded-t-lg transition-colors flex items-center gap-2 ${
-            activeTab === "team" 
-              ? "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 border-b-2 border-indigo-600" 
-              : "text-default-500 hover:text-default-800 hover:bg-default-50 dark:hover:bg-slate-800"
-          }`}
-        >
-          <Icon icon="heroicons:user-group" className="h-4 w-4" />
-          Team Management
-        </button>
-        <button
-          onClick={() => setActiveTab("workspace")}
-          className={`px-4 py-2.5 text-xs font-bold rounded-t-lg transition-colors flex items-center gap-2 ${
-            activeTab === "workspace" 
-              ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-b-2 border-emerald-600" 
-              : "text-default-500 hover:text-default-800 hover:bg-default-50 dark:hover:bg-slate-800"
-          }`}
-        >
-          <Icon icon="heroicons:briefcase" className="h-4 w-4" />
-          My Sourcing Workspace
-        </button>
+      {/* Top Platform Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-11 w-11 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-2xl shadow-inner border border-indigo-100 dark:border-indigo-900/50">
+              <Icon icon="heroicons:building-office-2" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Company Tenants</p>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <h3 className="text-2xl font-bold text-default-850">{tenants.length}</h3>
+                <span className="text-[11px] font-bold text-emerald-600">({activeTenants.length} Active)</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-11 w-11 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center text-2xl shadow-inner border border-amber-100 dark:border-amber-900/50">
+              <Icon icon="heroicons:clock" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Pending Approvals</p>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <h3 className="text-2xl font-bold text-amber-600">{pendingApprovals.length}</h3>
+                <span className="text-[11px] text-default-400 font-medium">Workspaces</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-11 w-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl shadow-inner border border-emerald-100 dark:border-emerald-900/50">
+              <Icon icon="heroicons:cpu-chip" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">AI Resume Parser</p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <h3 className="text-sm font-bold text-emerald-600">FastAPI Online</h3>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-11 w-11 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-2xl shadow-inner border border-blue-100 dark:border-blue-900/50">
+              <Icon icon="heroicons:shield-check" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Security Audits</p>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <h3 className="text-2xl font-bold text-default-850">{auditLogs.length}</h3>
+                <span className="text-[11px] text-default-400 font-medium">Logged</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {activeTab === "team" ? (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          {/* Row 1: Pod Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-lg bg-indigo-50 dark:bg-slate-800 text-indigo-655 dark:text-indigo-400 flex items-center justify-center text-xl shadow-inner">
-                  <Icon icon="heroicons:users" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Pod Name</p>
-                  <h3 className="text-base font-bold text-default-855 mt-1 truncate max-w-[150px]">{podTeam?.name || "No Pod Assigned"}</h3>
-                </div>
-              </CardContent>
-            </Card>
+      {/* Quick Action Command Shortcuts */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Link href="/utility/approvals">
+          <div className="p-3.5 rounded-xl border border-default-150 bg-white dark:bg-slate-900 hover:border-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-all flex items-center gap-3 shadow-sm group">
+            <div className="h-9 w-9 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform">
+              <Icon icon="heroicons:building-office" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-default-850 group-hover:text-indigo-600">Tenant Management</p>
+              <p className="text-[10px] text-default-400">Approvals & Limits</p>
+            </div>
+          </div>
+        </Link>
 
-            <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-slate-800 text-emerald-605 dark:text-emerald-400 flex items-center justify-center text-xl shadow-inner">
-                  <Icon icon="heroicons:briefcase" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Total Pod Jobs</p>
-                  <h3 className="text-xl font-bold text-default-850 mt-1">{podJobs.length}</h3>
-                </div>
-              </CardContent>
-            </Card>
+        <Link href="/utility/audit-logs">
+          <div className="p-3.5 rounded-xl border border-default-150 bg-white dark:bg-slate-900 hover:border-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-all flex items-center gap-3 shadow-sm group">
+            <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform">
+              <Icon icon="heroicons:shield-check" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-default-850 group-hover:text-emerald-600">Audit Logs</p>
+              <p className="text-[10px] text-default-400">Cross-tenant trail</p>
+            </div>
+          </div>
+        </Link>
 
-            <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl shadow-inner">
-                  <Icon icon="heroicons:user-group" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Team Size</p>
-                  <h3 className="text-xl font-bold text-default-850 mt-1">{totalMembers} Recruiters</h3>
-                </div>
-              </CardContent>
-            </Card>
+        <Link href="/utility/dictionaries">
+          <div className="p-3.5 rounded-xl border border-default-150 bg-white dark:bg-slate-900 hover:border-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-all flex items-center gap-3 shadow-sm group">
+            <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform">
+              <Icon icon="heroicons:cpu-chip" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-default-850 group-hover:text-amber-600">AI Dictionaries</p>
+              <p className="text-[10px] text-default-400">Skill normalization</p>
+            </div>
+          </div>
+        </Link>
 
-            <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-lg bg-amber-50 dark:bg-slate-800 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl shadow-inner">
-                  <Icon icon="heroicons:trophy" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Pod Fill Rate</p>
-                  <h3 className="text-xl font-bold text-default-850 mt-1">{fillRate}%</h3>
-                </div>
-              </CardContent>
-            </Card>
+        <Link href="/utility/roles-permissions">
+          <div className="p-3.5 rounded-xl border border-default-150 bg-white dark:bg-slate-900 hover:border-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-all flex items-center gap-3 shadow-sm group">
+            <div className="h-9 w-9 rounded-lg bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 flex items-center justify-center text-lg group-hover:scale-110 transition-transform">
+              <Icon icon="heroicons:lock-closed" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-default-850 group-hover:text-rose-600">Global RBAC</p>
+              <p className="text-[10px] text-default-400">Roles & permissions</p>
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      {/* Pending Tenant Workspace Approvals */}
+      <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+        <CardHeader className="border-b border-default-100 bg-amber-50/30 dark:bg-amber-950/10 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base font-bold flex items-center gap-2 text-default-900">
+              <Icon icon="heroicons:clock" className="text-amber-500" />
+              Pending Workspace Approvals ({pendingApprovals.length})
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Review self-registered SaaS company tenants awaiting platform authorization.
+            </CardDescription>
           </div>
 
-          {/* Row 2: High Priority Approvals */}
-          <Card className="border border-default-150 bg-white dark:bg-slate-900">
-            <CardHeader className="border-b border-default-100 flex flex-row items-center justify-between">
+          <Link href="/utility/approvals">
+            <Button variant="outline" size="sm" className="text-xs h-8">
+              Full Approvals Panel
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent className="p-0">
+          {pendingApprovals.length === 0 ? (
+            <div className="p-8 text-center text-xs text-default-400">
+              <Icon icon="heroicons:check-circle" className="h-8 w-8 mx-auto text-emerald-500 mb-1" />
+              No pending tenant approvals. All registered company workspaces are active!
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-default-50 border-b border-default-100 text-xs font-semibold text-default-700">
+                    <th className="py-3 px-4">Company / User</th>
+                    <th className="py-3 px-4">Subdomain</th>
+                    <th className="py-3 px-4">Market Mode</th>
+                    <th className="py-3 px-4">User Limit</th>
+                    <th className="py-3 px-4">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-default-100 text-xs">
+                  {pendingApprovals.map((u) => (
+                    <tr key={u.id} className="hover:bg-default-50/50 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-default-900">{u.tenantName || u.fullName}</div>
+                        <div className="text-[11px] text-default-500">{u.email}</div>
+                      </td>
+                      <td className="py-3 px-4 font-mono text-indigo-600">
+                        {u.tenantSubdomain ? `${u.tenantSubdomain}.enfycon.com` : "Auto"}
+                      </td>
+                      <td className="py-3 px-4">
+                        <select
+                          value={selectedMarket[u.id] || u.defaultMarket || "US"}
+                          onChange={(e) =>
+                            setSelectedMarket({ ...selectedMarket, [u.id]: e.target.value })
+                          }
+                          className="h-7 text-xs rounded border border-default-200 bg-white dark:bg-slate-800 px-2 text-default-700 outline-none"
+                        >
+                          <option value="US">🇺🇸 US IT Staffing</option>
+                          <option value="IN">🇮🇳 India IT Staffing</option>
+                        </select>
+                      </td>
+                      <td className="py-3 px-4">
+                        <input
+                          type="number"
+                          min={1}
+                          max={500}
+                          value={selectedLimit[u.id] || 5}
+                          onChange={(e) =>
+                            setSelectedLimit({ ...selectedLimit, [u.id]: parseInt(e.target.value, 10) || 5 })
+                          }
+                          className="h-7 w-16 text-xs text-center rounded border border-default-200 bg-white dark:bg-slate-800 outline-none"
+                        />
+                      </td>
+                      <td className="py-3 px-4">
+                        <Button
+                          size="sm"
+                          disabled={submittingUser === u.id}
+                          onClick={() => handleApproveUser(u)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 px-3 rounded font-semibold"
+                        >
+                          {submittingUser === u.id ? "Approving..." : "Approve Workspace"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Active Company Workspaces & Audit Logs split */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Active Tenants Directory */}
+        <div className="lg:col-span-8">
+          <Card className="border border-default-150 bg-white dark:bg-slate-900 h-full shadow-sm">
+            <CardHeader className="border-b border-default-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <CardTitle className="text-base font-bold flex items-center gap-2">
-                  <Icon icon="heroicons:check-badge" className="text-amber-500" />
-                  Pending Submissions Approval
+                  <Icon icon="heroicons:building-office-2" className="text-indigo-600" />
+                  Active Company Workspaces ({filteredTenantsList.length})
                 </CardTitle>
-                <CardDescription className="text-xs">Review and approve submissions from your pod members.</CardDescription>
+                <CardDescription className="text-xs">
+                  Overview of all onboarded SaaS companies and license allocation.
+                </CardDescription>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Input
+                  placeholder="Search tenant..."
+                  value={searchTenant}
+                  onChange={(e) => setSearchTenant(e.target.value)}
+                  className="h-8 text-xs w-full sm:w-44"
+                />
+                <Link href="/utility/approvals?tab=tenants">
+                  <Button variant="outline" size="sm" className="text-xs h-8 whitespace-nowrap font-bold text-indigo-650 border-indigo-200 hover:bg-indigo-50">
+                    Full Tenant Page →
+                  </Button>
+                </Link>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {loadingPending ? (
-                <div className="p-8 text-center text-xs text-default-400">Loading pending approvals...</div>
-              ) : pendingSubmissions.length === 0 ? (
-                <div className="p-8 text-center text-xs text-default-400">No pending submissions.</div>
+              {filteredTenantsList.length === 0 ? (
+                <div className="p-8 text-center text-xs text-default-400">No company tenants found.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-default-50 border-b border-default-100">
-                        <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Candidate</th>
-                        <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Job Code</th>
-                        <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Submitted By</th>
-                        <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Actions</th>
+                      <tr className="bg-default-50 border-b border-default-100 text-xs font-semibold text-default-700">
+                        <th className="py-2.5 px-4">Company Name</th>
+                        <th className="py-2.5 px-4">Domain / Subdomain</th>
+                        <th className="py-2.5 px-4">Market</th>
+                        <th className="py-2.5 px-4">Seats Limit</th>
+                        <th className="py-2.5 px-4">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-default-100">
-                      {pendingSubmissions.map((sub) => (
-                        <tr key={sub.id} className="hover:bg-default-50/50 transition-colors text-xs">
-                          <td className="py-2.5 px-4 font-semibold text-default-900">{sub.candidate?.firstName} {sub.candidate?.lastName}</td>
-                          <td className="py-2.5 px-4 text-default-600 font-mono">{sub.job?.jobCode}</td>
-                          <td className="py-2.5 px-4 text-default-600">{sub.recruiter?.fullName}</td>
-                          <td className="py-2.5 px-4">
-                            <Button size="sm" onClick={() => handleApproveSubmission(sub.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 px-3 rounded">
-                              Approve
-                            </Button>
+                    <tbody className="divide-y divide-default-100 text-xs">
+                      {filteredTenantsList.slice(0, 10).map((t) => (
+                        <tr
+                          key={t.id}
+                          onClick={() => handleOpenTenantDetails(t.id)}
+                          className="hover:bg-indigo-50/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group"
+                        >
+                          <td className="py-2.5 px-4 font-bold text-default-900 group-hover:text-indigo-600 flex items-center gap-1.5">
+                            {t.name}
+                            <Icon icon="heroicons:arrow-top-right-on-square" className="h-3 w-3 text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </td>
+                          <td className="py-2.5 px-4 font-mono text-indigo-600">{t.domain || "N/A"}</td>
+                          <td className="py-2.5 px-4 font-semibold">
+                            {t.default_market === "IN" ? "🇮🇳 India" : "🇺🇸 US IT"}
+                          </td>
+                          <td className="py-2.5 px-4 font-semibold text-default-700">
+                            {t.user_limit || 5} Seats
+                          </td>
+                          <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => handleToggleTenantStatus(t.id, t.status)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                                t.status === "ACTIVE"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400"
+                                  : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400"
+                              }`}
+                            >
+                              {t.status}
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -385,148 +561,194 @@ function PodLeadDashboardView({ profile, jobs, activeJobs }: { profile: any; job
               )}
             </CardContent>
           </Card>
+        </div>
 
-          {/* Row 3: Recruiter Workload Analysis */}
-          <Card className="border border-default-150 bg-white dark:bg-slate-900">
-            <CardHeader className="border-b border-default-100">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Icon icon="heroicons:chart-bar-square" className="text-emerald-600" />
-                Recruiter Workload Analysis
-              </CardTitle>
-              <CardDescription className="text-xs">Status of sourcing requisitions assigned to recruiters in your pod.</CardDescription>
+        {/* Live Security Audit Logs Preview */}
+        <div className="lg:col-span-4">
+          <Card className="border border-default-150 bg-white dark:bg-slate-900 h-full shadow-sm flex flex-col justify-between">
+            <CardHeader className="border-b border-default-100 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Icon icon="heroicons:shield-check" className="text-emerald-600" />
+                  Live Security Trail
+                </CardTitle>
+                <CardDescription className="text-xs">Latest cross-tenant administrative logs.</CardDescription>
+              </div>
+              <Link href="/utility/audit-logs">
+                <Button variant="ghost" size="sm" className="text-xs h-7 px-2 text-indigo-600">
+                  View All
+                </Button>
+              </Link>
             </CardHeader>
-            <CardContent className="p-6">
-              {recruiterWorkload.length === 0 ? (
-                <p className="text-xs text-default-400 text-center py-4">No team member workload to display.</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {recruiterWorkload.map((rec: any) => (
-                    <div key={rec.email} className="rounded-xl border border-default-150 p-4 bg-default-50/50 hover:bg-default-50 transition-all shadow-sm">
-                      <div className="flex items-start justify-between min-w-0 gap-2">
-                        <div className="min-w-0">
-                          <p className="font-bold text-sm text-default-855 truncate">{rec.name}</p>
-                          <p className="text-[10px] text-default-400 font-mono truncate">{rec.email}</p>
-                        </div>
-                        <Badge className="bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-slate-800 dark:text-slate-300 font-semibold px-2 py-0.5 text-[8px] uppercase tracking-wider shrink-0">
-                          {rec.role === "POD_LEAD" ? "Head 👑" : "Recruiter"}
-                        </Badge>
-                      </div>
-                      <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-default-100 shadow-inner">
-                          <p className="text-[10px] text-default-400 font-semibold uppercase">Total</p>
-                          <p className="font-bold text-default-800 mt-0.5">{rec.total}</p>
-                        </div>
-                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-default-100 shadow-inner">
-                          <p className="text-[10px] text-blue-500 font-semibold uppercase">Active</p>
-                          <p className="font-bold text-blue-600 mt-0.5">{rec.active}</p>
-                        </div>
-                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-default-100 shadow-inner">
-                          <p className="text-[10px] text-emerald-500 font-semibold uppercase">Filled</p>
-                          <p className="font-bold text-emerald-600 mt-0.5">{rec.filled}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+            <CardContent className="p-4 space-y-3 flex-1 overflow-y-auto max-h-[350px]">
+              {auditLogs.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-default-400 text-xs py-8">
+                  No recent audit events captured.
                 </div>
+              ) : (
+                auditLogs.map((log) => (
+                  <div key={log.id} className="p-2.5 rounded-lg border border-default-100 bg-default-50/50 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className="text-[9px] uppercase font-mono">
+                        {log.action}
+                      </Badge>
+                      <span className="text-[10px] text-default-400 font-mono">
+                        {log.created_at ? new Date(log.created_at).toLocaleTimeString() : ""}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold text-default-800 truncate">{log.actor_email || "System User"}</p>
+                    <p className="text-[11px] text-default-500 truncate">{log.details}</p>
+                  </div>
+                ))
               )}
             </CardContent>
           </Card>
+        </div>
+      </div>
 
-          {/* Row 4: Requisitions & Status Distribution split */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Active Pod Requisitions */}
-            <div className="lg:col-span-8">
-              <Card className="border border-default-150 bg-white dark:bg-slate-900 h-full">
-                <CardHeader className="border-b border-default-100 flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base font-bold flex items-center gap-2">
-                      <Icon icon="heroicons:list-bullet" className="text-indigo-650" />
-                      Pod Sourcing Requisitions ({podTeam?.name})
-                    </CardTitle>
-                    <CardDescription className="text-xs">Monitor assignments and submission quotas for jobs routed to your pod.</CardDescription>
+      {/* TENANT DETAILS & USER ROSTER MODAL */}
+      <Dialog open={isTenantModalOpen} onOpenChange={setIsTenantModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border border-default-200">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Icon icon="heroicons:building-office-2" className="text-indigo-600" />
+              Tenant Workspace Details & Users Roster
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Review user accounts, assigned roles, and usage metrics for this company.
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingTenantDetail ? (
+            <div className="p-12 text-center text-xs text-default-400 flex flex-col items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
+              Loading tenant user roster...
+            </div>
+          ) : selectedTenantDetail ? (
+            <div className="space-y-5 py-2">
+              {/* Tenant Header Info */}
+              <div className="p-4 bg-default-50 dark:bg-slate-800/60 rounded-xl border border-default-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-default-900">{selectedTenantDetail.tenant?.name}</h3>
+                    <Badge variant={selectedTenantDetail.tenant?.status === "ACTIVE" ? "success" : "destructive"} className="text-[10px]">
+                      {selectedTenantDetail.tenant?.status}
+                    </Badge>
                   </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {podJobs.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-default-400">No job orders assigned to this pod yet.</div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-default-50 border-b border-default-100">
-                            <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Code / Title</th>
-                            <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Client Name</th>
-                            <th className="py-2.5 px-4 text-xs font-semibold text-default-700">Priority</th>
-                            <th className="py-2.5 px-4 text-xs font-semibold text-default-700 text-center">Submissions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-default-100">
-                          {podJobs.slice(0, 10).map((job) => (
-                            <tr key={job.id} className="hover:bg-default-50/50 transition-colors text-xs">
-                              <td className="py-2.5 px-4">
-                                <div className="font-semibold text-default-900">{job.jobTitle}</div>
-                                <div className="text-[10px] text-default-400 font-mono">{job.jobCode}</div>
-                              </td>
-                              <td className="py-2.5 px-4 font-medium text-default-600">{job.client}</td>
-                              <td className="py-2.5 px-4">
-                                <Badge className={`px-2 py-0.5 text-[9px] font-bold ${
-                                  job.priority === "Hot" || job.priority === "High" || job.priority === "Urgent" 
-                                    ? "bg-rose-50 text-rose-700 border-rose-100" 
-                                    : "bg-amber-50 text-amber-700 border-amber-100"
-                                }`}>
-                                  {job.priority}
-                                </Badge>
-                              </td>
-                              <td className="py-2.5 px-4 text-center font-bold text-indigo-655">
-                                {job.submissionDone} / {job.submissionRequired}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                  <p className="text-xs text-default-500 font-mono mt-0.5">
+                    Subdomain: <strong className="text-indigo-600">{selectedTenantDetail.tenant?.domain}.localhost:3000</strong> | Market: <strong>{selectedTenantDetail.tenant?.defaultMarket === "IN" ? "🇮🇳 India IT" : "🇺🇸 US IT Staffing"}</strong>
+                  </p>
+                </div>
 
-            {/* Pod Job Status Distribution */}
-            <div className="lg:col-span-4">
-              <Card className="border border-default-150 bg-white dark:bg-slate-900 h-full">
-                <CardHeader className="border-b border-default-100">
-                  <CardTitle className="text-base font-bold flex items-center gap-2">
-                    <Icon icon="heroicons:chart-pie" className="text-amber-500" />
-                    Job Distribution
-                  </CardTitle>
-                  <CardDescription className="text-xs">Breakdown of requisitions currently assigned to your team.</CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 flex items-center justify-center min-h-[250px]">
-                  {hasChartData ? (
-                    <div className="w-full">
-                      <Chart
-                        options={donutOptions}
-                        series={statusSeries}
-                        type="donut"
-                        height={260}
-                      />
-                    </div>
-                  ) : (
-                    <p className="text-xs text-default-400 font-medium">No distribution data available.</p>
-                  )}
-                </CardContent>
-              </Card>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`http://${selectedTenantDetail.tenant?.domain}.localhost:3000/dashboard`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <Button size="sm" variant="outline" className="text-xs gap-1.5">
+                      <Icon icon="heroicons:arrow-top-right-on-square" className="h-3.5 w-3.5" />
+                      Visit Tenant Workspace
+                    </Button>
+                  </a>
+                </div>
+              </div>
+
+              {/* Usage Stat Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs">
+                <div className="p-3 bg-white dark:bg-slate-900 border border-default-200 rounded-lg">
+                  <span className="text-[10px] text-default-400 uppercase font-bold block mb-1">User License Usage</span>
+                  <span className="text-sm font-extrabold text-indigo-600">
+                    {selectedTenantDetail.users?.length || 0} / {selectedTenantDetail.tenant?.userLimit || 5} Seats
+                  </span>
+                </div>
+                <div className="p-3 bg-white dark:bg-slate-900 border border-default-200 rounded-lg">
+                  <span className="text-[10px] text-default-400 uppercase font-bold block mb-1">Active Job Requisitions</span>
+                  <span className="text-sm font-extrabold text-emerald-600">
+                    {selectedTenantDetail.stats?.totalJobs || 0} Jobs
+                  </span>
+                </div>
+                <div className="p-3 bg-white dark:bg-slate-900 border border-default-200 rounded-lg">
+                  <span className="text-[10px] text-default-400 uppercase font-bold block mb-1">Candidate Profiles</span>
+                  <span className="text-sm font-extrabold text-blue-600">
+                    {selectedTenantDetail.stats?.totalCandidates || 0} CVs
+                  </span>
+                </div>
+                <div className="p-3 bg-white dark:bg-slate-900 border border-default-200 rounded-lg">
+                  <span className="text-[10px] text-default-400 uppercase font-bold block mb-1">Submissions Done</span>
+                  <span className="text-sm font-extrabold text-amber-600">
+                    {selectedTenantDetail.stats?.totalSubmissions || 0} Submissions
+                  </span>
+                </div>
+              </div>
+
+              {/* Users Roster Table */}
+              <div className="space-y-2">
+                <h4 className="font-bold text-xs text-default-900 flex items-center gap-1.5">
+                  <Icon icon="heroicons:users" className="text-indigo-600" />
+                  Users Roster ({selectedTenantDetail.users?.length || 0})
+                </h4>
+
+                <div className="border border-default-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-default-50 border-b border-default-200 text-default-700 font-semibold">
+                        <th className="py-2.5 px-3">Full Name</th>
+                        <th className="py-2.5 px-3">Email Address</th>
+                        <th className="py-2.5 px-3">Assigned Role</th>
+                        <th className="py-2.5 px-3">Status</th>
+                        <th className="py-2.5 px-3">Date Added</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-default-100">
+                      {selectedTenantDetail.users?.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-4 text-center text-default-400">
+                            No users registered under this tenant.
+                          </td>
+                        </tr>
+                      ) : (
+                        selectedTenantDetail.users?.map((u: any) => (
+                          <tr key={u.id} className="hover:bg-default-50/50">
+                            <td className="py-2.5 px-3 font-bold text-default-900">{u.fullName || "User"}</td>
+                            <td className="py-2.5 px-3 font-mono text-indigo-600">{u.email}</td>
+                            <td className="py-2.5 px-3">
+                              <Badge variant="outline" className="text-[10px] uppercase font-bold">
+                                {u.systemRole || u.roleName || (u.roles && u.roles[0]) || "STAFF"}
+                              </Badge>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                u.isActive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                              }`}>
+                                {u.isActive ? "ACTIVE" : "INACTIVE"}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-default-400 font-mono text-[10px]">
+                              {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "N/A"}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      ) : (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <RecruiterDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
-        </div>
-      )}
+          ) : (
+            <div className="p-8 text-center text-xs text-default-400">No details available.</div>
+          )}
+
+          <DialogFooter className="pt-2">
+            <Button size="sm" variant="outline" onClick={() => setIsTenantModalOpen(false)} className="text-xs">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
 
 // ─── ADMIN / SUPER ADMIN DASHBOARD VIEW ───────────────────────────────────────
 function AdminDashboardView({ profile, jobs, activeJobs }: { profile: any; jobs: any[]; activeJobs: any[] }) {
@@ -1041,53 +1263,261 @@ function AccountManagerDashboardView({
         <CardContent className="p-0">
           {loadingSubmissions ? (
             <div className="p-8 text-center text-xs text-default-400">Loading submissions...</div>
-          ) : amSubmissions.length === 0 ? (
-            <div className="p-12 text-center flex flex-col items-center justify-center">
-              <Icon icon="heroicons:inbox" className="h-10 w-10 text-default-300 mb-3" />
-              <p className="text-sm font-semibold text-default-600">No Submissions Yet</p>
-              <p className="text-xs text-default-400 max-w-sm mt-1">Candidates submitted by recruiters for your job requisitions will appear here.</p>
+          ) : (
+            <div className="p-8 text-center text-xs text-default-400">No candidate submissions recorded for your portfolio yet.</div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── POD LEAD / TEAM HEAD DASHBOARD VIEW ──────────────────────────────────────
+function PodLeadDashboardView({ profile, jobs, activeJobs }: { profile: any; jobs: any[]; activeJobs: any[] }) {
+  const [podSubmissions, setPodSubmissions] = useState<any[]>([]);
+  const [loadingSubs, setLoadingSubs] = useState(true);
+  const [processingId, setProcessingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    loadPodSubmissions();
+  }, []);
+
+  async function loadPodSubmissions() {
+    setLoadingSubs(true);
+    try {
+      const data = await atsApi.submissions.list();
+      const list = Array.isArray(data) ? data : data.data || [];
+      setPodSubmissions(list);
+    } catch (err) {
+      console.error("Failed to fetch pod submissions:", err);
+    } finally {
+      setLoadingSubs(false);
+    }
+  }
+
+  const handleApproveSubmission = async (subId: number) => {
+    setProcessingId(subId);
+    try {
+      await atsApi.submissions.update(subId, { finalStatus: "SUBMITTED" });
+      toast.success("Submission approved and forwarded to client!");
+      await loadPodSubmissions();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to approve submission");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRejectSubmission = async (subId: number) => {
+    setProcessingId(subId);
+    try {
+      await atsApi.submissions.update(subId, { finalStatus: "REJECTED" });
+      toast.success("Submission rejected.");
+      await loadPodSubmissions();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reject submission");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  // Metrics
+  const pendingApprovals = podSubmissions.filter((s) => s.finalStatus === "PENDING_APPROVAL");
+  const approvedSubs = podSubmissions.filter((s) => s.finalStatus === "SUBMITTED" || s.finalStatus === "POD_APPROVED");
+  const interviewsCount = podSubmissions.filter((s) => s.l1Status === "SCHEDULED" || s.l2Status === "SCHEDULED" || s.l3Status === "SCHEDULED" || s.l1Status === "PASSED" || s.l2Status === "PASSED" || s.l3Status === "PASSED").length;
+  const placementsCount = podSubmissions.filter((s) => s.finalStatus === "OFFER" || s.finalStatus === "JOIN" || s.finalStatus === "PLACED").length;
+
+  return (
+    <div className="space-y-6">
+      {/* 1. HOT ACTION ITEM BANNER: PENDING APPROVALS */}
+      {pendingApprovals.length > 0 && (
+        <Card className="border border-amber-300 dark:border-amber-900/60 bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-500/10 dark:from-amber-950/40 dark:to-slate-900 shadow-sm rounded-xl overflow-hidden">
+          <CardHeader className="pb-3 pt-4 px-5 border-b border-amber-200/50 dark:border-amber-900/30 flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold shadow">
+                <Icon icon="heroicons:exclamation-triangle" className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold text-amber-950 dark:text-amber-300 flex items-center gap-2">
+                  Action Required: Submissions Pending Approval ({pendingApprovals.length})
+                </CardTitle>
+                <CardDescription className="text-xs text-amber-800 dark:text-amber-400">
+                  Review candidate CVs submitted by your pod recruiters before client dispatch.
+                </CardDescription>
+              </div>
             </div>
+            <Link href="/utility/submissions">
+              <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold gap-1 shadow-sm">
+                Full Review Queue →
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="p-4 space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {pendingApprovals.slice(0, 4).map((sub) => (
+                <div key={sub.id} className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-amber-200/80 dark:border-amber-900/40 flex items-center justify-between gap-3 shadow-xs">
+                  <div>
+                    <p className="font-bold text-xs text-default-900">{sub.candidateName || `Candidate #${sub.candidateId}`}</p>
+                    <p className="text-[11px] text-default-500 font-mono mt-0.5">Job: {sub.jobCode || "Requirement"} | By: <strong>{sub.recruiterName || "Pod Recruiter"}</strong></p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      size="sm"
+                      disabled={processingId === sub.id}
+                      onClick={() => handleApproveSubmission(sub.id)}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold h-7 px-2.5 shadow-xs"
+                    >
+                      Approve ✓
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={processingId === sub.id}
+                      onClick={() => handleRejectSubmission(sub.id)}
+                      className="text-rose-600 border-rose-200 hover:bg-rose-50 text-[11px] font-bold h-7 px-2"
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 2. POD LEAD SCORECARD */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl hover:shadow-md transition-all">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-600 flex items-center justify-center text-2xl shrink-0 border border-amber-100 dark:border-amber-900/30">
+              <Icon icon="heroicons:clock" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Pending My Review</p>
+              <h3 className="text-2xl font-bold text-default-900 mt-0.5">{pendingApprovals.length}</h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl hover:shadow-md transition-all">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/30 text-blue-600 flex items-center justify-center text-2xl shrink-0 border border-blue-100 dark:border-blue-900/30">
+              <Icon icon="heroicons:document-check" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Pod Submissions</p>
+              <h3 className="text-2xl font-bold text-default-900 mt-0.5">{podSubmissions.length}</h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl hover:shadow-md transition-all">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 flex items-center justify-center text-2xl shrink-0 border border-cyan-100 dark:border-cyan-900/30">
+              <Icon icon="heroicons:calendar" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Scheduled Interviews</p>
+              <h3 className="text-2xl font-bold text-default-900 mt-0.5">{interviewsCount}</h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl hover:shadow-md transition-all">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 flex items-center justify-center text-2xl shrink-0 border border-emerald-100 dark:border-emerald-900/30">
+              <Icon icon="heroicons:trophy" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Pod Placements</p>
+              <h3 className="text-2xl font-bold text-default-900 mt-0.5">{placementsCount}</h3>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 3. POD SUBMISSIONS AUDIT TABLE */}
+      <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl overflow-hidden">
+        <CardHeader className="border-b border-default-100 pb-4 px-6 flex flex-row items-center justify-between bg-slate-50/50 dark:bg-slate-800/20">
+          <div>
+            <CardTitle className="text-base font-bold text-default-900 flex items-center gap-2">
+              <Icon icon="heroicons:user-group" className="text-indigo-600" />
+              Pod Team Submissions & Review Table
+            </CardTitle>
+            <CardDescription className="text-xs mt-1">Live submission throughput across recruiters in your assigned pod.</CardDescription>
+          </div>
+          <Link href="/utility/submissions">
+            <Button variant="outline" size="sm" className="text-xs font-bold h-8 text-indigo-600 border-indigo-200">
+              Full Submissions Tracker →
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loadingSubs ? (
+            <div className="p-8 text-center text-xs text-default-400">Loading pod submissions...</div>
+          ) : podSubmissions.length === 0 ? (
+            <div className="p-8 text-center text-xs text-default-400">No candidate submissions recorded for your pod yet.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-default-50 border-b border-default-200">
-                    <th className="py-3 px-4 text-[11px] font-bold text-default-700 uppercase tracking-wider">Candidate Name</th>
-                    <th className="py-3 px-4 text-[11px] font-bold text-default-700 uppercase tracking-wider">Job Code</th>
-                    <th className="py-3 px-4 text-[11px] font-bold text-default-700 uppercase tracking-wider">Submitted By</th>
-                    <th className="py-3 px-4 text-[11px] font-bold text-default-700 uppercase tracking-wider">Current Status</th>
-                    <th className="py-3 px-4 text-[11px] font-bold text-default-700 uppercase tracking-wider">Submitted Date</th>
-                    <th className="py-3 px-4 text-[11px] font-bold text-default-700 uppercase tracking-wider">Final Status</th>
+                  <tr className="bg-default-50 border-b border-default-200 text-default-700 font-bold uppercase tracking-wider">
+                    <th className="py-3 px-4">Candidate Name</th>
+                    <th className="py-3 px-4">Job Code & Title</th>
+                    <th className="py-3 px-4">Submitted By</th>
+                    <th className="py-3 px-4">Submitted Rate</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-default-100">
-                  {amSubmissions.map((sub: any) => (
-                    <tr key={sub.id} className="hover:bg-default-50/70 transition-colors text-xs">
-                      <td className="py-3 px-4 font-semibold text-default-900">
-                        {sub.candidate?.firstName} {sub.candidate?.lastName}
-                        <div className="text-[10px] text-default-450 font-normal mt-0.5">{sub.candidate?.email || "No Email"}</div>
+                  {podSubmissions.slice(0, 10).map((sub) => (
+                    <tr key={sub.id} className="hover:bg-default-50/50 transition-colors">
+                      <td className="py-3 px-4 font-bold text-default-900">
+                        {sub.candidateName || `Candidate #${sub.candidateId}`}
+                        <div className="text-[10px] text-default-400 font-normal">{sub.candidateEmail || "No Email"}</div>
                       </td>
-                      <td className="py-3 px-4 font-mono text-default-600">{sub.job?.jobCode || "N/A"}</td>
-                      <td className="py-3 px-4 font-medium text-default-700">{sub.recruiter?.fullName || "Unknown Recruiter"}</td>
                       <td className="py-3 px-4">
-                        <div className="flex gap-1 flex-col items-start">
-                          <span className="text-[10px] text-default-500 font-semibold">L1: {sub.l1Status || "Pending"}</span>
-                          <span className="text-[10px] text-default-500 font-semibold">L2: {sub.l2Status || "Pending"}</span>
-                        </div>
+                        <div className="font-semibold text-default-900">{sub.jobTitle || "Requirement"}</div>
+                        <div className="font-mono text-[10px] text-indigo-600">{sub.jobCode}</div>
                       </td>
-                      <td className="py-3 px-4 text-default-500">
-                        {new Date(sub.submittedAt || sub.createdAt).toLocaleDateString()}
-                      </td>
+                      <td className="py-3 px-4 font-medium text-default-700">{sub.recruiterName || "Pod Recruiter"}</td>
+                      <td className="py-3 px-4 font-bold text-default-800">{sub.submittedRate || "Standard"}</td>
                       <td className="py-3 px-4">
                         <Badge className={`px-2 py-0.5 text-[10px] font-bold ${
-                          sub.finalStatus === "OFFER" || sub.finalStatus === "JOIN" 
-                            ? "bg-emerald-100 text-emerald-800" 
-                            : sub.finalStatus === "REJECTED" 
-                            ? "bg-red-100 text-red-800"
-                            : "bg-blue-100 text-blue-800"
+                          sub.finalStatus === "PENDING_APPROVAL" ? "bg-amber-100 text-amber-800" :
+                          sub.finalStatus === "SUBMITTED" || sub.finalStatus === "POD_APPROVED" ? "bg-blue-100 text-blue-800" :
+                          sub.finalStatus === "REJECTED" ? "bg-rose-100 text-rose-800" :
+                          "bg-emerald-100 text-emerald-800"
                         }`}>
-                          {sub.finalStatus || "SUBMITTED"}
+                          {sub.finalStatus?.replace("_", " ") || "SUBMITTED"}
                         </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {sub.finalStatus === "PENDING_APPROVAL" ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="sm"
+                              disabled={processingId === sub.id}
+                              onClick={() => handleApproveSubmission(sub.id)}
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold h-6 px-2"
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={processingId === sub.id}
+                              onClick={() => handleRejectSubmission(sub.id)}
+                              className="text-rose-600 border-rose-200 text-[10px] font-bold h-6 px-1.5"
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-default-400 font-medium">Reviewed ✓</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1103,8 +1533,6 @@ function AccountManagerDashboardView({
 
 // ─── RECRUITER DASHBOARD VIEW ────────────────────────────────────────────────
 function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; jobs: any[]; activeJobs: any[] }) {
-  const canViewJobs = profile?.permissions?.includes("job:view");
-
   const [mySubmissions, setMySubmissions] = useState<any[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(true);
   const [selectedJobForCV, setSelectedJobForCV] = useState<any | null>(null);
@@ -1113,7 +1541,7 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
     async function loadSubs() {
       try {
         const res = await atsApi.submissions.list();
-        const mine = res?.filter((s: any) => s.recruiterId === profile?.id) || [];
+        const mine = Array.isArray(res) ? res : res?.data || [];
         setMySubmissions(mine);
       } catch (err) {
         console.error("Failed to load my submissions", err);
@@ -1127,163 +1555,163 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
   // Analytics Calculations
   const totalJobs = jobs.length;
   const activeCount = activeJobs.length;
-  const selectedCount = mySubmissions.filter((sub) => sub.finalStatus === "OFFER" || sub.finalStatus === "JOIN").length;
-  const rejectedCount = mySubmissions.filter((sub) => sub.finalStatus === "REJECTED").length;
-  const holdCount = jobs.filter((job) => job.jobStatus === "Hold" || job.jobStatus === "On Hold").length;
+  const interviewsScheduled = mySubmissions.filter((s) => s.l1Status === "SCHEDULED" || s.l2Status === "SCHEDULED" || s.l3Status === "SCHEDULED" || s.l1Status === "PASSED" || s.l2Status === "PASSED" || s.l3Status === "PASSED").length;
+  const selectedCount = mySubmissions.filter((sub) => sub.finalStatus === "OFFER" || sub.finalStatus === "JOIN" || sub.finalStatus === "PLACED").length;
 
   return (
     <div className="space-y-6">
-      {/* 1. Stat Cards (Enfysync Style) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+      {/* 1. RECRUITER QUICK SOURCING TOOLBAR */}
+      <div className="p-4 rounded-xl border border-indigo-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="h-9 w-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-100">
+            <Icon icon="heroicons:user-plus" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-default-900">Recruiter Sourcing Workspace</h3>
+            <p className="text-xs text-default-500">Pick an active job requisition below to upload candidate CVs or match talent from database.</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link href="/candidates">
+            <Button size="sm" variant="outline" className="text-xs font-bold border-default-200 h-8 gap-1">
+              <Icon icon="heroicons:magnifying-glass" className="h-3.5 w-3.5 text-indigo-600" />
+              Talent Bench Search
+            </Button>
+          </Link>
+          <Link href="/mass-mail">
+            <Button size="sm" variant="outline" className="text-xs font-bold border-default-200 h-8 gap-1 text-purple-700 bg-purple-50/50 hover:bg-purple-100">
+              <Icon icon="heroicons:paper-airplane" className="h-3.5 w-3.5 text-purple-600" />
+              Mass Mail Outreach
+            </Button>
+          </Link>
+          <Link href="/utility/submissions">
+            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold h-8 gap-1 shadow-xs">
+              <Icon icon="heroicons:clipboard-document-list" className="h-3.5 w-3.5" />
+              My Submissions Tracker
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* 2. RECRUITER SCORECARD */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl hover:shadow-md transition-all">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-semibold text-default-500">Assigned Jobs</p>
-                <h3 className="text-3xl font-bold text-default-900 mt-2">{totalJobs}</h3>
-              </div>
-              <div className="h-12 w-12 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center text-2xl">
-                <Icon icon="heroicons:briefcase" />
-              </div>
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/30 text-blue-600 flex items-center justify-center text-2xl shrink-0 border border-blue-100 dark:border-blue-900/30">
+              <Icon icon="heroicons:briefcase" />
             </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-emerald-500 font-bold flex items-center gap-1">
-                <Icon icon="heroicons:arrow-trending-up" className="h-4 w-4" />
-                +{activeCount}
-              </span>
-              <span className="text-default-400 ml-2">Currently active roles</span>
+            <div>
+              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Active Assigned Jobs</p>
+              <h3 className="text-2xl font-bold text-default-900 mt-0.5">{activeCount}</h3>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl hover:shadow-md transition-all">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-semibold text-default-500">Candidate Submissions</p>
-                <h3 className="text-3xl font-bold text-default-900 mt-2">{mySubmissions.length}</h3>
-              </div>
-              <div className="h-12 w-12 rounded-lg bg-purple-600/10 text-purple-600 flex items-center justify-center text-2xl">
-                <Icon icon="heroicons:document-text" />
-              </div>
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-purple-50 dark:bg-purple-950/30 text-purple-600 flex items-center justify-center text-2xl shrink-0 border border-purple-100 dark:border-purple-900/30">
+              <Icon icon="heroicons:document-text" />
             </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-emerald-500 font-bold flex items-center gap-1">
-                <Icon icon="heroicons:arrow-trending-up" className="h-4 w-4" />
-                {totalJobs ? (mySubmissions.length / totalJobs).toFixed(1) : "0"}/job
-              </span>
-              <span className="text-default-400 ml-2">Submission throughput</span>
+            <div>
+              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">My Submissions</p>
+              <h3 className="text-2xl font-bold text-default-900 mt-0.5">{mySubmissions.length}</h3>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl hover:shadow-md transition-all">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-semibold text-default-500">Selected Candidates</p>
-                <h3 className="text-3xl font-bold text-default-900 mt-2">{selectedCount}</h3>
-              </div>
-              <div className="h-12 w-12 rounded-lg bg-emerald-600/10 text-emerald-600 flex items-center justify-center text-2xl">
-                <Icon icon="heroicons:users" />
-              </div>
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 flex items-center justify-center text-2xl shrink-0 border border-cyan-100 dark:border-cyan-900/30">
+              <Icon icon="heroicons:calendar" />
             </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-emerald-500 font-bold flex items-center gap-1">
-                <Icon icon="heroicons:arrow-trending-up" className="h-4 w-4" />
-                -{rejectedCount}
-              </span>
-              <span className="text-default-400 ml-2">Conversion to final select</span>
+            <div>
+              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Interviews Scheduled</p>
+              <h3 className="text-2xl font-bold text-default-900 mt-0.5">{interviewsScheduled}</h3>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl hover:shadow-md transition-all">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-semibold text-default-500">Jobs On Hold</p>
-                <h3 className="text-3xl font-bold text-default-900 mt-2">{holdCount}</h3>
-              </div>
-              <div className="h-12 w-12 rounded-lg bg-amber-600/10 text-amber-600 flex items-center justify-center text-2xl">
-                <Icon icon="heroicons:clock" />
-              </div>
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 flex items-center justify-center text-2xl shrink-0 border border-emerald-100 dark:border-emerald-900/30">
+              <Icon icon="heroicons:trophy" />
             </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-amber-500 font-bold flex items-center gap-1">
-                <Icon icon="heroicons:exclamation-circle" className="h-4 w-4" />
-                Needs Action
-              </span>
-              <span className="text-default-400 ml-2">Need follow-up action</span>
+            <div>
+              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Selections / Placed</p>
+              <h3 className="text-2xl font-bold text-default-900 mt-0.5">{selectedCount}</h3>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* 2. Workspace Split Grid */}
+      {/* 3. WORKSPACE SPLIT GRID */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* Left pane: My Assigned Jobs */}
+        {/* Left Pane: Active Assigned Jobs Queue */}
         <div className="xl:col-span-8">
           <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl h-full overflow-hidden">
-            <CardHeader className="border-b border-default-100 pb-4 flex flex-row items-center justify-between bg-slate-50/50 dark:bg-slate-800/20">
+            <CardHeader className="border-b border-default-100 pb-4 px-6 flex flex-row items-center justify-between bg-slate-50/50 dark:bg-slate-800/20">
               <div>
                 <CardTitle className="text-base font-bold text-default-900 flex items-center gap-2">
                   <Icon icon="heroicons:magnifying-glass" className="text-indigo-600" />
-                  My Assigned Jobs
+                  Active Sourcing Requisitions
                 </CardTitle>
-                <CardDescription className="text-xs mt-1">Select a job order to submit candidates.</CardDescription>
+                <CardDescription className="text-xs mt-1">Select an active job requisition to post candidate profiles.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="p-0">
               {activeJobs.length === 0 ? (
-                <div className="p-12 text-center text-sm text-default-400">No jobs to source for at the moment.</div>
+                <div className="p-12 text-center text-xs text-default-400">No active job requirements assigned at the moment.</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="bg-default-50 border-b border-default-200">
-                        <th className="py-4 px-5 text-xs font-bold text-default-700 uppercase tracking-wider">Code / Job Title</th>
-                        <th className="py-4 px-5 text-xs font-bold text-default-700 uppercase tracking-wider">Client</th>
-                        <th className="py-4 px-5 text-xs font-bold text-default-700 uppercase tracking-wider">Primary Skills</th>
-                        <th className="py-4 px-5 text-xs font-bold text-default-700 uppercase tracking-wider">Pay Rate</th>
-                        <th className="py-4 px-5 text-xs font-bold text-default-700 uppercase tracking-wider text-right">Actions</th>
+                      <tr className="bg-default-50 border-b border-default-200 text-default-700 font-bold uppercase tracking-wider">
+                        <th className="py-3 px-4">Job Title & Code</th>
+                        <th className="py-3 px-4">Client</th>
+                        <th className="py-3 px-4">Budget / Pay Rate</th>
+                        <th className="py-3 px-4 text-center">Done / Target</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-default-100">
                       {activeJobs.slice(0, 10).map((job) => (
-                        <tr key={job.id} className="hover:bg-default-50/70 transition-colors text-sm group">
-                          <td className="py-4 px-5">
+                        <tr key={job.id} className="hover:bg-default-50/70 transition-colors">
+                          <td className="py-3.5 px-4">
                             <div className="font-bold text-default-900">{job.jobTitle}</div>
-                            <div className="text-xs text-default-500 font-mono mt-0.5">{job.jobCode}</div>
+                            <div className="text-[10px] text-indigo-600 font-mono mt-0.5">{job.jobCode}</div>
                           </td>
-                          <td className="py-4 px-5 text-default-700 font-medium">{job.client || "N/A"}</td>
-                          <td className="py-4 px-5">
-                            <div className="flex flex-wrap gap-1.5 max-w-[200px]">
-                              {job.skillsRequired?.slice(0, 3).map((skill: string, index: number) => (
-                                <Badge key={index} className="bg-default-100 text-default-700 border-default-200 font-semibold px-2 py-0.5 text-[10px] uppercase tracking-wider">
-                                  {skill}
-                                </Badge>
-                              )) || <span className="text-xs text-default-400">Not specified</span>}
-                            </div>
-                          </td>
-                          <td className="py-4 px-5 font-bold text-default-855">
+                          <td className="py-3.5 px-4 text-default-700 font-medium">{job.client || "Client Requisition"}</td>
+                          <td className="py-3.5 px-4 font-bold text-default-800">
                             {(() => {
                               const rate = job.payRate;
-                              if (!rate || rate === "N/A") return "N/A";
+                              if (!rate || rate === "N/A") return "Standard";
                               if (/[a-zA-Z$₹]/.test(rate)) return rate;
                               return (job.market || "US") === "IN" ? `INR - ${rate} LPA` : `USD - $${rate}/hr`;
                             })()}
                           </td>
-                          <td className="py-4 px-5 text-right">
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300 font-bold transition-all shadow-sm"
-                              onClick={() => setSelectedJobForCV(job)}
-                            >
-                              <Icon icon="heroicons:plus-circle" className="mr-1.5 h-4 w-4" />
-                              Source / Add CV
-                            </Button>
+                          <td className="py-3.5 px-4 text-center font-extrabold text-indigo-600">
+                            {job.submissionDone || 0} / {job.submissionRequired || 5}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button 
+                                size="sm" 
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] h-7 px-2.5 shadow-xs"
+                                onClick={() => setSelectedJobForCV(job)}
+                              >
+                                + Add CV
+                              </Button>
+                              <Link href={`/job-posting/${job.id}/matches`}>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="text-purple-600 border-purple-200 hover:bg-purple-50 font-bold text-[11px] h-7 px-2"
+                                >
+                                  AI Match
+                                </Button>
+                              </Link>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1295,44 +1723,38 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
           </Card>
         </div>
 
-        {/* Right pane: My Submissions Tracker */}
+        {/* Right Pane: My Recent Submissions Live Feed */}
         <div className="xl:col-span-4">
-          <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl h-full">
-            <CardHeader className="border-b border-default-100 pb-4 flex flex-row items-center justify-between">
+          <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-xl h-full flex flex-col justify-between">
+            <CardHeader className="border-b border-default-100 pb-4 px-5 flex flex-row items-center justify-between">
               <CardTitle className="text-base font-bold text-default-900 flex items-center gap-2">
                 <Icon icon="heroicons:document-check" className="text-emerald-500" />
-                My Submissions Tracker
+                My Active Pipeline
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-0 flex-1">
               {loadingSubs ? (
-                <div className="p-6 text-center text-sm text-default-400">Loading tracker...</div>
+                <div className="p-6 text-center text-xs text-default-400">Loading submissions...</div>
               ) : mySubmissions.length === 0 ? (
-                <div className="p-8 text-center text-sm text-default-400">No submissions yet. Start sourcing!</div>
+                <div className="p-8 text-center text-xs text-default-400">No candidate submissions recorded yet.</div>
               ) : (
-                <div className="max-h-[500px] overflow-y-auto">
-                  <table className="w-full text-left border-collapse">
-                    <tbody className="divide-y divide-default-100">
-                      {mySubmissions.map((sub) => (
-                        <tr key={sub.id} className="hover:bg-default-50/50 transition-colors text-xs">
-                          <td className="py-3 px-4 font-semibold text-default-900">
-                            {sub.candidate?.firstName} {sub.candidate?.lastName}
-                            <div className="text-[10px] text-default-500 font-mono mt-0.5">{sub.job?.jobCode}</div>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <Badge className={`px-2 py-0.5 text-[9px] font-bold ${
-                              sub.finalStatus === "PENDING_APPROVAL" ? "bg-amber-100 text-amber-800" :
-                              sub.finalStatus === "SUBMITTED" ? "bg-blue-100 text-blue-800" :
-                              sub.finalStatus === "REJECTED" ? "bg-red-100 text-red-800" :
-                              "bg-emerald-100 text-emerald-800"
-                            }`}>
-                              {sub.finalStatus?.replace("_", " ") || "SUBMITTED"}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="max-h-[480px] overflow-y-auto divide-y divide-default-100">
+                  {mySubmissions.slice(0, 10).map((sub) => (
+                    <div key={sub.id} className="p-3.5 hover:bg-default-50/50 transition-colors flex items-center justify-between gap-2 text-xs">
+                      <div>
+                        <p className="font-bold text-default-900">{sub.candidateName || `Candidate #${sub.candidateId}`}</p>
+                        <p className="text-[10px] text-default-400 font-mono mt-0.5">{sub.jobCode || "Requirement"}</p>
+                      </div>
+                      <Badge className={`px-2 py-0.5 text-[9px] font-bold ${
+                        sub.finalStatus === "PENDING_APPROVAL" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" :
+                        sub.finalStatus === "SUBMITTED" || sub.finalStatus === "POD_APPROVED" ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" :
+                        sub.finalStatus === "REJECTED" ? "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300" :
+                        "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                      }`}>
+                        {sub.finalStatus?.replace("_", " ") || "SUBMITTED"}
+                      </Badge>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -1340,7 +1762,7 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
         </div>
       </div>
 
-      {/* Add CV Modal */}
+      {/* Candidate CV Upload Modal */}
       <AddCandidateModal 
         isOpen={!!selectedJobForCV} 
         onClose={() => setSelectedJobForCV(null)} 

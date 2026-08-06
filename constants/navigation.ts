@@ -16,6 +16,12 @@ import {
   Database,
   Globe,
   HelpCircle,
+  Shield,
+  Activity,
+  Cpu,
+  Lock,
+  Server,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 
@@ -84,13 +90,12 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
     href: "/applicants",
     icon: Users,
     children: [
-      { label: "Add Candidate", href: "/applicants/new" },
-      { label: "Bulk CV Upload", href: "/applicants/bulk" },
-      { label: "All Candidates", href: "/applicants/all" },
+      { label: "All Applicants", href: "/applicants/all" },
+      { label: "US IT Candidate Search", href: "/applicants/resume-search/usit" },
+      { label: "Domestic Candidate Search", href: "/applicants/resume-search/domestic" },
+      { label: "Individual Resume Import", href: "/applicants/new" },
+      { label: "Batch Resume Parsing Engine", href: "/applicants/bulk" },
       { label: "Pipeline View", href: "/applicants/pipeline" },
-      { label: "Resume Search", href: "/applicants/resume-search" },
-      { label: "Interviews", href: "/applicants/interviews" },
-      { label: "Offers", href: "/applicants/offers" },
     ],
   },
   {
@@ -183,11 +188,68 @@ export const MORE_NAV_ITEMS: NavItem[] = [
   { id: "database", label: "Database", href: "/database", icon: Database },
   { id: "integrations", label: "Integrations", href: "/integrations", icon: Globe },
   { id: "tenant-management", label: "Tenant Management", href: "/utility/approvals", icon: Building2 },
+  { id: "user-management", label: "User & Team Roster", href: "/utility/users", icon: Users },
+  { id: "branch-management", label: "Branch & Office Locations", href: "/utility/branches", icon: MapPin },
   { id: "role-management", label: "Role Management", href: "/utility/roles-permissions", icon: UserCheck },
   { id: "pod-management", label: "Recruitment Pods", href: "/utility/pods", icon: Users },
   { id: "dictionaries", label: "Master Dictionaries", href: "/utility/dictionaries", icon: Database },
   { id: "settings", label: "Settings", href: "/company", icon: Settings },
   { id: "help", label: "Help & Support", href: "/help", icon: HelpCircle },
+];
+
+// ─────────────────────────────────────────────
+// Dedicated Global Admin (SUPER_ADMIN) Navigation
+// ─────────────────────────────────────────────
+
+export const GLOBAL_ADMIN_NAV_ITEMS: NavItem[] = [
+  {
+    id: "dashboard",
+    label: "Platform Command Center",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    id: "tenant-management",
+    label: "Tenants & Workspace Approvals",
+    href: "/utility/approvals",
+    icon: Building2,
+    children: [
+      { label: "Pending Approvals & Tenants", href: "/utility/approvals" },
+      { label: "Branch Office Locations", href: "/utility/branches" },
+      { label: "Business Units & Depts", href: "/utility/business-units" },
+    ],
+  },
+  {
+    id: "security-audit",
+    label: "Cross-Tenant Security Audit Logs",
+    href: "/utility/audit-logs",
+    icon: Shield,
+  },
+  {
+    id: "ai-dictionaries",
+    label: "Master AI Skill Dictionaries",
+    href: "/utility/dictionaries",
+    icon: Cpu,
+  },
+  {
+    id: "global-rbac",
+    label: "Global Roles & Permissions",
+    href: "/utility/roles-permissions",
+    icon: Lock,
+  },
+  {
+    id: "recruitment-pods",
+    label: "Recruitment Pods",
+    href: "/utility/pods",
+    icon: Users,
+  },
+];
+
+export const GLOBAL_ADMIN_MORE_ITEMS: NavItem[] = [
+  { id: "email-integration", label: "Mass Mail & OAuth Accounts", href: "/email", icon: Mail },
+  { id: "system-settings", label: "Platform Global Settings", href: "/company", icon: Settings },
+  { id: "reports-analytics", label: "Platform Usage Analytics", href: "/reports", icon: BarChart3 },
+  { id: "help-support", label: "Admin Help & Documentation", href: "/help", icon: HelpCircle },
 ];
 
 // ─────────────────────────────────────────────

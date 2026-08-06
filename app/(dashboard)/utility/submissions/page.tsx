@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ScheduleInterviewModal } from "@/components/interviews/schedule-interview-modal";
 
 interface Submission {
   id: number;
@@ -131,6 +138,10 @@ export default function SubmissionsPage() {
   // Edit panel state
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+
+  // Interview Schedule Modal state
+  const [interviewModalOpen, setInterviewModalOpen] = useState(false);
+  const [selectedSubForInterview, setSelectedSubForInterview] = useState<any>(null);
 
   // Form fields state
   const [l1Status, setL1Status] = useState<any>("");
@@ -509,7 +520,7 @@ export default function SubmissionsPage() {
               <table className="w-full text-left border-collapse min-w-[1200px]">
                 <thead>
                   <tr className="bg-default-50/50 dark:bg-slate-800/20 border-b border-default-150">
-                    {["Job Requisition", "Account Manager", "Recruiter", "Candidate Details", "Pay Rate", "Pipeline Progress", "Status", "Remarks / Feedback", "Sourced On"].map((h) => (
+                    {["Job Requisition", "Account Manager", "Recruiter", "Candidate Details", "Pay Rate", "Pipeline Progress", "Status", "Remarks / Feedback", "Sourced On", "Actions"].map((h) => (
                       <th key={h} className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">
                         {h}
                       </th>
@@ -519,7 +530,7 @@ export default function SubmissionsPage() {
                 <tbody className="divide-y divide-default-100 text-xs">
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="py-16 text-center text-default-500 font-semibold italic">
+                      <td colSpan={10} className="py-16 text-center text-default-500 font-semibold italic">
                         <div className="flex flex-col items-center gap-3">
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
                           <span>Loading candidate submissions…</span>
@@ -528,7 +539,7 @@ export default function SubmissionsPage() {
                     </tr>
                   ) : submissions.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-16 text-center text-default-500 font-semibold italic">
+                      <td colSpan={10} className="py-16 text-center text-default-500 font-semibold italic">
                         <div className="flex flex-col items-center gap-3">
                           <Icon icon="heroicons:clipboard-document-check" className="h-10 w-10 text-default-300" />
                           <span>No submissions match your query.</span>
@@ -587,6 +598,16 @@ export default function SubmissionsPage() {
                                 {sub.candidateCurrentLocation}
                               </div>
                             )}
+                            <div 
+                              className="inline-flex items-center gap-1 mt-1.5 text-[9px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors w-fit"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate");
+                              }}
+                            >
+                              <Icon icon="heroicons:document-arrow-down" className="h-3 w-3" />
+                              View / Download CV
+                            </div>
                           </div>
                         </td>
 
@@ -665,6 +686,55 @@ export default function SubmissionsPage() {
                         <td className="py-4 px-4 whitespace-nowrap text-default-500 font-medium">
                           {new Date(sub.createdAt).toLocaleDateString()}
                         </td>
+
+                        {/* Actions (Kebab Menu) */}
+                        <td className="py-4 px-4 whitespace-nowrap text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-default-500 hover:text-default-900 rounded-full"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Icon icon="heroicons:ellipsis-vertical" className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-36 rounded-xl shadow-lg border-default-200">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditPanel(sub);
+                                }}
+                                className="text-xs cursor-pointer gap-2 font-medium"
+                              >
+                                <Icon icon="heroicons:pencil-square" className="h-4 w-4 text-indigo-500" />
+                                Edit status
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSubForInterview(sub);
+                                  setInterviewModalOpen(true);
+                                }}
+                                className="text-xs cursor-pointer gap-2 font-medium"
+                              >
+                                <Icon icon="heroicons:calendar-days" className="h-4 w-4 text-purple-500" />
+                                Schedule Interview
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate");
+                                }}
+                                className="text-xs cursor-pointer gap-2 font-medium"
+                              >
+                                <Icon icon="heroicons:document-arrow-down" className="h-4 w-4 text-emerald-500" />
+                                View Details (CV)
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -687,14 +757,14 @@ export default function SubmissionsPage() {
                 title: "Submitted",
                 color: "border-t-blue-500 bg-blue-50/10 dark:bg-blue-950/5",
                 badge: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-                subs: submissions.filter(s => s.finalStatus === "SUBMITTED" && s.l2Status !== "SCHEDULED" && s.l3Status !== "SCHEDULED" && s.l1Status !== "REJECTED" && s.l2Status !== "REJECTED" && s.l3Status !== "REJECTED"),
+                subs: submissions.filter(s => (s.finalStatus === "SUBMITTED" || (s.finalStatus as string) === "POD_APPROVED") && s.l1Status !== "SCHEDULED" && s.l2Status !== "SCHEDULED" && s.l3Status !== "SCHEDULED" && s.l1Status !== "REJECTED" && s.l2Status !== "REJECTED" && s.l3Status !== "REJECTED"),
               },
               {
                 id: "interviews",
                 title: "Interviews",
                 color: "border-t-cyan-500 bg-cyan-50/10 dark:bg-cyan-950/5",
                 badge: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300",
-                subs: submissions.filter(s => (s.l2Status === "SCHEDULED" || s.l3Status === "SCHEDULED" || s.l2Status === "CLEARED" || s.l3Status === "PENDING") && s.finalStatus !== "OFFER" && s.finalStatus !== "JOIN" && s.finalStatus !== "REJECTED" && s.l1Status !== "REJECTED" && s.l2Status !== "REJECTED" && s.l3Status !== "REJECTED"),
+                subs: submissions.filter(s => (s.l1Status === "SCHEDULED" || (s.l1Status as string) === "PASSED" || s.l1Status === "CLEARED" || s.l2Status === "SCHEDULED" || (s.l2Status as string) === "PASSED" || s.l2Status === "CLEARED" || s.l3Status === "SCHEDULED" || (s.l3Status as string) === "PASSED" || s.l3Status === "CLEARED" || (s.finalStatus && s.finalStatus.includes("PASSED"))) && s.finalStatus !== "OFFER" && s.finalStatus !== "JOIN" && s.finalStatus !== "REJECTED"),
               },
               {
                 id: "offers",
@@ -708,7 +778,7 @@ export default function SubmissionsPage() {
                 title: "Joined",
                 color: "border-t-emerald-500 bg-emerald-50/10 dark:bg-emerald-950/5",
                 badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
-                subs: submissions.filter(s => s.finalStatus === "JOIN"),
+                subs: submissions.filter(s => s.finalStatus === "JOIN" || (s.finalStatus as string) === "PLACED"),
               },
               {
                 id: "rejected",
@@ -1252,6 +1322,13 @@ export default function SubmissionsPage() {
           </div>
         </form>
       </div>
+      {/* Schedule Interview Modal */}
+      <ScheduleInterviewModal
+        isOpen={interviewModalOpen}
+        onClose={() => setInterviewModalOpen(false)}
+        submission={selectedSubForInterview}
+        onSuccess={loadData}
+      />
     </div>
   );
 }

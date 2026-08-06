@@ -3,9 +3,13 @@
 import {
   PRIMARY_NAV_ITEMS,
   MORE_NAV_ITEMS,
+  GLOBAL_ADMIN_NAV_ITEMS,
+  GLOBAL_ADMIN_MORE_ITEMS,
 } from "@/constants/navigation";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
+import { useSession } from "next-auth/react";
+import { atsApi } from "@/lib/ats-api";
 import { MobileNavbar } from "./mobile-navbar";
 import { NavbarMenu } from "./navbar-menu";
 import { NavbarRight } from "./navbar-right";
@@ -14,6 +18,16 @@ import { NavbarSearch } from "./navbar-search";
 
 export function TopNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { data: session } = useSession();
+  
+  const currentUser = typeof window !== 'undefined' ? atsApi.auth.getCurrentUser() : null;
+  const user = session?.user || currentUser;
+  const isSuperAdmin = 
+    (user as any)?.roles?.includes("SUPER_ADMIN") || 
+    (user as any)?.systemRole === "SUPER_ADMIN";
+
+  const navItems = isSuperAdmin ? GLOBAL_ADMIN_NAV_ITEMS : PRIMARY_NAV_ITEMS;
+  const navMoreItems = isSuperAdmin ? GLOBAL_ADMIN_MORE_ITEMS : MORE_NAV_ITEMS;
 
   return (
     <>
@@ -47,8 +61,8 @@ export function TopNavbar() {
             "
           >
             <NavbarMenu
-              items={PRIMARY_NAV_ITEMS}
-              moreItems={MORE_NAV_ITEMS}
+              items={navItems}
+              moreItems={navMoreItems}
             />
           </nav>
 
@@ -90,8 +104,8 @@ export function TopNavbar() {
       <MobileNavbar
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
-        primaryItems={PRIMARY_NAV_ITEMS}
-        moreItems={MORE_NAV_ITEMS}
+        primaryItems={navItems}
+        moreItems={navMoreItems}
       />
     </>
   );

@@ -31,6 +31,7 @@ import {
   XCircle,
   Eye,
   Lock,
+  Upload,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { atsApi } from "@/lib/ats-api";
 import { mapApiJobToJob, type Job } from "../data/mock-jobs";
 import toast from "react-hot-toast";
+import { ScheduleInterviewModal } from "@/components/interviews/schedule-interview-modal";
 
 const TIER_STYLES: Record<string, { chip: string; label: string; text: string }> = {
   Strong: { chip: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900", label: "Strong Match", text: "text-emerald-600 dark:text-emerald-400" },
@@ -87,6 +89,7 @@ export default function JobDetailPage() {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [aiMatches, setAiMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [matchesLoading, setMatchesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"details" | "pipeline" | "matches">("details");
   const [pipelineView, setPipelineView] = useState<"list" | "kanban">("list");
@@ -128,30 +131,55 @@ export default function JobDetailPage() {
   const [matchRate, setMatchRate] = useState("");
   const [matchComment, setMatchComment] = useState("");
 
+  // Interview Schedule Modal state
+  const [interviewModalOpen, setInterviewModalOpen] = useState(false);
+  const [selectedSubForInterview, setSelectedSubForInterview] = useState<any>(null);
+
+  // Direct Upload & Submit Candidate modal state
+  const [uploadSubmitOpen, setUploadSubmitOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadSource, setUploadSource] = useState("Dice Sourcing");
+  const [uploadRate, setUploadRate] = useState("");
+  const [uploadComment, setUploadComment] = useState("");
+  const [uploadingCv, setUploadingCv] = useState(false);
+
+  const loadMatches = useCallback(async () => {
+    if (!id) return;
+    setMatchesLoading(true);
+    try {
+      const matchesData = await atsApi.jobs.matches(id, { limit: 15 });
+      if (matchesData && matchesData.matches) {
+        setAiMatches(matchesData.matches);
+      }
+    } catch (err) {
+      console.error("Failed to load AI matches:", err);
+    } finally {
+      setMatchesLoading(false);
+    }
+  }, [id]);
+
   const loadData = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     setError(null);
     try {
-      // Fetch details, submissions, and matches in parallel
-      const [jobData, subsData, matchesData] = await Promise.all([
+      const [jobData, subsData] = await Promise.all([
         atsApi.jobs.get(id),
         atsApi.submissions.list({ jobId: id }),
-        atsApi.jobs.matches(id, { limit: 15 }).catch(() => null), // fail gracefully
       ]);
 
       setJob(mapApiJobToJob(jobData));
       setSubmissions(Array.isArray(subsData) ? subsData : subsData?.data || []);
-      if (matchesData && matchesData.matches) {
-        setAiMatches(matchesData.matches);
-      }
+      
+      // Fetch matches asynchronously so it doesn't block UI load
+      loadMatches();
     } catch (err: any) {
       console.error("Failed to load job order details:", err);
       setError(err.message || "Failed to load job order details.");
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, loadMatches]);
 
   useEffect(() => {
     loadData();
@@ -259,6 +287,42 @@ export default function JobDetailPage() {
     }
   };
 
+  const handleUploadAndSubmitCandidate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadFile || !job) {
+      toast.error("Please select a CV file to upload.");
+      return;
+    }
+
+    setUploadingCv(true);
+    try {
+      // 1. Upload & Parse CV -> creates Candidate Profile & saves binary CV file
+      const res = await atsApi.candidates.uploadCv(uploadFile, uploadSource);
+      const candidate = res.candidate;
+
+      // 2. Submit candidate to this active Requisition Pipeline
+      await atsApi.submissions.create({
+        candidateId: candidate.id,
+        jobId: job.id,
+        recruiterId: currentUser?.dbId || currentUser?.keycloakId || "system",
+        finalStatus: "PENDING_APPROVAL",
+        submittedRate: uploadRate.trim() || null,
+        recruiterComment: uploadComment.trim() || null,
+      });
+
+      toast.success(`Candidate ${candidate.fullName || ""} parsed & submitted to pipeline!`);
+      setUploadSubmitOpen(false);
+      setUploadFile(null);
+      setUploadRate("");
+      setUploadComment("");
+      loadData();
+    } catch (err: any) {
+      toast.error("Failed to upload & submit: " + err.message);
+    } finally {
+      setUploadingCv(false);
+    }
+  };
+
   const handleDownloadResume = async (candId: number, name: string) => {
     try {
       const blob = await atsApi.candidates.fetchResumeBlob(candId);
@@ -301,66 +365,77 @@ export default function JobDetailPage() {
   const totalSubCount = submissions.length;
   const pendingReviewCount = submissions.filter((s) => s.finalStatus === "PENDING_APPROVAL").length;
   const clientSubmittedCount = submissions.filter((s) => s.finalStatus === "SUBMITTED").length;
-  const interviewedCount = submissions.filter((s) => s.l1Status === "CLEARED" || s.l2Status === "CLEARED" || s.l3Status === "CLEARED").length;
+  const interviewedCount = submissions.filter((s) => s.l1Status === "PASSED" || s.l1Status === "CLEARED" || s.l2Status === "PASSED" || s.l2Status === "CLEARED" || s.l3Status === "PASSED" || s.l3Status === "CLEARED" || (s.finalStatus && s.finalStatus.includes("PASSED"))).length;
   const offeredCount = submissions.filter((s) => s.finalStatus === "OFFER").length;
-  const placedCount = submissions.filter((s) => s.finalStatus === "JOIN").length;
+  const placedCount = submissions.filter((s) => s.finalStatus === "JOIN" || s.finalStatus === "PLACED").length;
   const rejectedCount = submissions.filter((s) => s.finalStatus === "REJECTED").length;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-neutral-50 dark:bg-slate-955 font-sans p-4 space-y-4">
       
       {/* TOP HEADER CONTROLS */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0">
-        <div>
-          <button
-            onClick={() => router.push("/job-posting")}
-            className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-250 transition-all cursor-pointer bg-transparent border-0 mb-1"
-          >
-            <ChevronLeft className="h-4 w-4" /> Back to Job Orders
-          </button>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-extrabold text-neutral-850 dark:text-neutral-100 flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-indigo-650" /> {job.jobTitle}
-            </h1>
-            <code className="text-xs font-mono bg-neutral-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-neutral-200 dark:border-slate-700 text-neutral-600 font-bold">
-              {job.jobCode}
-            </code>
-            <Badge
-              className={`text-[9px] uppercase tracking-wide font-extrabold shadow-none border-none py-0.5 px-2 ${
-                job.jobStatus === "Active"
-                  ? "bg-emerald-100 text-emerald-800"
-                  : job.jobStatus === "Closed" || job.jobStatus === "Close"
-                  ? "bg-rose-100 text-rose-800"
-                  : "bg-amber-100 text-amber-800"
-              }`}
+      <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm shrink-0 mb-2">
+        <CardContent className="p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex gap-4 items-start">
+            <button
+              onClick={() => router.push("/job-posting")}
+              className="mt-1 flex items-center justify-center w-8 h-8 rounded-full border border-neutral-200 dark:border-slate-700 text-neutral-500 hover:bg-neutral-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
-              {job.jobStatus}
-            </Badge>
-            <Badge className="bg-indigo-50 text-indigo-700 border-none font-bold text-[9px] py-0.5 px-2">
-              🔥 {job.priority || "Warm"}
-            </Badge>
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <code className="text-[10px] font-mono bg-neutral-100 dark:bg-slate-800 px-2 py-0.5 rounded text-neutral-600 dark:text-neutral-300 font-bold border border-neutral-200 dark:border-slate-700">
+                  {job.jobCode}
+                </code>
+                <Badge
+                  className={`text-[9px] uppercase tracking-wide font-extrabold shadow-none border-none py-0.5 px-2 ${
+                    job.jobStatus === "Active"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : job.jobStatus === "Closed" || job.jobStatus === "Close"
+                      ? "bg-rose-100 text-rose-800"
+                      : "bg-amber-100 text-amber-800"
+                  }`}
+                >
+                  {job.jobStatus}
+                </Badge>
+                <Badge className="bg-rose-50 text-rose-600 border-none font-bold text-[9px] py-0.5 px-2 flex items-center gap-1">
+                  🔥 {job.priority || "Warm"}
+                </Badge>
+              </div>
+              <h1 className="text-xl font-black text-neutral-900 dark:text-white mb-2">
+                {job.jobTitle}
+              </h1>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-neutral-500 font-medium">
+                <span className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-neutral-400" /> {job.client} {job.clientJobId !== "N/A" ? `→ ${job.clientJobId}` : ""}</span>
+                <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-neutral-400" /> {job.location || "Remote"}</span>
+                <span className="flex items-center gap-1.5"><Briefcase className="h-3.5 w-3.5 text-neutral-400" /> {job.jobType || "Contract"}</span>
+                <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5 text-neutral-400" /> {job.visaType || "ALL_VISA"}</span>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-neutral-500 font-medium">
-            <span className="flex items-center gap-1"><Building2 className="h-3.5 w-3.5" /> {job.client} {job.clientJobId !== "N/A" ? `(${job.clientJobId})` : ""}</span>
-            <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {job.location || "Remote"}</span>
-            <span className="flex items-center gap-1"><CreditCard className="h-3.5 w-3.5" /> {job.visaType || "Any work authorization"}</span>
-            <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> Aging: {job.agingDays} days</span>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={loadData} className="border-neutral-250 text-xs font-semibold">
-            <RefreshCw className="h-3.5 w-3.5" />
-          </Button>
-          {hasEditPermission && (
-            <Link href={`/job-posting/${job.id}/edit`}>
-              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-1">
-                <Pencil className="h-3.5 w-3.5" /> Edit Requirement
-              </Button>
-            </Link>
-          )}
-        </div>
-      </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={loadData} className="border-neutral-250 text-xs font-semibold h-9">
+              <RefreshCw className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setUploadSubmitOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 text-xs"
+            >
+              <Upload className="h-3.5 w-3.5" /> Upload & Submit CV
+            </Button>
+            {hasEditPermission && (
+              <Link href={`/job-posting/${job.id}/edit`}>
+                <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9">
+                  <Pencil className="h-3.5 w-3.5" /> Edit Job
+                </Button>
+              </Link>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* TABS NAVIGATION BAR (Ceipal style) */}
       <div className="flex border-b border-neutral-200 dark:border-slate-800 shrink-0 select-none">
@@ -392,7 +467,7 @@ export default function JobDetailPage() {
               : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100/50"
           }`}
         >
-          <Sparkles className="h-4 w-4" /> AI Candidate Matches ({aiMatches.length})
+          <Sparkles className="h-4 w-4" /> AI Candidate Matches {matchesLoading ? <Loader2 className="h-3 w-3 animate-spin ml-1" /> : `(${aiMatches.length})`}
         </button>
       </div>
 
@@ -401,161 +476,160 @@ export default function JobDetailPage() {
 
         {/* TAB 1: JOB REQUISITION DETAILS */}
         {activeTab === "details" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+          <div className="space-y-4">
             
-            {/* Left Description area */}
-            <div className="lg:col-span-8 space-y-4">
-              <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none">
-                <CardContent className="p-5 space-y-4">
-                  <h2 className="text-sm font-bold text-neutral-800 dark:text-white flex items-center gap-2 border-b border-neutral-100 dark:border-slate-800 pb-2">
-                    <FileText className="h-4 w-4 text-indigo-500" /> Job Description / Scope of Work
-                  </h2>
-                  {job.jobDescription ? (
-                    <div
-                      className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed max-w-none prose dark:prose-invert prose-xs"
-                      dangerouslySetInnerHTML={{ __html: job.jobDescription }}
-                    />
-                  ) : (
-                    <p className="text-xs text-neutral-450 italic">No job description provided.</p>
-                  )}
-                </CardContent>
-              </Card>
+            {/* TOP STATS CARDS (US IT Template) */}
+            <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm p-5">
+              <div className="grid grid-cols-4 gap-4 mb-4">
+                <div className="flex flex-col items-center justify-center p-4 bg-neutral-50 dark:bg-slate-850 rounded-sm border border-neutral-100 dark:border-slate-800">
+                  <span className="text-2xl font-black text-neutral-800 dark:text-white">{job.noOfPositions}</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-450 mt-1">Positions</span>
+                </div>
+                <div className="flex flex-col items-center justify-center p-4 bg-neutral-50 dark:bg-slate-850 rounded-sm border border-neutral-100 dark:border-slate-800">
+                  <span className="text-2xl font-black text-neutral-800 dark:text-white">{submissions.length}</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-450 mt-1">Submitted</span>
+                </div>
+                <div className="flex flex-col items-center justify-center p-4 bg-neutral-50 dark:bg-slate-850 rounded-sm border border-neutral-100 dark:border-slate-800">
+                  <span className="text-2xl font-black text-neutral-800 dark:text-white">{job.submissionRequired}</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-450 mt-1">Required</span>
+                </div>
+                <div className="flex flex-col items-center justify-center p-4 bg-neutral-50 dark:bg-slate-850 rounded-sm border border-neutral-100 dark:border-slate-800">
+                  <span className="text-2xl font-black text-neutral-800 dark:text-white">{job.agingDays}d</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-450 mt-1">CFR Age</span>
+                </div>
+              </div>
+              
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
+                  <span>Submission Progress</span>
+                  <span>{Math.min(100, Math.round((submissions.length / (job.submissionRequired || 1)) * 100))}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-neutral-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-emerald-500 dark:bg-emerald-400 rounded-full transition-all duration-500" 
+                    style={{ width: `${Math.min(100, Math.round((submissions.length / (job.submissionRequired || 1)) * 100))}%` }} 
+                  />
+                </div>
+              </div>
+            </Card>
 
-              {job.skillsRequired && job.skillsRequired.length > 0 && (
-                <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none">
-                  <CardContent className="p-5">
-                    <h2 className="text-sm font-bold text-neutral-800 dark:text-white mb-3">Required Technical Skills</h2>
-                    <div className="flex flex-wrap gap-1.5">
-                      {job.skillsRequired.map((skill) => (
-                        <span
-                          key={skill}
-                          className="px-2 py-0.5 text-xs font-semibold rounded-md border bg-indigo-50/20 text-indigo-700 border-indigo-100 dark:bg-indigo-950/20 dark:text-indigo-300 dark:border-indigo-850"
-                        >
-                          {skill}
-                        </span>
-                      ))}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+              
+              {/* Left Description area */}
+              <div className="lg:col-span-8 space-y-4">
+                <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm">
+                  <CardContent className="p-5 space-y-4">
+                    <h2 className="text-sm font-bold text-neutral-800 dark:text-white flex items-center gap-2 border-b border-neutral-100 dark:border-slate-800 pb-2">
+                      <FileText className="h-4 w-4 text-indigo-500" /> Job Description
+                    </h2>
+                    {job.jobDescription ? (
+                      <div
+                        className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed max-w-none prose dark:prose-invert prose-xs"
+                        dangerouslySetInnerHTML={{ __html: job.jobDescription }}
+                      />
+                    ) : (
+                      <p className="text-xs text-neutral-450 italic">No job description provided.</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {job.skillsRequired && job.skillsRequired.length > 0 && (
+                  <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm">
+                    <CardContent className="p-5">
+                      <h2 className="text-sm font-bold text-neutral-800 dark:text-white mb-3">Required Technical Skills</h2>
+                      <div className="flex flex-wrap gap-1.5">
+                        {job.skillsRequired.map((skill) => (
+                          <span
+                            key={skill}
+                            className="px-2 py-0.5 text-xs font-semibold rounded-md border bg-indigo-50/20 text-indigo-700 border-indigo-100 dark:bg-indigo-950/20 dark:text-indigo-300 dark:border-indigo-850"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {/* Right Sidebar */}
+              <div className="lg:col-span-4 space-y-4">
+                
+                {/* Job Info */}
+                <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-sm">
+                  <CardContent className="p-5 space-y-4">
+                    <h3 className="text-xs font-bold text-neutral-800 dark:text-white">Job Info</h3>
+                    
+                    <div className="flex items-center gap-4 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-100 dark:border-slate-800">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white dark:bg-slate-800 shadow-sm border border-neutral-100 dark:border-slate-700 shrink-0">
+                        <DollarSign className="h-4 w-4 text-neutral-500" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-neutral-450 block tracking-wider mb-0.5">Pay Rate</span>
+                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 block">{job.payRate}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-100 dark:border-slate-800">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white dark:bg-slate-800 shadow-sm border border-neutral-100 dark:border-slate-700 shrink-0">
+                        <Zap className="h-4 w-4 text-neutral-500" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-neutral-450 block tracking-wider mb-0.5">Requirement Type</span>
+                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 block">{job.jobType || job.businessUnit}</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
-              )}
-            </div>
 
-            {/* Right Snapshot panel */}
-            <div className="lg:col-span-4 space-y-4">
-              
-              {/* Compensation rates */}
-              <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none">
-                <CardContent className="p-4 space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 border-b border-neutral-100 dark:border-slate-800 pb-1.5">Rates & Financials</h3>
-                  
-                  {/* Bill Rate (Locked for Recruiters) */}
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-neutral-500 font-medium">Client Bill Rate:</span>
-                    {isRecruiterOnly ? (
-                      <span className="font-semibold text-neutral-450 flex items-center gap-1.5 bg-neutral-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[10px]">
-                        <Lock className="h-3 w-3 text-neutral-400" /> Hidden (Recruiter)
-                      </span>
-                    ) : (
-                      <span className="font-extrabold text-neutral-800 dark:text-neutral-250 text-sm">
-                        {job.clientBillRate}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Pay Rate */}
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-neutral-500 font-medium">Target Pay Rate:</span>
-                    <span className="font-extrabold text-indigo-700 dark:text-indigo-400 text-sm">
-                      {job.payRate}
-                    </span>
-                  </div>
-
-                  {/* Profit Margin (Only visible to AMs/Admins) */}
-                  {!isRecruiterOnly && marginInfo && (
-                    <div className="pt-2 border-t border-dashed border-neutral-200 dark:border-slate-800 flex justify-between items-center text-xs">
-                      <span className="text-neutral-500 font-bold">Estimated Markup:</span>
-                      <div className="text-right">
-                        <span className="font-extrabold text-emerald-650 dark:text-emerald-450 block">
-                          +{marginInfo.value}
-                        </span>
-                        <span className="text-[10px] text-neutral-400 font-medium block">
-                          Margin: {marginInfo.percentage}
-                        </span>
+                {/* Client */}
+                <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-sm">
+                  <CardContent className="p-5 space-y-4">
+                    <h3 className="text-xs font-bold text-neutral-800 dark:text-white">Client</h3>
+                    
+                    <div className="flex items-center gap-4 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-100 dark:border-slate-800">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white dark:bg-slate-800 shadow-sm border border-neutral-100 dark:border-slate-700 shrink-0">
+                        <Building2 className="h-4 w-4 text-neutral-500" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-neutral-450 block tracking-wider mb-0.5">Client</span>
+                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 block">{job.client}</span>
                       </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                    
+                    {job.clientJobId && job.clientJobId !== "N/A" && (
+                      <div className="flex items-center gap-4 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-100 dark:border-slate-800">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white dark:bg-slate-800 shadow-sm border border-neutral-100 dark:border-slate-700 shrink-0">
+                          <Building2 className="h-4 w-4 text-neutral-500" />
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-neutral-450 block tracking-wider mb-0.5">End Client</span>
+                          <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 block">{job.clientJobId}</span>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-              {/* Assignments details */}
-              <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none">
-                <CardContent className="p-4 space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 border-b border-neutral-100 dark:border-slate-800 pb-1.5">Assignment & Scope</h3>
-                  
-                  <div className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-neutral-400 block">Account Manager</span>
-                    <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
-                      {job.recruitmentManager}
-                    </span>
-                  </div>
+                {/* Account Manager */}
+                <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-sm">
+                  <CardContent className="p-5 space-y-4">
+                    <h3 className="text-xs font-bold text-neutral-800 dark:text-white">Account Manager</h3>
+                    
+                    <div className="flex items-center gap-4 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-100 dark:border-slate-800">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white dark:bg-slate-800 shadow-sm border border-neutral-100 dark:border-slate-700 shrink-0">
+                        <UserPlus className="h-4 w-4 text-neutral-500" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-neutral-450 block tracking-wider mb-0.5">Account Manager</span>
+                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 block">{job.recruitmentManager}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  <div className="space-y-1 pt-1.5 border-t border-neutral-100 dark:border-slate-850">
-                    <span className="text-[10px] uppercase font-bold text-neutral-400 block">Primary Recruiter</span>
-                    <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
-                      {job.primaryRecruiter}
-                    </span>
-                  </div>
-
-                  {job.podName && (
-                    <div className="space-y-1 pt-1.5 border-t border-neutral-100 dark:border-slate-850">
-                      <span className="text-[10px] uppercase font-bold text-neutral-400 block">Assigned Pod Team</span>
-                      <span className="inline-flex items-center gap-1 bg-violet-50 dark:bg-violet-950/20 text-violet-755 dark:text-violet-400 border border-violet-100 dark:border-violet-900 px-2 py-0.5 rounded text-xs font-bold">
-                        <Users className="h-3.5 w-3.5" /> {job.podName}
-                      </span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Requirement Metadata */}
-              <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none">
-                <CardContent className="p-4 space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 border-b border-neutral-100 dark:border-slate-800 pb-1.5">Requirement Details</h3>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-[10px] text-neutral-450 block font-medium">Positions Open</span>
-                      <span className="font-bold text-neutral-800 dark:text-neutral-200">{job.noOfPositions}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-neutral-450 block font-medium">Submissions Required</span>
-                      <span className="font-bold text-neutral-800 dark:text-neutral-200">{job.submissionRequired}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-neutral-450 block font-medium">Job Category</span>
-                      <span className="font-bold text-neutral-800 dark:text-neutral-200">{job.businessUnit}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-neutral-450 block font-medium">Job Type</span>
-                      <span className="font-bold text-neutral-800 dark:text-neutral-200">{job.jobType}</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-neutral-100 dark:border-slate-850 grid grid-cols-2 gap-2 text-[10.5px]">
-                    <div>
-                      <span className="text-[9px] text-neutral-400 uppercase font-bold block">Posted On</span>
-                      <span className="font-semibold text-neutral-500 flex items-center gap-1 mt-0.5"><CalendarDays className="h-3.5 w-3.5 text-neutral-400" /> {job.createdOn}</span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-neutral-400 uppercase font-bold block">Last Updated</span>
-                      <span className="font-semibold text-neutral-500 flex items-center gap-1 mt-0.5"><Clock className="h-3.5 w-3.5 text-neutral-400" /> {job.modifiedOn}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
+              </div>
             </div>
-
           </div>
         )}
 
@@ -698,6 +772,17 @@ export default function JobDetailPage() {
                                   </Button>
                                 )}
                                 <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedSubForInterview(sub);
+                                    setInterviewModalOpen(true);
+                                  }}
+                                  className="h-7 text-[10px] font-bold border-neutral-300 text-indigo-650 hover:bg-indigo-50"
+                                >
+                                  <CalendarDays className="h-3 w-3 mr-1" /> Schedule
+                                </Button>
+                                <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate")}
@@ -722,10 +807,10 @@ export default function JobDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3 pb-4 overflow-x-auto min-w-max select-none">
                 {[
                   { id: "l1", title: "L1 Review", color: "border-t-amber-500 bg-amber-50/5", badge: "bg-amber-100 text-amber-800", subs: submissions.filter((s) => s.finalStatus === "PENDING_APPROVAL" && s.l1Status !== "REJECTED") },
-                  { id: "submitted", title: "Client Submitted", color: "border-t-blue-500 bg-blue-50/5", badge: "bg-blue-100 text-blue-800", subs: submissions.filter((s) => s.finalStatus === "SUBMITTED" && s.l2Status !== "SCHEDULED" && s.l3Status !== "SCHEDULED" && s.l1Status !== "REJECTED" && s.l2Status !== "REJECTED" && s.l3Status !== "REJECTED") },
-                  { id: "interviews", title: "Client Interviews", color: "border-t-cyan-500 bg-cyan-50/5", badge: "bg-cyan-100 text-cyan-800", subs: submissions.filter((s) => (s.l2Status === "SCHEDULED" || s.l3Status === "SCHEDULED" || s.l2Status === "CLEARED" || s.l3Status === "PENDING") && s.finalStatus !== "OFFER" && s.finalStatus !== "JOIN" && s.finalStatus !== "REJECTED" && s.l1Status !== "REJECTED" && s.l2Status !== "REJECTED" && s.l3Status !== "REJECTED") },
+                  { id: "submitted", title: "Client Submitted", color: "border-t-blue-500 bg-blue-50/5", badge: "bg-blue-100 text-blue-800", subs: submissions.filter((s) => (s.finalStatus === "SUBMITTED" || s.finalStatus === "POD_APPROVED") && s.l1Status !== "SCHEDULED" && s.l2Status !== "SCHEDULED" && s.l3Status !== "SCHEDULED" && s.l1Status !== "REJECTED" && s.l2Status !== "REJECTED" && s.l3Status !== "REJECTED") },
+                  { id: "interviews", title: "Client Interviews", color: "border-t-cyan-500 bg-cyan-50/5", badge: "bg-cyan-100 text-cyan-800", subs: submissions.filter((s) => (s.l1Status === "SCHEDULED" || s.l1Status === "PASSED" || s.l1Status === "CLEARED" || s.l2Status === "SCHEDULED" || s.l2Status === "PASSED" || s.l2Status === "CLEARED" || s.l3Status === "SCHEDULED" || s.l3Status === "PASSED" || s.l3Status === "CLEARED" || (s.finalStatus && s.finalStatus.includes("PASSED"))) && s.finalStatus !== "OFFER" && s.finalStatus !== "JOIN" && s.finalStatus !== "REJECTED") },
                   { id: "offers", title: "Offer Stage", color: "border-t-teal-500 bg-teal-50/5", badge: "bg-teal-100 text-teal-800", subs: submissions.filter((s) => s.finalStatus === "OFFER") },
-                  { id: "joined", title: "Placed / Joined", color: "border-t-emerald-500 bg-emerald-50/5", badge: "bg-emerald-100 text-emerald-800", subs: submissions.filter((s) => s.finalStatus === "JOIN") },
+                  { id: "joined", title: "Placed / Joined", color: "border-t-emerald-500 bg-emerald-50/5", badge: "bg-emerald-100 text-emerald-800", subs: submissions.filter((s) => s.finalStatus === "JOIN" || s.finalStatus === "PLACED") },
                   { id: "rejected", title: "Rejections", color: "border-t-rose-500 bg-rose-50/5", badge: "bg-rose-100 text-rose-800", subs: submissions.filter((s) => s.finalStatus === "REJECTED" || s.l1Status === "REJECTED" || s.l2Status === "REJECTED" || s.l3Status === "REJECTED") },
                 ].map((col) => (
                   <div
@@ -753,11 +838,25 @@ export default function JobDetailPage() {
                             <span className="text-neutral-400">{sub.submittedRate || "—"}</span>
                             {renderPipelineCircles(sub)}
                           </div>
+                          
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedSubForInterview(sub);
+                              setInterviewModalOpen(true);
+                            }}
+                            className="w-full mt-2 h-6 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 p-0"
+                          >
+                            <CalendarDays className="h-3 w-3 mr-1" /> Schedule Interview
+                          </Button>
                         </div>
                       ))}
                       {col.subs.length === 0 && (
-                        <div className="h-full flex items-center justify-center text-[10px] text-neutral-400 italic text-center pt-8">
-                          No profiles
+                        <div className="flex flex-col items-center justify-center text-[10px] text-neutral-400 font-medium text-center py-10 px-2 gap-1.5 border border-dashed border-neutral-200 dark:border-slate-800 rounded-lg my-2 bg-neutral-50/50 dark:bg-slate-850/20">
+                          <span className="font-bold text-neutral-500">No candidates in {col.title}</span>
+                          <span className="text-[9px] text-neutral-400">Click [+ Upload & Submit CV] above to add candidates from Dice/LinkedIn</span>
                         </div>
                       )}
                     </div>
@@ -1073,6 +1172,111 @@ export default function JobDetailPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Schedule Interview Modal */}
+      <ScheduleInterviewModal
+        isOpen={interviewModalOpen}
+        onClose={() => setInterviewModalOpen(false)}
+        submission={selectedSubForInterview}
+        onSuccess={loadData}
+      />
+
+      {/* DIRECT UPLOAD & SUBMIT CV DIALOG (Dice / LinkedIn / Portal Sourcing) */}
+      <Dialog open={uploadSubmitOpen} onOpenChange={setUploadSubmitOpen}>
+        <DialogContent className="sm:max-w-[480px] bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl p-0 overflow-hidden font-sans">
+          <div className="p-5 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850/40">
+            <div className="flex items-center gap-2">
+              <Badge className="bg-emerald-100 text-emerald-800 font-extrabold text-[10px] uppercase border-0 px-2 py-0.5">
+                1-Click Sourcing
+              </Badge>
+              <span className="text-[10px] font-mono text-neutral-500 font-bold">{job.jobCode}</span>
+            </div>
+            <DialogTitle className="text-lg font-black text-neutral-900 dark:text-white mt-1.5">
+              Upload CV & Submit Candidate
+            </DialogTitle>
+            <DialogDescription className="text-xs text-neutral-500 mt-0.5">
+              Upload a CV downloaded from Dice, LinkedIn, or Indeed to automatically parse & submit directly into this requisition pipeline.
+            </DialogDescription>
+          </div>
+
+          <form onSubmit={handleUploadAndSubmitCandidate} className="p-5 space-y-4 text-xs">
+            {/* File Dropzone */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-450">
+                Select Candidate Resume File (PDF / DOCX)
+              </label>
+              <div className="border-2 border-dashed border-neutral-300 dark:border-slate-700 hover:border-emerald-500 rounded-xl p-4 text-center bg-neutral-50/50 dark:bg-slate-850/50 transition-all">
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.doc"
+                  id="cv-upload-input"
+                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+                <label htmlFor="cv-upload-input" className="cursor-pointer flex flex-col items-center gap-1.5">
+                  <Upload className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                  <span className="font-bold text-neutral-700 dark:text-neutral-200">
+                    {uploadFile ? uploadFile.name : "Click to select or drop CV file"}
+                  </span>
+                  <span className="text-[10px] text-neutral-400">PDF, DOCX up to 15MB</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Sourcing Channel & Rate */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-450">Sourcing Source</label>
+                <select
+                  value={uploadSource}
+                  onChange={(e) => setUploadSource(e.target.value)}
+                  className="w-full h-9 border border-neutral-300 dark:border-slate-700 rounded-lg px-2.5 bg-transparent text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="Dice Sourcing">Dice Sourcing</option>
+                  <option value="LinkedIn Recruiter">LinkedIn Recruiter</option>
+                  <option value="Monster / Indeed">Monster / Indeed</option>
+                  <option value="CareerBuilder">CareerBuilder</option>
+                  <option value="Referral / Direct">Referral / Direct</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-450">Submitted / Expected Rate</label>
+                <Input
+                  placeholder="e.g. $70/hr or 14 LPA"
+                  value={uploadRate}
+                  onChange={(e) => setUploadRate(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Screening Comment */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-450">Screening Comment / Notes</label>
+              <textarea
+                rows={2}
+                placeholder="Initial screening remarks (e.g. Available immediately, 10+ yrs Java exp)..."
+                value={uploadComment}
+                onChange={(e) => setUploadComment(e.target.value)}
+                className="w-full p-2.5 border border-neutral-300 dark:border-slate-700 rounded-lg bg-transparent text-xs focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <DialogFooter className="pt-2 border-t border-neutral-100 dark:border-slate-800 gap-2">
+              <Button type="button" variant="outline" onClick={() => setUploadSubmitOpen(false)} className="text-xs h-9">
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={uploadingCv || !uploadFile}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs h-9 shadow-sm"
+              >
+                {uploadingCv ? "Parsing & Submitting..." : "Upload & Submit to Pipeline"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -15,7 +15,15 @@
 
 import { getTenantIdentifier } from '@/utils/subdomain-helper';
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('localhost', '127.0.0.1');
+function getApiBase(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined') {
+    return `http://localhost:5000`;
+  }
+  return 'http://127.0.0.1:5000';
+}
 
 // ─── Token Management ──────────────────────────────────────────────
 const TOKEN_KEY = 'ats_access_token';
@@ -58,6 +66,7 @@ async function apiFetch<T = any>(
   options: RequestInit = {},
 ): Promise<T> {
   const token = getToken();
+  const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
@@ -66,11 +75,24 @@ async function apiFetch<T = any>(
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+  if (activeBranchId) {
+    headers['x-branch-id'] = activeBranchId;
+  }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    const apiBase = getApiBase();
+    res = await fetch(`${apiBase}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (err: any) {
+    const apiBase = getApiBase();
+    if (err?.name === 'TypeError' || err?.message?.includes('fetch')) {
+      throw new Error(`Unable to reach the backend service at ${apiBase}. Please ensure the backend server is running.`);
+    }
+    throw err;
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ message: res.statusText }));
@@ -127,10 +149,32 @@ const auth = {
     return apiFetch<any[]>('/api/auth/approvals/pending');
   },
 
-  async approveUser(userId: string, market: string, subdomain?: string): Promise<any> {
+  async approveUser(
+    userId: string,
+    market: string,
+    subdomain?: string,
+    userLimit?: number,
+    maxBranches?: number,
+  ): Promise<any> {
     return apiFetch<any>(`/api/auth/approvals/approve/${userId}`, {
       method: 'POST',
-      body: JSON.stringify({ market, subdomain }),
+      body: JSON.stringify({ market, subdomain, userLimit, maxBranches }),
+    });
+  },
+
+  async createManualTenant(data: {
+    companyName: string;
+    subdomain: string;
+    adminFullName: string;
+    adminEmail: string;
+    adminPassword?: string;
+    userLimit?: number;
+    maxBranches?: number;
+    defaultMarket?: string;
+  }): Promise<any> {
+    return apiFetch<any>('/api/auth/tenants/manual', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   },
 
@@ -147,6 +191,13 @@ const auth = {
 
   async updateTenantUserLimit(tenantId: string, limit: number): Promise<any> {
     return apiFetch<any>(`/api/auth/tenants/${tenantId}/user-limit`, {
+      method: 'PATCH',
+      body: JSON.stringify({ limit }),
+    });
+  },
+
+  async updateTenantBranchLimit(tenantId: string, limit: number): Promise<any> {
+    return apiFetch<any>(`/api/auth/tenants/${tenantId}/branch-limit`, {
       method: 'PATCH',
       body: JSON.stringify({ limit }),
     });
@@ -192,6 +243,13 @@ const auth = {
     return apiFetch<any>(`/api/auth/users/${userId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ isActive }),
+    });
+  },
+
+  async updateUserDetail(userId: string, data: { fullName?: string; email?: string; password?: string; branchId?: string; businessUnitId?: string; roles?: string[] }): Promise<any> {
+    return apiFetch<any>(`/api/auth/users/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     });
   },
 
@@ -265,11 +323,15 @@ const auth = {
     });
   },
 
-  async updateMySettings(settings: { podSystemEnabled?: boolean }): Promise<any> {
+  async updateMySettings(settings: { podSystemEnabled?: boolean; candidatePoolMode?: string }): Promise<any> {
     return apiFetch<any>('/api/auth/tenants/my-settings', {
       method: 'PATCH',
       body: JSON.stringify(settings),
     });
+  },
+
+  async getTenantDetails(tenantId: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/tenants/${tenantId}/details`);
   },
 };
 
@@ -410,6 +472,10 @@ const jobs = {
     noticePeriod?: string;
     jobType?: string;
     remoteJob?: string;
+    title?: string;
+    payRate?: string;
+    ctc?: string;
+    salary?: string;
   }> {
     return apiFetch('/api/jobs/parse-jd', {
       method: 'POST',
@@ -419,8 +485,17 @@ const jobs = {
 };
 
 const candidates = {
-  async list(): Promise<any[]> {
-    return apiFetch<any[]>('/api/candidates');
+  async list(filters?: Record<string, any>): Promise<any[]> {
+    const cleanFilters: Record<string, string> = {};
+    if (filters) {
+      Object.entries(filters).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== "") {
+          cleanFilters[key] = String(val);
+        }
+      });
+    }
+    const query = new URLSearchParams(cleanFilters).toString();
+    return apiFetch<any[]>(`/api/candidates${query ? `?${query}` : ''}`);
   },
 
   async get(id: string | number): Promise<any> {
@@ -459,7 +534,7 @@ const candidates = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${API_BASE}/api/candidates/bulk-upload`, {
+    const res = await fetch(`${getApiBase()}/api/candidates/bulk-upload`, {
       method: 'POST',
       headers,
       body: formData,
@@ -490,7 +565,7 @@ const candidates = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${API_BASE}/api/candidates/parse`, {
+    const res = await fetch(`${getApiBase()}/api/candidates/parse`, {
       method: 'POST',
       body: formData,
       headers,
@@ -522,7 +597,7 @@ const candidates = {
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`${API_BASE}/api/candidates/upload`, {
+    const res = await fetch(`${getApiBase()}/api/candidates/upload`, {
       method: 'POST',
       body: formData,
       headers,
@@ -539,7 +614,7 @@ const candidates = {
     const token = getToken();
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res = await fetch(`${API_BASE}/api/candidates/${candidateId}/resume`, { headers });
+    const res = await fetch(`${getApiBase()}/api/candidates/${candidateId}/resume`, { headers });
     if (!res.ok) throw new Error(res.status === 404 ? 'No CV on file for this candidate.' : `Download failed: ${res.status}`);
     return res.blob();
   },
@@ -688,6 +763,82 @@ const submissions = {
   },
 };
 
+const branches = {
+  async list(): Promise<any[]> {
+    return apiFetch<any[]>('/api/branches');
+  },
+  async get(id: string): Promise<any> {
+    return apiFetch<any>(`/api/branches/${id}`);
+  },
+  async create(data: { name: string; code?: string; city?: string; state?: string; country?: string; market?: string }): Promise<any> {
+    return apiFetch<any>('/api/branches', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async update(id: string, data: { name?: string; code?: string; city?: string; state?: string; country?: string; market?: string; isActive?: boolean }): Promise<any> {
+    return apiFetch<any>(`/api/branches/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async delete(id: string): Promise<any> {
+    return apiFetch<any>(`/api/branches/${id}`, {
+      method: 'DELETE',
+    });
+  },
+  async getMembers(id: string): Promise<any[]> {
+    return apiFetch<any[]>(`/api/branches/${id}/members`);
+  },
+  async assignUser(id: string, userId: string, roles?: string[]): Promise<any> {
+    return apiFetch<any>(`/api/branches/${id}/assign-user`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, roles }),
+    });
+  },
+  async updateManager(id: string, managerId: string | null): Promise<any> {
+    return apiFetch<any>(`/api/branches/${id}/manager`, {
+      method: 'PATCH',
+      body: JSON.stringify({ managerId }),
+    });
+  },
+  async getHierarchy(): Promise<any> {
+    return apiFetch<any>('/api/branches/hierarchy');
+  },
+};
+
+const businessUnits = {
+  async list(): Promise<any[]> {
+    return apiFetch<any[]>('/api/business-units');
+  },
+  async get(id: string): Promise<any> {
+    return apiFetch<any>(`/api/business-units/${id}`);
+  },
+  async create(data: { name: string; code?: string; market?: string; currency?: string }): Promise<any> {
+    return apiFetch<any>('/api/business-units', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async update(id: string, data: { name?: string; code?: string; market?: string; currency?: string }): Promise<any> {
+    return apiFetch<any>(`/api/business-units/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async delete(id: string): Promise<any> {
+    return apiFetch<any>(`/api/business-units/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+const auditLogs = {
+  async list(limit = 100): Promise<any[]> {
+    return apiFetch<any[]>(`/api/audit/logs?limit=${limit}`).catch(() => []);
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────
 export const atsApi = {
   auth,
@@ -695,7 +846,10 @@ export const atsApi = {
   candidates,
   clients,
   pods,
+  branches,
+  businessUnits,
   submissions,
+  auditLogs,
   fetch: apiFetch,
 };
 

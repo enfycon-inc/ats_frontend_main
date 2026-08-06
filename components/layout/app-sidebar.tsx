@@ -13,7 +13,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { PRIMARY_NAV_ITEMS, MORE_NAV_ITEMS } from "@/constants/navigation";
+import { PRIMARY_NAV_ITEMS, MORE_NAV_ITEMS, GLOBAL_ADMIN_NAV_ITEMS, GLOBAL_ADMIN_MORE_ITEMS } from "@/constants/navigation";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavbarLogo } from "./navbar-logo";
@@ -44,6 +44,10 @@ export function AppSidebar() {
   }, [session, overrideRole]);
 
   const filteredPrimaryNav = useMemo(() => {
+    if (systemRole === "SUPER_ADMIN") {
+      return GLOBAL_ADMIN_NAV_ITEMS;
+    }
+
     return PRIMARY_NAV_ITEMS.filter(item => {
       // Recruiter filters
       if (systemRole === "RECRUITER") {
@@ -69,6 +73,10 @@ export function AppSidebar() {
   }, [systemRole]);
 
   const filteredMoreNav = useMemo(() => {
+    if (systemRole === "SUPER_ADMIN") {
+      return GLOBAL_ADMIN_MORE_ITEMS;
+    }
+
     return MORE_NAV_ITEMS.filter(item => {
       // Recruiter filters
       if (systemRole === "RECRUITER") {

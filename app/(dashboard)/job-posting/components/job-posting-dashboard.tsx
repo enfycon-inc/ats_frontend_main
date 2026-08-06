@@ -38,7 +38,7 @@ export default function JobPostingDashboard({
   initialStatusFilter = "All",
 }: JobPostingDashboardProps) {
   // Market State (US or India)
-  const [market, setMarket] = useState<"US" | "IN">("US");
+  const [market, setMarket] = useState<"US" | "IN">("IN");
 
   // Drawer States
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -125,8 +125,8 @@ export default function JobPostingDashboard({
       const apiJobs = await atsApi.jobs.list();
       if (apiJobs && apiJobs.length > 0) {
         const mapped = apiJobs.map(mapApiJobToJob);
-        // Filter by the current market shift (defaulting to "US" if not present)
-        const shiftJobs = mapped.filter((job) => (job.market || "US") === market);
+        // Filter by the current market shift (defaulting to "IN" if not present)
+        const shiftJobs = mapped.filter((job) => (job.market || "IN") === market);
         // Pre-filter by status if required
         const filteredByRoute = shiftJobs.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
 

@@ -16,6 +16,7 @@ import {
   CircleCheck,
   X,
   ShieldCheck,
+  MapPin,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
@@ -23,6 +24,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import userImg from "@/public/assets/images/user.png";
 import { ModeToggle } from "@/components/shared/mode-toggle";
+import { atsApi } from "@/lib/ats-api";
 
 // ─── Shared icon button base ─────────────────────────────────────────────────
 function NavIconBtn({
@@ -706,6 +708,13 @@ function SandboxSwitcher() {
             ⚙️ Tenant Admin
           </button>
           <button
+            onClick={() => handleSelectRole("BRANCH_ADMIN")}
+            role="menuitem"
+            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
+          >
+            🏢 Branch Admin
+          </button>
+          <button
             onClick={() => handleSelectRole("ACCOUNT_MANAGER")}
             role="menuitem"
             className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
@@ -732,10 +741,175 @@ function SandboxSwitcher() {
   );
 }
 
+function BranchSwitcher() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const { data: session } = useSession();
+  const [overrideRole, setOverrideRole] = useState<string | null>(null);
+  const [activeBranch, setActiveBranch] = useState<string>("Loading Branch...");
+  const [branches, setBranches] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOverrideRole(localStorage.getItem("override_role"));
+    }
+    loadLiveBranches();
+  }, []);
+
+  const loadLiveBranches = async () => {
+    try {
+      const data = await atsApi.branches.list();
+      if (Array.isArray(data)) {
+        if (data.length > 0) {
+          setBranches(data);
+          const savedName = typeof window !== "undefined" ? localStorage.getItem("active_branch_name") : null;
+          const match = data.find(b => b.name === savedName);
+          if (match) {
+            setActiveBranch(match.name);
+          } else {
+            setActiveBranch(data[0].name);
+            localStorage.setItem("active_branch_id", data[0].id);
+            localStorage.setItem("active_branch_name", data[0].name);
+          }
+        } else {
+          setBranches([]);
+          setActiveBranch("Setup Branch");
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("active_branch_id");
+            localStorage.removeItem("active_branch_name");
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch branches:", err);
+    }
+  };
+
+  const systemRole = overrideRole || (session as any)?.user?.systemRole || "RECRUITER";
+  const userPermissions: string[] = (session as any)?.user?.permissions || [];
+
+  const canSwitchBranch =
+    systemRole === "ADMIN" ||
+    systemRole === "SUPER_ADMIN" ||
+    systemRole === "DELIVERY_HEAD" ||
+    userPermissions.includes("candidate:search_all_branches") ||
+    userPermissions.includes("job:view_all_branches");
+
+  useEffect(() => {
+    const handle = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open]);
+
+  const handleSelectBranch = (b: any) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("active_branch_id", b.id);
+      localStorage.setItem("active_branch_name", b.name);
+      setActiveBranch(b.name);
+      window.location.reload();
+    }
+    setOpen(false);
+  };
+
+  if (!canSwitchBranch) {
+    return (
+      <div 
+        title="Your branch assignment is locked to your home branch. Contact Tenant Admin for cross-branch access."
+        className="
+          flex items-center gap-1.5
+          h-7 px-2.5 rounded
+          text-[11px] font-bold tracking-wide
+          bg-emerald-900/60 text-emerald-200
+          border border-emerald-700/50 shadow-sm
+          cursor-default select-none
+        "
+      >
+        <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-emerald-300" />
+        <span>Office: {activeBranch}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="
+          flex items-center gap-1.5
+          h-7 px-2.5 rounded
+          text-[11px] font-bold tracking-wide
+          bg-emerald-600 hover:bg-emerald-700 text-white
+          transition-colors duration-150
+          cursor-pointer whitespace-nowrap select-none
+          shadow-sm border border-emerald-500
+        "
+      >
+        <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-emerald-200" />
+        <span>Office: {activeBranch}</span>
+        <ChevronDown className={`w-3 h-3 opacity-80 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="Select Active Branch Context"
+          className="
+            absolute top-full right-0 mt-1.5 z-[350]
+            w-[220px]
+            bg-white dark:bg-[#1e2d50]
+            border border-neutral-200 dark:border-white/10
+            rounded shadow-xl shadow-black/25
+            py-1
+            animate-in fade-in-0 slide-in-from-top-2
+          "
+        >
+          <div className="px-3 pt-1 pb-1 border-b border-neutral-100 dark:border-white/10 flex justify-between items-center">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 dark:text-white/30">
+              Active Branch Context
+            </span>
+            <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded">
+              Multi-Branch
+            </span>
+          </div>
+          {branches.map((b) => (
+            <button
+              key={b.id}
+              onClick={() => handleSelectBranch(b)}
+              role="menuitem"
+              className={`
+                w-full text-left px-3 py-2 text-[12px] transition-colors cursor-pointer flex justify-between items-center
+                ${activeBranch === b.name
+                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold"
+                  : "text-neutral-700 dark:text-white/80 hover:bg-neutral-50 dark:hover:bg-white/8 font-medium"
+                }
+              `}
+            >
+              <div className="flex flex-col">
+                <span>🏢 {b.name}</span>
+                <span className="text-[9.5px] text-neutral-400 font-normal">{b.city} • {b.market === "US" ? "US IT" : "Domestic India"}</span>
+              </div>
+              {activeBranch === b.name && (
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Exported Right Section ───────────────────────────────────────────────────
 export function NavbarRight() {
   return (
     <div className="flex items-center gap-1.5">
+      <BranchSwitcher />
+
+      {/* Divider */}
+      <div className="w-px h-5 bg-white/15 mx-0.5 flex-shrink-0" />
+
       <SandboxSwitcher />
 
       {/* Divider */}

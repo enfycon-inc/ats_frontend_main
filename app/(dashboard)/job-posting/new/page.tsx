@@ -15,6 +15,7 @@ import {
   Save,
   CheckCircle,
   X,
+  AlertTriangle,
   Upload,
   Sparkles,
   ChevronDown,
@@ -114,8 +115,8 @@ const formSchema = zod.object({
   startDate: zod.string().optional(),
   endDate: zod.string().optional(),
   respondBy: zod.string().optional(),
-  country: zod.string().min(1, "Country is required"),
-  states: zod.string().min(1, "State is required"),
+  country: zod.string().optional(),
+  states: zod.string().optional(),
   city: zod.string().optional(),
   remoteJob: zod.enum(["Yes", "No", "Hybrid"]),
   hoursPerWeek: zod.union([zod.number().min(1).max(168), zod.nan().transform(() => undefined)]).optional(),
@@ -308,8 +309,9 @@ export default function NewJobPostingPage() {
     defaultValues: {
       businessUnit: "enfycon Inc",
       jobCode: "ENFY-" + Math.floor(1000 + Math.random() * 9000),
-      country: "United States",
-      states: "Texas",
+      clientBillRate: "8.33% Placement Commission",
+      country: "",
+      states: "",
       city: "",
       remoteJob: "Hybrid",
       hoursPerWeek: undefined,
@@ -332,6 +334,18 @@ export default function NewJobPostingPage() {
   });
 
   const selectedCountry = watch("country");
+  const watchTaxTerms = watch("taxTerms");
+
+  // Keep clientBillRate synced when market is IN and taxTerms is Permanent
+  useEffect(() => {
+    if (market === "IN" && watchTaxTerms === "Permanent") {
+      const commVal = commissionType === "custom" ? customCommission : commissionType;
+      if (commVal) {
+        setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: true });
+      }
+    }
+  }, [market, watchTaxTerms, commissionType, customCommission, setValue]);
+
   useEffect(() => {
     if (selectedCountry === "India") {
       setMarket("IN");
@@ -345,6 +359,8 @@ export default function NewJobPostingPage() {
       
       setValue("taxTerms", "Permanent");
       setValue("workAuthorization", "Indian Citizen");
+      const commVal = commissionType === "custom" ? customCommission : commissionType;
+      setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: true });
     } else if (selectedCountry === "United States") {
       setMarket("US");
       setBillCurrency("USD");
@@ -358,7 +374,7 @@ export default function NewJobPostingPage() {
       setValue("taxTerms", "C2C");
       setValue("workAuthorization", "US Authorized");
     }
-  }, [selectedCountry, setValue]);
+  }, [selectedCountry, setValue, commissionType, customCommission]);
 
   const fetchClients = useCallback(async () => {
     try {
@@ -425,8 +441,7 @@ export default function NewJobPostingPage() {
             
             if (m === "IN") {
               setValue("jobType", "Full Time");
-              setValue("country", "India");
-              setValue("states", "Karnataka");
+              // Auto-fill removed per user request
               setValue("workAuthorization", "Indian Citizen");
               setValue("taxTerms", "Permanent");
               setBillCurrency("INR");
@@ -437,8 +452,7 @@ export default function NewJobPostingPage() {
               setPayTerm("Permanent");
             } else {
               setValue("jobType", "Contract");
-              setValue("country", "United States");
-              setValue("states", "Texas");
+              // Auto-fill removed per user request
               setValue("workAuthorization", "US Authorized");
               setValue("taxTerms", "C2C");
               setBillCurrency("USD");
@@ -537,8 +551,9 @@ export default function NewJobPostingPage() {
       const res = await atsApi.jobs.parseJd(parseText);
       if (res && res.success) {
         // Pre-fill extracted details
-        if (res.jobTitle && res.jobTitle !== "Unknown") {
-          setValue("jobTitle", res.jobTitle);
+        const extractedTitle = res.jobTitle || res.title;
+        if (extractedTitle && extractedTitle !== "Unknown") {
+          setValue("jobTitle", extractedTitle, { shouldValidate: true, shouldDirty: true });
         }
         
         // Auto-assign work authorization if matched
@@ -567,6 +582,12 @@ export default function NewJobPostingPage() {
         }
         if (res.experienceMax !== undefined && res.experienceMax !== null) {
           setValue("expMax", Number(res.experienceMax));
+        }
+
+        // Pre-fill pay rate / Candidate CTC
+        const extractedPay = res.payRate || res.ctc || res.salary;
+        if (extractedPay) {
+          setValue("payRate", String(extractedPay), { shouldValidate: true, shouldDirty: true });
         }
 
         // Pre-fill notice period
@@ -624,17 +645,46 @@ export default function NewJobPostingPage() {
     try {
       const res = await atsApi.jobs.parseJd(strippedText);
       if (res && res.success) {
+        // Pre-fill job title if extracted
+        const extractedTitle = res.jobTitle || res.title;
+        if (extractedTitle && extractedTitle !== "Unknown") {
+          const currentTitle = getValues("jobTitle");
+          if (!currentTitle || currentTitle.trim() === "" || currentTitle.includes("Auto-generated")) {
+            setValue("jobTitle", extractedTitle, { shouldValidate: true, shouldDirty: true });
+          }
+        }
+
+        // Merge extracted skills with existing manually entered ones
         const pSkills = res.primarySkills || [];
         const sSkills = res.secondarySkills || [];
-        
-        // Merge extracted skills with existing manually entered ones
         const mergedPrimary = Array.from(new Set([...primarySkills, ...pSkills]));
         const mergedSecondary = Array.from(new Set([...secondarySkills, ...sSkills]));
         
         setPrimarySkills(mergedPrimary);
         setSecondarySkills(mergedSecondary);
-        if (pSkills.length > 0 || sSkills.length > 0) {
-          toast.success(`AI extracted ${pSkills.length + sSkills.length} skills successfully!`);
+
+        // Pre-fill experience ranges if extracted and not already manually set
+        const currentMin = getValues("expMin");
+        const currentMax = getValues("expMax");
+
+        if ((currentMin === undefined || currentMin === null || isNaN(currentMin)) && res.experienceMin !== undefined && res.experienceMin !== null) {
+          setValue("expMin", Number(res.experienceMin));
+        }
+        if ((currentMax === undefined || currentMax === null || isNaN(currentMax)) && res.experienceMax !== undefined && res.experienceMax !== null) {
+          setValue("expMax", Number(res.experienceMax));
+        }
+
+        // Pre-fill CTC / Pay Rate
+        const extractedPay = res.payRate || res.ctc || res.salary;
+        if (extractedPay) {
+          const currentPay = getValues("payRate");
+          if (!currentPay || currentPay.trim() === "") {
+            setValue("payRate", String(extractedPay), { shouldValidate: true, shouldDirty: true });
+          }
+        }
+
+        if (pSkills.length > 0 || sSkills.length > 0 || res.experienceMin !== undefined || extractedTitle) {
+          toast.success(`AI extracted Job Title (${extractedTitle || 'Role'}), Skills & Experience (${res.experienceMin ?? 0}-${res.experienceMax ?? 5} yrs)!`);
         } else {
           toast("No skills found in description.", { icon: "⚠️" });
         }
@@ -802,8 +852,7 @@ export default function NewJobPostingPage() {
             {/* Card 2: Requisition */}
             <div
               onClick={() => {
-                toast.success("Loading requisitions lists...");
-                setActiveWorkflow("manual");
+                toast("Coming Soon!", { icon: "🚧" });
               }}
               className="flex flex-col items-center text-center p-6 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg cursor-pointer shadow-xs hover:shadow-md hover:border-primary/50 group transition-all duration-300"
             >
@@ -821,8 +870,7 @@ export default function NewJobPostingPage() {
             {/* Card 3: Job Template */}
             <div
               onClick={() => {
-                toast.success("Opening template catalog...");
-                setActiveWorkflow("manual");
+                toast("Coming Soon!", { icon: "🚧" });
               }}
               className="flex flex-col items-center text-center p-6 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg cursor-pointer shadow-xs hover:shadow-md hover:border-primary/50 group transition-all duration-300"
             >
@@ -982,13 +1030,48 @@ export default function NewJobPostingPage() {
           {/* Form Scrollable Body */}
           <div className="flex-1 overflow-y-auto pb-12">
             <div className="w-full p-4 space-y-4">
-              {/* Validation errors summary badge */}
+              {/* Requisition Completeness Alert Banner with Recruitment Jargon */}
               {Object.keys(errors).length > 0 && (
-                <div className="p-3 bg-red-100 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 rounded text-red-700 dark:text-red-400 flex items-center gap-2 text-xs font-semibold">
-                  <X className="h-4 w-4 shrink-0" />
-                  <span>
-                    Form validation failed. Please check the {Object.keys(errors).length} highlighted fields below before submitting.
-                  </span>
+                <div className="p-3.5 bg-red-50 dark:bg-red-950/30 border-l-4 border-l-red-600 border border-red-200 dark:border-red-900/50 rounded-r-lg text-red-900 dark:text-red-300 shadow-xs space-y-2 font-sans">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-xs">
+                      <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0" />
+                      <span>Requisition Incomplete — Please complete the {Object.keys(errors).length} mandatory field{Object.keys(errors).length > 1 ? "s" : ""} below before submitting:</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 pt-0.5 pl-6">
+                    {Object.entries(errors).map(([key, err]) => {
+                      const jargonLabels: Record<string, string> = {
+                        client: "Client Account / End Client",
+                        clientBillRate: "Client Bill Rate / Commission",
+                        payRate: "Candidate Target CTC / Pay Rate",
+                        jobTitle: "Requisition Designation (Job Title)",
+                        jobCode: "Requisition Job Code",
+                        jobType: "Employment Engagement Type",
+                        taxTerms: "Billing & Tax Classification",
+                        workAuthorization: "Work Authorization & Visa Eligibility",
+                        numPositions: "Target Headcount Requisition",
+                        maxSubmissions: "SLA Submission Cap",
+                        jobDescription: "Job Specification Scope",
+                        businessUnit: "Business Unit Requisition",
+                        country: "Geographic Location (Country)",
+                        states: "Geographic Location (State)",
+                        city: "Geographic Location (City)",
+                      };
+                      const label = jargonLabels[key] || key;
+                      const msg = (err?.message as string) || "Required";
+                      return (
+                        <span
+                          key={key}
+                          className="inline-flex items-center gap-1.5 bg-red-100/90 dark:bg-red-900/50 text-red-900 dark:text-red-200 text-[11px] font-bold px-2.5 py-1 rounded border border-red-300 dark:border-red-800 shadow-2xs"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-red-600 shrink-0 animate-pulse" />
+                          <span>{label}:</span>
+                          <span className="font-semibold text-red-700 dark:text-red-300">{msg}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -1080,7 +1163,14 @@ export default function NewJobPostingPage() {
                           <div className="flex gap-2 items-center">
                             <select
                               value={commissionType}
-                              onChange={(e) => setCommissionType(e.target.value)}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setCommissionType(val);
+                                const commVal = val === "custom" ? customCommission : val;
+                                if (commVal) {
+                                  setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: true });
+                                }
+                              }}
                               className="w-full md:w-56 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
                             >
                               <option value="8.33">8.33% (1 Month Salary)</option>
@@ -1097,7 +1187,13 @@ export default function NewJobPostingPage() {
                                   min="0"
                                   max="100"
                                   value={customCommission}
-                                  onChange={(e) => setCustomCommission(e.target.value)}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCustomCommission(val);
+                                    if (val) {
+                                      setValue("clientBillRate", `${val}% Placement Commission`, { shouldValidate: true });
+                                    }
+                                  }}
                                   placeholder="e.g. 10.5"
                                   className="h-8 w-24 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 rounded"
                                 />
@@ -1299,18 +1395,22 @@ export default function NewJobPostingPage() {
                     </div>
 
                     {/* Job End Date */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Job End Date</label>
-                      <input
-                        type="date"
-                        {...register("endDate")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
-                      />
-                    </div>
+                    {watch("jobType") !== "Full Time" ? (
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Job End Date</label>
+                        <input
+                          type="date"
+                          {...register("endDate")}
+                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
+                        />
+                      </div>
+                    ) : (
+                      <div className="hidden md:block"></div>
+                    )}
 
                     {/* Country */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Country <span className="text-red-500">*</span></label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Country</label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -1355,7 +1455,7 @@ export default function NewJobPostingPage() {
 
                     {/* States */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">State <span className="text-red-500">*</span></label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">State</label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -1862,14 +1962,14 @@ export default function NewJobPostingPage() {
                       </select>
                     </div>
 
-                    {/* Location Autocomplete */}
+                    {/* Display Location */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Location Autocomplete</label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Display Location (External)</label>
                       <input
                         type="text"
                         {...register("locationAutocomplete")}
                         className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
-                        placeholder="e.g. Plano, TX"
+                        placeholder="e.g. Plano, TX (Shown on job boards)"
                       />
                     </div>
                   </div>
@@ -2042,6 +2142,7 @@ export default function NewJobPostingPage() {
                         {...register("department")}
                         className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
                       >
+                        <option value="">Select Department</option>
                         <option value="IT Services">IT Services</option>
                         <option value="Operations">Operations</option>
                         <option value="Sales">Sales</option>
@@ -2051,13 +2152,34 @@ export default function NewJobPostingPage() {
                     {/* Sales Manager */}
                     <div className="space-y-1">
                       <label className="font-bold text-neutral-700 dark:text-neutral-300">Sales Manager</label>
-                      <select
+                      <input
+                        type="text"
                         {...register("salesManager")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                      >
-                        <option value="Sanjay Kumar">Sanjay Kumar</option>
-                        <option value="Kunal Sharma">Kunal Sharma</option>
-                      </select>
+                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
+                        placeholder="e.g. Sanjay Kumar"
+                      />
+                    </div>
+
+                    {/* Account Manager */}
+                    <div className="space-y-1">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Account Manager</label>
+                      <input
+                        type="text"
+                        {...register("accountManager")}
+                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
+                        placeholder="e.g. John Doe"
+                      />
+                    </div>
+
+                    {/* Primary Recruiter */}
+                    <div className="space-y-1">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Primary Recruiter</label>
+                      <input
+                        type="text"
+                        {...register("primaryRecruiter")}
+                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
+                        placeholder="e.g. Jane Smith"
+                      />
                     </div>
 
                     {/* Recruitment Pod Assignment */}
