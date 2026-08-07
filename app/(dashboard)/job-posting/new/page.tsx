@@ -531,7 +531,7 @@ export default function NewJobPostingPage() {
   // Document Upload Sim
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const filesArray = Array.from(e.target.files).map((f) => ({
+      const filesArray = Array.from(e.target.files).map((f: File) => ({
         name: f.name,
         size: (f.size / 1024).toFixed(1) + " KB",
       }));

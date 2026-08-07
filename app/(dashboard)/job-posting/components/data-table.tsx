@@ -396,7 +396,7 @@ export default function DataTable({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none overflow-hidden relative font-sans" onClick={closeContextMenu}>
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none overflow-hidden relative font-sans" onClick={closeContextMenu}>
       {/* Action Bar */}
       <div className="py-1 px-2.5 border-b border-neutral-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 bg-neutral-50/50 dark:bg-slate-900/50 text-xs">
         <div className="flex items-center gap-2">

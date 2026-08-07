@@ -334,7 +334,7 @@ export default function JobPostingDashboard({
   return (
     <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
       {/* Recruiter Metrics KPI Strip */}
-      <div className="w-full flex items-center gap-6 shrink-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 px-6 py-1.5 rounded-sm select-none shadow-xs text-[11px]">
+      <div className="w-full min-w-0 flex items-center gap-6 shrink-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 px-6 py-1.5 rounded-sm select-none shadow-xs text-[11px] overflow-x-auto">
         {/* Total Jobs */}
         <div className="flex items-center gap-1.5">
           <Briefcase className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />

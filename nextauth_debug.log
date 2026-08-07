@@ -1,0 +1,98 @@
+[2026-08-06T12:47:27.541Z] Authorize started for email: admin@enfycon.com
+[2026-08-06T12:47:27.549Z] Parsed credentials: email=admin@enfycon.com, subdomain=
+[2026-08-06T12:47:27.551Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T12:47:28.572Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T12:47:28.575Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T12:47:29.781Z] Localhost backend response status: 200
+[2026-08-06T12:47:29.787Z] Backend login successful. User data: {"id":"850f4384-e579-41a0-a4e7-613c4ca198be","email":"admin@enfycon.com","fullName":"Enfy Admin","roles":["ADMIN","SUPER_ADMIN"],"tenantId":"d3b07384-d113-49c3-a555-9ee75c13ca33","defaultMarket":"IN","tenantDomain":"enfycon","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","platform:manage","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"SUPER_ADMIN","podId":null,"branchId":"cb93e495-52a0-4b2a-999b-d4517e7f7d82","branchName":"Default Enfy SaaS Tenant Headquarters","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-06T12:50:24.096Z] Authorize started for email: admin@enfycon.com
+[2026-08-06T12:50:24.103Z] Parsed credentials: email=admin@enfycon.com, subdomain=
+[2026-08-06T12:50:24.105Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T12:50:25.113Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T12:50:25.115Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T12:50:26.067Z] Localhost backend response status: 200
+[2026-08-06T12:50:26.072Z] Backend login successful. User data: {"id":"850f4384-e579-41a0-a4e7-613c4ca198be","email":"admin@enfycon.com","fullName":"Enfy Admin","roles":["ADMIN","SUPER_ADMIN"],"tenantId":"d3b07384-d113-49c3-a555-9ee75c13ca33","defaultMarket":"IN","tenantDomain":"enfycon","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","platform:manage","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"SUPER_ADMIN","podId":null,"branchId":"cb93e495-52a0-4b2a-999b-d4517e7f7d82","branchName":"Default Enfy SaaS Tenant Headquarters","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-06T12:51:44.813Z] Authorize started for email: debam@deb.com
+[2026-08-06T12:51:44.822Z] Parsed credentials: email=debam@deb.com, subdomain=
+[2026-08-06T12:51:44.827Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T12:51:45.846Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T12:51:45.849Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T12:51:46.801Z] Localhost backend response status: 200
+[2026-08-06T12:51:46.807Z] Backend login successful. User data: {"id":"d2ec2da8-816c-410a-8c0c-4737b5ae21cf","email":"debam@deb.com","fullName":"debam","roles":["RECRUITER","POD_LEAD","ACCOUNT_MANAGER","BDM"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-06T12:51:59.946Z] Authorize started for email: debam@deb.com
+[2026-08-06T12:51:59.952Z] Parsed credentials: email=debam@deb.com, subdomain=deb
+[2026-08-06T12:51:59.956Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T12:52:00.969Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T12:52:00.994Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T12:52:01.541Z] Localhost backend response status: 200
+[2026-08-06T12:52:01.546Z] Backend login successful. User data: {"id":"d2ec2da8-816c-410a-8c0c-4737b5ae21cf","email":"debam@deb.com","fullName":"debam","roles":["RECRUITER","POD_LEAD","ACCOUNT_MANAGER","BDM"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-06T15:01:05.590Z] Authorize started for email: deb@deb.com
+[2026-08-06T15:01:05.595Z] Parsed credentials: email=deb@deb.com, subdomain=deb
+[2026-08-06T15:01:05.596Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T15:01:06.606Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T15:01:06.608Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T15:01:07.091Z] Localhost backend response status: 200
+[2026-08-06T15:01:07.170Z] Backend login successful. User data: {"id":"fa6898d0-39fb-4550-b5b3-3a5a3f0e07e6","email":"deb@deb.com","fullName":"deb","roles":["ADMIN"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"US","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-06T15:13:02.483Z] Authorize started for email: am1@deb.com
+[2026-08-06T15:13:02.489Z] Parsed credentials: email=am1@deb.com, subdomain=deb
+[2026-08-06T15:13:02.492Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T15:13:03.499Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T15:13:03.501Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T15:13:03.944Z] Localhost backend response status: 200
+[2026-08-06T15:13:03.950Z] Backend login successful. User data: {"id":"969a44ce-51d0-4bdc-8231-364358349ff2","email":"am1@deb.com","fullName":"account manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"US","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c6dcb074-4fda-44e8-a8bf-7c337f0ca108","branchName":"indbbsr","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-06T15:13:57.408Z] Authorize started for email: deb@deb.com
+[2026-08-06T15:13:57.411Z] Parsed credentials: email=deb@deb.com, subdomain=deb
+[2026-08-06T15:13:57.415Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T15:13:58.426Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T15:13:58.431Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T15:13:58.878Z] Localhost backend response status: 200
+[2026-08-06T15:13:58.882Z] Backend login successful. User data: {"id":"fa6898d0-39fb-4550-b5b3-3a5a3f0e07e6","email":"deb@deb.com","fullName":"deb","roles":["ADMIN"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"US","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-06T15:15:27.785Z] Authorize started for email: am1@deb.com
+[2026-08-06T15:15:27.788Z] Parsed credentials: email=am1@deb.com, subdomain=deb
+[2026-08-06T15:15:27.790Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T15:15:28.801Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T15:15:28.809Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T15:15:29.267Z] Localhost backend response status: 200
+[2026-08-06T15:15:29.278Z] Backend login successful. User data: {"id":"969a44ce-51d0-4bdc-8231-364358349ff2","email":"am1@deb.com","fullName":"account manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"US","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c6dcb074-4fda-44e8-a8bf-7c337f0ca108","branchName":"indbbsr","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-06T15:22:30.900Z] Authorize started for email: am1@deb.com
+[2026-08-06T15:22:30.910Z] Parsed credentials: email=am1@deb.com, subdomain=deb
+[2026-08-06T15:22:30.913Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T15:22:31.927Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T15:22:31.929Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T15:22:32.419Z] Localhost backend response status: 200
+[2026-08-06T15:22:32.434Z] Backend login successful. User data: {"id":"969a44ce-51d0-4bdc-8231-364358349ff2","email":"am1@deb.com","fullName":"account manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"US","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c6dcb074-4fda-44e8-a8bf-7c337f0ca108","branchName":"indbbsr","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-06T15:26:31.166Z] Authorize started for email: deb@deb.com
+[2026-08-06T15:26:31.173Z] Parsed credentials: email=deb@deb.com, subdomain=deb
+[2026-08-06T15:26:31.176Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T15:26:32.194Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T15:26:32.196Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T15:26:32.652Z] Localhost backend response status: 200
+[2026-08-06T15:26:32.656Z] Backend login successful. User data: {"id":"fa6898d0-39fb-4550-b5b3-3a5a3f0e07e6","email":"deb@deb.com","fullName":"deb","roles":["ADMIN"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"US","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-06T15:32:33.552Z] Authorize started for email: vizag-am-us@deb.com
+[2026-08-06T15:32:33.555Z] Parsed credentials: email=vizag-am-us@deb.com, subdomain=deb
+[2026-08-06T15:32:33.556Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T15:32:34.563Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T15:32:34.565Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T15:32:35.040Z] Localhost backend response status: 200
+[2026-08-06T15:32:35.049Z] Backend login successful. User data: {"id":"ef4ddfcf-da5d-45ed-ac64-aa44781c8c62","email":"vizag-am-us@deb.com","fullName":"Vizag Account Manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"US","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c3de05e5-c583-4415-a24e-d087cd6ac2b0","branchName":"Vizag-US-IT","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-06T15:55:22.119Z] Authorize started for email: debrec2@deb.com
+[2026-08-06T15:55:22.122Z] Parsed credentials: email=debrec2@deb.com, subdomain=deb
+[2026-08-06T15:55:22.124Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T15:55:23.134Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T15:55:23.139Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T15:55:23.612Z] Localhost backend response status: 200
+[2026-08-06T15:55:23.616Z] Backend login successful. User data: {"id":"0c6853ec-9e49-40b0-a116-246aae5327b4","email":"debrec2@deb.com","fullName":"debrec2","roles":["RECRUITER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"US","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:view","pod:view","submission:create","submission:view"],"systemRole":"RECRUITER","podId":"b04b43b7-9195-410c-9a47-54ed0b8250c6","branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-06T15:58:19.665Z] Authorize started for email: debam@deb.com
+[2026-08-06T15:58:19.668Z] Parsed credentials: email=debam@deb.com, subdomain=deb
+[2026-08-06T15:58:19.671Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-06T15:58:20.676Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-06T15:58:20.678Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-06T15:58:21.100Z] Localhost backend response status: 200
+[2026-08-06T15:58:21.103Z] Backend login successful. User data: {"id":"d2ec2da8-816c-410a-8c0c-4737b5ae21cf","email":"debam@deb.com","fullName":"debam","roles":["RECRUITER","POD_LEAD","ACCOUNT_MANAGER","BDM"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-07T00:07:00.552Z] Authorize started for email: admin@enfycon.com
+[2026-08-07T00:07:00.558Z] Parsed credentials: email=admin@enfycon.com, subdomain=
+[2026-08-07T00:07:00.562Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-07T00:07:01.581Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-07T00:07:01.583Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-07T00:07:01.933Z] Localhost backend response status: 200
+[2026-08-07T00:07:01.938Z] Backend login successful. User data: {"id":"850f4384-e579-41a0-a4e7-613c4ca198be","email":"admin@enfycon.com","fullName":"Enfy Admin","roles":["ADMIN","SUPER_ADMIN"],"tenantId":"d3b07384-d113-49c3-a555-9ee75c13ca33","defaultMarket":"IN","tenantDomain":"enfycon","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","platform:manage","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"SUPER_ADMIN","podId":null,"branchId":"cb93e495-52a0-4b2a-999b-d4517e7f7d82","branchName":"Default Enfy SaaS Tenant Headquarters","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}

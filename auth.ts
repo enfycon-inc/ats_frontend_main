@@ -9,6 +9,7 @@ import { getUserFromDb } from "./utils/db"
 const DEFAULT_TENANT_ID = "d3b07384-d113-49c3-a555-9ee75c13ca33";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret: process.env.AUTH_SECRET,
   session: {
     strategy: "jwt",
   },
@@ -34,8 +35,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       authorize: async (credentials) => {
         const fs = require('fs');
         const path = require('path');
-        const logPath = path.join('C:', 'Users', 'enfyc', 'OneDrive', 'Desktop', 'ATS enfy', 'nextauth_debug.log');
-        const log = (msg: any) => fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`);
+        const logPath = path.join(process.cwd(), 'nextauth_debug.log');
+        const log = (msg: any) => {
+          console.log(msg);
+          try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`); } catch(e) {}
+        };
         
         try {
           log(`Authorize started for email: ${credentials?.email}`);
@@ -88,6 +92,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   tenantDomain: data.user.tenantDomain || '',
                   systemRole: data.user.systemRole || 'RECRUITER',
                   podId: data.user.podId || null,
+                  branchId: data.user.branchId || null,
+                  branchName: data.user.branchName || null,
                   tenantId: data.user.tenantId || DEFAULT_TENANT_ID,
                   defaultMarket: data.user.defaultMarket || 'US',
                 }
@@ -165,6 +171,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.tenantDomain = (user as any).tenantDomain
         token.systemRole = (user as any).systemRole
         token.podId = (user as any).podId
+        token.branchId = (user as any).branchId
+        token.branchName = (user as any).branchName
         token.tenantId = (user as any).tenantId
         token.defaultMarket = (user as any).defaultMarket
       }
@@ -179,6 +187,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as any).tenantDomain = token.tenantDomain;
         (session.user as any).systemRole = token.systemRole;
         (session.user as any).podId = token.podId;
+        (session.user as any).branchId = token.branchId;
+        (session.user as any).branchName = token.branchName;
         (session.user as any).tenantId = token.tenantId;
         (session.user as any).defaultMarket = token.defaultMarket;
       }
