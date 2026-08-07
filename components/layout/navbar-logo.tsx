@@ -11,32 +11,33 @@ export function NavbarLogo() {
       aria-label="enfySync – go to Dashboard"
       className="
         flex items-center gap-2.5
-        px-4 h-full
-        hover:bg-white/8
+        px-3 py-1.5
+        hover:bg-slate-100 dark:hover:bg-slate-800/60
+        rounded-lg
         transition-colors duration-150
         no-underline
         group
-        min-w-[130px]
+        w-full
       "
     >
       {/* Brand Logo Icon */}
-      <div className="flex-shrink-0 flex items-center justify-center">
+      <div className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/50 p-1 shadow-xs">
         <Image
           src="/assets/images/asset/logo/enfysync.ico"
           alt="enfySync Logo"
-          width={28}
-          height={28}
+          width={24}
+          height={24}
           unoptimized
           className="object-contain"
         />
       </div>
 
       {/* Brand text */}
-      <div className="flex flex-col leading-none select-none">
-        <span className="text-white font-bold text-[15px] tracking-tight group-hover:text-white/95 transition-colors duration-150">
-          enfySync
+      <div className="flex flex-col leading-tight select-none">
+        <span className="text-slate-900 dark:text-white font-black text-[16px] tracking-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+          enfy<span className="text-indigo-600 dark:text-indigo-400">Sync</span>
         </span>
-        <span className="text-[9px] text-blue-200/80 font-medium tracking-widest uppercase mt-px">
+        <span className="text-[9.5px] text-indigo-600/90 dark:text-indigo-300 font-bold tracking-wider uppercase">
           AI Recruitment
         </span>
       </div>

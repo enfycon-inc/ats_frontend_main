@@ -86,14 +86,14 @@ export function ClientRoot({
   const MainContent = (
     <>
       {isViewportLocked ? (
-        <div className="flex flex-col h-[calc(100vh-46px)] max-h-[calc(100vh-46px)] overflow-hidden">
-          <div className="dashboard-body bg-neutral-50 dark:bg-[#1e2734] md:p-3 p-2 flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex flex-col h-[calc(100vh-46px)] max-h-[calc(100vh-46px)] overflow-hidden min-w-0 max-w-full">
+          <div className="dashboard-body bg-neutral-50 dark:bg-[#1e2734] md:p-3 p-2 flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
             {children}
           </div>
         </div>
       ) : (
-        <div className="flex flex-col">
-          <div className="dashboard-body bg-neutral-50 dark:bg-[#1e2734] md:p-6 p-4 min-h-[calc(100vh-46px)] flex-1">
+        <div className="flex flex-col min-w-0 max-w-full overflow-x-hidden">
+          <div className="dashboard-body bg-neutral-50 dark:bg-[#1e2734] md:p-6 p-4 min-h-[calc(100vh-46px)] flex-1 min-w-0">
             {children}
           </div>
           <Footer />

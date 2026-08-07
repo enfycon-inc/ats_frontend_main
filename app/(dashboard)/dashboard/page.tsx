@@ -108,49 +108,36 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <SiteBreadcrumb />
 
-      {/* Welcome Banner */}
-      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-950 p-6 md:p-8 text-white shadow-md border border-slate-800">
-        <div className="absolute -right-10 -bottom-10 opacity-10 text-[180px] font-black select-none pointer-events-none">
-          ATS
-        </div>
-        <div className="relative z-10 max-w-2xl space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold border border-indigo-500/30">
-            <Icon icon="heroicons:sparkles" className="h-3.5 w-3.5" />
-            {profile?.tenantDomain || "Company Workspace"}
+      {/* Workspace Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              Welcome back, {profile?.fullName || "Staff Member"}!
+            </h1>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold border border-indigo-200 dark:border-indigo-800">
+              <Icon icon="heroicons:sparkles" className="h-3 w-3" />
+              {profile?.tenantDomain || "Workspace"}
+            </span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-            Welcome back, {profile?.fullName || "Staff Member"}!
-          </h1>
-          <p className="text-slate-300 text-sm md:text-base max-w-md">
-            Here is your dynamic workspace overview. Configure requirements, review candidate pipeline, and check staffing metrics.
+          <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Monitor requisition status, review candidate pipeline, and manage active staffing operations.
           </p>
+        </div>
 
-          <div className="pt-2 flex flex-wrap items-center gap-3">
-            <Badge className="bg-white/10 text-white hover:bg-white/20 border-white/10 font-semibold px-2.5 py-1 text-xs">
-              Role: {roleName}
-            </Badge>
-            {isAlias && (
-              <Badge className="bg-amber-500/25 text-amber-300 border-amber-500/30 font-semibold px-2.5 py-1 text-xs flex items-center gap-1">
-                <Icon icon="heroicons:cpu-chip" className="h-3.5 w-3.5" />
-                Template: {systemRole.replace("_", " ")}
-              </Badge>
-            )}
-            
-            <div className="ml-auto flex items-center gap-2">
-              <Link href="/job-posting/new">
-                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold gap-1 shadow-sm h-8">
-                  <Icon icon="heroicons:plus-circle" className="h-4 w-4" />
-                  + Create Requisition
-                </Button>
-              </Link>
-              <Link href="/utility/submissions">
-                <Button size="sm" variant="outline" className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs font-bold gap-1 h-8">
-                  <Icon icon="heroicons:clipboard-document-list" className="h-4 w-4" />
-                  Submissions Tracker
-                </Button>
-              </Link>
-            </div>
-          </div>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <Link href="/job-posting/new">
+            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-1.5 shadow-xs h-9 px-3.5 cursor-pointer">
+              <Icon icon="heroicons:plus-circle" className="h-4 w-4" />
+              + Create Requisition
+            </Button>
+          </Link>
+          <Link href="/utility/submissions">
+            <Button size="sm" variant="outline" className="text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold gap-1.5 h-9 px-3.5 cursor-pointer">
+              <Icon icon="heroicons:clipboard-document-list" className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              Submissions Tracker
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -1098,53 +1085,53 @@ function AccountManagerDashboardView({
       {/* AM Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Jobs Card */}
-        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
+        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 flex items-center justify-center text-2xl shadow-inner shrink-0">
+            <div className="h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-2xl shadow-inner shrink-0 border border-blue-100 dark:border-blue-900/30">
               <Icon icon="heroicons:briefcase" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Total Jobs</p>
-              <h3 className="text-2xl font-bold text-default-850 mt-1">{canViewJobs ? totalJobs : "N/A"}</h3>
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Total Jobs</p>
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">{canViewJobs ? totalJobs : "N/A"}</h3>
             </div>
           </CardContent>
         </Card>
 
         {/* Total Submissions Card */}
-        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
+        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 flex items-center justify-center text-2xl shadow-inner shrink-0">
+            <div className="h-12 w-12 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center text-2xl shadow-inner shrink-0 border border-purple-100 dark:border-purple-900/30">
               <Icon icon="heroicons:document-text" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Total Submissions</p>
-              <h3 className="text-2xl font-bold text-default-850 mt-1">{canViewJobs ? totalSubmissions : "N/A"}</h3>
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Total Submissions</p>
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">{canViewJobs ? totalSubmissions : "N/A"}</h3>
             </div>
           </CardContent>
         </Card>
 
         {/* Filled Jobs Card */}
-        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
+        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl shadow-inner shrink-0">
+            <div className="h-12 w-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl shadow-inner shrink-0 border border-emerald-100 dark:border-emerald-900/30">
               <Icon icon="heroicons:user-group" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Filled Jobs</p>
-              <h3 className="text-2xl font-bold text-default-850 mt-1">{canViewJobs ? filledJobsCount : "N/A"}</h3>
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Filled Jobs</p>
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">{canViewJobs ? filledJobsCount : "N/A"}</h3>
             </div>
           </CardContent>
         </Card>
 
         {/* Jobs On Hold Card */}
-        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm hover:shadow transition-shadow">
+        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 flex items-center justify-center text-2xl shadow-inner shrink-0">
+            <div className="h-12 w-12 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-2xl shadow-inner shrink-0 border border-amber-100 dark:border-amber-900/30">
               <Icon icon="heroicons:clock" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">Jobs On Hold</p>
-              <h3 className="text-2xl font-bold text-default-850 mt-1">{canViewJobs ? holdJobsCount : "N/A"}</h3>
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Jobs On Hold</p>
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">{canViewJobs ? holdJobsCount : "N/A"}</h3>
             </div>
           </CardContent>
         </Card>

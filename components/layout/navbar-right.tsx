@@ -476,18 +476,20 @@ function ProfileDropdownNav() {
   }, [open]);
 
   const userName = session?.user?.name ?? "Sahadeb";
-  const systemRole = overrideRole || (session as any)?.user?.systemRole || "RECRUITER";
+  const actualRole = (session as any)?.user?.systemRole || (session as any)?.user?.roles?.[0] || "RECRUITER";
 
   const roleLabels: Record<string, string> = {
     SUPER_ADMIN: "Global Admin",
     ADMIN: "Tenant Admin",
+    BRANCH_ADMIN: "Branch Admin",
     ACCOUNT_MANAGER: "Account Manager",
     POD_LEAD: "Pod Lead",
     DELIVERY_HEAD: "Delivery Head",
     RECRUITER: "Recruiter",
+    TRACKER: "Tracker",
   };
 
-  const displayRole = roleLabels[systemRole] || systemRole.replace("_", " ");
+  const displayRole = roleLabels[actualRole] || actualRole.replace("_", " ");
 
   return (
     <div ref={ref} className="relative">

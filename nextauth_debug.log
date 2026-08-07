@@ -96,3 +96,24 @@
 [2026-08-07T00:07:01.583Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
 [2026-08-07T00:07:01.933Z] Localhost backend response status: 200
 [2026-08-07T00:07:01.938Z] Backend login successful. User data: {"id":"850f4384-e579-41a0-a4e7-613c4ca198be","email":"admin@enfycon.com","fullName":"Enfy Admin","roles":["ADMIN","SUPER_ADMIN"],"tenantId":"d3b07384-d113-49c3-a555-9ee75c13ca33","defaultMarket":"IN","tenantDomain":"enfycon","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","platform:manage","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"SUPER_ADMIN","podId":null,"branchId":"cb93e495-52a0-4b2a-999b-d4517e7f7d82","branchName":"Default Enfy SaaS Tenant Headquarters","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-07T09:09:25.583Z] Authorize started for email: admin@enfycon.com
+[2026-08-07T09:09:25.589Z] Parsed credentials: email=admin@enfycon.com, subdomain=
+[2026-08-07T09:09:25.592Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-07T09:09:26.604Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-07T09:09:26.606Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-07T09:09:26.917Z] Localhost backend response status: 200
+[2026-08-07T09:09:26.921Z] Backend login successful. User data: {"id":"850f4384-e579-41a0-a4e7-613c4ca198be","email":"admin@enfycon.com","fullName":"Enfy Admin","roles":["ADMIN","SUPER_ADMIN"],"tenantId":"d3b07384-d113-49c3-a555-9ee75c13ca33","defaultMarket":"IN","tenantDomain":"enfycon","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","platform:manage","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"SUPER_ADMIN","podId":null,"branchId":"cb93e495-52a0-4b2a-999b-d4517e7f7d82","branchName":"Default Enfy SaaS Tenant Headquarters","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-07T09:10:40.455Z] Authorize started for email: am1@deb.com
+[2026-08-07T09:10:40.459Z] Parsed credentials: email=am1@deb.com, subdomain=deb
+[2026-08-07T09:10:40.463Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-07T09:10:41.471Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-07T09:10:41.475Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-07T09:10:42.040Z] Localhost backend response status: 200
+[2026-08-07T09:10:42.044Z] Backend login successful. User data: {"id":"969a44ce-51d0-4bdc-8231-364358349ff2","email":"am1@deb.com","fullName":"account manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c6dcb074-4fda-44e8-a8bf-7c337f0ca108","branchName":"indbbsr","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-07T09:28:04.539Z] Authorize started for email: deb@deb.com
+[2026-08-07T09:28:04.544Z] Parsed credentials: email=deb@deb.com, subdomain=deb
+[2026-08-07T09:28:04.545Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-07T09:28:05.553Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-07T09:28:05.558Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-07T09:28:06.058Z] Localhost backend response status: 200
+[2026-08-07T09:28:06.063Z] Backend login successful. User data: {"id":"fa6898d0-39fb-4550-b5b3-3a5a3f0e07e6","email":"deb@deb.com","fullName":"deb","roles":["ADMIN"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}

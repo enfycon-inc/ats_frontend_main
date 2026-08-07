@@ -174,7 +174,7 @@ export default function JobMatchesPage() {
 
   return (
     <div className="min-h-full bg-neutral-50 dark:bg-slate-950 [--meter-track:#e5e7eb] dark:[--meter-track:#334155]">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 py-5">
+      <div className="w-full max-w-full px-4 md:px-6 py-5 space-y-4">
         {/* Breadcrumb / back */}
         <button
           onClick={() => router.push("/job-posting")}

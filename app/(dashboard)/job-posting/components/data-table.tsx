@@ -619,8 +619,8 @@ export default function DataTable({
                           onDoubleClick={() => isEditable && handleCellDoubleClick(job.id, colId, rawValue)}
                           className={cn(
                             "py-2 px-2 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap font-normal text-neutral-800 dark:text-neutral-200 transition-colors",
-                            isEditable && !isCellEditing ? "hover:bg-yellow-50/60 dark:hover:bg-yellow-950/10 cursor-cell" : "",
-                            isCellEditing ? "p-0 bg-blue-50/40 dark:bg-blue-950/20" : ""
+                            isEditable && !isCellEditing ? "hover:bg-blue-50 dark:hover:bg-blue-950/50 cursor-cell" : "",
+                            isCellEditing ? "p-0 bg-blue-100/90 dark:bg-blue-950/90 ring-2 ring-blue-600" : ""
                           )}
                           title={isEditable && !isCellEditing ? "Double-click to edit" : undefined}
                         >
