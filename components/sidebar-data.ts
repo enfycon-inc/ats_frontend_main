@@ -117,7 +117,7 @@ export const data = {
       label: "Application",
     },
     {
-      title: "Email",
+      title: "Mass Mail",
       url: "/email",
       icon: Mail,
     },

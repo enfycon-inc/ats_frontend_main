@@ -33,6 +33,7 @@ interface Tenant {
   status: string;
   defaultMarket: "US" | "IN";
   userLimit: number;
+  maxBranches?: number;
   createdAt: string;
 }
 

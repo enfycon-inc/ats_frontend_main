@@ -232,7 +232,7 @@ export default function BranchManagementPage() {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-6 w-full max-w-full space-y-6">
       
       {/* HEADER SECTION */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-xl border border-neutral-200 dark:border-slate-800 shadow-sm">
@@ -426,7 +426,7 @@ export default function BranchManagementPage() {
                               variant="outline"
                               className="h-7 text-[11px] font-semibold border-neutral-300"
                             >
-                              Manage Roster ({b.usersCount || 0})
+                              Manage Users ({b.usersCount || 0})
                             </Button>
                           </div>
                         </div>
@@ -449,7 +449,7 @@ export default function BranchManagementPage() {
 
                         {/* MEMBERS NESTED NODES */}
                         <div className="pl-6 border-l-2 border-dashed border-neutral-300 dark:border-slate-700 space-y-2 pt-1">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Assigned Team Roster</p>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Assigned Team</p>
                           
                           {members.length === 0 ? (
                             <p className="text-xs text-neutral-400 italic">No recruiters assigned to this branch yet.</p>
@@ -553,7 +553,7 @@ export default function BranchManagementPage() {
                     size="sm"
                     className="h-7 text-[11px] font-semibold border-neutral-300 rounded flex items-center gap-1"
                   >
-                    <Users className="h-3.5 w-3.5 text-indigo-650" /> Roster & Roles ({b.usersCount || 0})
+                    <Users className="h-3.5 w-3.5 text-indigo-650" /> Users & Roles ({b.usersCount || 0})
                   </Button>
 
                   <Button
@@ -729,7 +729,7 @@ export default function BranchManagementPage() {
             <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
               <div>
                 <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                  <Users className="h-4 w-4 text-indigo-650" /> Branch Roster: {selectedBranch.name}
+                  <Users className="h-4 w-4 text-indigo-650" /> Branch Team: {selectedBranch.name}
                 </h3>
                 <p className="text-[11px] text-neutral-400">Staff members & custom multi-role assignments</p>
               </div>
@@ -751,7 +751,7 @@ export default function BranchManagementPage() {
                     rel="noreferrer"
                     className="text-[10.5px] font-bold text-indigo-650 hover:underline"
                   >
-                    Manage Full Roster →
+                    Manage All Users →
                   </a>
                 </div>
 
@@ -843,7 +843,7 @@ export default function BranchManagementPage() {
 
             <div className="p-4 bg-neutral-50 dark:bg-slate-850 border-t border-neutral-100 dark:border-slate-800 text-right">
               <Button size="sm" variant="outline" onClick={() => setIsMembersOpen(false)} className="h-8 text-xs font-bold">
-                Close Roster
+                Close
               </Button>
             </div>
           </div>

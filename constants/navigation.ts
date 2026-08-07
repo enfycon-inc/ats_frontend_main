@@ -182,13 +182,13 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
 // ─────────────────────────────────────────────
 
 export const MORE_NAV_ITEMS: NavItem[] = [
-  { id: "email", label: "Email", href: "/email", icon: Mail },
+  { id: "email", label: "Mass Mail", href: "/email", icon: Mail },
   { id: "calendar", label: "Calendar", href: "/calendar", icon: Calendar },
   { id: "documents", label: "Documents", href: "/documents", icon: FileText },
   { id: "database", label: "Database", href: "/database", icon: Database },
   { id: "integrations", label: "Integrations", href: "/integrations", icon: Globe },
   { id: "tenant-management", label: "Tenant Management", href: "/utility/approvals", icon: Building2 },
-  { id: "user-management", label: "User & Team Roster", href: "/utility/users", icon: Users },
+  { id: "user-management", label: "Users & Teams", href: "/utility/users", icon: Users },
   { id: "branch-management", label: "Branch & Office Locations", href: "/utility/branches", icon: MapPin },
   { id: "role-management", label: "Role Management", href: "/utility/roles-permissions", icon: UserCheck },
   { id: "pod-management", label: "Recruitment Pods", href: "/utility/pods", icon: Users },
@@ -278,6 +278,6 @@ export const APP_LAUNCHER_ITEMS: AppLauncherItem[] = [
   { id: "pods", label: "Pods", href: "/utility/pods", icon: Users, color: "#6f42c1" },
   { id: "reports", label: "Reports", href: "/reports", icon: BarChart3, color: "#fd7e14" },
   { id: "calendar", label: "Calendar", href: "/calendar", icon: Calendar, color: "#0dcaf0" },
-  { id: "email", label: "Email", href: "/email", icon: Mail, color: "#d63384" },
+  { id: "email", label: "Mass Mail", href: "/email", icon: Mail, color: "#d63384" },
   { id: "settings", label: "Settings", href: "/company", icon: Settings, color: "#6c757d" },
 ];

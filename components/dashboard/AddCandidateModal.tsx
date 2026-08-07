@@ -76,8 +76,18 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
     }
   };
 
+  const handleClose = () => {
+    onClose();
+    if (typeof document !== "undefined") {
+      setTimeout(() => {
+        document.body.style.pointerEvents = "";
+        document.body.style.overflow = "";
+      }, 50);
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Source Candidate (Upload CV)</DialogTitle>
@@ -148,7 +158,7 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
         </div>
         
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={onClose} className="text-xs">Cancel</Button>
+          <Button variant="outline" size="sm" onClick={handleClose} className="text-xs">Cancel</Button>
           <Button size="sm" onClick={handleSubmit} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs">
             {loading ? "Submitting..." : "Submit Candidate"}
           </Button>

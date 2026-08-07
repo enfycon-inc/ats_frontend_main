@@ -139,7 +139,7 @@ function SidebarProvider({
             } as React.CSSProperties
           }
           className={cn(
-            "group/sidebar-wrapper dashboard-sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full",
+            "group/sidebar-wrapper dashboard-sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex h-screen w-full overflow-hidden",
             className
           )}
           {...props}
@@ -304,8 +304,8 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
     <main
       data-slot="sidebar-inset"
       className={cn(
-        "dashboard-header-wrapper bg-background relative flex w-full flex-col min-w-0 max-w-full overflow-x-hidden",
-        "dashboard-header-wrapper md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2 sticky top-0 z-10 shadow-sm",
+        "dashboard-header-wrapper bg-background relative flex w-full flex-col min-w-0 max-w-full overflow-x-hidden overflow-y-auto h-screen",
+        "dashboard-header-wrapper md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
         className
       )}
       {...props}

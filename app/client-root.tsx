@@ -4,6 +4,7 @@ import Footer from "@/components/layout/footer";
 import ThemeCustomizer from "@/components/theme-customizer/theme-customizer";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ReactNode, useEffect, useMemo, useState } from "react";
+import { useRadixScrollLockFix } from "@/hooks/use-radix-scroll-lock-fix";
 import { Toaster } from "react-hot-toast";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -50,6 +51,9 @@ export function ClientRoot({
     }
   }, [session]);
 
+  // Fix Radix UI scroll-lock padding-right injection on body
+  useRadixScrollLockFix();
+
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,8 +96,8 @@ export function ClientRoot({
           </div>
         </div>
       ) : (
-        <div className="flex flex-col min-w-0 max-w-full overflow-x-hidden">
-          <div className="dashboard-body bg-neutral-50 dark:bg-[#1e2734] md:p-6 p-4 min-h-[calc(100vh-46px)] flex-1 min-w-0">
+        <div className="flex flex-col min-w-0 max-w-full overflow-x-hidden min-h-[calc(100vh-46px)] bg-neutral-50 dark:bg-[#1e2734]">
+          <div className="dashboard-body md:p-6 p-4 flex-1 min-w-0 flex flex-col">
             {children}
           </div>
           <Footer />

@@ -552,7 +552,66 @@ html[layout="boron"] .dashboard-sidebar-container {
 
 /* ======================================= Layout Css End ================================== */
 
-html, body {
-  max-width: 100vw !important;
-  overflow-x: hidden !important;
+/* === Radix UI Scroll-Lock Fix ===
+   Radix injects padding-right onto <body> to compensate for a scrollbar
+   that doesn't exist on body (SidebarInset is the real scroll container).
+   This creates phantom whitespace on the right. Block it entirely. */
+body,
+body[style],
+body[data-scroll-locked] {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
 }
+
+html {
+  overflow-x: hidden;
+}
+
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+/* ======================================= Custom Scrollbars ================================== */
+
+/* Firefox — thin scrollbar with brand blue */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(26, 79, 160, 0.45) transparent;
+}
+
+/* Chrome, Edge, Safari */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(26, 79, 160, 0.45);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(26, 79, 160, 0.75);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Dark mode */
+.dark *::-webkit-scrollbar-thumb {
+  background-color: rgba(99, 147, 255, 0.4);
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(99, 147, 255, 0.65);
+}
+
+.dark * {
+  scrollbar-color: rgba(99, 147, 255, 0.4) transparent;
+}
+

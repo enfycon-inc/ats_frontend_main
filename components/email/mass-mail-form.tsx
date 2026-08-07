@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Papa from "papaparse";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,9 +21,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Bold, Italic, Link2, List, ListOrdered, Send, Clock, X, Paperclip, PlusCircle, Mail, Globe, Server, Settings } from "lucide-react";
+import { Bold, Italic, Link2, List, ListOrdered, Send, Clock, X, Paperclip, PlusCircle, Mail, Globe, Server, Settings, Lock, ShieldCheck } from "lucide-react";
 import { SmtpConfigModal } from "@/components/email/smtp-config-modal";
 import Link from 'next/link';
+import { atsApi } from "@/lib/ats-api";
 
 export function MassMailForm() {
   const [subject, setSubject] = useState("");
@@ -46,12 +47,85 @@ export function MassMailForm() {
   const [csvRecipients, setCsvRecipients] = useState<{ firstName: string; lastName: string; email: string; metadata?: any }[]>([]);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const subjectInputRef = useRef<HTMLInputElement>(null);
+  const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [lastFocusedField, setLastFocusedField] = useState<'subject' | 'body'>('body');
 
   // Delivery Settings
   const [ratePerMinute, setRatePerMinute] = useState(30);
   const [ratePerHour, setRatePerHour] = useState(500);
   const [randomizeDelay, setRandomizeDelay] = useState(true);
   const [isSending, setIsSending] = useState(false);
+
+  // User Profile & Delivery Settings Permissions
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    atsApi.auth.me().then((res) => {
+      if (res) setUserProfile(res);
+    }).catch(() => {
+      const local = atsApi.auth.getCurrentUser();
+      if (local) setUserProfile(local);
+    });
+  }, []);
+
+  const canEditDeliverySettings = useMemo(() => {
+    const u = userProfile || (typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null);
+    if (!u) return true;
+    const mainRole = String(u.role || u.roleName || "").toUpperCase();
+    const rolesArr: string[] = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toUpperCase()) : [];
+    
+    const privileged = [
+      "SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "BRANCH_ADMIN",
+      "BRANCH_MANAGER", "BRANCH_HEAD", "BRANCH_LEAD", "ACCOUNT_MANAGER"
+    ];
+    
+    if (privileged.includes(mainRole)) return true;
+    if (rolesArr.some((r) => privileged.includes(r))) return true;
+    if (mainRole.includes("ADMIN") || mainRole.includes("BRANCH") || mainRole.includes("MANAGER")) return true;
+    if (rolesArr.some((r) => r.includes("ADMIN") || r.includes("BRANCH") || r.includes("MANAGER"))) return true;
+    
+    return false;
+  }, [userProfile]);
+
+  const activeBranchId = useMemo(() => {
+    if (typeof window !== "undefined") {
+      const branchFromStorage = localStorage.getItem("active_branch_id");
+      if (branchFromStorage) return branchFromStorage;
+    }
+    return userProfile?.branchId || userProfile?.branchName || "default_branch";
+  }, [userProfile]);
+
+  const branchSettingsKey = `mass_mail_delivery_settings_${activeBranchId}`;
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(branchSettingsKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (typeof parsed.ratePerMinute === "number") setRatePerMinute(parsed.ratePerMinute);
+          if (typeof parsed.ratePerHour === "number") setRatePerHour(parsed.ratePerHour);
+          if (typeof parsed.randomizeDelay === "boolean") setRandomizeDelay(parsed.randomizeDelay);
+        } catch (e) {
+          console.error("Error loading branch delivery settings", e);
+        }
+      }
+    }
+  }, [branchSettingsKey]);
+
+  const updateBranchSettings = (min: number, hr: number, rand: boolean) => {
+    setRatePerMinute(min);
+    setRatePerHour(hr);
+    setRandomizeDelay(rand);
+    if (canEditDeliverySettings && typeof window !== "undefined") {
+      localStorage.setItem(branchSettingsKey, JSON.stringify({
+        ratePerMinute: min,
+        ratePerHour: hr,
+        randomizeDelay: rand,
+      }));
+    }
+  };
 
   // Status Polling
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
@@ -229,33 +303,71 @@ export function MassMailForm() {
     }
   };
   
-  const insertMergeField = (field: string) => {
-    setBody((prev) => prev + `{{${field}}} `);
-  };
+  const insertMergeField = useCallback((field: string) => {
+    const tag = `{{${field}}}`;
+    if (lastFocusedField === 'subject' && subjectInputRef.current) {
+      const el = subjectInputRef.current;
+      const start = el.selectionStart ?? subject.length;
+      const end = el.selectionEnd ?? subject.length;
+      const newVal = subject.slice(0, start) + tag + subject.slice(end);
+      setSubject(newVal);
+      // Restore cursor after the inserted tag
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(start + tag.length, start + tag.length);
+      });
+    } else {
+      const el = bodyTextareaRef.current;
+      if (el) {
+        const start = el.selectionStart ?? body.length;
+        const end = el.selectionEnd ?? body.length;
+        const newVal = body.slice(0, start) + tag + body.slice(end);
+        setBody(newVal);
+        requestAnimationFrame(() => {
+          el.focus();
+          el.setSelectionRange(start + tag.length, start + tag.length);
+        });
+      } else {
+        setBody((prev) => prev + tag);
+      }
+    }
+  }, [lastFocusedField, subject, body]);
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-7xl mx-auto px-4">
+    <div className="flex flex-col gap-5 w-full max-w-full">
       
-      <div className="flex flex-col gap-2">
-        <div className="flex justify-between items-end">
-          <div>
-            <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">Mass Email Campaigns</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Send personalized bulk emails to candidates and track engagement.</p>
-          </div>
-          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-md">
-            <button 
-              className={`px-4 py-1.5 text-sm rounded-sm transition-all ${activeTab === 'new' ? 'bg-white dark:bg-slate-700 shadow-sm font-medium' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-              onClick={() => setActiveTab('new')}
-            >
-              New Campaign
-            </button>
-            <button 
-              className={`px-4 py-1.5 text-sm rounded-sm transition-all ${activeTab === 'history' ? 'bg-white dark:bg-slate-700 shadow-sm font-medium' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-              onClick={() => { setActiveTab('history'); fetchHistory(); }}
-            >
-              History
-            </button>
-          </div>
+      {/* STANDARD PAGE HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-default-200 dark:border-slate-800">
+        <div>
+          <h1 className="text-xl font-bold text-default-900 dark:text-white flex items-center gap-2">
+            <Mail className="h-5 w-5 text-indigo-600" /> Mass Email Campaigns
+          </h1>
+          <p className="text-xs text-default-500 dark:text-neutral-400 mt-1">
+            Send personalized bulk emails to candidates and track engagement.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-slate-800/80 p-1 rounded-lg border border-neutral-200 dark:border-slate-700">
+          <button 
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+              activeTab === 'new' 
+                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs font-bold' 
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
+            }`}
+            onClick={() => setActiveTab('new')}
+          >
+            New Campaign
+          </button>
+          <button 
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+              activeTab === 'history' 
+                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs font-bold' 
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
+            }`}
+            onClick={() => { setActiveTab('history'); fetchHistory(); }}
+          >
+            History
+          </button>
         </div>
       </div>
 
@@ -331,7 +443,7 @@ export function MassMailForm() {
       )}
 
       {activeTab === 'new' && (
-      <Card className="p-6 border shadow-sm">
+      <Card className="p-6 border border-default-200 dark:border-slate-800 shadow-xs bg-white dark:bg-slate-900 w-full">
         <div className="space-y-6">
       
       {/* Header */}
@@ -548,21 +660,87 @@ export function MassMailForm() {
           
           <div className="flex flex-col gap-2">
             <Label>Template</Label>
-            <Select 
+            <Select
               onValueChange={(val) => {
-                if (val === "invite") {
-                  setSubject("Interview Invitation: {{Job_Title}}");
-                  setBody("Hi {{Candidate_Name}},\n\nWe would like to invite you for an interview for the {{Job_Title}} position.\n\nBest,\nRecruitment Team");
+                const templates: Record<string, { subject: string; body: string }> = {
+                  initial_outreach: {
+                    subject: "Exciting Opportunity: {{Job_Title}} at {{Company_Name}}",
+                    body: `Hi {{Candidate_Name}},\n\nI came across your profile and was impressed by your background in {{Candidate_Skill}}.\n\nWe have an exciting opening for a {{Job_Title}} role at {{Company_Name}} that I think could be a great fit for you.\n\nHere's a quick overview:\n- Role: {{Job_Title}}\n- Location: {{Job_Location}}\n- Department: {{Department}}\n\nI'd love to schedule a quick 15-minute call to share more details. Would you be open to connecting this week?\n\nBest regards,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
+                  },
+                  job_alert: {
+                    subject: "New Job Match: {{Job_Title}} – {{Company_Name}}",
+                    body: `Hi {{Candidate_Name}},\n\nBased on your profile, we think you'd be a great fit for a new opportunity we just posted:\n\n📌 Role: {{Job_Title}}\n📍 Location: {{Job_Location}}\n💼 Department: {{Department}}\n📅 Start Date: {{Start_Date}}\n\nApply now or reply to this email to express interest. We'd love to hear from you!\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Talent Team`,
+                  },
+                  re_engagement: {
+                    subject: "We'd love to reconnect, {{Candidate_Name}}!",
+                    body: `Hi {{Candidate_Name}},\n\nIt's been a while since we last spoke, and we have some exciting new opportunities that might interest you.\n\nWe currently have openings in {{Department}} that align with your experience in {{Candidate_Skill}}.\n\nWould you be open to a quick call to catch up?\n\nWarm regards,\n{{Recruiter_Name}}\n{{Company_Name}} Talent Team`,
+                  },
+                  application_ack: {
+                    subject: "We received your application – {{Job_Title}}",
+                    body: `Hi {{Candidate_Name}},\n\nThank you for applying for the {{Job_Title}} position at {{Company_Name}}!\n\nWe have received your application and our team is currently reviewing it. We will be in touch within {{Response_Days}} business days with an update.\n\nThank you for your interest!\n\nBest regards,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
+                  },
+                  interview_invite: {
+                    subject: "Interview Invitation – {{Job_Title}} at {{Company_Name}}",
+                    body: `Hi {{Candidate_Name}},\n\nCongratulations! We'd like to invite you to interview for the {{Job_Title}} position at {{Company_Name}}.\n\n📅 Date: {{Interview_Date}}\n⏰ Time: {{Interview_Time}}\n📍 Location / Link: {{Interview_Link}}\n👤 Interviewer: {{Interviewer_Name}}\n\nPlease confirm your availability by replying to this email.\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
+                  },
+                  interview_reminder: {
+                    subject: "Reminder: Your Interview Tomorrow – {{Job_Title}}",
+                    body: `Hi {{Candidate_Name}},\n\nThis is a friendly reminder about your upcoming interview for the {{Job_Title}} role at {{Company_Name}}.\n\n📅 Date: {{Interview_Date}}\n⏰ Time: {{Interview_Time}}\n📍 Location / Link: {{Interview_Link}}\n\nIf you need to reschedule, please let us know as soon as possible.\n\nSee you soon!\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
+                  },
+                  assessment_invite: {
+                    subject: "Skills Assessment – {{Job_Title}} at {{Company_Name}}",
+                    body: `Hi {{Candidate_Name}},\n\nAs part of our selection process for the {{Job_Title}} role, we'd like to invite you to complete a short skills assessment.\n\n🔗 Assessment Link: {{Assessment_Link}}\n⏱ Estimated Time: {{Assessment_Duration}} minutes\n📅 Deadline: {{Assessment_Deadline}}\n\nPlease reach out if you have any questions.\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
+                  },
+                  offer_notification: {
+                    subject: "Congratulations! Job Offer – {{Job_Title}}",
+                    body: `Hi {{Candidate_Name}},\n\nWe are thrilled to extend an offer for the {{Job_Title}} position at {{Company_Name}}!\n\n- 📋 Role: {{Job_Title}}\n- 💰 Compensation: {{Compensation}}\n- 📍 Location: {{Job_Location}}\n- 📅 Start Date: {{Start_Date}}\n\nYour formal offer letter will follow shortly. Please confirm your acceptance by {{Offer_Deadline}}.\n\nWe're excited to have you join the team!\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} HR Team`,
+                  },
+                  onboarding_welcome: {
+                    subject: "Welcome to {{Company_Name}}, {{Candidate_Name}}! 🎉",
+                    body: `Hi {{Candidate_Name}},\n\nWelcome to the {{Company_Name}} family! We're so excited to have you join us as {{Job_Title}}.\n\n📅 Start Date: {{Start_Date}}\n📍 Location: {{Job_Location}}\n⏰ Reporting Time: {{Reporting_Time}}\n👤 Your Manager: {{Manager_Name}}\n\nSee you soon!\n\n{{Recruiter_Name}}\n{{Company_Name}} HR Team`,
+                  },
+                  rejection_pre_interview: {
+                    subject: "Your Application – {{Job_Title}} at {{Company_Name}}",
+                    body: `Hi {{Candidate_Name}},\n\nThank you for applying for the {{Job_Title}} position at {{Company_Name}}.\n\nAfter careful review, we have decided to move forward with other candidates whose experience more closely matches our current needs.\n\nWe will keep your profile on file for future openings.\n\nThank you again and we wish you all the best.\n\nKind regards,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
+                  },
+                  rejection_post_interview: {
+                    subject: "Update on Your Application – {{Job_Title}}",
+                    body: `Hi {{Candidate_Name}},\n\nThank you for taking the time to meet with us for the {{Job_Title}} role at {{Company_Name}}. We genuinely enjoyed learning more about your background.\n\nAfter careful consideration, we have decided to move forward with another candidate. We were impressed by your {{Candidate_Skill}} and would love to stay in touch for future opportunities.\n\nWarm regards,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
+                  },
+                  event_invite: {
+                    subject: "You're Invited: {{Event_Name}} – {{Company_Name}}",
+                    body: `Hi {{Candidate_Name}},\n\nYou're invited to {{Event_Name}}, hosted by {{Company_Name}}!\n\n📅 Date: {{Event_Date}}\n⏰ Time: {{Event_Time}}\n📍 Location: {{Event_Location}}\n🔗 Register Here: {{Event_Link}}\n\nRSVP by {{RSVP_Deadline}}.\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Talent Team`,
+                  },
+                };
+                if (templates[val]) {
+                  setSubject(templates[val].subject);
+                  setBody(templates[val].body);
                 }
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a template..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="invite">Interview Invitation</SelectItem>
-                <SelectItem value="sourcing">Initial Outreach</SelectItem>
-                <SelectItem value="rejection">Application Update</SelectItem>
+                <SelectItem value="_s" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Sourcing</SelectItem>
+                <SelectItem value="initial_outreach">Initial Outreach</SelectItem>
+                <SelectItem value="job_alert">Job Alert</SelectItem>
+                <SelectItem value="re_engagement">Re-Engagement Campaign</SelectItem>
+                <SelectItem value="_a" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Application</SelectItem>
+                <SelectItem value="application_ack">Application Acknowledgement</SelectItem>
+                <SelectItem value="_i" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Interview</SelectItem>
+                <SelectItem value="interview_invite">Interview Invitation</SelectItem>
+                <SelectItem value="interview_reminder">Interview Reminder</SelectItem>
+                <SelectItem value="_as" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Assessment</SelectItem>
+                <SelectItem value="assessment_invite">Skills Assessment Invite</SelectItem>
+                <SelectItem value="_o" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Offer & Hiring</SelectItem>
+                <SelectItem value="offer_notification">Job Offer Notification</SelectItem>
+                <SelectItem value="onboarding_welcome">Onboarding Welcome</SelectItem>
+                <SelectItem value="_r" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Rejections</SelectItem>
+                <SelectItem value="rejection_pre_interview">Rejection (Pre-Interview)</SelectItem>
+                <SelectItem value="rejection_post_interview">Rejection (Post-Interview)</SelectItem>
+                <SelectItem value="_e" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Events</SelectItem>
+                <SelectItem value="event_invite">Event / Job Fair Invite</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -572,9 +750,11 @@ export function MassMailForm() {
         <div className="flex flex-col gap-2">
           <Label>Subject</Label>
           <Input 
+            ref={subjectInputRef}
             placeholder="Enter email subject" 
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
+            onFocus={() => setLastFocusedField('subject')}
           />
         </div>
 
@@ -618,36 +798,72 @@ export function MassMailForm() {
           </div>
           
           <textarea
+            ref={bodyTextareaRef}
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            onFocus={() => setLastFocusedField('body')}
             placeholder="Type your message here..."
             className="w-full min-h-[300px] p-4 bg-transparent outline-none resize-y text-sm text-neutral-800 dark:text-neutral-200"
           />
         </div>
 
-        {/* Delivery Settings */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border border-blue-100 bg-blue-50/50 dark:border-blue-900/30 dark:bg-blue-900/10 rounded-md mt-2">
-          <div className="flex flex-col gap-2">
-            <Label className="text-xs text-neutral-500">Emails Per Minute (Max)</Label>
-            <Input type="number" value={ratePerMinute} onChange={e => {
-              const val = Number(e.target.value);
-              setRatePerMinute(val);
-              setRatePerHour(val * 60);
-            }} className="h-8" />
+        {/* Delivery Settings (Branch Isolated & Role Protected) */}
+        <div className="p-4 border border-blue-100 bg-blue-50/50 dark:border-blue-900/30 dark:bg-blue-900/10 rounded-lg space-y-3 mt-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-100 dark:border-blue-900/30 pb-2">
+            <span className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              Branch Delivery Rate & Anti-Spam Controls ({userProfile?.branchName || "HQ / Default Branch"})
+            </span>
+            {canEditDeliverySettings ? (
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                Tenant / Branch Admin Access (Editable)
+              </span>
+            ) : (
+              <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+                <Lock className="h-3 w-3" /> Managed by Tenant & Branch Admins
+              </span>
+            )}
           </div>
-          <div className="flex flex-col gap-2">
-            <Label className="text-xs text-neutral-500">Emails Per Hour (Max)</Label>
-            <Input type="number" value={ratePerHour} onChange={e => {
-              const val = Number(e.target.value);
-              setRatePerHour(val);
-              setRatePerMinute(Math.round(val / 60));
-            }} className="h-8" />
-          </div>
-          <div className="flex flex-col gap-2 justify-center">
-            <Label className="flex items-center gap-2 text-sm cursor-pointer mt-4">
-              <input type="checkbox" checked={randomizeDelay} onChange={e => setRandomizeDelay(e.target.checked)} className="rounded border-neutral-300 text-primary focus:ring-primary h-4 w-4" />
-              Randomize wait time (Anti-spam jitter)
-            </Label>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-neutral-600 dark:text-neutral-300 font-semibold">Emails Per Minute (Max)</Label>
+              <Input 
+                type="number" 
+                disabled={!canEditDeliverySettings}
+                value={ratePerMinute} 
+                onChange={e => {
+                  const val = Number(e.target.value);
+                  updateBranchSettings(val, val * 60, randomizeDelay);
+                }} 
+                className="h-9 disabled:opacity-75 disabled:bg-neutral-100 dark:disabled:bg-slate-800" 
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-neutral-600 dark:text-neutral-300 font-semibold">Emails Per Hour (Max)</Label>
+              <Input 
+                type="number" 
+                disabled={!canEditDeliverySettings}
+                value={ratePerHour} 
+                onChange={e => {
+                  const val = Number(e.target.value);
+                  updateBranchSettings(Math.round(val / 60), val, randomizeDelay);
+                }} 
+                className="h-9 disabled:opacity-75 disabled:bg-neutral-100 dark:disabled:bg-slate-800" 
+              />
+            </div>
+            <div className="flex flex-col justify-end pb-1">
+              <Label className={`flex items-center gap-2 text-xs font-semibold select-none ${!canEditDeliverySettings ? "cursor-not-allowed opacity-75" : "cursor-pointer"}`}>
+                <input 
+                  type="checkbox" 
+                  disabled={!canEditDeliverySettings}
+                  checked={randomizeDelay} 
+                  onChange={e => updateBranchSettings(ratePerMinute, ratePerHour, e.target.checked)} 
+                  className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 disabled:cursor-not-allowed" 
+                />
+                Randomize wait time (Anti-spam jitter)
+              </Label>
+            </div>
           </div>
         </div>
       </div>

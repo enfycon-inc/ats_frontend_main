@@ -3,8 +3,16 @@
 import React, { useState, useEffect } from "react";
 import { 
   Users, UserPlus, Search, Edit2, Key, Shield, Building2, MapPin, 
-  CheckCircle2, XCircle, RefreshCw, Mail, Lock, Sparkles, Filter, ShieldAlert, X, ChevronRight
+  CheckCircle2, XCircle, RefreshCw, Mail, Lock, Sparkles, Filter, ShieldAlert, X, ChevronRight, Loader2,
+  MoreVertical, Trash2, UserCheck, UserX
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,6 +31,7 @@ interface UserItem {
   branchId: string | null;
   branchName: string | null;
   isActive: boolean;
+  lastLoginAt?: string;
   createdAt: string;
 }
 
@@ -33,11 +42,30 @@ export default function UserManagementPage() {
   const [rolesList, setRolesList] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
 
+  const currentUser = typeof window !== 'undefined' ? atsApi.auth.getCurrentUser() : null;
+
+  const getDomainSuffix = () => {
+    const userEmail = profile?.email || currentUser?.email;
+    if (userEmail?.toLowerCase().endsWith("@csm.com")) return "csm";
+    const currentSub = typeof window !== 'undefined' ? getTenantIdentifier() : "";
+    const rawDomain = currentSub || profile?.tenantDomain || currentUser?.tenantDomain || "enfycon";
+    return rawDomain.toLowerCase().endsWith(".com") ? rawDomain.slice(0, -4) : rawDomain;
+  };
+  const tenantDomain = getDomainSuffix();
+  const userLimit = profile?.userLimit || 10;
+
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [branchFilter, setBranchFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
+
+  // Multi-select bulk action state
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [isBulkRoleModalOpen, setIsBulkRoleModalOpen] = useState(false);
+  const [bulkSelectedRoleIds, setBulkSelectedRoleIds] = useState<string[]>([]);
+  const [isBulkMoveBranchModalOpen, setIsBulkMoveBranchModalOpen] = useState(false);
+  const [targetMoveBranchId, setTargetMoveBranchId] = useState("");
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -51,17 +79,49 @@ export default function UserManagementPage() {
 
   // Add Member Form
   const [addForm, setAddForm] = useState({
-    fullName: "",
+    firstName: "",
+    lastName: "",
     emailPrefix: "",
     password: "",
-    role: "RECRUITER",
+    confirmPassword: "",
+    roles: ["RECRUITER"],
     branchId: "",
     sendEmailInvite: false,
   });
 
+  // Debounced Email availability state
+  const [emailStatus, setEmailStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const [emailCheckMsg, setEmailCheckMsg] = useState("");
+
+  useEffect(() => {
+    const rawPrefix = addForm.emailPrefix.trim().toLowerCase();
+    if (!rawPrefix) {
+      setEmailStatus("idle");
+      setEmailCheckMsg("");
+      return;
+    }
+
+    setEmailStatus("checking");
+    const timer = setTimeout(() => {
+      const fullEmail = `${rawPrefix}@${tenantDomain}.com`;
+      const isTaken = users.some((u) => u.email.toLowerCase() === fullEmail);
+
+      if (isTaken) {
+        setEmailStatus("taken");
+        setEmailCheckMsg(`Email ${fullEmail} is already registered.`);
+      } else {
+        setEmailStatus("available");
+        setEmailCheckMsg(`Email ${fullEmail} is available!`);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [addForm.emailPrefix, users, tenantDomain]);
+
   // Edit Member Form
   const [editForm, setEditForm] = useState({
-    fullName: "",
+    firstName: "",
+    lastName: "",
     email: "",
     branchId: "",
     roles: ["RECRUITER"],
@@ -70,17 +130,7 @@ export default function UserManagementPage() {
   // Password Reset Form
   const [newPassword, setNewPassword] = useState("");
 
-  const currentUser = typeof window !== 'undefined' ? atsApi.auth.getCurrentUser() : null;
 
-  const getDomainSuffix = () => {
-    const userEmail = profile?.email || currentUser?.email;
-    if (userEmail?.toLowerCase().endsWith("@csm.com")) return "csm";
-    const currentSub = typeof window !== 'undefined' ? getTenantIdentifier() : "";
-    const rawDomain = currentSub || profile?.tenantDomain || currentUser?.tenantDomain || "enfycon";
-    return rawDomain.toLowerCase().endsWith(".com") ? rawDomain.slice(0, -4) : rawDomain;
-  };
-  const tenantDomain = getDomainSuffix();
-  const userLimit = profile?.userLimit || 10;
 
   useEffect(() => {
     loadData();
@@ -103,7 +153,7 @@ export default function UserManagementPage() {
         setAddForm((prev) => ({ ...prev, branchId: prev.branchId || branchesData[0].id }));
       }
     } catch (err: any) {
-      toast.error("Failed to load user roster: " + (err.message || "Unknown error"));
+      toast.error("Failed to load users: " + (err.message || "Unknown error"));
     } finally {
       setLoading(false);
     }
@@ -111,18 +161,23 @@ export default function UserManagementPage() {
 
   const handleCreateMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedName = addForm.fullName.trim();
+    const firstName = addForm.firstName.trim();
+    const lastName = addForm.lastName.trim();
+    const trimmedName = `${firstName} ${lastName}`.trim();
     const trimmedPrefix = addForm.emailPrefix.trim().toLowerCase();
     const password = addForm.password;
 
-    if (!trimmedName || !trimmedPrefix || !password) {
-      return toast.error("Please fill in all required fields.");
+    if (!firstName || !lastName || !trimmedPrefix || !password) {
+      return toast.error("Please fill in First Name, Last Name, Email, and Password.");
     }
     if (trimmedName.length < 2) {
-      return toast.error("Full Name must be at least 2 characters.");
+      return toast.error("Name must be at least 2 characters.");
     }
     if (password.length < 8) {
       return toast.error("Password must be at least 8 characters.");
+    }
+    if (password !== addForm.confirmPassword) {
+      return toast.error("Passwords do not match. Please verify confirmation password.");
     }
 
     const activeCount = users.filter(u => u.isActive).length;
@@ -139,27 +194,30 @@ export default function UserManagementPage() {
         email: fullEmail,
         fullName: trimmedName,
         password: password,
-        role: addForm.role,
+        role: addForm.roles[0] || "RECRUITER",
         tenantId: tenantId,
         isApproved: true,
       });
 
-      // If branch selected, assign branch
-      if (addForm.branchId) {
-        const freshUsers = await atsApi.auth.listUsers();
-        const createdUser = freshUsers.find((u: any) => u.email === fullEmail);
-        if (createdUser) {
-          await atsApi.auth.updateUserDetail(createdUser.id, { branchId: addForm.branchId });
-        }
+      // Update full roles and branch location after creation
+      const freshUsers = await atsApi.auth.listUsers();
+      const createdUser = freshUsers.find((u: any) => u.email === fullEmail);
+      if (createdUser) {
+        await atsApi.auth.updateUserDetail(createdUser.id, {
+          branchId: addForm.branchId || undefined,
+          roles: addForm.roles,
+        });
       }
 
       toast.success(`Successfully added ${trimmedName} (${fullEmail})!`);
       setIsAddModalOpen(false);
       setAddForm({
-        fullName: "",
+        firstName: "",
+        lastName: "",
         emailPrefix: "",
         password: "",
-        role: "RECRUITER",
+        confirmPassword: "",
+        roles: ["RECRUITER"],
         branchId: "",
         sendEmailInvite: false,
       });
@@ -174,11 +232,18 @@ export default function UserManagementPage() {
   const handleUpdateMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
+    const firstName = editForm.firstName.trim();
+    const lastName = editForm.lastName.trim();
+    const trimmedName = `${firstName} ${lastName}`.trim();
+
+    if (!firstName || !lastName || !editForm.email.trim()) {
+      return toast.error("First Name, Last Name, and Work Email are required.");
+    }
 
     try {
       setSubmitting(true);
       await atsApi.auth.updateUserDetail(selectedUser.id, {
-        fullName: editForm.fullName.trim(),
+        fullName: trimmedName,
         email: editForm.email.trim().toLowerCase(),
         branchId: editForm.branchId || undefined,
         roles: editForm.roles,
@@ -236,10 +301,178 @@ export default function UserManagementPage() {
     }
   };
 
+  const handleDeleteUser = async (user: UserItem) => {
+    if (profile?.id === user.id) {
+      return toast.error("You cannot delete your own account.");
+    }
+    const confirmDelete = window.confirm(
+      `Are you sure you want to deactivate and remove ${user.fullName} (${user.email}) from active team access?`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      setSubmittingId(user.id);
+      await atsApi.auth.setUserStatus(user.id, false);
+      toast.success(`User ${user.fullName} deactivated successfully.`);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to deactivate user.");
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  // Bulk Selection Handlers
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedUserIds(filteredUsers.map((u) => u.id));
+    } else {
+      setSelectedUserIds([]);
+    }
+  };
+
+  const handleSelectRow = (userId: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleBulkStatusChange = async (targetActiveState: boolean) => {
+    if (selectedUserIds.length === 0) return;
+    try {
+      setLoading(true);
+      await Promise.all(
+        selectedUserIds.map((id) => {
+          if (profile?.id === id && !targetActiveState) return Promise.resolve();
+          return atsApi.auth.setUserStatus(id, targetActiveState).catch(() => null);
+        })
+      );
+      toast.success(
+        `Successfully ${targetActiveState ? "activated" : "deactivated"} ${selectedUserIds.length} user(s)!`
+      );
+      setSelectedUserIds([]);
+      loadData();
+    } catch (err: any) {
+      toast.error("Failed bulk status update.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkMoveBranch = async (targetBranchId: string) => {
+    if (selectedUserIds.length === 0 || !targetBranchId) return;
+    try {
+      setLoading(true);
+      const branchObj = branches.find((b) => b.id === targetBranchId);
+      await Promise.all(
+        selectedUserIds.map((id) =>
+          atsApi.auth.updateUserDetail(id, { branchId: targetBranchId }).catch(() => null)
+        )
+      );
+      toast.success(
+        `Moved ${selectedUserIds.length} user(s) to ${branchObj?.name || "selected branch"}!`
+      );
+      setSelectedUserIds([]);
+      loadData();
+    } catch (err: any) {
+      toast.error("Failed bulk branch relocation.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedUserIds.length === 0) return;
+    const confirmDelete = window.confirm(
+      `Are you sure you want to de-register and deactivate ${selectedUserIds.length} selected team member(s)?`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      setLoading(true);
+      await Promise.all(
+        selectedUserIds.map((id) => {
+          if (profile?.id === id) return Promise.resolve();
+          return atsApi.auth.setUserStatus(id, false).catch(() => null);
+        })
+      );
+      toast.success(`Successfully deactivated ${selectedUserIds.length} user(s)!`);
+      setSelectedUserIds([]);
+      loadData();
+    } catch (err: any) {
+      toast.error("Failed bulk deletion.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkAssignRoles = async () => {
+    if (selectedUserIds.length === 0) return;
+    if (bulkSelectedRoleIds.length === 0) {
+      return toast.error("Please select at least one system role to assign.");
+    }
+    try {
+      setLoading(true);
+      await Promise.all(
+        selectedUserIds.map((id) =>
+          atsApi.auth.updateUserDetail(id, { roles: bulkSelectedRoleIds }).catch(() => null)
+        )
+      );
+      toast.success(
+        `Successfully assigned ${bulkSelectedRoleIds.length} role(s) to ${selectedUserIds.length} selected user(s)!`
+      );
+      setIsBulkRoleModalOpen(false);
+      setBulkSelectedRoleIds([]);
+      setSelectedUserIds([]);
+      loadData();
+    } catch (err: any) {
+      toast.error("Failed bulk role assignment.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    const listToExport = selectedUserIds.length > 0
+      ? filteredUsers.filter((u) => selectedUserIds.includes(u.id))
+      : filteredUsers;
+
+    if (listToExport.length === 0) {
+      toast.error("No user data available to export.");
+      return;
+    }
+
+    const headers = ["User ID", "Full Name", "Email", "Roles", "Branch Location", "Status", "Last Login"];
+    const rows = listToExport.map((u) => [
+      `"${u.id || ""}"`,
+      `"${(u.fullName || "").replace(/"/g, '""')}"`,
+      `"${(u.email || "").replace(/"/g, '""')}"`,
+      `"${((u.roles && u.roles.length > 0 ? u.roles.join(", ") : u.roleName) || "").replace(/"/g, '""')}"`,
+      `"${(u.branchName || "HQ Shared").replace(/"/g, '""')}"`,
+      `"${u.isActive ? "Active" : "Inactive"}"`,
+      `"${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : "Never"}"`,
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `users_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success(`Exported ${listToExport.length} user records to CSV!`);
+  };
+
   const openEditModal = (user: UserItem) => {
     setSelectedUser(user);
+    const nameParts = (user.fullName || "").trim().split(" ");
+    const fName = nameParts[0] || "";
+    const lName = nameParts.slice(1).join(" ") || "";
     setEditForm({
-      fullName: user.fullName || "",
+      firstName: fName,
+      lastName: lName,
       email: user.email || "",
       branchId: user.branchId || "",
       roles: user.roles && user.roles.length > 0 ? user.roles : [user.roleName || "RECRUITER"],
@@ -289,13 +522,13 @@ export default function UserManagementPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-6 w-full max-w-full space-y-5">
       
       {/* STANDARD PAGE HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-default-200">
         <div>
           <h1 className="text-xl font-bold text-default-900 flex items-center gap-2">
-            <Users className="h-5 w-5 text-indigo-600" /> User & Team Roster
+            <Users className="h-5 w-5 text-indigo-600" /> Users & Teams
           </h1>
           <p className="text-xs text-default-500 mt-1">
             Manage employee profiles, branch office assignments, and seat licensing for <span className="font-semibold text-default-800">{profile?.tenant?.name || "your company workspace"}</span>.
@@ -339,13 +572,13 @@ export default function UserManagementPage() {
             />
           </div>
 
-          {/* DROPDOWN FILTERS */}
+          {/* ALWAYS VISIBLE DROPDOWN FILTERS & AITTUDE ACTIONS BUTTON */}
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             {/* ROLE FILTER */}
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="h-9 text-xs rounded-md border border-default-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-medium text-default-700 dark:text-neutral-200 outline-none"
+              className="h-9 text-xs rounded-md border border-default-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-medium text-default-700 dark:text-neutral-200 outline-none hover:border-indigo-500"
             >
               <option value="ALL">All Roles</option>
               <option value="ADMIN">Tenant Admin</option>
@@ -360,7 +593,7 @@ export default function UserManagementPage() {
             <select
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
-              className="h-9 text-xs rounded-md border border-default-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-medium text-default-700 dark:text-neutral-200 outline-none"
+              className="h-9 text-xs rounded-md border border-default-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-medium text-default-700 dark:text-neutral-200 outline-none hover:border-indigo-500"
             >
               <option value="ALL">All Branch Offices</option>
               <option value="UNASSIGNED">Unassigned (HQ Shared)</option>
@@ -375,7 +608,7 @@ export default function UserManagementPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-9 text-xs rounded-md border border-default-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-medium text-default-700 dark:text-neutral-200 outline-none"
+              className="h-9 text-xs rounded-md border border-default-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-medium text-default-700 dark:text-neutral-200 outline-none hover:border-indigo-500"
             >
               <option value="ALL">All Statuses</option>
               <option value="ACTIVE">Active</option>
@@ -392,16 +625,135 @@ export default function UserManagementPage() {
                 Reset Filters
               </Button>
             )}
+
+            {/* FILTER FUNNEL ICON BUTTON (Aittude style) */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 w-9 p-0 rounded-md border-default-200 dark:border-slate-700 text-default-600 dark:text-neutral-300 hover:text-indigo-600 hover:border-indigo-500"
+              title="Toggle Filter Options"
+            >
+              <Filter className="h-4 w-4" />
+            </Button>
+
+            {/* PRIMARY ACTIONS DROPDOWN BUTTON (Aittude style) */}
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  className="h-9 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-4 rounded-md flex items-center gap-1.5 cursor-pointer shadow-sm ml-1"
+                >
+                  Actions ▾
+                  {selectedUserIds.length > 0 && (
+                    <span className="bg-white text-indigo-700 text-[10px] font-extrabold px-1.5 py-0.2 rounded-full">
+                      {selectedUserIds.length}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-xl rounded-lg p-1.5 text-xs">
+                {selectedUserIds.length > 0 ? (
+                  <>
+                    <div className="px-2 py-1.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 rounded mb-1 flex items-center justify-between">
+                      <span>{selectedUserIds.length} Users Selected</span>
+                      <button onClick={() => setSelectedUserIds([])} className="text-[10px] text-neutral-500 hover:text-neutral-900 cursor-pointer">Clear</button>
+                    </div>
+
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setBulkSelectedRoleIds(["RECRUITER"]);
+                        setIsBulkRoleModalOpen(true);
+                      }}
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-semibold"
+                    >
+                      <Shield className="h-3.5 w-3.5 text-indigo-600" /> Assign System Roles...
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setTargetMoveBranchId("");
+                        setIsBulkMoveBranchModalOpen(true);
+                      }}
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-semibold"
+                    >
+                      <Building2 className="h-3.5 w-3.5 text-indigo-600" /> Move to Branch...
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => handleBulkStatusChange(true)}
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-emerald-700 font-semibold"
+                    >
+                      <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> Activate Selected
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => handleBulkStatusChange(false)}
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/50 text-amber-700 font-semibold"
+                    >
+                      <UserX className="h-3.5 w-3.5 text-amber-600" /> Deactivate & Revoke
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
+
+                    <DropdownMenuItem
+                      onClick={handleExportCSV}
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800 font-medium"
+                    >
+                      <Mail className="h-3.5 w-3.5 text-neutral-500" /> Export Selected to CSV
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (activeSeats >= userLimit) {
+                          toast.error(`Seat limit reached! (${userLimit} active licenses). Deactivate a user first.`);
+                          return;
+                        }
+                        setIsAddModalOpen(true);
+                      }}
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 font-semibold"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" /> Add New Member
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => window.location.href = "/utility/roles-permissions"}
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-800 dark:text-neutral-200 font-medium"
+                    >
+                      <Shield className="h-3.5 w-3.5 text-neutral-500" /> Role & Permission Settings
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => window.location.href = "/utility/branches"}
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-800 dark:text-neutral-200 font-medium"
+                    >
+                      <Building2 className="h-3.5 w-3.5 text-neutral-500" /> Manage Office Branches
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
+
+                    <DropdownMenuItem
+                      onClick={handleExportCSV}
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-800 dark:text-neutral-200 font-medium"
+                    >
+                      <Mail className="h-3.5 w-3.5 text-neutral-500" /> Export Users (CSV)
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
 
       {/* STANDARD DATA TABLE */}
       <div className="bg-white dark:bg-slate-900 border border-default-200 dark:border-slate-800 rounded-lg shadow-xs overflow-hidden">
+
         {loading ? (
           <div className="text-center py-16">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mx-auto"></div>
-            <p className="text-xs text-default-500 mt-2 font-medium">Loading user roster...</p>
+            <p className="text-xs text-default-500 mt-2 font-medium">Loading users...</p>
           </div>
         ) : filteredUsers.length === 0 ? (
           <div className="text-center py-12 px-4 space-y-3">
@@ -436,6 +788,14 @@ export default function UserManagementPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-default-50 dark:bg-slate-800/60 border-b border-default-200 dark:border-slate-800 text-[11px] font-semibold text-default-500 uppercase tracking-wider">
+                  <th className="py-3 px-3 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                    />
+                  </th>
                   <th className="py-3 px-4">Staff Member</th>
                   <th className="py-3 px-4">Work Email</th>
                   <th className="py-3 px-4">Assigned Role(s)</th>
@@ -450,7 +810,17 @@ export default function UserManagementPage() {
                   const rolesDisplay = user.roles && user.roles.length > 0 ? user.roles : [user.roleName || "RECRUITER"];
 
                   return (
-                    <tr key={user.id} className="hover:bg-default-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                    <tr key={user.id} className={`transition-colors ${selectedUserIds.includes(user.id) ? "bg-indigo-50/40 dark:bg-indigo-950/20" : "hover:bg-default-50/60 dark:hover:bg-slate-800/40"}`}>
+                      {/* Checkbox Column */}
+                      <td className="py-3 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedUserIds.includes(user.id)}
+                          onChange={() => handleSelectRow(user.id)}
+                          className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                        />
+                      </td>
+
                       {/* Name */}
                       <td className="py-3 px-4 font-semibold text-default-900 dark:text-white">
                         <div className="flex items-center gap-2.5">
@@ -544,29 +914,54 @@ export default function UserManagementPage() {
                         </div>
                       </td>
 
-                      {/* Actions */}
+                      {/* Floating Actions Menu (Triple Dot) */}
                       <td className="py-3 px-4 text-right">
-                        <div className="inline-flex items-center gap-1.5 justify-end">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openEditModal(user)}
-                            className="h-7 px-2.5 text-[11px] font-medium border-default-200 hover:border-indigo-500 hover:text-indigo-600 rounded-md"
-                            title="Edit Member / Fix Email Typo"
-                          >
-                            <Edit2 className="h-3 w-3 mr-1" /> Edit Profile
-                          </Button>
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 rounded-full hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-500 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
+                              title="User Actions Menu"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-xl rounded-lg p-1 text-xs">
+                            <DropdownMenuItem
+                              onClick={() => openEditModal(user)}
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
+                            >
+                              <Edit2 className="h-3.5 w-3.5 text-indigo-600" /> Edit Profile & Roles
+                            </DropdownMenuItem>
 
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openPasswordModal(user)}
-                            className="h-7 px-2.5 text-[11px] font-medium border-amber-200 text-amber-700 bg-amber-50/50 hover:bg-amber-100 rounded-md"
-                            title="Reset User Password"
-                          >
-                            <Key className="h-3 w-3 mr-1" /> Password
-                          </Button>
-                        </div>
+                            <DropdownMenuItem
+                              onClick={() => openPasswordModal(user)}
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
+                            >
+                              <Key className="h-3.5 w-3.5 text-amber-500" /> Reset Password
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
+
+                            {user.isActive ? (
+                              <DropdownMenuItem
+                                onClick={() => handleStatusToggle(user)}
+                                disabled={isCurrent}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/50 text-amber-700 font-medium"
+                              >
+                                <UserX className="h-3.5 w-3.5" /> Deactivate & Revoke Access
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                onClick={() => handleStatusToggle(user)}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-emerald-700 font-medium"
+                              >
+                                <UserCheck className="h-3.5 w-3.5" /> Reactivate Account
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   );
@@ -580,72 +975,87 @@ export default function UserManagementPage() {
       {/* ADD MEMBER MODAL */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in-0 zoom-in-95">
-            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95">
+            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
                 <UserPlus className="h-4 w-4 text-indigo-650" /> Add Team Member
               </h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-neutral-400 hover:text-neutral-600">
+              <button onClick={() => setIsAddModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 cursor-pointer">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateMember} className="p-5 space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Full Name *</label>
-                <Input
-                  value={addForm.fullName}
-                  onChange={(e) => setAddForm({ ...addForm, fullName: e.target.value })}
-                  placeholder="e.g. Rajesh Kumar"
-                  className="h-8 text-xs rounded border-neutral-300"
-                  required
-                />
-              </div>
-
-              {/* DOMAIN SUFFIX AUTO-LOCKING */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Work Email Username *</label>
-                <div className="flex items-center">
+            <form onSubmit={handleCreateMember} className="p-5 space-y-4 overflow-y-auto flex-1">
+              {/* FIRST NAME + LAST NAME GRID */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">First Name *</label>
                   <Input
-                    value={addForm.emailPrefix}
-                    onChange={(e) => setAddForm({ ...addForm, emailPrefix: e.target.value })}
-                    placeholder="e.g. rajesh"
-                    className="h-8 text-xs rounded-l border-neutral-300 font-mono"
+                    value={addForm.firstName}
+                    onChange={(e) => setAddForm({ ...addForm, firstName: e.target.value })}
+                    placeholder="e.g. Rajesh"
+                    className="h-8 text-xs rounded border-neutral-300"
                     required
                   />
-                  <span className="h-8 px-3 text-xs font-mono font-bold bg-neutral-100 dark:bg-slate-800 border border-l-0 border-neutral-300 dark:border-slate-700 rounded-r text-indigo-650 flex items-center">
-                    @{tenantDomain}.com
-                  </span>
                 </div>
-                <p className="text-[10px] text-neutral-400">Locked to your company's verified domain suffix.</p>
-              </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Initial Password *</label>
-                <Input
-                  type="password"
-                  value={addForm.password}
-                  onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
-                  placeholder="At least 8 characters"
-                  className="h-8 text-xs rounded border-neutral-300 font-mono"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Assign Role *</label>
-                  <select
-                    value={addForm.role}
-                    onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
-                    className="w-full h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 font-semibold"
-                  >
-                    <option value="RECRUITER">Recruiter</option>
-                    <option value="POD_LEAD">Pod Lead</option>
-                    <option value="ACCOUNT_MANAGER">Account Manager (BDM)</option>
-                    <option value="BRANCH_ADMIN">Branch Admin</option>
-                    <option value="DELIVERY_HEAD">Delivery Head</option>
-                  </select>
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Last Name *</label>
+                  <Input
+                    value={addForm.lastName}
+                    onChange={(e) => setAddForm({ ...addForm, lastName: e.target.value })}
+                    placeholder="e.g. Kumar"
+                    className="h-8 text-xs rounded border-neutral-300"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* DOMAIN SUFFIX AUTO-LOCKING & LIVE AVAILABILITY CHECK + BRANCH IN ONE ROW */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Work Email Username *</label>
+                  <div className="flex items-center">
+                    <Input
+                      value={addForm.emailPrefix}
+                      onChange={(e) => setAddForm({ ...addForm, emailPrefix: e.target.value })}
+                      placeholder="e.g. rajesh"
+                      className={`h-8 text-xs rounded-l font-mono ${
+                        emailStatus === "taken"
+                          ? "border-red-500 bg-red-50/40 dark:bg-red-950/20 text-red-600 font-semibold"
+                          : emailStatus === "available"
+                          ? "border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-700 font-semibold"
+                          : "border-neutral-300"
+                      }`}
+                      required
+                    />
+                    <span className="h-8 px-2 text-[11px] font-mono font-bold bg-neutral-100 dark:bg-slate-800 border border-l-0 border-neutral-300 dark:border-slate-700 rounded-r text-indigo-650 flex items-center shrink-0">
+                      @{tenantDomain}.com
+                    </span>
+                  </div>
+
+                  {/* Debounced Inline Availability Message */}
+                  {addForm.emailPrefix.trim() ? (
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold pt-0.5">
+                      {emailStatus === "checking" && (
+                        <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin text-amber-500" /> Checking...
+                        </span>
+                      )}
+                      {emailStatus === "taken" && (
+                        <span className="text-red-600 dark:text-red-400 flex items-center gap-1 font-bold">
+                          <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" /> Registered
+                        </span>
+                      )}
+                      {emailStatus === "available" && (
+                        <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-bold">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> Available!
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-neutral-400">Locked to company domain.</p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -656,6 +1066,7 @@ export default function UserManagementPage() {
                     className="w-full h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 font-semibold"
                     required
                   >
+                    <option value="">Select Office Branch...</option>
                     {branches.map(b => (
                       <option key={b.id} value={b.id}>{b.name} ({b.market === 'US' ? 'US IT' : 'Domestic'})</option>
                     ))}
@@ -663,11 +1074,95 @@ export default function UserManagementPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
-                <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)} className="h-8 text-xs">
+              {/* PASSWORD + CONFIRM PASSWORD GRID */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Initial Password *</label>
+                  <Input
+                    type="password"
+                    value={addForm.password}
+                    onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
+                    placeholder="At least 8 characters"
+                    className="h-8 text-xs rounded border-neutral-300 font-mono"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Confirm Password *</label>
+                  <Input
+                    type="password"
+                    value={addForm.confirmPassword}
+                    onChange={(e) => setAddForm({ ...addForm, confirmPassword: e.target.value })}
+                    placeholder="Re-enter password"
+                    className={`h-8 text-xs rounded font-mono ${
+                      addForm.confirmPassword && addForm.confirmPassword !== addForm.password
+                        ? "border-red-500 bg-red-50/50 dark:bg-red-950/20"
+                        : "border-neutral-300"
+                    }`}
+                    required
+                  />
+                </div>
+              </div>
+              {addForm.confirmPassword && addForm.confirmPassword !== addForm.password && (
+                <p className="text-[10px] font-semibold text-red-500 -mt-2">Passwords do not match</p>
+              )}
+
+              {/* ASSIGNED SYSTEM ROLES SELECTION */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  Assign System Roles *
+                </label>
+                <div className="grid grid-cols-2 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
+                  {[
+                    { key: "RECRUITER", label: "Recruiter" },
+                    { key: "ACCOUNT_MANAGER", label: "Account Manager (BDM)" },
+                    { key: "POD_LEAD", label: "Pod Lead" },
+                    { key: "BRANCH_ADMIN", label: "Branch Admin" },
+                    { key: "DELIVERY_HEAD", label: "Delivery Head" },
+                    { key: "ADMIN", label: "Tenant Admin" },
+                  ].map((r) => {
+                    const isChecked = addForm.roles.includes(r.key);
+                    return (
+                      <label
+                        key={r.key}
+                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer transition-colors ${
+                          isChecked
+                            ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 font-bold"
+                            : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800 font-medium"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setAddForm({ ...addForm, roles: [...addForm.roles, r.key] });
+                            } else {
+                              if (addForm.roles.length > 1) {
+                                setAddForm({ ...addForm, roles: addForm.roles.filter((roleKey) => roleKey !== r.key) });
+                              } else {
+                                toast.error("User must have at least one assigned role.");
+                              }
+                            }
+                          }}
+                          className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                        />
+                        <span className="truncate">{r.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-neutral-400">
+                  Select initial system roles to assign permissions for this user.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100 dark:border-slate-800 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)} className="h-8 text-xs cursor-pointer">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submitting} size="sm" className="h-8 text-xs bg-indigo-650 hover:bg-indigo-700 text-white font-bold">
+                <Button type="submit" disabled={submitting || emailStatus === "taken"} size="sm" className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer disabled:opacity-50">
                   {submitting ? "Adding..." : "Add Member"}
                 </Button>
               </div>
@@ -679,56 +1174,124 @@ export default function UserManagementPage() {
       {/* EDIT MEMBER MODAL (FIX EMAIL TYPOS / BRANCH) */}
       {isEditModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in-0 zoom-in-95">
-            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95">
+            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
                 <Edit2 className="h-4 w-4 text-indigo-650" /> Edit Member Details
               </h3>
-              <button onClick={() => setIsEditModalOpen(false)} className="text-neutral-400 hover:text-neutral-600">
+              <button onClick={() => setIsEditModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 cursor-pointer">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateMember} className="p-5 space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Full Name *</label>
-                <Input
-                  value={editForm.fullName}
-                  onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
-                  className="h-8 text-xs rounded border-neutral-300"
-                  required
-                />
+            <form onSubmit={handleUpdateMember} className="p-5 space-y-4 overflow-y-auto flex-1">
+              {/* FIRST NAME + LAST NAME GRID */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">First Name *</label>
+                  <Input
+                    value={editForm.firstName}
+                    onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                    placeholder="e.g. Rajesh"
+                    className="h-8 text-xs rounded border-neutral-300"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Last Name *</label>
+                  <Input
+                    value={editForm.lastName}
+                    onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                    placeholder="e.g. Kumar"
+                    className="h-8 text-xs rounded border-neutral-300"
+                    required
+                  />
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Work Email Address (Fix Typo) *</label>
-                <Input
-                  value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  className="h-8 text-xs rounded border-neutral-300 font-mono"
-                  required
-                />
+              {/* EMAIL + BRANCH GRID */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Work Email Address *</label>
+                  <Input
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="h-8 text-xs rounded border-neutral-300 font-mono"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Office Branch Location</label>
+                  <select
+                    value={editForm.branchId}
+                    onChange={(e) => setEditForm({ ...editForm, branchId: e.target.value })}
+                    className="w-full h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 font-semibold"
+                  >
+                    <option value="">Unassigned (HQ Shared)</option>
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>{b.name} ({b.market === 'US' ? 'US IT' : 'Domestic'})</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Office Branch Location</label>
-                <select
-                  value={editForm.branchId}
-                  onChange={(e) => setEditForm({ ...editForm, branchId: e.target.value })}
-                  className="w-full h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 font-semibold"
-                >
-                  <option value="">Unassigned (HQ Shared)</option>
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>{b.name} ({b.market === 'US' ? 'US IT' : 'Domestic'})</option>
-                  ))}
-                </select>
+              {/* ASSIGNED SYSTEM ROLES SELECTION */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  Assigned System Roles *
+                </label>
+                <div className="grid grid-cols-2 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
+                  {[
+                    { key: "RECRUITER", label: "Recruiter" },
+                    { key: "ACCOUNT_MANAGER", label: "Account Manager (BDM)" },
+                    { key: "POD_LEAD", label: "Pod Lead" },
+                    { key: "BRANCH_ADMIN", label: "Branch Admin" },
+                    { key: "DELIVERY_HEAD", label: "Delivery Head" },
+                    { key: "ADMIN", label: "Tenant Admin" },
+                  ].map((r) => {
+                    const isChecked = editForm.roles.includes(r.key);
+                    return (
+                      <label
+                        key={r.key}
+                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer transition-colors ${
+                          isChecked
+                            ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 font-bold"
+                            : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800 font-medium"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditForm({ ...editForm, roles: [...editForm.roles, r.key] });
+                            } else {
+                              if (editForm.roles.length > 1) {
+                                setEditForm({ ...editForm, roles: editForm.roles.filter((roleKey) => roleKey !== r.key) });
+                              } else {
+                                toast.error("User must have at least one assigned role.");
+                              }
+                            }
+                          }}
+                          className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                        />
+                        <span className="truncate">{r.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-neutral-400">
+                  Toggle one or multiple roles to assign permissions for this user.
+                </p>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
-                <Button type="button" variant="outline" size="sm" onClick={() => setIsEditModalOpen(false)} className="h-8 text-xs">
+              <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100 dark:border-slate-800 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsEditModalOpen(false)} className="h-8 text-xs cursor-pointer">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submitting} size="sm" className="h-8 text-xs bg-indigo-650 hover:bg-indigo-700 text-white font-bold">
+                <Button type="submit" disabled={submitting} size="sm" className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer">
                   {submitting ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
@@ -780,6 +1343,125 @@ export default function UserManagementPage() {
         </div>
       )}
 
+      {/* BULK ASSIGN ROLES MODAL */}
+      {isBulkRoleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in-0">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md flex flex-col overflow-hidden">
+            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
+              <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                <Shield className="h-4 w-4 text-indigo-600" /> Assign System Roles ({selectedUserIds.length} Users)
+              </h3>
+              <button onClick={() => setIsBulkRoleModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 cursor-pointer">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3 max-h-72 overflow-y-auto">
+              <p className="text-xs text-neutral-500 mb-2">
+                Select one or more system roles to assign simultaneously to the <strong>{selectedUserIds.length} selected team members</strong>:
+              </p>
+
+              {rolesList.map((r) => {
+                const roleKey = r.name || r.id;
+                const isChecked = bulkSelectedRoleIds.includes(roleKey);
+                return (
+                  <label
+                    key={r.id || r.name}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer select-none transition ${
+                      isChecked ? "border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/30" : "border-neutral-200 dark:border-slate-800 hover:bg-neutral-50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {
+                        if (isChecked) {
+                          setBulkSelectedRoleIds(prev => prev.filter(item => item !== roleKey));
+                        } else {
+                          setBulkSelectedRoleIds(prev => [...prev, roleKey]);
+                        }
+                      }}
+                      className="h-4 w-4 accent-indigo-600 rounded cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-neutral-900 dark:text-white block">{r.name}</span>
+                      {r.description && <span className="text-[10px] text-neutral-500 block">{r.description}</span>}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="border-t border-neutral-100 dark:border-slate-800 p-4 bg-neutral-50 dark:bg-slate-850 flex justify-end gap-2">
+              <Button size="sm" variant="outline" type="button" onClick={() => setIsBulkRoleModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleBulkAssignRoles}
+                disabled={loading}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs"
+              >
+                {loading ? "Assigning..." : `Apply Roles to ${selectedUserIds.length} Users`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* BULK MOVE BRANCH MODAL */}
+      {isBulkMoveBranchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in-0">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md flex flex-col overflow-hidden">
+            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
+              <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-indigo-600" /> Relocate {selectedUserIds.length} Selected Users
+              </h3>
+              <button onClick={() => setIsBulkMoveBranchModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 cursor-pointer">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-neutral-500">
+                Select the target office branch for the <strong>{selectedUserIds.length} selected team members</strong>:
+              </p>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Target Office Branch *</label>
+                <select
+                  value={targetMoveBranchId}
+                  onChange={(e) => setTargetMoveBranchId(e.target.value)}
+                  className="w-full h-9 text-xs font-medium rounded-md border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-neutral-900 dark:text-neutral-100 outline-none"
+                >
+                  <option value="">-- Unassigned (HQ Shared) --</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.market === "US" ? "US IT" : "Domestic"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="border-t border-neutral-100 dark:border-slate-800 p-4 bg-neutral-50 dark:bg-slate-850 flex justify-end gap-2">
+              <Button size="sm" variant="outline" type="button" onClick={() => setIsBulkMoveBranchModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={async () => {
+                  await handleBulkMoveBranch(targetMoveBranchId);
+                  setIsBulkMoveBranchModalOpen(false);
+                }}
+                disabled={loading}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs"
+              >
+                {loading ? "Relocating..." : `Move ${selectedUserIds.length} Users`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

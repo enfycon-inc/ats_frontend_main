@@ -276,7 +276,7 @@ export default function DictionariesPage() {
   const CategoryIcon = categoryDetails.icon;
 
   return (
-    <div className="container mx-auto py-6 px-4 space-y-6 max-w-7xl font-sans">
+    <div className="w-full max-w-full py-6 px-4 space-y-6 font-sans">
       {/* ── Breadcrumb & Header ────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>

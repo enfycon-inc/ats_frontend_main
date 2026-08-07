@@ -138,8 +138,10 @@ export default function DataTable({
   const [selectedJobForSourcing, setSelectedJobForSourcing] = useState<Job | null>(null);
 
   const handleOpenSourceModal = (job: Job) => {
-    setSelectedJobForSourcing(job);
-    setSourceModalOpen(true);
+    setTimeout(() => {
+      setSelectedJobForSourcing(job);
+      setSourceModalOpen(true);
+    }, 50);
   };
 
   // Job Status Modal States
@@ -1326,6 +1328,12 @@ export default function DataTable({
           onClose={() => {
             setSourceModalOpen(false);
             setSelectedJobForSourcing(null);
+            if (typeof document !== "undefined") {
+              setTimeout(() => {
+                document.body.style.pointerEvents = "";
+                document.body.style.overflow = "";
+              }, 50);
+            }
           }}
           job={selectedJobForSourcing}
         />

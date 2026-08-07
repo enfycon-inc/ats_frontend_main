@@ -599,7 +599,7 @@ function GlobalAdminDashboardView({ profile }: { profile: any }) {
           <DialogHeader>
             <DialogTitle className="text-base font-bold flex items-center gap-2">
               <Icon icon="heroicons:building-office-2" className="text-indigo-600" />
-              Tenant Workspace Details & Users Roster
+              Tenant Workspace Details & Users
             </DialogTitle>
             <DialogDescription className="text-xs">
               Review user accounts, assigned roles, and usage metrics for this company.
@@ -609,7 +609,7 @@ function GlobalAdminDashboardView({ profile }: { profile: any }) {
           {loadingTenantDetail ? (
             <div className="p-12 text-center text-xs text-default-400 flex flex-col items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
-              Loading tenant user roster...
+              Loading tenant users...
             </div>
           ) : selectedTenantDetail ? (
             <div className="space-y-5 py-2">
@@ -673,7 +673,7 @@ function GlobalAdminDashboardView({ profile }: { profile: any }) {
               <div className="space-y-2">
                 <h4 className="font-bold text-xs text-default-900 flex items-center gap-1.5">
                   <Icon icon="heroicons:users" className="text-indigo-600" />
-                  Users Roster ({selectedTenantDetail.users?.length || 0})
+                  Users ({selectedTenantDetail.users?.length || 0})
                 </h4>
 
                 <div className="border border-default-200 rounded-xl overflow-hidden">
