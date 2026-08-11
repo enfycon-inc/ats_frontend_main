@@ -83,6 +83,7 @@ async function apiFetch<T = any>(
   try {
     const apiBase = getApiBase();
     res = await fetch(`${apiBase}${path}`, {
+      cache: 'no-store',
       ...options,
       headers,
     });
@@ -334,6 +335,71 @@ const auth = {
     return apiFetch<any>(`/api/auth/tenants/${tenantId}/details`);
   },
 };
+
+// ─── Email API ───────────────────────────────────────────────────────
+const email = {
+  async getAccounts(): Promise<any[]> {
+    return apiFetch<any[]>('/email/accounts');
+  },
+  async getPreferences(): Promise<any[]> {
+    return apiFetch<any[]>('/email/preferences');
+  },
+  async savePreference(actionName: string, accountId: string): Promise<any> {
+    return apiFetch<any>('/email/preferences', {
+      method: 'POST',
+      body: JSON.stringify({ actionName, accountId }),
+    });
+  },
+  async addCustomAccount(data: Record<string, any>): Promise<any> {
+    return apiFetch<any>('/email/accounts/custom', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async deleteAccount(id: string): Promise<any> {
+    return apiFetch<any>(`/email/accounts/${id}/delete`, {
+      method: 'POST',
+    });
+  },
+  async setDefaultAccount(id: string): Promise<any> {
+    return apiFetch<any>(`/email/accounts/${id}/default`, {
+      method: 'POST',
+    });
+  },
+  async shareAccount(id: string, data: { sharedWithAll: boolean; sharedWithUsers: string[]; sharedWithBranches: string[] }): Promise<any> {
+    return apiFetch<any>(`/email/accounts/${id}/share`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async getCampaigns(): Promise<any[]> {
+    return apiFetch<any[]>('/email/campaigns');
+  },
+  async getActiveCampaign(): Promise<any> {
+    return apiFetch<any>('/email/campaigns/active');
+  },
+  async getCampaignStatus(id: string): Promise<any> {
+    return apiFetch<any>(`/email/campaigns/${id}/status`);
+  },
+  async getCampaignRecipients(id: string): Promise<any[]> {
+    return apiFetch<any[]>(`/email/campaigns/${id}/recipients`);
+  },
+  async createCampaign(data: Record<string, any>): Promise<any> {
+    return apiFetch<any>('/email/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async cancelCampaign(id: string): Promise<any> {
+    return apiFetch<any>(`/email/campaigns/${id}/cancel`, {
+      method: 'POST',
+    });
+  },
+  async getTemplates(): Promise<any[]> {
+    return apiFetch<any[]>('/email/templates');
+  },
+};
+
 
 // ─── Jobs API ───────────────────────────────────────────────────────
 export interface JobPayload {
@@ -850,6 +916,7 @@ export const atsApi = {
   businessUnits,
   submissions,
   auditLogs,
+  email,
   fetch: apiFetch,
 };
 

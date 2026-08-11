@@ -101,6 +101,7 @@ export default function ApprovalsPage() {
   const [tenantUsers, setTenantUsers] = useState<any[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false); 
+  const [expandedBranches, setExpandedBranches] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (status === "loading") return;
@@ -158,6 +159,7 @@ export default function ApprovalsPage() {
   const handleViewTenantDetails = async (tenant: Tenant) => {
     setSelectedTenant(tenant);
     setIsModalOpen(true);
+    setExpandedBranches({});
     setTenantUsers([]);
     try {
       setUsersLoading(true);
@@ -862,34 +864,63 @@ export default function ApprovalsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-150 dark:divide-slate-800/80">
-                      {tenantUsers.map((user) => (
-                        <tr key={user.id} className="hover:bg-slate-50/30 dark:hover:bg-slate-850/20 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-2.5">
-                              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-indigo-655 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-                                {user.fullName ? user.fullName.charAt(0).toUpperCase() : '?'}
+                      {Object.entries(
+                        tenantUsers.reduce((acc: any, user: any) => {
+                          const branch = user.branchName || 'Unassigned';
+                          if (!acc[branch]) acc[branch] = [];
+                          acc[branch].push(user);
+                          return acc;
+                        }, {})
+                      ).map(([branchName, branchUsers]: [string, any]) => {
+                        const isExpanded = !!expandedBranches[branchName];
+                        return (
+                        <React.Fragment key={branchName}>
+                          <tr 
+                            className="bg-slate-100/50 dark:bg-slate-800/50 border-y border-slate-150 dark:border-slate-800/80 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            onClick={() => setExpandedBranches(prev => ({ ...prev, [branchName]: !prev[branchName] }))}
+                          >
+                            <td colSpan={4} className="py-2 px-4 text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">
+                              <div className="flex items-center gap-2">
+                                <Icon icon={isExpanded ? "heroicons:chevron-down" : "heroicons:chevron-right"} className="h-4 w-4" />
+                                <Icon icon="heroicons:building-office-2" className="h-4 w-4" />
+                                {branchName}
+                                <span className="text-slate-500 dark:text-slate-400 font-normal normal-case ml-1">
+                                  ({branchUsers.length} user{branchUsers.length !== 1 ? 's' : ''})
+                                </span>
                               </div>
-                              <span className="font-semibold text-default-900 text-xs">{user.fullName}</span>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-400 font-mono">
-                            {user.email}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 uppercase tracking-wider">
-                              {user.roleName || user.roles?.join(', ') || 'Staff'}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-right">
-                            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${
-                              user.isActive ? 'text-emerald-600' : 'text-slate-400'
-                            }`}>
-                              <span className={`h-1.5 w-1.5 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                              {user.isActive ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                          </tr>
+                          {isExpanded && branchUsers.map((user: any) => (
+                            <tr key={user.id} className="hover:bg-slate-50/30 dark:hover:bg-slate-850/20 transition-colors">
+                              <td className="py-3.5 px-4">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-indigo-655 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                                    {user.fullName ? user.fullName.charAt(0).toUpperCase() : '?'}
+                                  </div>
+                                  <span className="font-semibold text-default-900 text-xs">{user.fullName}</span>
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-400 font-mono">
+                                {user.email}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 uppercase tracking-wider">
+                                  {user.roleName || user.roles?.join(', ') || 'Staff'}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-right">
+                                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${
+                                  user.isActive ? 'text-emerald-600' : 'text-slate-400'
+                                }`}>
+                                  <span className={`h-1.5 w-1.5 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                                  {user.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

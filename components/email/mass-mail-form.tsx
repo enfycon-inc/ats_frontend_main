@@ -21,10 +21,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Bold, Italic, Link2, List, ListOrdered, Send, Clock, X, Paperclip, PlusCircle, Mail, Globe, Server, Settings, Lock, ShieldCheck } from "lucide-react";
 import { SmtpConfigModal } from "@/components/email/smtp-config-modal";
+import { MassMailSettingsModal } from "./mass-mail-settings-modal";
 import Link from 'next/link';
 import { atsApi } from "@/lib/ats-api";
+import dynamic from 'next/dynamic';
+import 'react-quill-new/dist/quill.snow.css';
+
+const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false }) as any;
 
 export function MassMailForm() {
   const [subject, setSubject] = useState("");
@@ -42,14 +53,41 @@ export function MassMailForm() {
   const [isConnecting, setIsConnecting] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSmtpModalOpen, setIsSmtpModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // CSV State
   const [csvRecipients, setCsvRecipients] = useState<{ firstName: string; lastName: string; email: string; metadata?: any }[]>([]);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const subjectInputRef = useRef<HTMLInputElement>(null);
-  const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const [lastFocusedField, setLastFocusedField] = useState<'subject' | 'body'>('body');
+  const [lastFocusedField, setLastFocusedField] = useState<'subject' | 'body' | null>(null);
+
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const attachmentsInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAttachmentsUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setAttachments(prev => [...prev, ...Array.from(e.target.files!)]);
+    }
+  };
+  
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const quillRef = useRef<any>(null);
+
+  const quillModules = useMemo(() => ({
+    toolbar: [
+      [{ 'font': [] }, { 'size': [] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ 'color': [] }, { 'background': [] }],
+      [{ 'script': 'sub'}, { 'script': 'super' }],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      [{ 'indent': '-1'}, { 'indent': '+1' }, { 'align': [] }],
+      ['link', 'clean']
+    ]
+  }), []);
 
   // Delivery Settings
   const [ratePerMinute, setRatePerMinute] = useState(30);
@@ -71,19 +109,16 @@ export function MassMailForm() {
 
   const canEditDeliverySettings = useMemo(() => {
     const u = userProfile || (typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null);
-    if (!u) return true;
+    if (!u) return false;
     const mainRole = String(u.role || u.roleName || "").toUpperCase();
     const rolesArr: string[] = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toUpperCase()) : [];
     
     const privileged = [
-      "SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "BRANCH_ADMIN",
-      "BRANCH_MANAGER", "BRANCH_HEAD", "BRANCH_LEAD", "ACCOUNT_MANAGER"
+      "SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "BRANCH_ADMIN"
     ];
     
     if (privileged.includes(mainRole)) return true;
     if (rolesArr.some((r) => privileged.includes(r))) return true;
-    if (mainRole.includes("ADMIN") || mainRole.includes("BRANCH") || mainRole.includes("MANAGER")) return true;
-    if (rolesArr.some((r) => r.includes("ADMIN") || r.includes("BRANCH") || r.includes("MANAGER"))) return true;
     
     return false;
   }, [userProfile]);
@@ -132,8 +167,7 @@ export function MassMailForm() {
   const [campaignStats, setCampaignStats] = useState<{ total: number; sent: number; pending: number; failed: number } | null>(null);
 
   const fetchHistory = () => {
-    fetch("http://localhost:5000/email/campaigns")
-      .then(res => res.json())
+    atsApi.email.getCampaigns()
       .then(data => {
         if (Array.isArray(data)) {
           setCampaignHistory(data);
@@ -144,8 +178,7 @@ export function MassMailForm() {
 
   const fetchLogs = async (camp: any) => {
     try {
-      const res = await fetch(`http://localhost:5000/email/campaigns/${camp.id}/recipients`);
-      const data = await res.json();
+      const data = await atsApi.email.getCampaignRecipients(camp.id);
       setSelectedCampaignLogs({ campaign: camp, recipients: data });
       setIsLogsDialogOpen(true);
     } catch(err) {
@@ -154,8 +187,7 @@ export function MassMailForm() {
   };
 
   const fetchAccounts = () => {
-    fetch("http://localhost:5000/email/accounts")
-      .then(res => res.json())
+    atsApi.email.getAccounts()
       .then(data => {
         if (Array.isArray(data)) {
           setAccounts(data);
@@ -174,8 +206,7 @@ export function MassMailForm() {
     fetchHistory();
 
     // Fetch active campaign on load to restore status overlay
-    fetch("http://localhost:5000/email/campaigns/active")
-      .then(res => res.json())
+    atsApi.email.getActiveCampaign()
       .then(data => {
         if (data.activeCampaignId) {
           setActiveCampaignId(data.activeCampaignId);
@@ -189,8 +220,7 @@ export function MassMailForm() {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`http://localhost:5000/email/campaigns/${activeCampaignId}/status`);
-        const stats = await res.json();
+        const stats = await atsApi.email.getCampaignStatus(activeCampaignId);
         setCampaignStats(stats);
         
         if (stats.pending === 0) {
@@ -241,21 +271,16 @@ export function MassMailForm() {
     setIsSending(true);
     try {
       const selectedAccId = accounts.find(a => a.email === selectedAccount)?.id;
-      const res = await fetch("http://localhost:5000/email/campaigns", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: campaignName || "Untitled Campaign",
-          accountId: selectedAccId,
-          subject,
-          body,
-          ratePerMinute,
-          ratePerHour,
-          randomizeDelay,
-          recipients: csvRecipients
-        })
+      const data = await atsApi.email.createCampaign({
+        name: campaignName || "Untitled Campaign",
+        accountId: selectedAccId,
+        subject,
+        body,
+        ratePerMinute,
+        ratePerHour,
+        randomizeDelay,
+        recipients: csvRecipients
       });
-      const data = await res.json();
       if (data.success) {
         setCsvRecipients([]);
         if (data.campaignId) {
@@ -276,7 +301,35 @@ export function MassMailForm() {
   };
 
   const downloadSampleCsv = () => {
-    const csvContent = "First Name,Last Name,Email,Job Title,Company Name\nJohn,Doe,john@example.com,Software Engineer,Tech Corp\nJane,Smith,jane@example.com,Product Manager,Innovate LLC\nAlice,Johnson,alice@example.com,Designer,Creative Inc";
+    const tagRegex = /\{\{([^}]+)\}\}/g;
+    const matches = new Set<string>();
+    
+    let match;
+    while ((match = tagRegex.exec(subject)) !== null) {
+      matches.add(match[1]);
+    }
+    while ((match = tagRegex.exec(body)) !== null) {
+      matches.add(match[1]);
+    }
+    
+    const headers = ["First Name", "Last Name", "Email"];
+    
+    Array.from(matches).forEach(tag => {
+      if (!headers.includes(tag) && tag.toLowerCase() !== 'first name' && tag.toLowerCase() !== 'last name' && tag.toLowerCase() !== 'email') {
+        headers.push(tag);
+      }
+    });
+
+    const headerRow = headers.join(",");
+    const sampleRow1 = headers.map(h => {
+      if (h === 'First Name' || h === 'Candidate_Name') return 'John';
+      if (h === 'Last Name') return 'Doe';
+      if (h === 'Email') return 'john@example.com';
+      return `Sample ${h.replace(/_/g, ' ')}`;
+    }).join(",");
+    
+    const csvContent = `${headerRow}\n${sampleRow1}`;
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -289,10 +342,12 @@ export function MassMailForm() {
 
   const handleConnect = (provider: string) => {
     setIsConnecting(provider);
+    const user = atsApi.auth.getCurrentUser();
+    const tenantId = user?.tenantId || '';
     if (provider === 'google') {
-      window.location.href = "http://localhost:5000/api/v1/auth/google?returnTo=/email";
+      window.location.href = `http://localhost:5000/api/v1/auth/google?tenantId=${tenantId}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
     } else if (provider === 'microsoft') {
-      window.location.href = "http://localhost:5000/api/v1/auth/microsoft?returnTo=/email";
+      window.location.href = `http://localhost:5000/api/v1/auth/microsoft?tenantId=${tenantId}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
     } else if (provider === 'smtp') {
       setIsConnecting(null);
       setIsDialogOpen(false);
@@ -317,16 +372,11 @@ export function MassMailForm() {
         el.setSelectionRange(start + tag.length, start + tag.length);
       });
     } else {
-      const el = bodyTextareaRef.current;
-      if (el) {
-        const start = el.selectionStart ?? body.length;
-        const end = el.selectionEnd ?? body.length;
-        const newVal = body.slice(0, start) + tag + body.slice(end);
-        setBody(newVal);
-        requestAnimationFrame(() => {
-          el.focus();
-          el.setSelectionRange(start + tag.length, start + tag.length);
-        });
+      const editor = quillRef.current?.getEditor();
+      if (editor) {
+        const range = editor.getSelection(true);
+        editor.insertText(range?.index || 0, tag);
+        editor.setSelection((range?.index || 0) + tag.length);
       } else {
         setBody((prev) => prev + tag);
       }
@@ -447,17 +497,14 @@ export function MassMailForm() {
         <div className="space-y-6">
       
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-4">
+      <div className="flex items-center justify-between pb-4">
         <div className="flex-1 mr-4">
           <Input 
             placeholder="Campaign Name (e.g. Q3 Outreach)" 
             value={campaignName}
             onChange={(e) => setCampaignName(e.target.value)}
-            className="text-xl font-semibold border-none focus-visible:ring-0 shadow-none px-0 h-auto"
+            className="text-2xl font-bold border-none focus-visible:ring-0 shadow-none px-0 h-auto placeholder:text-neutral-300 dark:placeholder:text-slate-700"
           />
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-            {csvRecipients.length > 0 ? `Sending to ${csvRecipients.length} recipients` : 'Upload a CSV to add recipients'}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={downloadSampleCsv} className="text-neutral-500 hover:text-neutral-800 text-xs h-9">
@@ -467,34 +514,53 @@ export function MassMailForm() {
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex gap-2 h-9">
             <List className="w-4 h-4" /> Import CSV
           </Button>
+          <Button variant="outline" onClick={() => setIsSettingsOpen(true)} className="flex gap-2 h-9 px-2">
+            <Settings className="w-4 h-4 text-neutral-500" />
+          </Button>
         </div>
       </div>
 
-      {/* CSV Preview Table */}
+      {/* Recipients Summary */}
       {csvRecipients.length > 0 && (
-        <div className="border border-neutral-200 dark:border-slate-800 rounded-md p-4 bg-neutral-50 dark:bg-slate-800/50 max-h-48 overflow-y-auto">
-          <h4 className="text-sm font-semibold mb-2">Recipient Preview</h4>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-neutral-500 border-b border-neutral-200 dark:border-slate-700">
-                {csvHeaders.map(header => (
-                  <th key={header} className="pb-2 font-medium px-4">{header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {csvRecipients.slice(0, 5).map((r, i) => (
-                <tr key={i} className="border-b border-neutral-100 dark:border-slate-700/50 last:border-0">
-                  {csvHeaders.map(header => (
-                    <td key={header} className="py-2 px-4 truncate max-w-[200px]">{r.metadata[header] || '-'}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {csvRecipients.length > 5 && (
-            <p className="text-xs text-neutral-500 mt-2 text-center">...and {csvRecipients.length - 5} more recipients</p>
-          )}
+        <div className="flex items-center gap-3 bg-neutral-50 dark:bg-slate-800/50 p-2 rounded-md border border-neutral-200 dark:border-slate-700">
+          <span className="text-sm text-neutral-600 dark:text-neutral-300 font-medium px-2">To:</span>
+          <span className="text-sm font-semibold bg-white dark:bg-slate-700 px-3 py-1 rounded-full border border-neutral-200 dark:border-slate-600">
+            {csvRecipients.length} Recipients
+          </span>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="link" size="sm" className="text-primary h-auto p-0 ml-2">View List</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Recipient List</DialogTitle>
+                <DialogDescription>Previewing data for {csvRecipients.length} imported recipients.</DialogDescription>
+              </DialogHeader>
+              <div className="overflow-y-auto border rounded-md">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
+                    <tr className="text-left text-neutral-500 border-b border-neutral-200 dark:border-slate-700">
+                      {csvHeaders.map(header => (
+                        <th key={header} className="py-3 px-4 font-medium">{header}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {csvRecipients.slice(0, 50).map((r, i) => (
+                      <tr key={i} className="border-b border-neutral-100 dark:border-slate-700/50 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        {csvHeaders.map(header => (
+                          <td key={header} className="py-2 px-4 truncate max-w-[200px]">{r.metadata[header] || '-'}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {csvRecipients.length > 50 && (
+                <p className="text-xs text-neutral-500 text-center py-2">Showing first 50 recipients. {csvRecipients.length - 50} more not shown.</p>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 
@@ -545,7 +611,7 @@ export function MassMailForm() {
                 size="sm" 
                 onClick={async () => {
                   try {
-                    await fetch(`http://localhost:5000/email/campaigns/${activeCampaignId}/cancel`, { method: 'POST' });
+                    await atsApi.email.cancelCampaign(activeCampaignId);
                     setCampaignStats(s => s ? { ...s, pending: 0 } : null);
                     alert("Campaign cancelled. Remaining emails will not be sent.");
                   } catch (err) {
@@ -560,320 +626,246 @@ export function MassMailForm() {
         </div>
       )}
 
-      {/* Form Fields */}
-      <div className="flex flex-col gap-5">
+      {/* Form Fields - Modern Clean UI */}
+      <div className="flex flex-col border border-neutral-200 dark:border-slate-700 rounded-lg overflow-hidden focus-within:border-primary/50 transition-colors bg-white dark:bg-slate-900 shadow-sm mt-4">
         
-        {/* From / Template Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex flex-col gap-2">
-            <Label>From Account</Label>
-            <div className="flex items-center gap-2">
-              <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="No accounts connected" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.length === 0 ? (
-                    <SelectItem value="none" disabled>No connected accounts</SelectItem>
-                  ) : (
-                    accounts.map(acc => (
-                      <SelectItem key={acc.id} value={acc.email}>
-                        {acc.email} ({acc.provider === 'google' ? 'Gmail' : acc.provider === 'microsoft' ? 'Office365' : 'SMTP'})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="icon" title="Connect New Account">
-                    <PlusCircle className="w-4 h-4 text-neutral-500" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[500px]">
-                  <DialogHeader>
-                    <DialogTitle>Connect Email Account</DialogTitle>
-                    <DialogDescription>
-                      Choose your email provider to connect for 2-way mass mail sync.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="flex items-center p-4 border border-neutral-200 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors">
-                      <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mr-4">
-                        <Mail className="w-5 h-5 text-red-600 dark:text-red-400" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Google Workspace / Gmail</h4>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400">Connect via Google OAuth</p>
-                      </div>
-                      <Button variant="secondary" size="sm" onClick={() => handleConnect('google')} disabled={isConnecting !== null}>
-                        {isConnecting === 'google' ? 'Connecting...' : 'Connect'}
-                      </Button>
-                    </div>
-                    
-                    <div className="flex items-center p-4 border border-neutral-200 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-4">
-                        <Globe className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Microsoft 365 / Outlook</h4>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400">Connect via Microsoft Graph</p>
-                      </div>
-                      <Button variant="secondary" size="sm" onClick={() => handleConnect('microsoft')} disabled={isConnecting !== null}>
-                        {isConnecting === 'microsoft' ? 'Connecting...' : 'Connect'}
-                      </Button>
-                    </div>
-                    
-                    <div className="flex items-center p-4 border border-neutral-200 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors">
-                      <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-slate-800 flex items-center justify-center mr-4">
-                        <Server className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Custom SMTP / IMAP</h4>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400">Use standard mail protocols</p>
-                      </div>
-                      <Button variant="secondary" size="sm" onClick={() => handleConnect('smtp')} disabled={isConnecting !== null}>
-                        {isConnecting === 'smtp' ? 'Connecting...' : 'Setup'}
-                      </Button>
-                    </div>
-
-                    <div className="mt-4 text-center">
-                      <Link href="/view-profile?tab=email_integration">
-                        <Button variant="link" className="text-blue-600 text-xs">
-                          <Settings className="w-3 h-3 mr-1" />
-                          Manage Advanced Email Settings
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              
-              <SmtpConfigModal 
-                isOpen={isSmtpModalOpen} 
-                onClose={() => setIsSmtpModalOpen(false)} 
-                onSave={fetchAccounts} 
-              />
-            </div>
-          </div>
+        {/* Unified Header Rows */}
+        <div className="flex flex-col border-b border-neutral-100 dark:border-slate-800">
           
-          <div className="flex flex-col gap-2">
-            <Label>Template</Label>
-            <Select
-              onValueChange={(val) => {
-                const templates: Record<string, { subject: string; body: string }> = {
-                  initial_outreach: {
-                    subject: "Exciting Opportunity: {{Job_Title}} at {{Company_Name}}",
-                    body: `Hi {{Candidate_Name}},\n\nI came across your profile and was impressed by your background in {{Candidate_Skill}}.\n\nWe have an exciting opening for a {{Job_Title}} role at {{Company_Name}} that I think could be a great fit for you.\n\nHere's a quick overview:\n- Role: {{Job_Title}}\n- Location: {{Job_Location}}\n- Department: {{Department}}\n\nI'd love to schedule a quick 15-minute call to share more details. Would you be open to connecting this week?\n\nBest regards,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
-                  },
-                  job_alert: {
-                    subject: "New Job Match: {{Job_Title}} – {{Company_Name}}",
-                    body: `Hi {{Candidate_Name}},\n\nBased on your profile, we think you'd be a great fit for a new opportunity we just posted:\n\n📌 Role: {{Job_Title}}\n📍 Location: {{Job_Location}}\n💼 Department: {{Department}}\n📅 Start Date: {{Start_Date}}\n\nApply now or reply to this email to express interest. We'd love to hear from you!\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Talent Team`,
-                  },
-                  re_engagement: {
-                    subject: "We'd love to reconnect, {{Candidate_Name}}!",
-                    body: `Hi {{Candidate_Name}},\n\nIt's been a while since we last spoke, and we have some exciting new opportunities that might interest you.\n\nWe currently have openings in {{Department}} that align with your experience in {{Candidate_Skill}}.\n\nWould you be open to a quick call to catch up?\n\nWarm regards,\n{{Recruiter_Name}}\n{{Company_Name}} Talent Team`,
-                  },
-                  application_ack: {
-                    subject: "We received your application – {{Job_Title}}",
-                    body: `Hi {{Candidate_Name}},\n\nThank you for applying for the {{Job_Title}} position at {{Company_Name}}!\n\nWe have received your application and our team is currently reviewing it. We will be in touch within {{Response_Days}} business days with an update.\n\nThank you for your interest!\n\nBest regards,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
-                  },
-                  interview_invite: {
-                    subject: "Interview Invitation – {{Job_Title}} at {{Company_Name}}",
-                    body: `Hi {{Candidate_Name}},\n\nCongratulations! We'd like to invite you to interview for the {{Job_Title}} position at {{Company_Name}}.\n\n📅 Date: {{Interview_Date}}\n⏰ Time: {{Interview_Time}}\n📍 Location / Link: {{Interview_Link}}\n👤 Interviewer: {{Interviewer_Name}}\n\nPlease confirm your availability by replying to this email.\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
-                  },
-                  interview_reminder: {
-                    subject: "Reminder: Your Interview Tomorrow – {{Job_Title}}",
-                    body: `Hi {{Candidate_Name}},\n\nThis is a friendly reminder about your upcoming interview for the {{Job_Title}} role at {{Company_Name}}.\n\n📅 Date: {{Interview_Date}}\n⏰ Time: {{Interview_Time}}\n📍 Location / Link: {{Interview_Link}}\n\nIf you need to reschedule, please let us know as soon as possible.\n\nSee you soon!\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
-                  },
-                  assessment_invite: {
-                    subject: "Skills Assessment – {{Job_Title}} at {{Company_Name}}",
-                    body: `Hi {{Candidate_Name}},\n\nAs part of our selection process for the {{Job_Title}} role, we'd like to invite you to complete a short skills assessment.\n\n🔗 Assessment Link: {{Assessment_Link}}\n⏱ Estimated Time: {{Assessment_Duration}} minutes\n📅 Deadline: {{Assessment_Deadline}}\n\nPlease reach out if you have any questions.\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
-                  },
-                  offer_notification: {
-                    subject: "Congratulations! Job Offer – {{Job_Title}}",
-                    body: `Hi {{Candidate_Name}},\n\nWe are thrilled to extend an offer for the {{Job_Title}} position at {{Company_Name}}!\n\n- 📋 Role: {{Job_Title}}\n- 💰 Compensation: {{Compensation}}\n- 📍 Location: {{Job_Location}}\n- 📅 Start Date: {{Start_Date}}\n\nYour formal offer letter will follow shortly. Please confirm your acceptance by {{Offer_Deadline}}.\n\nWe're excited to have you join the team!\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} HR Team`,
-                  },
-                  onboarding_welcome: {
-                    subject: "Welcome to {{Company_Name}}, {{Candidate_Name}}! 🎉",
-                    body: `Hi {{Candidate_Name}},\n\nWelcome to the {{Company_Name}} family! We're so excited to have you join us as {{Job_Title}}.\n\n📅 Start Date: {{Start_Date}}\n📍 Location: {{Job_Location}}\n⏰ Reporting Time: {{Reporting_Time}}\n👤 Your Manager: {{Manager_Name}}\n\nSee you soon!\n\n{{Recruiter_Name}}\n{{Company_Name}} HR Team`,
-                  },
-                  rejection_pre_interview: {
-                    subject: "Your Application – {{Job_Title}} at {{Company_Name}}",
-                    body: `Hi {{Candidate_Name}},\n\nThank you for applying for the {{Job_Title}} position at {{Company_Name}}.\n\nAfter careful review, we have decided to move forward with other candidates whose experience more closely matches our current needs.\n\nWe will keep your profile on file for future openings.\n\nThank you again and we wish you all the best.\n\nKind regards,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
-                  },
-                  rejection_post_interview: {
-                    subject: "Update on Your Application – {{Job_Title}}",
-                    body: `Hi {{Candidate_Name}},\n\nThank you for taking the time to meet with us for the {{Job_Title}} role at {{Company_Name}}. We genuinely enjoyed learning more about your background.\n\nAfter careful consideration, we have decided to move forward with another candidate. We were impressed by your {{Candidate_Skill}} and would love to stay in touch for future opportunities.\n\nWarm regards,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team`,
-                  },
-                  event_invite: {
-                    subject: "You're Invited: {{Event_Name}} – {{Company_Name}}",
-                    body: `Hi {{Candidate_Name}},\n\nYou're invited to {{Event_Name}}, hosted by {{Company_Name}}!\n\n📅 Date: {{Event_Date}}\n⏰ Time: {{Event_Time}}\n📍 Location: {{Event_Location}}\n🔗 Register Here: {{Event_Link}}\n\nRSVP by {{RSVP_Deadline}}.\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Talent Team`,
-                  },
-                };
-                if (templates[val]) {
-                  setSubject(templates[val].subject);
-                  setBody(templates[val].body);
-                }
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a template..." />
+          {/* From Account Row */}
+          <div className="flex items-center px-4 py-2 border-b border-neutral-100 dark:border-slate-800/50">
+            <span className="text-sm font-medium text-neutral-500 w-16">From:</span>
+            <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+              <SelectTrigger className="flex-1 max-w-md border-none shadow-none focus:ring-0 h-8 text-sm bg-transparent px-2">
+                <SelectValue placeholder="Select account..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="_s" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Sourcing</SelectItem>
-                <SelectItem value="initial_outreach">Initial Outreach</SelectItem>
-                <SelectItem value="job_alert">Job Alert</SelectItem>
-                <SelectItem value="re_engagement">Re-Engagement Campaign</SelectItem>
-                <SelectItem value="_a" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Application</SelectItem>
-                <SelectItem value="application_ack">Application Acknowledgement</SelectItem>
-                <SelectItem value="_i" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Interview</SelectItem>
-                <SelectItem value="interview_invite">Interview Invitation</SelectItem>
-                <SelectItem value="interview_reminder">Interview Reminder</SelectItem>
-                <SelectItem value="_as" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Assessment</SelectItem>
-                <SelectItem value="assessment_invite">Skills Assessment Invite</SelectItem>
-                <SelectItem value="_o" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Offer & Hiring</SelectItem>
-                <SelectItem value="offer_notification">Job Offer Notification</SelectItem>
-                <SelectItem value="onboarding_welcome">Onboarding Welcome</SelectItem>
-                <SelectItem value="_r" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Rejections</SelectItem>
-                <SelectItem value="rejection_pre_interview">Rejection (Pre-Interview)</SelectItem>
-                <SelectItem value="rejection_post_interview">Rejection (Post-Interview)</SelectItem>
-                <SelectItem value="_e" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Events</SelectItem>
-                <SelectItem value="event_invite">Event / Job Fair Invite</SelectItem>
+                {accounts.length === 0 ? (
+                  <SelectItem value="none" disabled>No connected accounts</SelectItem>
+                ) : (
+                  accounts.map(acc => (
+                    <SelectItem key={acc.id} value={acc.email}>
+                      {acc.email} ({acc.provider === 'google' ? 'Gmail' : acc.provider === 'microsoft' ? 'Office365' : 'SMTP'})
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
-          </div>
-        </div>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 px-2 text-primary" title="Connect New Account">
+                  <PlusCircle className="w-4 h-4 mr-1" /> Add
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Connect Email Account</DialogTitle>
+                  <DialogDescription>
+                    Choose your email provider to connect for 2-way mass mail sync.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="flex items-center p-4 border border-neutral-200 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors">
+                    <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mr-4">
+                      <Mail className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Google Workspace / Gmail</h4>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">Connect via Google OAuth</p>
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={() => handleConnect('google')} disabled={isConnecting !== null}>
+                      {isConnecting === 'google' ? 'Connecting...' : 'Connect'}
+                    </Button>
+                  </div>
+                  
+                  <div className="flex items-center p-4 border border-neutral-200 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-4">
+                      <Globe className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Microsoft 365 / Outlook</h4>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">Connect via Microsoft Graph</p>
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={() => handleConnect('microsoft')} disabled={isConnecting !== null}>
+                      {isConnecting === 'microsoft' ? 'Connecting...' : 'Connect'}
+                    </Button>
+                  </div>
+                  
+                  <div className="flex items-center p-4 border border-neutral-200 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors">
+                    <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-slate-800 flex items-center justify-center mr-4">
+                      <Server className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Custom SMTP / IMAP</h4>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">Use standard mail protocols</p>
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={() => handleConnect('smtp')} disabled={isConnecting !== null}>
+                      {isConnecting === 'smtp' ? 'Connecting...' : 'Setup'}
+                    </Button>
+                  </div>
 
-        {/* Subject */}
-        <div className="flex flex-col gap-2">
-          <Label>Subject</Label>
-          <Input 
-            ref={subjectInputRef}
-            placeholder="Enter email subject" 
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            onFocus={() => setLastFocusedField('subject')}
-          />
+                  <div className="mt-4 text-center">
+                    <Link href="/view-profile?tab=email_integration">
+                      <Button variant="link" className="text-blue-600 text-xs">
+                        <Settings className="w-3 h-3 mr-1" />
+                        Manage Advanced Email Settings
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <SmtpConfigModal isOpen={isSmtpModalOpen} onClose={() => setIsSmtpModalOpen(false)} onSave={fetchAccounts} />
+          </div>
+
+          {/* Subject & Template Row */}
+          <div className="flex items-center px-4 py-2">
+            <span className="text-sm font-medium text-neutral-500 w-16">Subject:</span>
+            <Input 
+              ref={subjectInputRef}
+              placeholder="Enter email subject" 
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              onFocus={() => setLastFocusedField('subject')}
+              className="flex-1 border-none focus-visible:ring-0 shadow-none px-2 h-8 text-sm font-medium"
+            />
+            <div className="flex items-center border-l border-neutral-200 dark:border-slate-700 pl-4 ml-2">
+              <Select
+                onValueChange={(val) => {
+                  const templates: Record<string, { subject: string; body: string }> = {
+                    initial_outreach: { subject: "Exciting Opportunity: {{Job_Title}} at {{Company_Name}}", body: `Hi {{Candidate_Name}},\n\nI came across your profile and was impressed by your background in {{Candidate_Skill}}.\n\nWe have an exciting opening for a {{Job_Title}} role at {{Company_Name}} that I think could be a great fit for you.\n\nHere's a quick overview:\n- Role: {{Job_Title}}\n- Location: {{Job_Location}}\n- Department: {{Department}}\n\nI'd love to schedule a quick 15-minute call to share more details. Would you be open to connecting this week?\n\nBest regards,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team` },
+                    job_alert: { subject: "New Job Match: {{Job_Title}} – {{Company_Name}}", body: `Hi {{Candidate_Name}},\n\nBased on your profile, we think you'd be a great fit for a new opportunity we just posted:\n\n📌 Role: {{Job_Title}}\n📍 Location: {{Job_Location}}\n💼 Department: {{Department}}\n📅 Start Date: {{Start_Date}}\n\nApply now or reply to this email to express interest. We'd love to hear from you!\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Talent Team` },
+                    re_engagement: { subject: "We'd love to reconnect, {{Candidate_Name}}!", body: `Hi {{Candidate_Name}},\n\nIt's been a while since we last spoke, and we have some exciting new opportunities that might interest you.\n\nWe currently have openings in {{Department}} that align with your experience in {{Candidate_Skill}}.\n\nWould you be open to a quick call to catch up?\n\nWarm regards,\n{{Recruiter_Name}}\n{{Company_Name}} Talent Team` },
+                    application_ack: { subject: "We received your application – {{Job_Title}}", body: `Hi {{Candidate_Name}},\n\nThank you for applying for the {{Job_Title}} position at {{Company_Name}}!\n\nWe have received your application and our team is currently reviewing it. We will be in touch within {{Response_Days}} business days with an update.\n\nThank you for your interest!\n\nBest regards,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team` },
+                    interview_invite: { subject: "Interview Invitation – {{Job_Title}} at {{Company_Name}}", body: `Hi {{Candidate_Name}},\n\nCongratulations! We'd like to invite you to interview for the {{Job_Title}} position at {{Company_Name}}.\n\n📅 Date: {{Interview_Date}}\n⏰ Time: {{Interview_Time}}\n📍 Location / Link: {{Interview_Link}}\n👤 Interviewer: {{Interviewer_Name}}\n\nPlease confirm your availability by replying to this email.\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team` },
+                    interview_reminder: { subject: "Reminder: Your Interview Tomorrow – {{Job_Title}}", body: `Hi {{Candidate_Name}},\n\nThis is a friendly reminder about your upcoming interview for the {{Job_Title}} role at {{Company_Name}}.\n\n📅 Date: {{Interview_Date}}\n⏰ Time: {{Interview_Time}}\n📍 Location / Link: {{Interview_Link}}\n\nIf you need to reschedule, please let us know as soon as possible.\n\nSee you soon!\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team` },
+                    assessment_invite: { subject: "Skills Assessment – {{Job_Title}} at {{Company_Name}}", body: `Hi {{Candidate_Name}},\n\nAs part of our selection process for the {{Job_Title}} role, we'd like to invite you to complete a short skills assessment.\n\n🔗 Assessment Link: {{Assessment_Link}}\n⏱ Estimated Time: {{Assessment_Duration}} minutes\n📅 Deadline: {{Assessment_Deadline}}\n\nPlease reach out if you have any questions.\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team` },
+                    offer_notification: { subject: "Congratulations! Job Offer – {{Job_Title}}", body: `Hi {{Candidate_Name}},\n\nWe are thrilled to extend an offer for the {{Job_Title}} position at {{Company_Name}}!\n\n- 📋 Role: {{Job_Title}}\n- 💰 Compensation: {{Compensation}}\n- 📍 Location: {{Job_Location}}\n- 📅 Start Date: {{Start_Date}}\n\nYour formal offer letter will follow shortly. Please confirm your acceptance by {{Offer_Deadline}}.\n\nWe're excited to have you join the team!\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} HR Team` },
+                    onboarding_welcome: { subject: "Welcome to {{Company_Name}}, {{Candidate_Name}}! 🎉", body: `Hi {{Candidate_Name}},\n\nWelcome to the {{Company_Name}} family! We're so excited to have you join us as {{Job_Title}}.\n\n📅 Start Date: {{Start_Date}}\n📍 Location: {{Job_Location}}\n⏰ Reporting Time: {{Reporting_Time}}\n👤 Your Manager: {{Manager_Name}}\n\nSee you soon!\n\n{{Recruiter_Name}}\n{{Company_Name}} HR Team` },
+                    rejection_pre_interview: { subject: "Your Application – {{Job_Title}} at {{Company_Name}}", body: `Hi {{Candidate_Name}},\n\nThank you for applying for the {{Job_Title}} position at {{Company_Name}}.\n\nAfter careful review, we have decided to move forward with other candidates whose experience more closely matches our current needs.\n\nWe will keep your profile on file for future openings.\n\nThank you again and we wish you all the best.\n\nKind regards,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team` },
+                    rejection_post_interview: { subject: "Update on Your Application – {{Job_Title}}", body: `Hi {{Candidate_Name}},\n\nThank you for taking the time to meet with us for the {{Job_Title}} role at {{Company_Name}}. We genuinely enjoyed learning more about your background.\n\nAfter careful consideration, we have decided to move forward with another candidate. We were impressed by your {{Candidate_Skill}} and would love to stay in touch for future opportunities.\n\nWarm regards,\n{{Recruiter_Name}}\n{{Company_Name}} Recruitment Team` },
+                    event_invite: { subject: "You're Invited: {{Event_Name}} – {{Company_Name}}", body: `Hi {{Candidate_Name}},\n\nYou're invited to {{Event_Name}}, hosted by {{Company_Name}}!\n\n📅 Date: {{Event_Date}}\n⏰ Time: {{Event_Time}}\n📍 Location: {{Event_Location}}\n🔗 Register Here: {{Event_Link}}\n\nRSVP by {{RSVP_Deadline}}.\n\nBest,\n{{Recruiter_Name}}\n{{Company_Name}} Talent Team` },
+                  };
+                  if (templates[val]) {
+                    setSubject(templates[val].subject);
+                    setBody(templates[val].body.replace(/\n/g, '<br>'));
+                  }
+                }}
+              >
+                <SelectTrigger className="w-auto min-w-[140px] border-none shadow-none focus:ring-0 h-8 text-sm bg-transparent text-primary font-medium hover:bg-neutral-50 dark:hover:bg-slate-800 rounded">
+                  <span className="flex items-center gap-2"><ListOrdered className="w-3.5 h-3.5"/> Use Template</span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_s" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Sourcing</SelectItem>
+                  <SelectItem value="initial_outreach">Initial Outreach</SelectItem>
+                  <SelectItem value="job_alert">Job Alert</SelectItem>
+                  <SelectItem value="re_engagement">Re-Engagement Campaign</SelectItem>
+                  <SelectItem value="_a" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Application</SelectItem>
+                  <SelectItem value="application_ack">Application Acknowledgement</SelectItem>
+                  <SelectItem value="_i" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Interview</SelectItem>
+                  <SelectItem value="interview_invite">Interview Invitation</SelectItem>
+                  <SelectItem value="interview_reminder">Interview Reminder</SelectItem>
+                  <SelectItem value="_as" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Assessment</SelectItem>
+                  <SelectItem value="assessment_invite">Skills Assessment Invite</SelectItem>
+                  <SelectItem value="_o" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Offer & Hiring</SelectItem>
+                  <SelectItem value="offer_notification">Job Offer Notification</SelectItem>
+                  <SelectItem value="onboarding_welcome">Onboarding Welcome</SelectItem>
+                  <SelectItem value="_r" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Rejections</SelectItem>
+                  <SelectItem value="rejection_pre_interview">Rejection (Pre-Interview)</SelectItem>
+                  <SelectItem value="rejection_post_interview">Rejection (Post-Interview)</SelectItem>
+                  <SelectItem value="_e" disabled className="text-xs font-semibold text-muted-foreground opacity-70 cursor-default">── Events</SelectItem>
+                  <SelectItem value="event_invite">Event / Job Fair Invite</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
         {/* Body & Rich Text Toolbar */}
-        <div className="flex flex-col gap-0 border border-neutral-200 dark:border-slate-700 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
-          
-          {/* Toolbar */}
-          <div className="bg-neutral-50 dark:bg-slate-800/50 border-b border-neutral-200 dark:border-slate-700 p-2 flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200">
-                <Bold className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200">
-                <Italic className="w-4 h-4" />
-              </Button>
-              <div className="w-px h-4 bg-neutral-300 dark:bg-slate-600 mx-1" />
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200">
-                <List className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200">
-                <ListOrdered className="w-4 h-4" />
-              </Button>
-              <div className="w-px h-4 bg-neutral-300 dark:bg-slate-600 mx-1" />
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200">
-                <Link2 className="w-4 h-4" />
-              </Button>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-neutral-500 font-medium">Insert Merge Field:</span>
-              {csvHeaders.length > 0 && (
-                <div className="flex gap-1 flex-wrap max-w-full overflow-hidden">
+        <div className="flex flex-col relative group">
+          {/* Merge Fields floating toolbar */}
+          {csvHeaders.length > 0 && (
+            <div className="absolute top-[8px] right-[8px] z-10">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs bg-white dark:bg-slate-800 shadow-sm border-neutral-200 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-700">
+                    <span className="text-primary font-bold mr-1">{'{ }'}</span> Insert Variable
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-y-auto">
                   {csvHeaders.map(header => (
-                    <Button key={header} variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => insertMergeField(header)}>
-                      [{header}]
-                    </Button>
+                    <DropdownMenuItem key={header} onClick={() => insertMergeField(header)} className="text-xs font-mono cursor-pointer flex justify-between">
+                      {header} <span className="text-neutral-400 opacity-50">{`{{${header}}}`}</span>
+                    </DropdownMenuItem>
                   ))}
-                </div>
-              )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
+          )}
+          
+          <div className="bg-white dark:bg-slate-900 quill-wrapper" onClick={() => setLastFocusedField('body')}>
+            <style dangerouslySetInnerHTML={{__html: `
+              .quill-wrapper .ql-toolbar { border: none; border-bottom: 1px solid #f1f5f9; background: #ffffff; padding: 12px 16px; border-radius: 0; }
+              .dark .quill-wrapper .ql-toolbar { border-bottom: 1px solid #1e293b; background: #0f172a; }
+              .quill-wrapper .ql-container { border: none; min-height: 400px; font-family: inherit; font-size: 15px; }
+              .quill-wrapper .ql-editor { padding: 24px 32px; color: #334155; }
+              .dark .quill-wrapper .ql-editor { color: #cbd5e1; }
+              .dark .quill-wrapper .ql-snow .ql-stroke { stroke: #94a3b8; }
+              .dark .quill-wrapper .ql-snow .ql-fill { fill: #94a3b8; }
+              .dark .quill-wrapper .ql-snow .ql-picker { color: #94a3b8; }
+            `}} />
+            {/* @ts-ignore */}
+            <ReactQuill 
+              ref={quillRef}
+              theme="snow" 
+              value={body} 
+              onChange={setBody} 
+              modules={quillModules}
+              className="min-h-[400px]"
+              placeholder="Type your message here..."
+            />
           </div>
           
-          <textarea
-            ref={bodyTextareaRef}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            onFocus={() => setLastFocusedField('body')}
-            placeholder="Type your message here..."
-            className="w-full min-h-[300px] p-4 bg-transparent outline-none resize-y text-sm text-neutral-800 dark:text-neutral-200"
-          />
-        </div>
-
-        {/* Delivery Settings (Branch Isolated & Role Protected) */}
-        <div className="p-4 border border-blue-100 bg-blue-50/50 dark:border-blue-900/30 dark:bg-blue-900/10 rounded-lg space-y-3 mt-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-100 dark:border-blue-900/30 pb-2">
-            <span className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-              Branch Delivery Rate & Anti-Spam Controls ({userProfile?.branchName || "HQ / Default Branch"})
-            </span>
-            {canEditDeliverySettings ? (
-              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                Tenant / Branch Admin Access (Editable)
-              </span>
-            ) : (
-              <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
-                <Lock className="h-3 w-3" /> Managed by Tenant & Branch Admins
-              </span>
+          {/* Attachments Section */}
+          <div className="bg-white dark:bg-slate-900 p-4 border-t border-neutral-100 dark:border-slate-800 flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <input type="file" multiple className="hidden" ref={attachmentsInputRef} onChange={handleAttachmentsUpload} />
+              <Button variant="ghost" size="sm" onClick={() => attachmentsInputRef.current?.click()} className="flex items-center gap-1.5 h-8 text-xs text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200">
+                <Paperclip className="w-4 h-4" />
+                Attach Files
+              </Button>
+            </div>
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-1 px-2">
+                {attachments.map((file, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-neutral-50 dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-full px-3 py-1.5 text-xs text-neutral-700 dark:text-neutral-300">
+                    <Paperclip className="w-3 h-3 text-neutral-400" />
+                    <span className="truncate max-w-[150px] font-medium">{file.name}</span>
+                    <span className="text-neutral-400 text-[10px]">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                    <button onClick={() => removeAttachment(i)} className="text-neutral-400 hover:text-red-500 transition-colors ml-1 rounded-full hover:bg-red-50 p-0.5">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-neutral-600 dark:text-neutral-300 font-semibold">Emails Per Minute (Max)</Label>
-              <Input 
-                type="number" 
-                disabled={!canEditDeliverySettings}
-                value={ratePerMinute} 
-                onChange={e => {
-                  const val = Number(e.target.value);
-                  updateBranchSettings(val, val * 60, randomizeDelay);
-                }} 
-                className="h-9 disabled:opacity-75 disabled:bg-neutral-100 dark:disabled:bg-slate-800" 
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-neutral-600 dark:text-neutral-300 font-semibold">Emails Per Hour (Max)</Label>
-              <Input 
-                type="number" 
-                disabled={!canEditDeliverySettings}
-                value={ratePerHour} 
-                onChange={e => {
-                  const val = Number(e.target.value);
-                  updateBranchSettings(Math.round(val / 60), val, randomizeDelay);
-                }} 
-                className="h-9 disabled:opacity-75 disabled:bg-neutral-100 dark:disabled:bg-slate-800" 
-              />
-            </div>
-            <div className="flex flex-col justify-end pb-1">
-              <Label className={`flex items-center gap-2 text-xs font-semibold select-none ${!canEditDeliverySettings ? "cursor-not-allowed opacity-75" : "cursor-pointer"}`}>
-                <input 
-                  type="checkbox" 
-                  disabled={!canEditDeliverySettings}
-                  checked={randomizeDelay} 
-                  onChange={e => updateBranchSettings(ratePerMinute, ratePerHour, e.target.checked)} 
-                  className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 disabled:cursor-not-allowed" 
-                />
-                Randomize wait time (Anti-spam jitter)
-              </Label>
-            </div>
           </div>
         </div>
       </div>
 
+      <MassMailSettingsModal 
+        open={isSettingsOpen} 
+        onOpenChange={setIsSettingsOpen}
+        deliverySettings={{ ratePerMinute, ratePerHour, randomizeDelay }}
+        onDeliverySettingsChange={(settings) => {
+          updateBranchSettings(settings.ratePerMinute, settings.ratePerHour, settings.randomizeDelay);
+        }}
+        canEditDeliverySettings={canEditDeliverySettings}
+        user={atsApi.auth.getCurrentUser()}
+      />
+
       {/* Footer Actions */}
-      <div className="flex items-center justify-between pt-4 border-t border-neutral-100 dark:border-slate-800">
-        <Button variant="ghost" className="text-neutral-500 flex items-center gap-2">
-          <Paperclip className="w-4 h-4" />
-          Attach Files
-        </Button>
+      <div className="flex items-center justify-end pt-4 border-t border-neutral-100 dark:border-slate-800">
         <div className="flex items-center gap-3">
           <Button variant="outline" className="flex items-center gap-2">
             <X className="w-4 h-4" />

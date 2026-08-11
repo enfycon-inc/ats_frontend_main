@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { atsApi } from "@/lib/ats-api";
 
 interface SmtpConfigModalProps {
   isOpen: boolean;
@@ -43,18 +44,9 @@ export function SmtpConfigModal({ isOpen, onClose, onSave }: SmtpConfigModalProp
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/email/accounts/custom", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      
-      if (res.ok) {
-        onSave();
-        onClose();
-      } else {
-        alert("Failed to save account configuration.");
-      }
+      await atsApi.email.addCustomAccount(formData);
+      onSave();
+      onClose();
     } catch (err) {
       console.error(err);
       alert("An error occurred while saving.");

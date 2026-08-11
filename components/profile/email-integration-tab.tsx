@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Mail, Globe, Trash2, ShieldAlert } from "lucide-react";
 import { SmtpConfigModal } from "@/components/email/smtp-config-modal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { atsApi } from "@/lib/ats-api";
 
 interface EmailAccount {
   id: string;
@@ -37,8 +38,7 @@ export function EmailIntegrationTab() {
 
   const fetchAccounts = async () => {
     try {
-      const res = await fetch("http://localhost:5000/email/accounts");
-      const data = await res.json();
+      const data = await atsApi.email.getAccounts();
       setAccounts(data);
     } catch (err) {
       console.error(err);
@@ -47,8 +47,7 @@ export function EmailIntegrationTab() {
 
   const fetchPreferences = async () => {
     try {
-      const res = await fetch("http://localhost:5000/email/preferences");
-      const data = await res.json();
+      const data = await atsApi.email.getPreferences();
       const prefMap: Record<string, string> = {};
       data.forEach((p: any) => {
         prefMap[p.action_name] = p.email_account_id;
@@ -61,10 +60,12 @@ export function EmailIntegrationTab() {
 
   const handleConnect = (provider: string) => {
     setIsConnecting(provider);
+    const user = atsApi.auth.getCurrentUser();
+    const tenantId = user?.tenantId || '';
     if (provider === 'google') {
-      window.location.href = `http://localhost:5000/api/v1/auth/google?returnTo=${encodeURIComponent('/view-profile?tab=email_integration')}`;
+      window.location.href = `http://localhost:5000/api/v1/auth/google?tenantId=${tenantId}&userId=${user?.id || ''}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname + '?tab=email_integration')}`;
     } else if (provider === 'microsoft') {
-      window.location.href = `http://localhost:5000/api/v1/auth/microsoft?returnTo=${encodeURIComponent('/view-profile?tab=email_integration')}`;
+      window.location.href = `http://localhost:5000/api/v1/auth/microsoft?tenantId=${tenantId}&userId=${user?.id || ''}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname + '?tab=email_integration')}`;
     } else if (provider === 'smtp') {
       setIsConnecting(null);
       setIsSmtpModalOpen(true);
@@ -74,7 +75,7 @@ export function EmailIntegrationTab() {
   const handleDelete = async () => {
     if (deleteId) {
       try {
-        await fetch(`http://localhost:5000/email/accounts/${deleteId}/delete`, { method: 'POST' });
+        await atsApi.email.deleteAccount(deleteId);
         fetchAccounts();
         setDeleteId(null);
       } catch (err) {
@@ -85,7 +86,7 @@ export function EmailIntegrationTab() {
 
   const handleSetDefault = async (id: string) => {
     try {
-      await fetch(`http://localhost:5000/email/accounts/${id}/default`, { method: 'POST' });
+      await atsApi.email.setDefaultAccount(id);
       fetchAccounts();
     } catch (err) {
       console.error(err);
@@ -95,11 +96,7 @@ export function EmailIntegrationTab() {
   const handlePreferenceChange = async (actionId: string, accountId: string) => {
     setPreferences(prev => ({ ...prev, [actionId]: accountId }));
     try {
-      await fetch("http://localhost:5000/email/preferences", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actionName: actionId, accountId })
-      });
+      await atsApi.email.savePreference(actionId, accountId);
     } catch (err) {
       console.error(err);
     }

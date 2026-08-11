@@ -145,3 +145,115 @@
 [2026-08-07T15:25:00.446Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
 [2026-08-07T15:25:00.932Z] Localhost backend response status: 200
 [2026-08-07T15:25:00.947Z] Backend login successful. User data: {"id":"fa6898d0-39fb-4550-b5b3-3a5a3f0e07e6","email":"deb@deb.com","fullName":"deb","roles":["ADMIN"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T10:27:14.077Z] Authorize started for email: admin@enfycon.com
+[2026-08-10T10:27:14.084Z] Parsed credentials: email=admin@enfycon.com, subdomain=
+[2026-08-10T10:27:14.086Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T10:27:15.108Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T10:27:15.116Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T10:27:15.486Z] Localhost backend response status: 200
+[2026-08-10T10:27:15.500Z] Backend login successful. User data: {"id":"850f4384-e579-41a0-a4e7-613c4ca198be","email":"admin@enfycon.com","fullName":"Enfy Admin","roles":["ADMIN","SUPER_ADMIN"],"tenantId":"d3b07384-d113-49c3-a555-9ee75c13ca33","defaultMarket":"IN","tenantDomain":"enfycon","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","platform:manage","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"SUPER_ADMIN","podId":null,"branchId":"cb93e495-52a0-4b2a-999b-d4517e7f7d82","branchName":"Default Enfy SaaS Tenant Headquarters","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T10:40:18.718Z] Authorize started for email: vizag-am-us@deb.com
+[2026-08-10T10:40:18.724Z] Parsed credentials: email=vizag-am-us@deb.com, subdomain=
+[2026-08-10T10:40:18.726Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T10:40:19.748Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T10:40:19.751Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T10:40:20.088Z] Localhost backend response status: 200
+[2026-08-10T10:40:20.094Z] Backend login successful. User data: {"id":"ef4ddfcf-da5d-45ed-ac64-aa44781c8c62","email":"vizag-am-us@deb.com","fullName":"Vizag Account Manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c3de05e5-c583-4415-a24e-d087cd6ac2b0","branchName":"Vizag-US-IT","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T10:40:31.763Z] Authorize started for email: vizag-am-us@deb.com
+[2026-08-10T10:40:31.766Z] Parsed credentials: email=vizag-am-us@deb.com, subdomain=deb
+[2026-08-10T10:40:31.768Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T10:40:32.771Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T10:40:32.773Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T10:40:33.243Z] Localhost backend response status: 200
+[2026-08-10T10:40:33.247Z] Backend login successful. User data: {"id":"ef4ddfcf-da5d-45ed-ac64-aa44781c8c62","email":"vizag-am-us@deb.com","fullName":"Vizag Account Manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c3de05e5-c583-4415-a24e-d087cd6ac2b0","branchName":"Vizag-US-IT","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T12:10:34.904Z] Authorize started for email: deb@deb.com
+[2026-08-10T12:10:34.912Z] Parsed credentials: email=deb@deb.com, subdomain=deb
+[2026-08-10T12:10:34.914Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T12:10:35.938Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T12:10:35.942Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T12:10:36.444Z] Localhost backend response status: 200
+[2026-08-10T12:10:36.453Z] Backend login successful. User data: {"id":"fa6898d0-39fb-4550-b5b3-3a5a3f0e07e6","email":"deb@deb.com","fullName":"deb","roles":["ADMIN"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T13:41:47.784Z] Authorize started for email: vizag-am-us@deb.com
+[2026-08-10T13:41:47.797Z] Parsed credentials: email=vizag-am-us@deb.com, subdomain=deb
+[2026-08-10T13:41:47.800Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T13:41:48.820Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T13:41:48.830Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T13:41:49.413Z] Localhost backend response status: 200
+[2026-08-10T13:41:49.422Z] Backend login successful. User data: {"id":"ef4ddfcf-da5d-45ed-ac64-aa44781c8c62","email":"vizag-am-us@deb.com","fullName":"Vizag Account Manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c3de05e5-c583-4415-a24e-d087cd6ac2b0","branchName":"Vizag-US-IT","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T13:54:47.589Z] Authorize started for email: deb@deb.com
+[2026-08-10T13:54:47.617Z] Parsed credentials: email=deb@deb.com, subdomain=deb
+[2026-08-10T13:54:47.621Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T13:54:48.647Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T13:54:48.652Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T13:54:49.282Z] Localhost backend response status: 200
+[2026-08-10T13:54:49.289Z] Backend login successful. User data: {"id":"fa6898d0-39fb-4550-b5b3-3a5a3f0e07e6","email":"deb@deb.com","fullName":"deb","roles":["ADMIN"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T14:19:48.314Z] Authorize started for email: vizag-am-us@deb.com
+[2026-08-10T14:19:48.328Z] Parsed credentials: email=vizag-am-us@deb.com, subdomain=deb
+[2026-08-10T14:19:48.333Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T14:19:49.346Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T14:19:49.352Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T14:19:49.956Z] Localhost backend response status: 200
+[2026-08-10T14:19:49.962Z] Backend login successful. User data: {"id":"ef4ddfcf-da5d-45ed-ac64-aa44781c8c62","email":"vizag-am-us@deb.com","fullName":"Vizag Account Manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c3de05e5-c583-4415-a24e-d087cd6ac2b0","branchName":"Vizag-US-IT","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T14:53:56.739Z] Authorize started for email: deb@deb.com
+[2026-08-10T14:53:56.746Z] Parsed credentials: email=deb@deb.com, subdomain=deb
+[2026-08-10T14:53:56.748Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T14:53:57.773Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T14:53:57.777Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T14:53:58.294Z] Localhost backend response status: 200
+[2026-08-10T14:53:58.302Z] Backend login successful. User data: {"id":"fa6898d0-39fb-4550-b5b3-3a5a3f0e07e6","email":"deb@deb.com","fullName":"deb","roles":["ADMIN"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T15:02:25.302Z] Authorize started for email: vizag-am-us@deb.com
+[2026-08-10T15:02:25.307Z] Parsed credentials: email=vizag-am-us@deb.com, subdomain=deb
+[2026-08-10T15:02:25.309Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T15:02:26.328Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T15:02:26.331Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T15:02:26.878Z] Localhost backend response status: 200
+[2026-08-10T15:02:26.884Z] Backend login successful. User data: {"id":"ef4ddfcf-da5d-45ed-ac64-aa44781c8c62","email":"vizag-am-us@deb.com","fullName":"Vizag Account Manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c3de05e5-c583-4415-a24e-d087cd6ac2b0","branchName":"Vizag-US-IT","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T15:12:24.562Z] Authorize started for email: deb@deb.com
+[2026-08-10T15:12:24.568Z] Parsed credentials: email=deb@deb.com, subdomain=deb
+[2026-08-10T15:12:24.569Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T15:12:25.589Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T15:12:25.591Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T15:12:26.107Z] Localhost backend response status: 200
+[2026-08-10T15:12:26.113Z] Backend login successful. User data: {"id":"fa6898d0-39fb-4550-b5b3-3a5a3f0e07e6","email":"deb@deb.com","fullName":"deb","roles":["ADMIN"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T15:22:31.197Z] Authorize started for email: vizag-am-us@deb.com
+[2026-08-10T15:22:31.201Z] Parsed credentials: email=vizag-am-us@deb.com, subdomain=deb
+[2026-08-10T15:22:31.204Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T15:22:32.214Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T15:22:32.216Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T15:22:32.676Z] Localhost backend response status: 200
+[2026-08-10T15:22:32.680Z] Backend login successful. User data: {"id":"ef4ddfcf-da5d-45ed-ac64-aa44781c8c62","email":"vizag-am-us@deb.com","fullName":"Vizag Account Manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c3de05e5-c583-4415-a24e-d087cd6ac2b0","branchName":"Vizag-US-IT","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T15:42:50.818Z] Authorize started for email: vizag-am-us@deb.com
+[2026-08-10T15:42:50.824Z] Parsed credentials: email=vizag-am-us@deb.com, subdomain=deb
+[2026-08-10T15:42:50.826Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T15:42:51.843Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T15:42:51.846Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T15:42:52.358Z] Localhost backend response status: 200
+[2026-08-10T15:42:52.368Z] Backend login successful. User data: {"id":"ef4ddfcf-da5d-45ed-ac64-aa44781c8c62","email":"vizag-am-us@deb.com","fullName":"Vizag Account Manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c3de05e5-c583-4415-a24e-d087cd6ac2b0","branchName":"Vizag-US-IT","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T15:51:03.920Z] Authorize started for email: deb@deb.com
+[2026-08-10T15:51:03.926Z] Parsed credentials: email=deb@deb.com, subdomain=deb
+[2026-08-10T15:51:03.927Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T15:51:04.940Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T15:51:04.944Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T15:51:05.463Z] Localhost backend response status: 200
+[2026-08-10T15:51:05.469Z] Backend login successful. User data: {"id":"fa6898d0-39fb-4550-b5b3-3a5a3f0e07e6","email":"deb@deb.com","fullName":"deb","roles":["ADMIN"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T15:51:53.573Z] Authorize started for email: vizag-am-us@deb.com
+[2026-08-10T15:51:53.576Z] Parsed credentials: email=vizag-am-us@deb.com, subdomain=deb
+[2026-08-10T15:51:53.578Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T15:51:54.585Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T15:51:54.586Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T15:51:55.055Z] Localhost backend response status: 200
+[2026-08-10T15:51:55.060Z] Backend login successful. User data: {"id":"ef4ddfcf-da5d-45ed-ac64-aa44781c8c62","email":"vizag-am-us@deb.com","fullName":"Vizag Account Manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c3de05e5-c583-4415-a24e-d087cd6ac2b0","branchName":"Vizag-US-IT","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T16:00:41.681Z] Authorize started for email: am1@deb.com
+[2026-08-10T16:00:41.686Z] Parsed credentials: email=am1@deb.com, subdomain=
+[2026-08-10T16:00:41.688Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T16:00:42.699Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T16:00:42.703Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T16:00:43.033Z] Localhost backend response status: 200
+[2026-08-10T16:00:43.037Z] Backend login successful. User data: {"id":"969a44ce-51d0-4bdc-8231-364358349ff2","email":"am1@deb.com","fullName":"account manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c6dcb074-4fda-44e8-a8bf-7c337f0ca108","branchName":"indbbsr","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-10T16:01:08.058Z] Authorize started for email: am1@deb.com
+[2026-08-10T16:01:08.063Z] Parsed credentials: email=am1@deb.com, subdomain=deb
+[2026-08-10T16:01:08.066Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-10T16:01:09.080Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-10T16:01:09.081Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-10T16:01:09.565Z] Localhost backend response status: 200
+[2026-08-10T16:01:09.571Z] Backend login successful. User data: {"id":"969a44ce-51d0-4bdc-8231-364358349ff2","email":"am1@deb.com","fullName":"account manager","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c6dcb074-4fda-44e8-a8bf-7c337f0ca108","branchName":"indbbsr","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}

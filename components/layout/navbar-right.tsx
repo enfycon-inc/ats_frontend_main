@@ -626,7 +626,12 @@ function ProfileDropdownNav() {
 // ─── Sandbox Switcher dropdown ────────────────────────────────────────────────
 function SandboxSwitcher() {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handle = (e: MouseEvent) => {
@@ -636,7 +641,7 @@ function SandboxSwitcher() {
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
-  const currentOverride = typeof window !== "undefined" ? localStorage.getItem("override_role") : null;
+  const currentOverride = mounted ? localStorage.getItem("override_role") : null;
 
   const handleSelectRole = (role: string | null) => {
     if (typeof window !== "undefined") {
