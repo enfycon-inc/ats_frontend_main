@@ -118,11 +118,11 @@ const formSchema = zod.object({
   country: zod.string().min(1, "Country is required"),
   states: zod.string().min(1, "State is required"),
   city: zod.string().optional(),
-  remoteJob: zod.enum(["Yes", "No", "Hybrid"]),
+  remoteJob: zod.enum(["Onsite", "Remote", "Hybrid", "Yes", "No"]),
   hoursPerWeek: zod.union([zod.number().min(1).max(168), zod.nan().transform(() => undefined)]).optional(),
   jobStatus: zod.string(),
-  client: zod.string().min(1, "Client is required"),
-  endClientName: zod.string().optional(),
+  client: zod.string().optional(),
+  endClientName: zod.string().min(1, "End Client is required"),
   clientJobId: zod.string().optional(),
   priority: zod.enum(["Hot", "Warm", "Cold"]),
   additionalDetails: zod.string().optional(),
@@ -255,9 +255,11 @@ export default function EditJobPostingPage() {
   // Documents file state
   const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: string }[]>([]);
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
+  const [endClientDropdownOpen, setEndClientDropdownOpen] = useState(false);
   const [addClientModalOpen, setAddClientModalOpen] = useState(false);
   const [clientList, setClientList] = useState<any[]>([]);
   const [clientSearchText, setClientSearchText] = useState("");
+  const [endClientSearchText, setEndClientSearchText] = useState("");
   const [isHtmlMode, setIsHtmlMode] = useState(false);
   const [respondByType, setRespondByType] = useState("Open Until Filled");
   const [workAuthSearch, setWorkAuthSearch] = useState("");
@@ -758,7 +760,7 @@ export default function EditJobPostingPage() {
       // Map frontend form fields → backend CreateJobDto
       const payload = {
         title: data.jobTitle,
-        client: data.client,
+        client: data.client || data.endClientName || "Direct Client",
         endClientName: data.endClientName || undefined,
         location: data.locationAutocomplete || data.city || data.states || "Remote",
         type: data.jobType || "Contract",
@@ -1180,7 +1182,7 @@ export default function EditJobPostingPage() {
                     </div>
 
                     {/* Client Bill Rate / Commission */}
-                    <div className="space-y-1 md:col-span-2">
+                    <div className="space-y-1 md:col-span-1">
                       {market === "IN" && watch("taxTerms") === "Permanent" ? (
                         <>
                           <div className="flex items-center gap-1">
@@ -1322,7 +1324,7 @@ export default function EditJobPostingPage() {
                                 type="text"
                                 {...register("payRate")}
                                 placeholder="e.g. 12.0"
-                                className="w-full h-8 pl-10 pr-12 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 font-semibold"
+                                className="w-full h-8 pl-10 pr-12 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold"
                               />
                               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">LPA</span>
                             </div>
@@ -1338,7 +1340,7 @@ export default function EditJobPostingPage() {
                             <select
                               value={payCurrency}
                               onChange={(e) => setPayCurrency(e.target.value)}
-                              className="w-16 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0 font-semibold"
+                              className="w-16 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 shrink-0 font-semibold"
                             >
                               {market === "IN" ? (
                                 <>
@@ -1356,13 +1358,13 @@ export default function EditJobPostingPage() {
                             <input
                               type="text"
                               {...register("payRate")}
-                              className="h-8 w-24 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 font-semibold"
+                              className="h-8 w-24 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold"
                               placeholder="Pay Rate"
                             />
                             <select
                               value={payUnit}
                               onChange={(e) => setPayUnit(e.target.value)}
-                              className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0 font-semibold"
+                              className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 shrink-0 font-semibold"
                             >
                               {market === "IN" ? (
                                 <>
@@ -1384,7 +1386,7 @@ export default function EditJobPostingPage() {
                             <select
                               value={payTerm}
                               onChange={(e) => setPayTerm(e.target.value)}
-                              className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200 shrink-0 font-semibold"
+                              className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 shrink-0 font-semibold"
                             >
                               {market === "IN" ? (
                                 <>
@@ -1415,7 +1417,7 @@ export default function EditJobPostingPage() {
                       <input
                         type="date"
                         {...register("startDate")}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
+                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200"
                       />
                     </div>
 
@@ -1429,166 +1431,175 @@ export default function EditJobPostingPage() {
                       />
                     </div>
 
-                    {/* Country */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Country <span className="text-red-500">*</span></label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            role="combobox"
-                            className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-955"
-                          >
-                            <span className="truncate">{watch("country") || "Select Country..."}</span>
-                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[280px] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder="Search country..." className="h-9 text-xs" />
-                            <CommandList className="max-h-[220px]">
-                              <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No country found.</CommandEmpty>
-                              <CommandGroup>
-                                {Country.getAllCountries().map((co) => (
-                                  <CommandItem
-                                    key={co.isoCode}
-                                    value={co.name}
-                                    onSelect={() => {
-                                      setValue("country", co.name, { shouldValidate: true });
-                                      setValue("states", "");
-                                      setValue("city", "");
-                                    }}
-                                    className="text-xs cursor-pointer"
-                                  >
-                                    <Check className={cn("mr-2 h-3 w-3", watch("country") === co.name ? "opacity-100" : "opacity-0")} />
-                                    <ReactCountryFlag countryCode={co.isoCode} svg className="mr-1.5" style={{ width: "1.1em", height: "1.1em" }} />
-                                    {co.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      {errors.country && <p className="text-[10px] text-red-655 font-bold">{errors.country.message}</p>}
-                    </div>
-
-                    {/* States */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">State <span className="text-red-500">*</span></label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            role="combobox"
-                            disabled={!watch("country")}
-                            className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-955 disabled:opacity-50"
-                          >
-                            <span className="truncate">{watch("states") || "Select State..."}</span>
-                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[280px] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder="Search state..." className="h-9 text-xs" />
-                            <CommandList className="max-h-[220px]">
-                              <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No state found.</CommandEmpty>
-                              <CommandGroup>
-                                {(() => {
-                                  const countryObj = Country.getAllCountries().find(co => co.name === watch("country"));
-                                  if (!countryObj) return null;
-                                  return State.getStatesOfCountry(countryObj.isoCode).map((st) => (
+                    {/* Country, State, City (Single Row) */}
+                    <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Country */}
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Country <span className="text-red-500">*</span></label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              role="combobox"
+                              className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800 text-neutral-900 dark:text-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100"
+                            >
+                              <span className={cn("truncate", watch("country") ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-400 dark:text-slate-400 font-medium")}>
+                                {watch("country") || "Select Country..."}
+                              </span>
+                              <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-neutral-500" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[280px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search country..." className="h-9 text-xs" />
+                              <CommandList className="max-h-[220px]">
+                                <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No country found.</CommandEmpty>
+                                <CommandGroup>
+                                  {Country.getAllCountries().map((co) => (
                                     <CommandItem
-                                      key={st.isoCode}
-                                      value={st.name}
+                                      key={co.isoCode}
+                                      value={co.name}
                                       onSelect={() => {
-                                        setValue("states", st.name, { shouldValidate: true });
+                                        setValue("country", co.name, { shouldValidate: true });
+                                        setValue("states", "");
                                         setValue("city", "");
                                       }}
                                       className="text-xs cursor-pointer"
                                     >
-                                      <Check className={cn("mr-2 h-3 w-3", watch("states") === st.name ? "opacity-100" : "opacity-0")} />
-                                      {st.name}
+                                      <Check className={cn("mr-2 h-3 w-3", watch("country") === co.name ? "opacity-100" : "opacity-0")} />
+                                      <ReactCountryFlag countryCode={co.isoCode} svg className="mr-1.5" style={{ width: "1.1em", height: "1.1em" }} />
+                                      {co.name}
                                     </CommandItem>
-                                  ));
-                                })()}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      {errors.states && <p className="text-[10px] text-red-655 font-bold">{errors.states.message}</p>}
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        {errors.country && <p className="text-[10px] text-red-655 font-bold">{errors.country.message}</p>}
+                      </div>
+
+                      {/* States */}
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">State <span className="text-red-500">*</span></label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              role="combobox"
+                              disabled={!watch("country")}
+                              className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800 text-neutral-900 dark:text-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-50"
+                            >
+                              <span className={cn("truncate", watch("states") ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-400 dark:text-slate-400 font-medium")}>
+                                {watch("states") || "Select State..."}
+                              </span>
+                              <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-neutral-500" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[280px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search state..." className="h-9 text-xs" />
+                              <CommandList className="max-h-[220px]">
+                                <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No state found.</CommandEmpty>
+                                <CommandGroup>
+                                  {(() => {
+                                    const countryObj = Country.getAllCountries().find(co => co.name === watch("country"));
+                                    if (!countryObj) return null;
+                                    return State.getStatesOfCountry(countryObj.isoCode).map((st) => (
+                                      <CommandItem
+                                        key={st.isoCode}
+                                        value={st.name}
+                                        onSelect={() => {
+                                          setValue("states", st.name, { shouldValidate: true });
+                                          setValue("city", "");
+                                        }}
+                                        className="text-xs cursor-pointer"
+                                      >
+                                        <Check className={cn("mr-2 h-3 w-3", watch("states") === st.name ? "opacity-100" : "opacity-0")} />
+                                        {st.name}
+                                      </CommandItem>
+                                    ));
+                                  })()}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        {errors.states && <p className="text-[10px] text-red-655 font-bold">{errors.states.message}</p>}
+                      </div>
+
+                      {/* City */}
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">City</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              role="combobox"
+                              disabled={!watch("states")}
+                              className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800 text-neutral-900 dark:text-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-50"
+                            >
+                              <span className={cn("truncate", watch("city") ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-400 dark:text-slate-400 font-medium")}>
+                                {watch("city") || "Select City..."}
+                              </span>
+                              <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-neutral-500" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[280px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search city..." className="h-9 text-xs" />
+                              <CommandList className="max-h-[220px]">
+                                <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No city found.</CommandEmpty>
+                                <CommandGroup>
+                                  {(() => {
+                                    const countryObj = Country.getAllCountries().find(co => co.name === watch("country"));
+                                    if (!countryObj) return null;
+                                    const stateObj = State.getStatesOfCountry(countryObj.isoCode).find(st => st.name === watch("states"));
+                                    if (!stateObj) return null;
+                                    return City.getCitiesOfState(countryObj.isoCode, stateObj.isoCode).map((city) => (
+                                      <CommandItem
+                                        key={city.name}
+                                        value={city.name}
+                                        onSelect={() => setValue("city", city.name, { shouldValidate: true })}
+                                        className="text-xs cursor-pointer"
+                                      >
+                                        <Check className={cn("mr-2 h-3 w-3", watch("city") === city.name ? "opacity-100" : "opacity-0")} />
+                                        {city.name}
+                                      </CommandItem>
+                                    ));
+                                  })()}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                     </div>
 
-                    {/* City */}
+                    {/* Work Mode */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">City</label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            role="combobox"
-                            disabled={!watch("states")}
-                            className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-955 disabled:opacity-50"
-                          >
-                            <span className="truncate">{watch("city") || "Select City..."}</span>
-                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[280px] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder="Search city..." className="h-9 text-xs" />
-                            <CommandList className="max-h-[220px]">
-                              <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No city found.</CommandEmpty>
-                              <CommandGroup>
-                                {(() => {
-                                  const countryObj = Country.getAllCountries().find(co => co.name === watch("country"));
-                                  if (!countryObj) return null;
-                                  const stateObj = State.getStatesOfCountry(countryObj.isoCode).find(st => st.name === watch("states"));
-                                  if (!stateObj) return null;
-                                  return City.getCitiesOfState(countryObj.isoCode, stateObj.isoCode).map((city) => (
-                                    <CommandItem
-                                      key={city.name}
-                                      value={city.name}
-                                      onSelect={() => setValue("city", city.name, { shouldValidate: true })}
-                                      className="text-xs cursor-pointer"
-                                    >
-                                      <Check className={cn("mr-2 h-3 w-3", watch("city") === city.name ? "opacity-100" : "opacity-0")} />
-                                      {city.name}
-                                    </CommandItem>
-                                  ));
-                                })()}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    {/* Remote Job */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Remote Job <span className="text-red-500">*</span></label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Work Mode <span className="text-red-500">*</span></label>
                       <div className="flex items-center gap-4 h-8 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                         <label className="flex items-center gap-1.5 cursor-pointer">
                           <input
                             type="radio"
-                            value="Yes"
+                            value="Onsite"
                             {...register("remoteJob")}
                             className="w-3.5 h-3.5 text-primary focus:ring-primary border-neutral-300 dark:border-slate-700 cursor-pointer"
                           />
-                          Yes
+                          Onsite
                         </label>
                         <label className="flex items-center gap-1.5 cursor-pointer">
                           <input
                             type="radio"
-                            value="No"
+                            value="Remote"
                             {...register("remoteJob")}
                             className="w-3.5 h-3.5 text-primary focus:ring-primary border-neutral-300 dark:border-slate-700 cursor-pointer"
                           />
-                          No
+                          Remote
                         </label>
                         <label className="flex items-center gap-1.5 cursor-pointer">
                           <input
@@ -1642,7 +1653,7 @@ export default function EditJobPostingPage() {
 
                     {/* Client */}
                     <div className="space-y-1 flex flex-col">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Client <span className="text-red-500">*</span></label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Client</label>
                       <Popover open={clientDropdownOpen} onOpenChange={(open) => {
                         setClientDropdownOpen(open);
                         if (!open) {
@@ -1651,13 +1662,16 @@ export default function EditJobPostingPage() {
                       }}>
                         <PopoverTrigger asChild>
                           <Button
-                            variant="outline"
+                            type="button"
+                            variant="ghost"
                             role="combobox"
                             aria-expanded={clientDropdownOpen}
-                            className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-955"
+                            className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800 text-neutral-900 dark:text-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100"
                           >
-                            {watch("client") ? watch("client") : "Search for a Client"}
-                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            <span className={cn("truncate", watch("client") ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-400 dark:text-slate-400 font-medium")}>
+                              {watch("client") ? watch("client") : "Search for a Client"}
+                            </span>
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-neutral-500" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0" align="start">
@@ -1718,14 +1732,113 @@ export default function EditJobPostingPage() {
                     </div>
 
                     {/* End Client */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">End Client</label>
-                      <input
-                        type="text"
-                        {...register("endClientName")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
-                        placeholder="e.g. End Client Corp"
-                      />
+                    <div className="space-y-1 flex flex-col">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">End Client <span className="text-red-500">*</span></label>
+                      <Popover open={endClientDropdownOpen} onOpenChange={(open) => {
+                        setEndClientDropdownOpen(open);
+                        if (!open) {
+                          setEndClientSearchText("");
+                        }
+                      }}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            role="combobox"
+                            aria-expanded={endClientDropdownOpen}
+                            className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800 text-neutral-900 dark:text-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100"
+                          >
+                            <span className={cn("truncate", watch("endClientName") ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-400 dark:text-slate-400 font-medium")}>
+                              {watch("endClientName") ? watch("endClientName") : "Search or enter End Client..."}
+                            </span>
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-neutral-500" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0" align="start">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search for an End Client..."
+                              className="h-9 text-xs"
+                              value={endClientSearchText}
+                              onValueChange={setEndClientSearchText}
+                            />
+                            <CommandList>
+                              <CommandEmpty className="py-4 px-3 text-center text-xs text-neutral-500">
+                                {endClientSearchText.trim() === "" ? (
+                                  "Search client database or type custom name"
+                                ) : (
+                                  <div className="space-y-2">
+                                    <p>No client matching "{endClientSearchText}"</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setValue("endClientName", endClientSearchText.trim(), { shouldValidate: true });
+                                        setEndClientDropdownOpen(false);
+                                        setEndClientSearchText("");
+                                      }}
+                                      className="px-3 py-1 bg-primary text-white text-xs font-semibold rounded hover:bg-primary/90 transition-colors cursor-pointer"
+                                    >
+                                      Use "{endClientSearchText.trim()}" as End Client
+                                    </button>
+                                  </div>
+                                )}
+                              </CommandEmpty>
+                              {clientList.filter(cl => cl.client_name.toLowerCase().includes(endClientSearchText.toLowerCase())).length > 0 && (
+                                <CommandGroup header="Existing Clients">
+                                  {clientList.filter(cl => cl.client_name.toLowerCase().includes(endClientSearchText.toLowerCase())).map((cl) => (
+                                    <CommandItem
+                                      key={cl.id}
+                                      value={cl.client_name}
+                                      onSelect={() => {
+                                        setValue("endClientName", cl.client_name, { shouldValidate: true });
+                                        setEndClientDropdownOpen(false);
+                                        setEndClientSearchText("");
+                                      }}
+                                      className="text-xs cursor-pointer"
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          watch("endClientName") === cl.client_name ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {cl.client_name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              )}
+                            </CommandList>
+                            <div className="p-2 border-t flex items-center justify-between gap-2">
+                              {endClientSearchText.trim() !== "" && (
+                                <button
+                                  type="button"
+                                  className="text-primary font-bold text-xs hover:underline bg-transparent border-0 cursor-pointer"
+                                  onClick={() => {
+                                    setValue("endClientName", endClientSearchText.trim(), { shouldValidate: true });
+                                    setEndClientDropdownOpen(false);
+                                    setEndClientSearchText("");
+                                  }}
+                                >
+                                  ✔ Select "{endClientSearchText.trim()}"
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer text-xs ml-auto"
+                                onClick={() => {
+                                  setEndClientDropdownOpen(false);
+                                  setAddClientModalOpen(true);
+                                }}
+                              >
+                                + Add Client
+                              </button>
+                            </div>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      {errors.endClientName && (
+                        <p className="text-[10px] text-red-655 font-bold">{errors.endClientName.message}</p>
+                      )}
                     </div>
 
                     {/* Client Job ID */}
@@ -1998,9 +2111,9 @@ export default function EditJobPostingPage() {
                 )}
               </div>
 
-              {/* -------------------- SKILLS SECTION -------------------- */}
+              {/* -------------------- REQUIRED SKILLS SECTION -------------------- */}
               <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
-                <SectionHeader title="Skills" sectionKey="skills" />
+                <SectionHeader title="Required Skills" sectionKey="skills" />
                 {!collapsedSections.skills && (
                   <div className="p-4 space-y-4 text-xs">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
