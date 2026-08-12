@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useSession } from "next-auth/react";
@@ -118,7 +118,7 @@ const formSchema = zod.object({
   country: zod.string().optional(),
   states: zod.string().optional(),
   city: zod.string().optional(),
-  remoteJob: zod.enum(["Onsite", "Remote", "Hybrid", "Yes", "No"]),
+  remoteJob: zod.string().min(1, "Work Mode is required"),
   hoursPerWeek: zod.union([zod.number().min(1).max(168), zod.nan().transform(() => undefined)]).optional(),
   jobStatus: zod.string(),
   client: zod.string().optional(),
@@ -257,6 +257,44 @@ export default function NewJobPostingPage() {
   const [clientList, setClientList] = useState<any[]>([]);
   const [clientSearchText, setClientSearchText] = useState("");
   const [endClientSearchText, setEndClientSearchText] = useState("");
+
+  const [countrySearchText, setCountrySearchText] = useState("");
+  const [stateSearchText, setStateSearchText] = useState("");
+  const [citySearchText, setCitySearchText] = useState("");
+  const [countryOpen, setCountryOpen] = useState(false);
+  const [stateOpen, setStateOpen] = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
+
+  const countryListRef = useRef<HTMLDivElement>(null);
+  const stateListRef = useRef<HTMLDivElement>(null);
+  const cityListRef = useRef<HTMLDivElement>(null);
+
+  const sortedCountries = useMemo(() => {
+    const popularNames = ["India", "United States", "United Kingdom", "Canada", "Australia", "United Arab Emirates", "Singapore"];
+    const countries = Country.getAllCountries();
+    const popular = countries.filter(c => popularNames.includes(c.name));
+    const others = countries.filter(c => !popularNames.includes(c.name)).sort((a, b) => a.name.localeCompare(b.name));
+    return [...popular, ...others];
+  }, []);
+
+  useEffect(() => {
+    if (countryListRef.current) {
+      countryListRef.current.scrollTop = 0;
+    }
+  }, [countrySearchText]);
+
+  useEffect(() => {
+    if (stateListRef.current) {
+      stateListRef.current.scrollTop = 0;
+    }
+  }, [stateSearchText]);
+
+  useEffect(() => {
+    if (cityListRef.current) {
+      cityListRef.current.scrollTop = 0;
+    }
+  }, [citySearchText]);
+
   const [isHtmlMode, setIsHtmlMode] = useState(false);
   const [respondByType, setRespondByType] = useState("Open Until Filled");
   const [workAuthSearch, setWorkAuthSearch] = useState("");
@@ -317,7 +355,7 @@ export default function NewJobPostingPage() {
       country: "",
       states: "",
       city: "",
-      remoteJob: "Hybrid",
+      remoteJob: "",
       hoursPerWeek: undefined,
       jobStatus: "Active",
       priority: "Warm",
@@ -414,14 +452,22 @@ export default function NewJobPostingPage() {
             }
           }
 
-          setTenantName(tName);
-          setValue("businessUnit", tName);
-
-          // Fetch dynamic next jobCode from the backend based on Active Branch Context & Shift
+          // Fetch dynamic next jobCode and market based on Active Branch Context & Shift
           const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
+          const activeBranchName = typeof window !== 'undefined' ? localStorage.getItem('active_branch_name') || "" : "";
           
+          const displayBusinessUnit = activeBranchName || tName;
+          setTenantName(displayBusinessUnit);
+          setValue("businessUnit", displayBusinessUnit);
+
+          const isUsBranch = activeBranchName.toLowerCase().includes("us") || activeBranchName.toLowerCase().includes("night");
+          const targetMarket: "US" | "IN" = isUsBranch ? "US" : (prof.defaultMarket as "US" | "IN" || "IN");
+
           try {
-            const res = await atsApi.jobs.getNextCode({ branchId: activeBranchId || undefined });
+            const res = await atsApi.jobs.getNextCode({ 
+              branchId: activeBranchId || undefined,
+              shift: isUsBranch ? 'NIGHT' : 'DAY'
+            });
             if (res && res.code) {
               setValue("jobCode", res.code);
             } else {
@@ -429,43 +475,41 @@ export default function NewJobPostingPage() {
               const yy = date.getFullYear().toString().slice(-2);
               const mm = String(date.getMonth() + 1).padStart(2, '0');
               const dd = String(date.getDate()).padStart(2, '0');
-              setValue("jobCode", `GEN-${yy}${mm}${dd}-D0001`);
+              const sCode = isUsBranch ? 'N' : 'D';
+              setValue("jobCode", `GEN-${yy}${mm}${dd}-${sCode}0001`);
             }
           } catch (e) {
             const date = new Date();
             const yy = date.getFullYear().toString().slice(-2);
             const mm = String(date.getMonth() + 1).padStart(2, '0');
             const dd = String(date.getDate()).padStart(2, '0');
-            setValue("jobCode", `GEN-${yy}${mm}${dd}-D0001`);
+            const sCode = isUsBranch ? 'N' : 'D';
+            setValue("jobCode", `GEN-${yy}${mm}${dd}-${sCode}0001`);
           }
 
-          if (prof.defaultMarket) {
-            const m = prof.defaultMarket as "US" | "IN";
-            setMarket(m);
-            
-            if (m === "IN") {
-              setValue("jobType", "Full Time");
-              // Auto-fill removed per user request
-              setValue("workAuthorization", "Indian Citizen");
-              setValue("taxTerms", "Permanent");
-              setBillCurrency("INR");
-              setBillUnit("LPA");
-              setBillTerm("Permanent");
-              setPayCurrency("INR");
-              setPayUnit("LPA");
-              setPayTerm("Permanent");
-            } else {
-              setValue("jobType", "Contract");
-              // Auto-fill removed per user request
-              setValue("workAuthorization", "US Authorized");
-              setValue("taxTerms", "C2C");
-              setBillCurrency("USD");
-              setBillUnit("Hourly");
-              setBillTerm("C2C");
-              setPayCurrency("USD");
-              setPayUnit("Hourly");
-              setPayTerm("C2C");
-            }
+          setMarket(targetMarket);
+          if (targetMarket === "IN") {
+            setValue("jobType", "Full Time");
+            setValue("shiftTiming", "General Shift (Day)");
+            setValue("workAuthorization", "Indian Citizen");
+            setValue("taxTerms", "Permanent");
+            setBillCurrency("INR");
+            setBillUnit("LPA");
+            setBillTerm("Permanent");
+            setPayCurrency("INR");
+            setPayUnit("LPA");
+            setPayTerm("Permanent");
+          } else {
+            setValue("jobType", "Contract");
+            setValue("shiftTiming", "US Shift (Night)");
+            setValue("workAuthorization", "US Authorized");
+            setValue("taxTerms", "C2C");
+            setBillCurrency("USD");
+            setBillUnit("Hourly");
+            setBillTerm("C2C");
+            setPayCurrency("USD");
+            setPayUnit("Hourly");
+            setPayTerm("C2C");
           }
         }
       } catch (err) {
@@ -1168,7 +1212,7 @@ export default function NewJobPostingPage() {
                     </div>
 
                                      {/* Client Bill Rate / Commission */}
-                    <div className="space-y-1 md:col-span-1">
+                    <div className={cn("space-y-1", market === "IN" && watch("taxTerms") === "Permanent" ? "md:col-span-1" : "md:col-span-2")}>
                       {market === "IN" && watch("taxTerms") === "Permanent" ? (
                         <>
                           <div className="flex items-center gap-1">
@@ -1425,7 +1469,10 @@ export default function NewJobPostingPage() {
                       {/* Country */}
                       <div className="space-y-1">
                         <label className="font-bold text-neutral-700 dark:text-neutral-300">Country</label>
-                        <Popover>
+                        <Popover open={countryOpen} onOpenChange={(open) => {
+                          setCountryOpen(open);
+                          if (!open) setCountrySearchText("");
+                        }}>
                           <PopoverTrigger asChild>
                             <Button
                               type="button"
@@ -1441,26 +1488,35 @@ export default function NewJobPostingPage() {
                           </PopoverTrigger>
                           <PopoverContent className="w-[280px] p-0" align="start">
                             <Command>
-                              <CommandInput placeholder="Search country..." className="h-9 text-xs" />
-                              <CommandList className="max-h-[220px]">
+                              <CommandInput
+                                placeholder="Search country..."
+                                className="h-9 text-xs"
+                                value={countrySearchText}
+                                onValueChange={setCountrySearchText}
+                              />
+                              <CommandList ref={countryListRef} className="max-h-[220px]">
                                 <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No country found.</CommandEmpty>
                                 <CommandGroup>
-                                  {Country.getAllCountries().map((co) => (
-                                    <CommandItem
-                                      key={co.isoCode}
-                                      value={co.name}
-                                      onSelect={() => {
-                                        setValue("country", co.name, { shouldValidate: true });
-                                        setValue("states", "");
-                                        setValue("city", "");
-                                      }}
-                                      className="text-xs cursor-pointer"
-                                    >
-                                      <Check className={cn("mr-2 h-3 w-3", watch("country") === co.name ? "opacity-100" : "opacity-0")} />
-                                      <ReactCountryFlag countryCode={co.isoCode} svg className="mr-1.5" style={{ width: "1.1em", height: "1.1em" }} />
-                                      {co.name}
-                                    </CommandItem>
-                                  ))}
+                                  {sortedCountries
+                                    .filter(co => co.name.toLowerCase().includes(countrySearchText.toLowerCase()))
+                                    .map((co) => (
+                                      <CommandItem
+                                        key={co.isoCode}
+                                        value={co.name}
+                                        onSelect={() => {
+                                          setValue("country", co.name, { shouldValidate: true });
+                                          setValue("states", "");
+                                          setValue("city", "");
+                                          setCountryOpen(false);
+                                          setCountrySearchText("");
+                                        }}
+                                        className="text-xs cursor-pointer"
+                                      >
+                                        <Check className={cn("mr-2 h-3 w-3", watch("country") === co.name ? "opacity-100" : "opacity-0")} />
+                                        <ReactCountryFlag countryCode={co.isoCode} svg className="mr-1.5" style={{ width: "1.1em", height: "1.1em" }} />
+                                        {co.name}
+                                      </CommandItem>
+                                    ))}
                                 </CommandGroup>
                               </CommandList>
                             </Command>
@@ -1472,7 +1528,10 @@ export default function NewJobPostingPage() {
                       {/* States */}
                       <div className="space-y-1">
                         <label className="font-bold text-neutral-700 dark:text-neutral-300">State</label>
-                        <Popover>
+                        <Popover open={stateOpen} onOpenChange={(open) => {
+                          setStateOpen(open);
+                          if (!open) setStateSearchText("");
+                        }}>
                           <PopoverTrigger asChild>
                             <Button
                               type="button"
@@ -1489,27 +1548,36 @@ export default function NewJobPostingPage() {
                           </PopoverTrigger>
                           <PopoverContent className="w-[280px] p-0" align="start">
                             <Command>
-                              <CommandInput placeholder="Search state..." className="h-9 text-xs" />
-                              <CommandList className="max-h-[220px]">
+                              <CommandInput
+                                placeholder="Search state..."
+                                className="h-9 text-xs"
+                                value={stateSearchText}
+                                onValueChange={setStateSearchText}
+                              />
+                              <CommandList ref={stateListRef} className="max-h-[220px]">
                                 <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No state found.</CommandEmpty>
                                 <CommandGroup>
                                   {(() => {
                                     const countryObj = Country.getAllCountries().find(co => co.name === watch("country"));
                                     if (!countryObj) return null;
-                                    return State.getStatesOfCountry(countryObj.isoCode).map((st) => (
-                                      <CommandItem
-                                        key={st.isoCode}
-                                        value={st.name}
-                                        onSelect={() => {
-                                          setValue("states", st.name, { shouldValidate: true });
-                                          setValue("city", "");
-                                        }}
-                                        className="text-xs cursor-pointer"
-                                      >
-                                        <Check className={cn("mr-2 h-3 w-3", watch("states") === st.name ? "opacity-100" : "opacity-0")} />
-                                        {st.name}
-                                      </CommandItem>
-                                    ));
+                                    return State.getStatesOfCountry(countryObj.isoCode)
+                                      .filter(st => st.name.toLowerCase().includes(stateSearchText.toLowerCase()))
+                                      .map((st) => (
+                                        <CommandItem
+                                          key={st.isoCode}
+                                          value={st.name}
+                                          onSelect={() => {
+                                            setValue("states", st.name, { shouldValidate: true });
+                                            setValue("city", "");
+                                            setStateOpen(false);
+                                            setStateSearchText("");
+                                          }}
+                                          className="text-xs cursor-pointer"
+                                        >
+                                          <Check className={cn("mr-2 h-3 w-3", watch("states") === st.name ? "opacity-100" : "opacity-0")} />
+                                          {st.name}
+                                        </CommandItem>
+                                      ));
                                   })()}
                                 </CommandGroup>
                               </CommandList>
@@ -1522,7 +1590,10 @@ export default function NewJobPostingPage() {
                       {/* City */}
                       <div className="space-y-1">
                         <label className="font-bold text-neutral-700 dark:text-neutral-300">City</label>
-                        <Popover>
+                        <Popover open={cityOpen} onOpenChange={(open) => {
+                          setCityOpen(open);
+                          if (!open) setCitySearchText("");
+                        }}>
                           <PopoverTrigger asChild>
                             <Button
                               type="button"
@@ -1539,8 +1610,13 @@ export default function NewJobPostingPage() {
                           </PopoverTrigger>
                           <PopoverContent className="w-[280px] p-0" align="start">
                             <Command>
-                              <CommandInput placeholder="Search city..." className="h-9 text-xs" />
-                              <CommandList className="max-h-[220px]">
+                              <CommandInput
+                                placeholder="Search city..."
+                                className="h-9 text-xs"
+                                value={citySearchText}
+                                onValueChange={setCitySearchText}
+                              />
+                              <CommandList ref={cityListRef} className="max-h-[220px]">
                                 <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No city found.</CommandEmpty>
                                 <CommandGroup>
                                   {(() => {
@@ -1548,17 +1624,23 @@ export default function NewJobPostingPage() {
                                     if (!countryObj) return null;
                                     const stateObj = State.getStatesOfCountry(countryObj.isoCode).find(st => st.name === watch("states"));
                                     if (!stateObj) return null;
-                                    return City.getCitiesOfState(countryObj.isoCode, stateObj.isoCode).map((city) => (
-                                      <CommandItem
-                                        key={city.name}
-                                        value={city.name}
-                                        onSelect={() => setValue("city", city.name, { shouldValidate: true })}
-                                        className="text-xs cursor-pointer"
-                                      >
-                                        <Check className={cn("mr-2 h-3 w-3", watch("city") === city.name ? "opacity-100" : "opacity-0")} />
-                                        {city.name}
-                                      </CommandItem>
-                                    ));
+                                    return City.getCitiesOfState(countryObj.isoCode, stateObj.isoCode)
+                                      .filter(ct => ct.name.toLowerCase().includes(citySearchText.toLowerCase()))
+                                      .map((city) => (
+                                        <CommandItem
+                                          key={city.name}
+                                          value={city.name}
+                                          onSelect={() => {
+                                            setValue("city", city.name, { shouldValidate: true });
+                                            setCityOpen(false);
+                                            setCitySearchText("");
+                                          }}
+                                          className="text-xs cursor-pointer"
+                                        >
+                                          <Check className={cn("mr-2 h-3 w-3", watch("city") === city.name ? "opacity-100" : "opacity-0")} />
+                                          {city.name}
+                                        </CommandItem>
+                                      ));
                                   })()}
                                 </CommandGroup>
                               </CommandList>
