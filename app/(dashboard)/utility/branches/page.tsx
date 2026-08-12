@@ -604,13 +604,14 @@ export default function BranchManagementPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Code</label>
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Code (Job Prefix)</label>
                   <Input
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    placeholder="e.g. MAIN, HQ, BHUB"
+                    placeholder="e.g. BBS, VIZ, NY"
                     className="h-8 text-xs font-mono rounded border-neutral-300"
                   />
+                  <span className="text-[10px] text-neutral-400 block">Used for Job Code (e.g. BBS-260212-N0001)</span>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">City</label>
@@ -680,12 +681,14 @@ export default function BranchManagementPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Code</label>
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Code (Job Prefix)</label>
                   <Input
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    placeholder="e.g. BBS, VIZ, NY"
                     className="h-8 text-xs font-mono rounded border-neutral-300"
                   />
+                  <span className="text-[10px] text-neutral-400 block">Used for Job Code (e.g. BBS-260212-N0001)</span>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">City</label>

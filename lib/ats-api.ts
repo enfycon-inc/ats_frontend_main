@@ -507,8 +507,12 @@ const jobs = {
     return apiFetch<JobMatchesResponse>(`/api/jobs/${id}/matches${suffix}`);
   },
 
-  async getNextCode(): Promise<{ code: string }> {
-    return apiFetch<{ code: string }>('/api/jobs/next-code');
+  async getNextCode(opts?: { branchId?: string; shift?: string }): Promise<{ code: string }> {
+    const params = new URLSearchParams();
+    if (opts?.branchId) params.append('branchId', opts.branchId);
+    if (opts?.shift) params.append('shift', opts.shift);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return apiFetch<{ code: string }>(`/api/jobs/next-code${qs}`);
   },
 
   async create(data: Record<string, any>): Promise<JobPayload> {

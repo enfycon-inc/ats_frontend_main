@@ -308,7 +308,7 @@ export default function NewJobPostingPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       businessUnit: "enfycon Inc",
-      jobCode: "ENFY-" + Math.floor(1000 + Math.random() * 9000),
+      jobCode: "",
       clientBillRate: "8.33% Placement Commission",
       country: "",
       states: "",
@@ -413,26 +413,26 @@ export default function NewJobPostingPage() {
           setTenantName(tName);
           setValue("businessUnit", tName);
 
-          // Fetch dynamic next jobCode from the backend
-          const domain = prof.tenantDomain || (typeof window !== 'undefined' ? getTenantIdentifier() : "");
-          const cleanDomain = domain.toLowerCase().endsWith(".com") ? domain.slice(0, -4) : domain;
-          const tenantPrefix = (cleanDomain === 'temp' || !cleanDomain) ? 'ENFY' : cleanDomain.substring(0, 4).toUpperCase();
+          // Fetch dynamic next jobCode from the backend based on Active Branch Context & Shift
+          const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
           
           try {
-            const res = await atsApi.jobs.getNextCode();
+            const res = await atsApi.jobs.getNextCode({ branchId: activeBranchId || undefined });
             if (res && res.code) {
               setValue("jobCode", res.code);
             } else {
-              const prefix = `${tenantPrefix}-JOB`;
-              const yy = new Date().getFullYear().toString().slice(-2);
-              const mm = String(new Date().getMonth() + 1).padStart(2, '0');
-              setValue("jobCode", `${prefix}-${yy}${mm}-XXXXX (Auto-generated)`);
+              const date = new Date();
+              const yy = date.getFullYear().toString().slice(-2);
+              const mm = String(date.getMonth() + 1).padStart(2, '0');
+              const dd = String(date.getDate()).padStart(2, '0');
+              setValue("jobCode", `GEN-${yy}${mm}${dd}-D0001`);
             }
           } catch (e) {
-            const prefix = `${tenantPrefix}-JOB`;
-            const yy = new Date().getFullYear().toString().slice(-2);
-            const mm = String(new Date().getMonth() + 1).padStart(2, '0');
-            setValue("jobCode", `${prefix}-${yy}${mm}-XXXXX (Auto-generated)`);
+            const date = new Date();
+            const yy = date.getFullYear().toString().slice(-2);
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            setValue("jobCode", `GEN-${yy}${mm}${dd}-D0001`);
           }
 
           if (prof.defaultMarket) {
