@@ -2347,30 +2347,34 @@ export default function EditJobPostingPage() {
                       />
                     </div>
 
-                    {/* Department */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Department</label>
-                      <select
-                        {...register("department")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                      >
-                        <option value="IT Services">IT Services</option>
-                        <option value="Operations">Operations</option>
-                        <option value="Sales">Sales</option>
-                      </select>
-                    </div>
+                    {/* Department (US Market Only) */}
+                    {market !== "IN" && (
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Department</label>
+                        <select
+                          {...register("department")}
+                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                        >
+                          <option value="IT Services">IT Services</option>
+                          <option value="Operations">Operations</option>
+                          <option value="Sales">Sales</option>
+                        </select>
+                      </div>
+                    )}
 
-                    {/* Sales Manager */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Sales Manager</label>
-                      <select
-                        {...register("salesManager")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                      >
-                        <option value="Sanjay Kumar">Sanjay Kumar</option>
-                        <option value="Kunal Sharma">Kunal Sharma</option>
-                      </select>
-                    </div>
+                    {/* Sales Manager (US Market Only) */}
+                    {market !== "IN" && (
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Sales Manager</label>
+                        <select
+                          {...register("salesManager")}
+                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                        >
+                          <option value="Sanjay Kumar">Sanjay Kumar</option>
+                          <option value="Kunal Sharma">Kunal Sharma</option>
+                        </select>
+                      </div>
+                    )}
 
                     {/* Recruitment Pod Assignment */}
                     <div className="space-y-1 md:col-span-2">

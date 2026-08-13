@@ -487,12 +487,15 @@ export default function NewJobPostingPage() {
             setValue("jobCode", `GEN-${yy}${mm}${dd}-${sCode}0001`);
           }
 
+          const posterName = (session as any)?.user?.name || prof?.name || prof?.email || "Account Manager";
+
           setMarket(targetMarket);
           if (targetMarket === "IN") {
             setValue("jobType", "Full Time");
             setValue("shiftTiming", "General Shift (Day)");
             setValue("workAuthorization", "Indian Citizen");
             setValue("taxTerms", "Permanent");
+            setValue("accountManager", posterName);
             setBillCurrency("INR");
             setBillUnit("LPA");
             setBillTerm("Permanent");
@@ -2349,16 +2352,18 @@ export default function NewJobPostingPage() {
                       </div>
                     )}
 
-                    {/* Account Manager */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Account Manager</label>
-                      <input
-                        type="text"
-                        {...register("accountManager")}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
-                        placeholder="e.g. John Doe"
-                      />
-                    </div>
+                    {/* Account Manager (US Market Only - In Domestic Market defaults to posting user) */}
+                    {market !== "IN" && (
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Account Manager</label>
+                        <input
+                          type="text"
+                          {...register("accountManager")}
+                          className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
+                          placeholder="e.g. John Doe"
+                        />
+                      </div>
+                    )}
 
                     {/* Primary Recruiter (US Market Only) */}
                     {market !== "IN" && (
