@@ -1861,7 +1861,7 @@ export default function EditJobPostingPage() {
                                 )}
                               </CommandEmpty>
                               {clientList.filter(cl => cl.client_name.toLowerCase().includes(endClientSearchText.toLowerCase())).length > 0 && (
-                                <CommandGroup header="Existing Clients">
+                                <CommandGroup heading="Existing Clients">
                                   {clientList.filter(cl => cl.client_name.toLowerCase().includes(endClientSearchText.toLowerCase())).map((cl) => (
                                     <CommandItem
                                       key={cl.id}

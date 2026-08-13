@@ -58,7 +58,9 @@ export default async function DashboardLayout({
       }
     } else {
       const userSub = (user as any).tenantDomain;
-      if (userSub) {
+      const isMasterTenant = !userSub || userSub === "enfycon" || userSub === "www" || userSub === "localhost";
+
+      if (userSub && !isMasterTenant) {
         // Preserve the actual dev-server port so local dev works off port 3000 too.
         const localBase = `localhost:${host.split(":")[1] || "3000"}`;
 
@@ -69,12 +71,16 @@ export default async function DashboardLayout({
           redirect(`${protocol}://${userSub}.${base}/dashboard`);
         }
 
-        // Redirect if user is at root domain but belongs to a tenant
+        // Redirect if user is at root domain but belongs to a secondary tenant
         if (!currentSub) {
           const base = hostname.includes("localhost") ? localBase : hostname;
           const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
           redirect(`${protocol}://${userSub}.${base}/dashboard`);
         }
+      } else if (isMasterTenant && currentSub === "enfycon") {
+        const localBase = `localhost:${host.split(":")[1] || "3000"}`;
+        const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
+        redirect(`${protocol}://${localBase}/dashboard`);
       }
     }
   } else {

@@ -80,17 +80,26 @@ const LoginForm = () => {
           toast.success("Successfully logged in");
 
           // Redirection logic
-          const isSuperAdmin = syncRes?.user?.roles?.includes("SUPER_ADMIN");
+          const isSuperAdmin = syncRes?.user?.roles?.includes("SUPER_ADMIN") || (syncRes?.user as any)?.systemRole === "SUPER_ADMIN";
           const userTenantDomain = syncRes?.user?.tenantDomain;
           const currentSubdomain = getCurrentSubdomain();
+          const base = getBaseDomain();
+          const protocol = window.location.protocol;
 
-          if (!isSuperAdmin && userTenantDomain && currentSubdomain !== userTenantDomain) {
-            // Redirect to correct subdomain (e.g. tenant1.localhost:3000)
-            const base = getBaseDomain();
-            const protocol = window.location.protocol;
+          if (isSuperAdmin) {
+            // Super Admin always stays on root domain (localhost:3000/dashboard)
+            if (currentSubdomain) {
+              window.location.href = `${protocol}//${base}/dashboard`;
+            } else {
+              window.location.href = "/dashboard";
+            }
+          } else if (userTenantDomain && userTenantDomain !== "enfycon" && userTenantDomain !== "www" && currentSubdomain !== userTenantDomain) {
+            // Tenant user logging in -> redirect to tenant subdomain
             window.location.href = `${protocol}//${userTenantDomain}.${base}/dashboard`;
+          } else if (currentSubdomain === "enfycon") {
+            // Master tenant user on enfycon.localhost -> redirect to root localhost:3000/dashboard
+            window.location.href = `${protocol}//${base}/dashboard`;
           } else {
-            // Already on correct subdomain (or super_admin) -> proceed to dashboard
             window.location.href = "/dashboard";
           }
         }

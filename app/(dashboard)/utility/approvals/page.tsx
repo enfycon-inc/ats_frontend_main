@@ -90,7 +90,7 @@ export default function ApprovalsPage() {
   const [manualSubdomain, setManualSubdomain] = useState("");
   const [manualAdminFullName, setManualAdminFullName] = useState("");
   const [manualAdminEmail, setManualAdminEmail] = useState("");
-  const [manualAdminPassword, setManualAdminPassword] = useState("Admin@123");
+  const [manualAdminPassword, setManualAdminPassword] = useState("");
   const [manualUserLimit, setManualUserLimit] = useState(20);
   const [manualMaxBranches, setManualMaxBranches] = useState(5);
   const [manualMarket, setManualMarket] = useState<"US" | "IN">("US");
@@ -217,7 +217,7 @@ export default function ApprovalsPage() {
         subdomain: manualSubdomain.trim().toLowerCase(),
         adminFullName: manualAdminFullName.trim(),
         adminEmail: manualAdminEmail.trim().toLowerCase(),
-        adminPassword: manualAdminPassword || "Admin@123",
+        adminPassword: manualAdminPassword,
         userLimit: manualUserLimit,
         maxBranches: manualMaxBranches,
         defaultMarket: manualMarket,
@@ -230,7 +230,7 @@ export default function ApprovalsPage() {
       setManualSubdomain("");
       setManualAdminFullName("");
       setManualAdminEmail("");
-      setManualAdminPassword("Admin@123");
+      setManualAdminPassword("");
       setManualUserLimit(20);
       setManualMaxBranches(5);
       setManualMarket("US");
@@ -1031,7 +1031,7 @@ export default function ApprovalsPage() {
                 <label className="text-xs font-bold text-default-800">Temporary Password</label>
                 <Input
                   type="text"
-                  placeholder="Admin@123"
+                  placeholder="Enter initial admin password"
                   value={manualAdminPassword}
                   onChange={(e) => setManualAdminPassword(e.target.value)}
                 />

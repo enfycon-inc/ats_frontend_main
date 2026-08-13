@@ -10,7 +10,7 @@
  * Usage:
  *   import { atsApi } from '@/lib/ats-api';
  *   const jobs = await atsApi.jobs.list();
- *   await atsApi.auth.login('admin@enfycon.com', 'Admin@123');
+ *   await atsApi.auth.login(userEmail, userPassword);
  */
 
 import { getTenantIdentifier } from '@/utils/subdomain-helper';
