@@ -764,59 +764,53 @@ function BranchSwitcher() {
   }, []);
 
   const loadLiveBranches = async () => {
+    const currentUser = atsApi.auth.getCurrentUser() || (session as any)?.user;
+    const fallbackBranchName = currentUser?.branchName || "Domestic Branch";
+
     try {
       const data = await atsApi.branches.list();
-      if (Array.isArray(data)) {
-        if (data.length > 0) {
-          setBranches(data);
-          
-          const sysRole = overrideRole || (session as any)?.user?.systemRole || "RECRUITER";
-          const perms = (session as any)?.user?.permissions || [];
-          const canSwitch = sysRole === "ADMIN" || sysRole === "SUPER_ADMIN" || sysRole === "DELIVERY_HEAD" || perms.includes("candidate:search_all_branches") || perms.includes("job:view_all_branches");
+      if (Array.isArray(data) && data.length > 0) {
+        setBranches(data);
 
-          let match = null;
-          
-          if (!canSwitch) {
-            // Force home branch if not allowed to switch
-            if ((session as any)?.user?.branchId) {
-              match = data.find((b: any) => b.id === (session as any)?.user?.branchId);
-            }
-            // Developer fallback for sandbox view if token is stale
-            if (!match && sysRole === "ACCOUNT_MANAGER") {
-              match = data.find((b: any) => b.name?.toLowerCase().includes("us it"));
-            }
-          } else {
-            const savedName = typeof window !== "undefined" ? localStorage.getItem("active_branch_name") : null;
+        const sysRole = overrideRole || currentUser?.systemRole || (currentUser?.roles && currentUser.roles[0]) || "RECRUITER";
+        const perms = currentUser?.permissions || [];
+        const canSwitch = sysRole === "ADMIN" || sysRole === "SUPER_ADMIN" || sysRole === "DELIVERY_HEAD" || perms.includes("candidate:search_all_branches") || perms.includes("job:view_all_branches");
+
+        let match = null;
+
+        if (currentUser?.branchId) {
+          match = data.find((b: any) => b.id === currentUser.branchId);
+        }
+
+        if (!match && currentUser?.branchName) {
+          match = data.find((b: any) => b.name?.toLowerCase() === currentUser.branchName.toLowerCase());
+        }
+
+        if (canSwitch && !match) {
+          const savedName = typeof window !== "undefined" ? localStorage.getItem("active_branch_name") : null;
+          if (savedName) {
             match = data.find((b: any) => b.name === savedName);
-            if (!match && (session as any)?.user?.branchId) {
-              match = data.find((b: any) => b.id === (session as any)?.user?.branchId);
-            }
-          }
-
-          if (match) {
-            setActiveBranch(match.name);
-            if (typeof window !== "undefined") {
-              localStorage.setItem("active_branch_id", match.id);
-              localStorage.setItem("active_branch_name", match.name);
-            }
-          } else {
-            setActiveBranch(data[0].name);
-            if (typeof window !== "undefined") {
-              localStorage.setItem("active_branch_id", data[0].id);
-              localStorage.setItem("active_branch_name", data[0].name);
-            }
-          }
-        } else {
-          setBranches([]);
-          setActiveBranch("Setup Branch");
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("active_branch_id");
-            localStorage.removeItem("active_branch_name");
           }
         }
+
+        if (!match) {
+          match = data[0];
+        }
+
+        if (match) {
+          setActiveBranch(match.name);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("active_branch_id", match.id);
+            localStorage.setItem("active_branch_name", match.name);
+            localStorage.setItem("active_branch_market", match.market || "INDIA");
+          }
+        }
+      } else {
+        setActiveBranch(fallbackBranchName);
       }
     } catch (err) {
       console.warn("Could not fetch branches:", err);
+      setActiveBranch(fallbackBranchName);
     }
   };
 
@@ -842,6 +836,7 @@ function BranchSwitcher() {
     if (typeof window !== "undefined") {
       localStorage.setItem("active_branch_id", b.id);
       localStorage.setItem("active_branch_name", b.name);
+      localStorage.setItem("active_branch_market", b.market || "INDIA");
       setActiveBranch(b.name);
       window.location.reload();
     }

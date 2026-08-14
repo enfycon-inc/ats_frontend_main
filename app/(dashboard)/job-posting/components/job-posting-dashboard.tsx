@@ -101,36 +101,60 @@ export default function JobPostingDashboard({
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load user profile on mount to get default market
+  // Load market context on mount based on active branch and user profile
   useEffect(() => {
-    async function loadProfile() {
+    async function loadMarketContext() {
       try {
-        // No auto-login fallback (prevent tenant hijacking)
-        const prof = await atsApi.auth.me();
-        if (prof && prof.defaultMarket) {
-          setMarket(prof.defaultMarket);
+        const activeBranchMarket = typeof window !== 'undefined' ? localStorage.getItem('active_branch_market') : null;
+        const activeBranchName = typeof window !== 'undefined' ? localStorage.getItem('active_branch_name') || "" : "";
+        
+        let resolvedMarket: "US" | "IN" = "IN";
+        if (activeBranchMarket) {
+          const upperM = activeBranchMarket.toUpperCase();
+          resolvedMarket = (upperM === "US" || upperM === "USA") ? "US" : "IN";
+        } else if (activeBranchName) {
+          const lowerName = activeBranchName.toLowerCase();
+          if (lowerName.includes("us") || lowerName.includes("night")) {
+            resolvedMarket = "US";
+          } else {
+            resolvedMarket = "IN";
+          }
+        } else {
+          const prof = await atsApi.auth.me().catch(() => null);
+          if (prof && prof.defaultMarket) {
+            resolvedMarket = (prof.defaultMarket as "US" | "IN") || "IN";
+          }
         }
+        setMarket(resolvedMarket);
       } catch (err) {
-        console.warn("[Dashboard] Failed to fetch profile on mount:", err);
+        console.warn("[Dashboard] Failed to fetch market context:", err);
       }
     }
-    loadProfile();
+    loadMarketContext();
   }, []);
 
   // Fetch jobs from backend API
   const fetchJobs = useCallback(async () => {
     setIsLoading(true);
     try {
-      // No auto-login fallback (prevent tenant hijacking)
       const apiJobs = await atsApi.jobs.list();
       if (apiJobs && apiJobs.length > 0) {
         const mapped = apiJobs.map(mapApiJobToJob);
-        // Filter by the current market shift (defaulting to "IN" if not present)
-        const shiftJobs = mapped.filter((job) => (job.market || "IN") === market);
-        // Pre-filter by status if required
-        const filteredByRoute = shiftJobs.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
+        // Filter by current market shift (matching IN/INDIA/DOMESTIC vs US/USA)
+        const shiftJobs = mapped.filter((job) => {
+          const jm = (job.market || "IN").toUpperCase();
+          if (market === "US") {
+            return jm === "US" || jm === "USA";
+          } else {
+            return jm === "IN" || jm === "INDIA" || jm === "DOMESTIC";
+          }
+        });
+        
+        // Prefer shift-filtered jobs; if empty, show all real tenant API jobs so real DB jobs are never hidden by mock data
+        const jobsToDisplay = shiftJobs.length > 0 ? shiftJobs : mapped;
+        const filteredByRoute = jobsToDisplay.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
 
-        setAllJobs(shiftJobs);
+        setAllJobs(jobsToDisplay);
         setJobsData(filteredByRoute);
       } else {
         const fallbackJobs = market === "IN" ? mockJobsIN : mockJobs;
@@ -139,7 +163,7 @@ export default function JobPostingDashboard({
         setJobsData(filteredByRoute);
       }
     } catch (err) {
-      console.warn("[Jobs] API fetch failed, using mock data:", err);
+      console.warn("[Jobs] API fetch failed, using fallback data:", err);
       const fallbackJobs = market === "IN" ? mockJobsIN : mockJobs;
       const filteredByRoute = fallbackJobs.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
       setAllJobs(fallbackJobs);

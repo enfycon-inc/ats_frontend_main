@@ -38,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -455,13 +456,60 @@ export default function NewJobPostingPage() {
           // Fetch dynamic next jobCode and market based on Active Branch Context & Shift
           const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
           const activeBranchName = typeof window !== 'undefined' ? localStorage.getItem('active_branch_name') || "" : "";
+          const activeBranchMarket = typeof window !== 'undefined' ? localStorage.getItem('active_branch_market') || "" : "";
           
           const displayBusinessUnit = activeBranchName || tName;
           setTenantName(displayBusinessUnit);
           setValue("businessUnit", displayBusinessUnit);
 
-          const isUsBranch = activeBranchName.toLowerCase().includes("us") || activeBranchName.toLowerCase().includes("night");
-          const targetMarket: "US" | "IN" = isUsBranch ? "US" : (prof.defaultMarket as "US" | "IN" || "IN");
+          // Fetch branches list to get authoritative branch market
+          let branchesList: any[] = [];
+          try {
+            branchesList = await atsApi.branches.list().catch(() => []);
+          } catch (e) {
+            console.warn("Failed to load branches list:", e);
+          }
+
+          let activeBranchObj = null;
+          if (activeBranchId) {
+            activeBranchObj = branchesList.find((b: any) => b.id === activeBranchId);
+          }
+          if (!activeBranchObj && activeBranchName) {
+            activeBranchObj = branchesList.find((b: any) => b.name?.toLowerCase() === activeBranchName.toLowerCase());
+          }
+
+          let branchMarketStr = activeBranchObj?.market || activeBranchMarket || "";
+
+          let isUsBranch = false;
+          let isDomesticBranch = false;
+
+          if (branchMarketStr) {
+            const upperM = branchMarketStr.toUpperCase();
+            if (upperM === "US" || upperM === "USA") {
+              isUsBranch = true;
+            } else if (upperM === "INDIA" || upperM === "IN" || upperM === "DOMESTIC") {
+              isDomesticBranch = true;
+            }
+          }
+          
+          if (!isUsBranch && !isDomesticBranch && activeBranchName) {
+            const lowerName = activeBranchName.toLowerCase();
+            if (lowerName.includes("us") || lowerName.includes("night")) {
+              isUsBranch = true;
+            } else if (lowerName.includes("domestic") || lowerName.includes("india") || lowerName.includes("bbsr") || lowerName.includes("hydrabad") || lowerName.includes("day")) {
+              isDomesticBranch = true;
+            }
+          }
+
+          let targetMarket: "US" | "IN" = "IN";
+          if (isUsBranch) {
+            targetMarket = "US";
+          } else if (isDomesticBranch) {
+            targetMarket = "IN";
+          } else {
+            targetMarket = (prof.defaultMarket as "US" | "IN") || "IN";
+            isUsBranch = targetMarket === "US";
+          }
 
           try {
             const res = await atsApi.jobs.getNextCode({ 
@@ -794,6 +842,8 @@ export default function NewJobPostingPage() {
 
       // Map frontend form fields → backend CreateJobDto
       const payload = {
+        jobCode: data.jobCode,
+        branchId: typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') || undefined : undefined,
         title: data.jobTitle,
         client: data.client || data.endClientName || "Direct Client",
         endClientName: data.endClientName || undefined,
@@ -1732,52 +1782,98 @@ export default function NewJobPostingPage() {
                             className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800 text-neutral-900 dark:text-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100"
                           >
                             <span className={cn("truncate", watch("client") ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-400 dark:text-slate-400 font-medium")}>
-                              {watch("client") ? watch("client") : "Search for a Client"}
+                              {watch("client") ? watch("client") : "Search for a Client..."}
                             </span>
                             <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-neutral-500" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0" align="start">
-                          <Command>
+                          <Command shouldFilter={false}>
                             <CommandInput
-                              placeholder="Search for a Client"
+                              placeholder="Search for a Client..."
                               className="h-9 text-xs"
                               value={clientSearchText}
                               onValueChange={setClientSearchText}
                             />
-                            <CommandList>
-                              <CommandEmpty className="py-6 text-center text-xs text-neutral-500">
-                                {clientSearchText.trim() === "" ? "Enter client name" : "No client found."}
-                              </CommandEmpty>
-                              {clientSearchText.trim() !== "" && (
-                                <CommandGroup>
-                                  {clientList.filter(cl => cl.client_name.toLowerCase().includes(clientSearchText.toLowerCase())).map((cl) => (
-                                    <CommandItem
-                                      key={cl.id}
-                                      value={cl.client_name}
-                                      onSelect={(currentValue) => {
-                                        setValue("client", cl.client_name, { shouldValidate: true });
-                                        setClientDropdownOpen(false);
-                                        setClientSearchText("");
-                                      }}
-                                      className="text-xs cursor-pointer"
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          watch("client") === cl.client_name ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      {cl.client_name}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              )}
+                            <CommandList className="max-h-[240px] overflow-y-auto">
+                              {(() => {
+                                const query = clientSearchText.trim().toLowerCase();
+                                const filtered = clientList.filter((cl: any) => {
+                                  const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                  return !query || cName.includes(query);
+                                });
+
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="py-4 px-3 text-center text-xs text-neutral-500">
+                                      {query ? (
+                                        <div className="space-y-2">
+                                          <p>No client matching "{clientSearchText.trim()}"</p>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setValue("client", clientSearchText.trim(), { shouldValidate: true });
+                                              setClientDropdownOpen(false);
+                                              setClientSearchText("");
+                                            }}
+                                            className="px-3 py-1 bg-primary text-white text-xs font-semibold rounded hover:bg-primary/90 transition-colors cursor-pointer"
+                                          >
+                                            Use "{clientSearchText.trim()}" as Client
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        "No clients available in database."
+                                      )}
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <CommandGroup heading="Existing Clients">
+                                    {filtered.map((cl: any) => {
+                                      const clientNameStr = cl.client_name || cl.clientName || cl.name || "";
+                                      return (
+                                        <CommandItem
+                                          key={cl.id || clientNameStr}
+                                          value={clientNameStr}
+                                          onSelect={() => {
+                                            setValue("client", clientNameStr, { shouldValidate: true });
+                                            setClientDropdownOpen(false);
+                                            setClientSearchText("");
+                                          }}
+                                          className="text-xs cursor-pointer"
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              watch("client") === clientNameStr ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {clientNameStr}
+                                        </CommandItem>
+                                      );
+                                    })}
+                                  </CommandGroup>
+                                );
+                              })()}
                             </CommandList>
-                            <div className="p-2 border-t">
+                            <div className="p-2 border-t flex items-center justify-between gap-2">
+                              {clientSearchText.trim() !== "" && (
+                                <button
+                                  type="button"
+                                  className="text-primary font-bold text-xs hover:underline bg-transparent border-0 cursor-pointer"
+                                  onClick={() => {
+                                    setValue("client", clientSearchText.trim(), { shouldValidate: true });
+                                    setClientDropdownOpen(false);
+                                    setClientSearchText("");
+                                  }}
+                                >
+                                  ✔ Select "{clientSearchText.trim()}"
+                                </button>
+                              )}
                               <button
                                 type="button"
-                                className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer w-full text-xs"
+                                className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer text-xs ml-auto"
                                 onClick={() => {
                                   setClientDropdownOpen(false);
                                   setAddClientModalOpen(true);
@@ -1818,58 +1914,74 @@ export default function NewJobPostingPage() {
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0" align="start">
-                          <Command>
+                          <Command shouldFilter={false}>
                             <CommandInput
                               placeholder="Search for an End Client..."
                               className="h-9 text-xs"
                               value={endClientSearchText}
                               onValueChange={setEndClientSearchText}
                             />
-                            <CommandList>
-                              <CommandEmpty className="py-4 px-3 text-center text-xs text-neutral-500">
-                                {endClientSearchText.trim() === "" ? (
-                                  "Search client database or type custom name"
-                                ) : (
-                                  <div className="space-y-2">
-                                    <p>No client matching "{endClientSearchText}"</p>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setValue("endClientName", endClientSearchText.trim(), { shouldValidate: true });
-                                        setEndClientDropdownOpen(false);
-                                        setEndClientSearchText("");
-                                      }}
-                                      className="px-3 py-1 bg-primary text-white text-xs font-semibold rounded hover:bg-primary/90 transition-colors cursor-pointer"
-                                    >
-                                      Use "{endClientSearchText.trim()}" as End Client
-                                    </button>
-                                  </div>
-                                )}
-                              </CommandEmpty>
-                              {clientList.filter(cl => cl.client_name.toLowerCase().includes(endClientSearchText.toLowerCase())).length > 0 && (
-                                <CommandGroup heading="Existing Clients">
-                                  {clientList.filter(cl => cl.client_name.toLowerCase().includes(endClientSearchText.toLowerCase())).map((cl) => (
-                                    <CommandItem
-                                      key={cl.id}
-                                      value={cl.client_name}
-                                      onSelect={() => {
-                                        setValue("endClientName", cl.client_name, { shouldValidate: true });
-                                        setEndClientDropdownOpen(false);
-                                        setEndClientSearchText("");
-                                      }}
-                                      className="text-xs cursor-pointer"
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          watch("endClientName") === cl.client_name ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      {cl.client_name}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              )}
+                            <CommandList className="max-h-[240px] overflow-y-auto">
+                              {(() => {
+                                const query = endClientSearchText.trim().toLowerCase();
+                                const filtered = clientList.filter((cl: any) => {
+                                  const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                  return !query || cName.includes(query);
+                                });
+
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="py-4 px-3 text-center text-xs text-neutral-500">
+                                      {query ? (
+                                        <div className="space-y-2">
+                                          <p>No client matching "{endClientSearchText.trim()}"</p>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setValue("endClientName", endClientSearchText.trim(), { shouldValidate: true });
+                                              setEndClientDropdownOpen(false);
+                                              setEndClientSearchText("");
+                                            }}
+                                            className="px-3 py-1 bg-primary text-white text-xs font-semibold rounded hover:bg-primary/90 transition-colors cursor-pointer"
+                                          >
+                                            Use "{endClientSearchText.trim()}" as End Client
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        "No clients available in database."
+                                      )}
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <CommandGroup heading="Existing Clients">
+                                    {filtered.map((cl: any) => {
+                                      const clientNameStr = cl.client_name || cl.clientName || cl.name || "";
+                                      return (
+                                        <CommandItem
+                                          key={cl.id || clientNameStr}
+                                          value={clientNameStr}
+                                          onSelect={() => {
+                                            setValue("endClientName", clientNameStr, { shouldValidate: true });
+                                            setEndClientDropdownOpen(false);
+                                            setEndClientSearchText("");
+                                          }}
+                                          className="text-xs cursor-pointer"
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              watch("endClientName") === clientNameStr ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {clientNameStr}
+                                        </CommandItem>
+                                      );
+                                    })}
+                                  </CommandGroup>
+                                );
+                              })()}
                             </CommandList>
                             <div className="p-2 border-t flex items-center justify-between gap-2">
                               {endClientSearchText.trim() !== "" && (
@@ -2406,7 +2518,6 @@ export default function NewJobPostingPage() {
                       </p>
                     </div>
                   </div>
-
                 )}
               </div>
 
@@ -2415,70 +2526,11 @@ export default function NewJobPostingPage() {
                 <SectionHeader title="Job Description & Editor" sectionKey="jobDescription" />
                 {!collapsedSections.jobDescription && (
                   <div className="p-4 space-y-3">
-                    <div className="flex items-center justify-between bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-t-lg p-2 transition-colors">
-                      {/* Editor formatting toolbar mock */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => toast("Bold style template", { icon: "📝" })}
-                          className="px-2 py-1 hover:bg-neutral-200 dark:hover:bg-slate-750 rounded font-bold text-xs cursor-pointer text-neutral-700 dark:text-neutral-300"
-                        >
-                          B
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toast("Italic style template", { icon: "📝" })}
-                          className="px-2 py-1 hover:bg-neutral-200 dark:hover:bg-slate-750 rounded italic text-xs cursor-pointer text-neutral-700 dark:text-neutral-300"
-                        >
-                          I
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toast("Underline style template", { icon: "📝" })}
-                          className="px-2 py-1 hover:bg-neutral-200 dark:hover:bg-slate-750 rounded underline text-xs cursor-pointer text-neutral-700 dark:text-neutral-300"
-                        >
-                          U
-                        </button>
-                        <span className="w-px h-4 bg-neutral-300 dark:bg-slate-700 mx-1" />
-                        <button
-                          type="button"
-                          onClick={() => toast("List template inserted", { icon: "📝" })}
-                          className="px-2 py-1 hover:bg-neutral-200 dark:hover:bg-slate-750 rounded text-xs cursor-pointer text-neutral-700 dark:text-neutral-300"
-                        >
-                          • Bullet List
-                        </button>
-                      </div>
-
-                      {/* Source Mode Toggle */}
-                      <button
-                        type="button"
-                        onClick={() => setIsHtmlMode(!isHtmlMode)}
-                        className={cn(
-                          "px-3 py-1 rounded text-xs font-bold border transition-colors cursor-pointer",
-                          isHtmlMode
-                            ? "bg-primary text-white border-primary"
-                            : "hover:bg-neutral-200 dark:hover:bg-slate-700 text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
-                        )}
-                      >
-                        {isHtmlMode ? "View Rich Text" : "HTML Source"}
-                      </button>
-                    </div>
-
-                    <div className="relative">
-                      {isHtmlMode ? (
-                        <textarea
-                          {...register("jobDescription")}
-                          className="w-full h-64 bg-neutral-50 dark:bg-slate-950 border border-t-0 border-neutral-200 dark:border-slate-800 rounded-b-lg p-3 outline-hidden text-xs font-mono resize-none leading-relaxed text-neutral-800 dark:text-neutral-200"
-                          placeholder="HTML Raw Content..."
-                        />
-                      ) : (
-                        <textarea
-                          {...register("jobDescription")}
-                          className="w-full h-64 bg-white dark:bg-slate-950 border border-t-0 border-neutral-200 dark:border-slate-800 rounded-b-lg p-3 outline-hidden text-xs resize-none leading-relaxed text-neutral-800 dark:text-neutral-200"
-                          placeholder="Type or paste rich job descriptions here..."
-                        />
-                      )}
-                    </div>
+                    <RichTextEditor
+                      value={watch("jobDescription") || ""}
+                      onChange={(val) => setValue("jobDescription", val, { shouldValidate: true, shouldDirty: true })}
+                      placeholder="Type or paste rich job description from Word, PDF, or Docs..."
+                    />
                     {errors.jobDescription && (
                       <p className="text-[10px] text-red-655 font-bold">{errors.jobDescription.message}</p>
                     )}
@@ -2573,7 +2625,10 @@ export default function NewJobPostingPage() {
         onOpenChange={setAddClientModalOpen}
         onClientAdded={(clientName) => {
           fetchClients();
-          setValue("client", clientName, { shouldValidate: true });
+          if (!getValues("client")) {
+            setValue("client", clientName, { shouldValidate: true });
+          }
+          setValue("endClientName", clientName, { shouldValidate: true });
         }}
         market={market}
       />

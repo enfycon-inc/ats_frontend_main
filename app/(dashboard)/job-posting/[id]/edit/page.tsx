@@ -1746,52 +1746,98 @@ export default function EditJobPostingPage() {
                             className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800 text-neutral-900 dark:text-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100"
                           >
                             <span className={cn("truncate", watch("client") ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-400 dark:text-slate-400 font-medium")}>
-                              {watch("client") ? watch("client") : "Search for a Client"}
+                              {watch("client") ? watch("client") : "Search for a Client..."}
                             </span>
                             <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-neutral-500" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0" align="start">
-                          <Command>
+                          <Command shouldFilter={false}>
                             <CommandInput
-                              placeholder="Search for a Client"
+                              placeholder="Search for a Client..."
                               className="h-9 text-xs"
                               value={clientSearchText}
                               onValueChange={setClientSearchText}
                             />
-                            <CommandList>
-                              <CommandEmpty className="py-6 text-center text-xs text-neutral-500">
-                                {clientSearchText.trim() === "" ? "Enter client name" : "No client found."}
-                              </CommandEmpty>
-                              {clientSearchText.trim() !== "" && (
-                                <CommandGroup>
-                                  {clientList.filter(cl => cl.client_name.toLowerCase().includes(clientSearchText.toLowerCase())).map((cl) => (
-                                    <CommandItem
-                                      key={cl.id}
-                                      value={cl.client_name}
-                                      onSelect={(currentValue) => {
-                                        setValue("client", cl.client_name, { shouldValidate: true });
-                                        setClientDropdownOpen(false);
-                                        setClientSearchText("");
-                                      }}
-                                      className="text-xs cursor-pointer"
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          watch("client") === cl.client_name ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      {cl.client_name}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              )}
+                            <CommandList className="max-h-[240px] overflow-y-auto">
+                              {(() => {
+                                const query = clientSearchText.trim().toLowerCase();
+                                const filtered = clientList.filter((cl: any) => {
+                                  const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                  return !query || cName.includes(query);
+                                });
+
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="py-4 px-3 text-center text-xs text-neutral-500">
+                                      {query ? (
+                                        <div className="space-y-2">
+                                          <p>No client matching "{clientSearchText.trim()}"</p>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setValue("client", clientSearchText.trim(), { shouldValidate: true });
+                                              setClientDropdownOpen(false);
+                                              setClientSearchText("");
+                                            }}
+                                            className="px-3 py-1 bg-primary text-white text-xs font-semibold rounded hover:bg-primary/90 transition-colors cursor-pointer"
+                                          >
+                                            Use "{clientSearchText.trim()}" as Client
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        "No clients available in database."
+                                      )}
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <CommandGroup heading="Existing Clients">
+                                    {filtered.map((cl: any) => {
+                                      const clientNameStr = cl.client_name || cl.clientName || cl.name || "";
+                                      return (
+                                        <CommandItem
+                                          key={cl.id || clientNameStr}
+                                          value={clientNameStr}
+                                          onSelect={() => {
+                                            setValue("client", clientNameStr, { shouldValidate: true });
+                                            setClientDropdownOpen(false);
+                                            setClientSearchText("");
+                                          }}
+                                          className="text-xs cursor-pointer"
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              watch("client") === clientNameStr ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {clientNameStr}
+                                        </CommandItem>
+                                      );
+                                    })}
+                                  </CommandGroup>
+                                );
+                              })()}
                             </CommandList>
-                            <div className="p-2 border-t">
+                            <div className="p-2 border-t flex items-center justify-between gap-2">
+                              {clientSearchText.trim() !== "" && (
+                                <button
+                                  type="button"
+                                  className="text-primary font-bold text-xs hover:underline bg-transparent border-0 cursor-pointer"
+                                  onClick={() => {
+                                    setValue("client", clientSearchText.trim(), { shouldValidate: true });
+                                    setClientDropdownOpen(false);
+                                    setClientSearchText("");
+                                  }}
+                                >
+                                  ✔ Select "{clientSearchText.trim()}"
+                                </button>
+                              )}
                               <button
                                 type="button"
-                                className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer w-full text-xs"
+                                className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer text-xs ml-auto"
                                 onClick={() => {
                                   setClientDropdownOpen(false);
                                   setAddClientModalOpen(true);
@@ -1832,58 +1878,74 @@ export default function EditJobPostingPage() {
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0" align="start">
-                          <Command>
+                          <Command shouldFilter={false}>
                             <CommandInput
                               placeholder="Search for an End Client..."
                               className="h-9 text-xs"
                               value={endClientSearchText}
                               onValueChange={setEndClientSearchText}
                             />
-                            <CommandList>
-                              <CommandEmpty className="py-4 px-3 text-center text-xs text-neutral-500">
-                                {endClientSearchText.trim() === "" ? (
-                                  "Search client database or type custom name"
-                                ) : (
-                                  <div className="space-y-2">
-                                    <p>No client matching "{endClientSearchText}"</p>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setValue("endClientName", endClientSearchText.trim(), { shouldValidate: true });
-                                        setEndClientDropdownOpen(false);
-                                        setEndClientSearchText("");
-                                      }}
-                                      className="px-3 py-1 bg-primary text-white text-xs font-semibold rounded hover:bg-primary/90 transition-colors cursor-pointer"
-                                    >
-                                      Use "{endClientSearchText.trim()}" as End Client
-                                    </button>
-                                  </div>
-                                )}
-                              </CommandEmpty>
-                              {clientList.filter(cl => cl.client_name.toLowerCase().includes(endClientSearchText.toLowerCase())).length > 0 && (
-                                <CommandGroup heading="Existing Clients">
-                                  {clientList.filter(cl => cl.client_name.toLowerCase().includes(endClientSearchText.toLowerCase())).map((cl) => (
-                                    <CommandItem
-                                      key={cl.id}
-                                      value={cl.client_name}
-                                      onSelect={() => {
-                                        setValue("endClientName", cl.client_name, { shouldValidate: true });
-                                        setEndClientDropdownOpen(false);
-                                        setEndClientSearchText("");
-                                      }}
-                                      className="text-xs cursor-pointer"
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          watch("endClientName") === cl.client_name ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      {cl.client_name}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              )}
+                            <CommandList className="max-h-[240px] overflow-y-auto">
+                              {(() => {
+                                const query = endClientSearchText.trim().toLowerCase();
+                                const filtered = clientList.filter((cl: any) => {
+                                  const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                  return !query || cName.includes(query);
+                                });
+
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="py-4 px-3 text-center text-xs text-neutral-500">
+                                      {query ? (
+                                        <div className="space-y-2">
+                                          <p>No client matching "{endClientSearchText.trim()}"</p>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setValue("endClientName", endClientSearchText.trim(), { shouldValidate: true });
+                                              setEndClientDropdownOpen(false);
+                                              setEndClientSearchText("");
+                                            }}
+                                            className="px-3 py-1 bg-primary text-white text-xs font-semibold rounded hover:bg-primary/90 transition-colors cursor-pointer"
+                                          >
+                                            Use "{endClientSearchText.trim()}" as End Client
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        "No clients available in database."
+                                      )}
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <CommandGroup heading="Existing Clients">
+                                    {filtered.map((cl: any) => {
+                                      const clientNameStr = cl.client_name || cl.clientName || cl.name || "";
+                                      return (
+                                        <CommandItem
+                                          key={cl.id || clientNameStr}
+                                          value={clientNameStr}
+                                          onSelect={() => {
+                                            setValue("endClientName", clientNameStr, { shouldValidate: true });
+                                            setEndClientDropdownOpen(false);
+                                            setEndClientSearchText("");
+                                          }}
+                                          className="text-xs cursor-pointer"
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              watch("endClientName") === clientNameStr ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {clientNameStr}
+                                        </CommandItem>
+                                      );
+                                    })}
+                                  </CommandGroup>
+                                );
+                              })()}
                             </CommandList>
                             <div className="p-2 border-t flex items-center justify-between gap-2">
                               {endClientSearchText.trim() !== "" && (

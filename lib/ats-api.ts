@@ -473,6 +473,16 @@ const email = {
   async getTemplates(): Promise<any[]> {
     return apiFetch<any[]>('/email/templates');
   },
+  async getDeliverySettings(branchId?: string): Promise<{ ratePerMinute: number; ratePerHour: number; randomizeDelay: boolean }> {
+    const query = branchId ? `?branchId=${encodeURIComponent(branchId)}` : '';
+    return apiFetch<{ ratePerMinute: number; ratePerHour: number; randomizeDelay: boolean }>(`/email/delivery-settings${query}`);
+  },
+  async saveDeliverySettings(data: { branchId?: string; ratePerMinute?: number; ratePerHour?: number; randomizeDelay?: boolean }): Promise<any> {
+    return apiFetch<any>('/email/delivery-settings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 };
 
 

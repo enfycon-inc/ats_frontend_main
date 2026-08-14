@@ -131,34 +131,29 @@ export function MassMailForm() {
     return userProfile?.branchId || userProfile?.branchName || "default_branch";
   }, [userProfile]);
 
-  const branchSettingsKey = `mass_mail_delivery_settings_${activeBranchId}`;
-
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(branchSettingsKey);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (typeof parsed.ratePerMinute === "number") setRatePerMinute(parsed.ratePerMinute);
-          if (typeof parsed.ratePerHour === "number") setRatePerHour(parsed.ratePerHour);
-          if (typeof parsed.randomizeDelay === "boolean") setRandomizeDelay(parsed.randomizeDelay);
-        } catch (e) {
-          console.error("Error loading branch delivery settings", e);
+    atsApi.email.getDeliverySettings(activeBranchId)
+      .then((data) => {
+        if (data) {
+          if (typeof data.ratePerMinute === "number") setRatePerMinute(data.ratePerMinute);
+          if (typeof data.ratePerHour === "number") setRatePerHour(data.ratePerHour);
+          if (typeof data.randomizeDelay === "boolean") setRandomizeDelay(data.randomizeDelay);
         }
-      }
-    }
-  }, [branchSettingsKey]);
+      })
+      .catch((err) => console.error("Error loading delivery settings from backend API", err));
+  }, [activeBranchId]);
 
   const updateBranchSettings = (min: number, hr: number, rand: boolean) => {
     setRatePerMinute(min);
     setRatePerHour(hr);
     setRandomizeDelay(rand);
-    if (canEditDeliverySettings && typeof window !== "undefined") {
-      localStorage.setItem(branchSettingsKey, JSON.stringify({
+    if (canEditDeliverySettings) {
+      atsApi.email.saveDeliverySettings({
+        branchId: activeBranchId,
         ratePerMinute: min,
         ratePerHour: hr,
         randomizeDelay: rand,
-      }));
+      }).catch((err) => console.error("Error saving delivery settings to backend API", err));
     }
   };
 
@@ -344,10 +339,11 @@ export function MassMailForm() {
     setIsConnecting(provider);
     const user = atsApi.auth.getCurrentUser();
     const tenantId = user?.tenantId || '';
+    const userId = user?.id || user?.dbId || '';
     if (provider === 'google') {
-      window.location.href = `http://localhost:5000/api/v1/auth/google?tenantId=${tenantId}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
+      window.location.href = `http://localhost:5000/api/v1/auth/google?tenantId=${tenantId}&userId=${userId}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
     } else if (provider === 'microsoft') {
-      window.location.href = `http://localhost:5000/api/v1/auth/microsoft?tenantId=${tenantId}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
+      window.location.href = `http://localhost:5000/api/v1/auth/microsoft?tenantId=${tenantId}&userId=${userId}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
     } else if (provider === 'smtp') {
       setIsConnecting(null);
       setIsDialogOpen(false);
