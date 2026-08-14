@@ -27,6 +27,7 @@ function getApiBase(): string {
 
 // ─── Token Management ──────────────────────────────────────────────
 const TOKEN_KEY = 'ats_access_token';
+const REFRESH_TOKEN_KEY = 'ats_refresh_token';
 const USER_KEY = 'ats_current_user';
 
 function getToken(): string | null {
@@ -40,9 +41,21 @@ function setToken(token: string) {
   }
 }
 
+function getRefreshToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+function setRefreshToken(token: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(REFRESH_TOKEN_KEY, token);
+  }
+}
+
 function clearToken() {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   }
 }
@@ -60,10 +73,47 @@ function getCurrentUser(): any | null {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+let isRefreshing = false;
+let refreshSubscribers: Array<(token: string) => void> = [];
+
+function onRefreshed(token: string) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+}
+
+async function tryAutoRefresh(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+
+  try {
+    const apiBase = getApiBase();
+    const res = await fetch(`${apiBase}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.accessToken) {
+        setToken(data.accessToken);
+        if (data.refreshToken) setRefreshToken(data.refreshToken);
+        return data.accessToken;
+      }
+    }
+  } catch (e) {
+    console.error('Auto token refresh failed:', e);
+  }
+
+  clearToken();
+  return null;
+}
+
 // ─── HTTP Helper ────────────────────────────────────────────────────
 async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {},
+  isRetry = false,
 ): Promise<T> {
   const token = getToken();
   const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
@@ -97,6 +147,29 @@ async function apiFetch<T = any>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ message: res.statusText }));
+    const isExpired = res.status === 401 || (body.message && body.message.toLowerCase().includes('expired'));
+
+    // Attempt automatic token refresh if token expired and retry once
+    if (isExpired && !isRetry && getRefreshToken()) {
+      if (!isRefreshing) {
+        isRefreshing = true;
+        const newToken = await tryAutoRefresh();
+        isRefreshing = false;
+        if (newToken) {
+          onRefreshed(newToken);
+          return apiFetch<T>(path, options, true);
+        }
+      } else {
+        // Wait for active refresh to finish
+        const retryObj = new Promise<T>((resolve, reject) => {
+          refreshSubscribers.push((newToken: string) => {
+            apiFetch<T>(path, options, true).then(resolve).catch(reject);
+          });
+        });
+        return retryObj;
+      }
+    }
+
     throw new Error(body.message || `API Error: ${res.status}`);
   }
 
@@ -112,6 +185,7 @@ const auth = {
     const subdomain = getTenantIdentifier();
     const data = await apiFetch<{
       accessToken: string;
+      refreshToken?: string;
       expiresIn: number;
       tokenType: string;
       user: {
@@ -128,6 +202,7 @@ const auth = {
     });
 
     setToken(data.accessToken);
+    if (data.refreshToken) setRefreshToken(data.refreshToken);
     setCurrentUser(data.user);
     return data;
   },

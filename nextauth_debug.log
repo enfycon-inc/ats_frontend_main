@@ -376,3 +376,52 @@
 [2026-08-13T14:15:09.654Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
 [2026-08-13T14:15:10.749Z] Localhost backend response status: 200
 [2026-08-13T14:15:10.754Z] Backend login successful. User data: {"id":"850f4384-e579-41a0-a4e7-613c4ca198be","email":"admin@enfycon.com","fullName":"Enfy Super Admin","roles":["DEFAULT_ROLES_ENFYCON_ATS","OFFLINE_ACCESS","UMA_AUTHORIZATION","MANAGE_ACCOUNT","MANAGE_ACCOUNT_LINKS","VIEW_PROFILE","SUPER_ADMIN"],"tenantId":"d3b07384-d113-49c3-a555-9ee75c13ca33","defaultMarket":"IN","tenantDomain":"enfycon","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","platform:manage","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"SUPER_ADMIN","podId":null,"branchId":"cb93e495-52a0-4b2a-999b-d4517e7f7d82","branchName":"Default Enfy SaaS Tenant Headquarters","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-13T14:29:42.934Z] Authorize started for email: admin@enfycon.com
+[2026-08-13T14:29:42.941Z] Parsed credentials: email=admin@enfycon.com, subdomain=
+[2026-08-13T14:29:42.943Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-13T14:29:43.961Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-13T14:29:43.963Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-13T14:29:45.294Z] Localhost backend response status: 200
+[2026-08-13T14:29:45.300Z] Backend login successful. User data: {"id":"850f4384-e579-41a0-a4e7-613c4ca198be","email":"admin@enfycon.com","fullName":"Enfy Super Admin","roles":["DEFAULT_ROLES_ENFYCON_ATS","OFFLINE_ACCESS","UMA_AUTHORIZATION","MANAGE_ACCOUNT","MANAGE_ACCOUNT_LINKS","VIEW_PROFILE","SUPER_ADMIN"],"tenantId":"d3b07384-d113-49c3-a555-9ee75c13ca33","defaultMarket":"IN","tenantDomain":"enfycon","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","platform:manage","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"SUPER_ADMIN","podId":null,"branchId":"cb93e495-52a0-4b2a-999b-d4517e7f7d82","branchName":"Default Enfy SaaS Tenant Headquarters","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-13T14:49:55.291Z] Authorize started for email: admin@enfycon.com
+[2026-08-13T14:49:55.295Z] Parsed credentials: email=admin@enfycon.com, subdomain=
+[2026-08-13T14:49:55.297Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-13T14:49:56.307Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-13T14:49:56.311Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-13T14:49:57.664Z] Localhost backend response status: 200
+[2026-08-13T14:49:57.668Z] Backend login successful. User data: {"id":"850f4384-e579-41a0-a4e7-613c4ca198be","email":"admin@enfycon.com","fullName":"Enfy Super Admin","roles":["DEFAULT_ROLES_ENFYCON_ATS","OFFLINE_ACCESS","UMA_AUTHORIZATION","MANAGE_ACCOUNT","MANAGE_ACCOUNT_LINKS","VIEW_PROFILE","SUPER_ADMIN"],"tenantId":"d3b07384-d113-49c3-a555-9ee75c13ca33","defaultMarket":"IN","tenantDomain":"enfycon","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","platform:manage","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"SUPER_ADMIN","podId":null,"branchId":"cb93e495-52a0-4b2a-999b-d4517e7f7d82","branchName":"Default Enfy SaaS Tenant Headquarters","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-13T15:02:44.006Z] Authorize started for email: admin@enfycon.com
+[2026-08-13T15:02:44.011Z] Parsed credentials: email=admin@enfycon.com, subdomain=
+[2026-08-13T15:02:44.013Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-13T15:02:45.027Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-13T15:02:45.030Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-13T15:02:46.669Z] Localhost backend response status: 200
+[2026-08-13T15:02:46.674Z] Backend login successful. User data: {"id":"850f4384-e579-41a0-a4e7-613c4ca198be","email":"admin@enfycon.com","fullName":"Enfy Super Admin","roles":["DEFAULT_ROLES_ENFYCON_ATS","OFFLINE_ACCESS","UMA_AUTHORIZATION","MANAGE_ACCOUNT","MANAGE_ACCOUNT_LINKS","VIEW_PROFILE","SUPER_ADMIN"],"tenantId":"d3b07384-d113-49c3-a555-9ee75c13ca33","defaultMarket":"IN","tenantDomain":"enfycon","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","platform:manage","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"SUPER_ADMIN","podId":null,"branchId":"cb93e495-52a0-4b2a-999b-d4517e7f7d82","branchName":"Default Enfy SaaS Tenant Headquarters","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-13T15:10:51.498Z] Authorize started for email: admin@enfycon.com
+[2026-08-13T15:10:51.505Z] Parsed credentials: email=admin@enfycon.com, subdomain=
+[2026-08-13T15:10:51.511Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-13T15:10:52.522Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-13T15:10:52.528Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-13T15:10:54.395Z] Localhost backend response status: 200
+[2026-08-13T15:10:54.407Z] Backend login successful. User data: {"id":"850f4384-e579-41a0-a4e7-613c4ca198be","email":"admin@enfycon.com","fullName":"Enfy Super Admin","roles":["DEFAULT_ROLES_ENFYCON_ATS","OFFLINE_ACCESS","UMA_AUTHORIZATION","MANAGE_ACCOUNT","MANAGE_ACCOUNT_LINKS","VIEW_PROFILE","SUPER_ADMIN"],"tenantId":"d3b07384-d113-49c3-a555-9ee75c13ca33","defaultMarket":"IN","tenantDomain":"enfycon","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","platform:manage","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"SUPER_ADMIN","podId":null,"branchId":"cb93e495-52a0-4b2a-999b-d4517e7f7d82","branchName":"Default Enfy SaaS Tenant Headquarters","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-13T15:13:51.536Z] Authorize started for email: admin@enfycon.com
+[2026-08-13T15:13:51.550Z] Parsed credentials: email=admin@enfycon.com, subdomain=
+[2026-08-13T15:13:51.562Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-13T15:13:52.576Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-13T15:13:52.580Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-13T15:13:54.370Z] Localhost backend response status: 200
+[2026-08-13T15:13:54.380Z] Backend login successful. User data: {"id":"850f4384-e579-41a0-a4e7-613c4ca198be","email":"admin@enfycon.com","fullName":"Enfy Super Admin","roles":["DEFAULT_ROLES_ENFYCON_ATS","OFFLINE_ACCESS","UMA_AUTHORIZATION","MANAGE_ACCOUNT","MANAGE_ACCOUNT_LINKS","VIEW_PROFILE","SUPER_ADMIN"],"tenantId":"d3b07384-d113-49c3-a555-9ee75c13ca33","defaultMarket":"IN","tenantDomain":"enfycon","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","platform:manage","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"SUPER_ADMIN","podId":null,"branchId":"cb93e495-52a0-4b2a-999b-d4517e7f7d82","branchName":"Default Enfy SaaS Tenant Headquarters","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-13T15:14:23.897Z] Authorize started for email: sahadeb@cil.com
+[2026-08-13T15:14:23.901Z] Parsed credentials: email=sahadeb@cil.com, subdomain=
+[2026-08-13T15:14:23.906Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-13T15:14:24.916Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-13T15:14:24.920Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-13T15:14:26.728Z] Localhost backend response status: 200
+[2026-08-13T15:14:26.734Z] Backend login successful. User data: {"id":"90ddf924-115e-43a1-bf45-b2905ce79f19","email":"sahadeb@cil.com","fullName":"sahadeb barman","roles":["ADMIN"],"tenantId":"2fb83e64-ff23-4ace-aaf4-36d7731a6412","defaultMarket":"US","tenantDomain":"cil","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":null,"branchName":null,"businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}
+[2026-08-13T15:14:56.021Z] Authorize started for email: sahadeb@cil.com
+[2026-08-13T15:14:56.028Z] Parsed credentials: email=sahadeb@cil.com, subdomain=cil
+[2026-08-13T15:14:56.034Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-13T15:14:57.051Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-13T15:14:57.056Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-13T15:14:59.090Z] Localhost backend response status: 200
+[2026-08-13T15:14:59.100Z] Backend login successful. User data: {"id":"90ddf924-115e-43a1-bf45-b2905ce79f19","email":"sahadeb@cil.com","fullName":"sahadeb barman","roles":["ADMIN"],"tenantId":"2fb83e64-ff23-4ace-aaf4-36d7731a6412","defaultMarket":"US","tenantDomain":"cil","permissions":["candidate:create","candidate:view","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":null,"branchName":null,"businessUnitId":null,"businessUnitName":null,"podSystemEnabled":true}

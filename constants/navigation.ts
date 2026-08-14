@@ -204,52 +204,51 @@ export const MORE_NAV_ITEMS: NavItem[] = [
 export const GLOBAL_ADMIN_NAV_ITEMS: NavItem[] = [
   {
     id: "dashboard",
-    label: "Platform Command Center",
+    label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
   },
   {
     id: "tenant-management",
-    label: "Tenants & Workspace Approvals",
+    label: "Tenants",
     href: "/utility/approvals",
     icon: Building2,
     children: [
-      { label: "Pending Approvals & Tenants", href: "/utility/approvals" },
-      { label: "Branch Office Locations", href: "/utility/branches" },
-      { label: "Business Units & Depts", href: "/utility/business-units" },
+      { label: "Pending Approvals", href: "/utility/approvals?tab=pending" },
+      { label: "Active Tenants", href: "/utility/approvals?tab=tenants" },
     ],
   },
   {
     id: "security-audit",
-    label: "Cross-Tenant Security Audit Logs",
+    label: "Audit Logs",
     href: "/utility/audit-logs",
     icon: Shield,
   },
   {
     id: "ai-dictionaries",
-    label: "Master AI Skill Dictionaries",
+    label: "Dictionaries",
     href: "/utility/dictionaries",
     icon: Cpu,
   },
   {
     id: "global-rbac",
-    label: "Global Roles & Permissions",
+    label: "Roles & Permissions",
     href: "/utility/roles-permissions",
     icon: Lock,
   },
   {
     id: "recruitment-pods",
-    label: "Recruitment Pods",
+    label: "Pods",
     href: "/utility/pods",
     icon: Users,
   },
 ];
 
 export const GLOBAL_ADMIN_MORE_ITEMS: NavItem[] = [
-  { id: "email-integration", label: "Mass Mail & OAuth Accounts", href: "/email", icon: Mail },
-  { id: "system-settings", label: "Platform Global Settings", href: "/company", icon: Settings },
-  { id: "reports-analytics", label: "Platform Usage Analytics", href: "/reports", icon: BarChart3 },
-  { id: "help-support", label: "Admin Help & Documentation", href: "/help", icon: HelpCircle },
+  { id: "email-integration", label: "Mass Mail", href: "/email", icon: Mail },
+  { id: "system-settings", label: "Settings", href: "/company", icon: Settings },
+  { id: "reports-analytics", label: "Reports", href: "/reports", icon: BarChart3 },
+  { id: "help-support", label: "Help & Support", href: "/help", icon: HelpCircle },
 ];
 
 // ─────────────────────────────────────────────

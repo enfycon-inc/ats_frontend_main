@@ -389,316 +389,168 @@ export default function ApprovalsPage() {
       </div>
 
       <div className="space-y-6">
-        {/* ========================================================
-           TOP SEPARATE SECTION: PENDING TENANTS & USERS (Only rendered when totalPendingCount > 0)
-           ======================================================== */}
-        {totalPendingCount > 0 && (
-          <Card className="border-2 border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20 shadow-md overflow-hidden">
-            <CardHeader className="border-b border-amber-500/20 bg-amber-500/10 dark:bg-amber-950/40 py-3.5 px-6">
+        {activeTab === "pending" ? (
+          /* ========================================================
+             PENDING APPROVALS VIEW
+             ======================================================== */
+          <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+            <CardHeader className="border-b border-default-100 bg-amber-500/5 dark:bg-amber-950/20 py-4 px-6">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-3 w-3 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
-                  </span>
-                  <div>
-                    <CardTitle className="text-base font-bold text-amber-950 dark:text-amber-300 flex items-center gap-2">
-                      <Icon icon="heroicons:exclamation-triangle" className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                      Pending Tenant Approvals Required ({totalPendingCount})
-                    </CardTitle>
-                    <CardDescription className="text-xs text-amber-800/80 dark:text-amber-400/80 mt-0.5">
-                      Review registration details, assign company domain, seat limits, and approve tenant activation.
-                    </CardDescription>
-                  </div>
+                <div>
+                  <CardTitle className="text-lg font-bold text-default-900 flex items-center gap-2">
+                    <Icon icon="heroicons:user-plus" className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    Pending Approvals ({totalPendingCount})
+                  </CardTitle>
+                  <CardDescription className="text-xs text-default-500 mt-0.5">
+                    Review company registration details, assign domain and seat limits, and activate new workspace accounts.
+                  </CardDescription>
                 </div>
+                <Button size="sm" variant="outline" onClick={loadData} className="flex items-center gap-2 text-xs">
+                  <Icon icon="heroicons:arrow-path" className="h-3.5 w-3.5" /> Refresh
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-amber-500/5 dark:bg-slate-800/50 border-b border-amber-500/10">
-                      <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Company / Applicant Details</th>
-                      <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Assigned Domain</th>
-                      <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Status</th>
-                      <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Seats Limit</th>
-                      <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Max Branches</th>
-                      <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Market Layout</th>
-                      <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-amber-500/10 bg-white/70 dark:bg-slate-900/80">
-                    {/* Render Pending Users */}
-                    {pendingUsers.map((user) => {
-                      const selectedMarket = marketAssignments[user.id] || "US";
-                      return (
-                        <tr key={`user-${user.id}`} className="hover:bg-amber-500/10 transition-colors">
-                          <td className="py-3.5 px-6">
-                            <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                                {user.fullName.charAt(0).toUpperCase()}
-                              </div>
-                              <div>
-                                <div className="font-semibold text-default-900 text-sm">{user.fullName}</div>
-                                <div className="text-xs text-default-500">{user.email} • {user.tenantName}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-6">
-                            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-amber-500/30 rounded-lg overflow-hidden w-52 shadow-xs">
-                              <input
-                                type="text"
-                                value={subdomainAssignments[user.id] || ""}
-                                onChange={(e) => handleSubdomainChange(user.id, e.target.value)}
-                                placeholder="company-slug"
-                                className="bg-transparent border-0 px-2.5 py-1.5 text-xs font-medium text-default-900 focus:outline-none w-full"
-                              />
-                              <span className="text-[10px] font-semibold text-default-500 bg-amber-500/10 px-1.5 py-1.5 whitespace-nowrap border-l border-amber-500/20">
-                                .enfycon.com
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-6">
-                            <span className="px-2 py-0.5 text-xs font-bold text-amber-700 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 rounded border border-amber-300">
-                              PENDING
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-6">
-                            <input
-                              type="number"
-                              min="1"
-                              value={userLimitAssignments[user.id] || 20}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                setUserLimitAssignments(prev => ({ ...prev, [user.id]: isNaN(val) ? 20 : val }));
-                              }}
-                              className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-amber-600 bg-white dark:bg-slate-800 text-default-850"
-                            />
-                          </td>
-                          <td className="py-3.5 px-6">
-                            <input
-                              type="number"
-                              min="1"
-                              value={maxBranchesAssignments[user.id] || 5}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                setMaxBranchesAssignments(prev => ({ ...prev, [user.id]: isNaN(val) ? 5 : val }));
-                              }}
-                              className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-amber-600 bg-white dark:bg-slate-800 text-default-850"
-                            />
-                          </td>
-                          <td className="py-3.5 px-6">
-                            <div className="flex bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-amber-500/20 w-fit">
-                              <button
-                                onClick={() => handleMarketChange(user.id, "US")}
-                                className={`px-2.5 py-1 rounded text-xs font-semibold ${selectedMarket === "US" ? "bg-indigo-600 text-white" : "text-default-500"}`}
-                              >
-                                🇺🇸 US
-                              </button>
-                              <button
-                                onClick={() => handleMarketChange(user.id, "IN")}
-                                className={`px-2.5 py-1 rounded text-xs font-semibold ${selectedMarket === "IN" ? "bg-emerald-600 text-white" : "text-default-500"}`}
-                              >
-                                🇮🇳 IN
-                              </button>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-6 text-right">
-                            <Button
-                              size="sm"
-                              onClick={() => handleApprove(user.id)}
-                              disabled={submittingId === user.id}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs"
-                            >
-                              Approve & Activate
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {/* Render Unlinked Pending Tenants */}
-                    {unlinkedPendingTenants.map((tenant) => {
-                      return (
-                        <tr key={`tenant-${tenant.id}`} className="hover:bg-amber-500/10 transition-colors">
-                          <td className="py-3.5 px-6">
-                            <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center font-bold text-base border border-amber-500/30">
-                                <Icon icon="heroicons:building-office-2" className="h-5 w-5" />
-                              </div>
-                              <div>
-                                <div className="font-bold text-default-900 text-sm">{tenant.name}</div>
-                                <div className="text-[10px] text-default-400">ID: {tenant.id}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-6">
-                            <span className="text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-2.5 py-1 rounded border border-amber-300">
-                              {tenant.domain}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-6">
-                            <span className="px-2.5 py-0.5 text-xs font-bold text-amber-700 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 rounded border border-amber-300">
-                              PENDING
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-6">
-                            <input
-                              type="number"
-                              min="1"
-                              defaultValue={tenant.userLimit || 20}
-                              onBlur={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                if (!isNaN(val) && val !== tenant.userLimit) {
-                                  handleTenantUserLimitChange(tenant.id, val);
-                                }
-                              }}
-                              className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-amber-600 bg-white dark:bg-slate-800 text-default-850"
-                            />
-                          </td>
-                          <td className="py-3.5 px-6">
-                            <input
-                              type="number"
-                              min="1"
-                              defaultValue={tenant.maxBranches || 5}
-                              onBlur={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                if (!isNaN(val) && val !== tenant.maxBranches) {
-                                  handleTenantBranchLimitChange(tenant.id, val);
-                                }
-                              }}
-                              className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-amber-600 bg-white dark:bg-slate-800 text-default-850"
-                            />
-                          </td>
-                          <td className="py-3.5 px-6">
-                            <div className="flex bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-amber-500/20 w-fit">
-                              <button
-                                onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
-                                className={`px-2.5 py-1 rounded text-xs font-semibold ${tenant.defaultMarket === "US" ? "bg-indigo-600 text-white" : "text-default-500"}`}
-                              >
-                                🇺🇸 US
-                              </button>
-                              <button
-                                onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
-                                className={`px-2.5 py-1 rounded text-xs font-semibold ${tenant.defaultMarket === "IN" ? "bg-emerald-600 text-white" : "text-default-500"}`}
-                              >
-                                🇮🇳 IN
-                              </button>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-6 text-right">
-                            <Button
-                              size="sm"
-                              onClick={() => handleTenantStatusToggle(tenant.id, "PENDING")}
-                              disabled={submittingId === tenant.id}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs"
-                            >
-                              {submittingId === tenant.id ? (
-                                <div className="h-4 w-4 border-2 border-white border-t-transparent animate-spin rounded-full"></div>
-                              ) : (
-                                <>
-                                  <Icon icon="heroicons:check" className="mr-1 h-4 w-4" />
-                                  Approve & Activate
-                                </>
-                              )}
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ========================================================
-           MAIN CARD: ACTIVE TENANTS & MARKETS DIRECTORY
-           ======================================================== */}
-        <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-          <CardHeader className="border-b border-default-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg font-semibold text-default-900 flex items-center gap-2">
-                  <Icon icon="heroicons:building-office-2" className="h-5 w-5 text-indigo-600" />
-                  Active Tenants & Market Configurations ({activeTenants.length})
-                </CardTitle>
-                <CardDescription className="mt-1 text-xs text-default-500">
-                  View active platform client companies and adjust their user seat limits, branch limits, and active market layouts on-the-fly.
-                </CardDescription>
-              </div>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={loadData} 
-                className="flex items-center gap-2 text-xs"
-              >
-                <Icon icon="heroicons:arrow-path" className="h-3.5 w-3.5" /> Refresh
-              </Button>
-            </div>
-          </CardHeader>
-          
-          <CardContent className="p-0">
-            {activeTenants.length === 0 ? (
-              <div className="p-16 text-center flex flex-col items-center justify-center">
-                <div className="inline-flex h-16 w-16 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 items-center justify-center text-3xl mb-4">
-                  <Icon icon="heroicons:building-office" />
+              {totalPendingCount === 0 ? (
+                <div className="p-16 text-center flex flex-col items-center justify-center">
+                  <div className="inline-flex h-16 w-16 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 items-center justify-center text-3xl mb-4">
+                    <Icon icon="heroicons:check-circle" />
+                  </div>
+                  <h3 className="text-lg font-bold text-default-900 mb-1">No Pending Approvals</h3>
+                  <p className="text-sm text-default-500 max-w-md">
+                    All company tenant registration requests and pending user activations have been reviewed and approved.
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-default-900 mb-1">No Active Tenants</h3>
-                <p className="text-sm text-default-500 max-w-sm">
-                  There are currently no active tenants registered on the platform.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-default-50 dark:bg-slate-800/50 border-b border-default-100">
-                      <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Company Details</th>
-                      <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Assigned Domain</th>
-                      <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Status</th>
-                      <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Seats Limit</th>
-                      <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Max Branches</th>
-                      <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Staffing Market Layout Configuration</th>
-                      <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-default-100">
-                    {activeTenants.map((tenant) => {
-                      return (
-                        <tr key={tenant.id} className="hover:bg-default-50/50 dark:hover:bg-slate-800/10 transition-colors">
-                          <td className="py-4 px-6">
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-lg bg-indigo-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg border border-indigo-100 dark:border-slate-700">
-                                <Icon icon="heroicons:building-office-2" className="h-5 w-5" />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-amber-500/5 dark:bg-slate-800/50 border-b border-amber-500/10">
+                        <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Company / Applicant Details</th>
+                        <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Assigned Domain</th>
+                        <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Status</th>
+                        <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Seats Limit</th>
+                        <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Max Branches</th>
+                        <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Market Layout</th>
+                        <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-amber-500/10 bg-white/70 dark:bg-slate-900/80">
+                      {/* Render Pending Users */}
+                      {pendingUsers.map((user) => {
+                        const selectedMarket = marketAssignments[user.id] || "US";
+                        return (
+                          <tr key={`user-${user.id}`} className="hover:bg-amber-500/10 transition-colors">
+                            <td className="py-3.5 px-6">
+                              <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                                  {user.fullName.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <div className="font-semibold text-default-900 text-sm">{user.fullName}</div>
+                                  <div className="text-xs text-default-500">{user.email} • {user.tenantName}</div>
+                                </div>
                               </div>
-                              <div>
-                                <div className="font-semibold text-default-900 text-sm">{tenant.name}</div>
-                                <div className="text-[10px] text-default-400">ID: {tenant.id}</div>
+                            </td>
+                            <td className="py-3.5 px-6">
+                              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-amber-500/30 rounded-lg overflow-hidden w-52 shadow-xs">
+                                <input
+                                  type="text"
+                                  value={subdomainAssignments[user.id] || ""}
+                                  onChange={(e) => handleSubdomainChange(user.id, e.target.value)}
+                                  placeholder="company-slug"
+                                  className="bg-transparent border-0 px-2.5 py-1.5 text-xs font-medium text-default-900 focus:outline-none w-full"
+                                />
+                                <span className="text-[10px] font-semibold text-default-500 bg-amber-500/10 px-1.5 py-1.5 whitespace-nowrap border-l border-amber-500/20">
+                                  .enfycon.com
+                                </span>
                               </div>
-                            </div>
-                          </td>
-                          <td className="py-4 px-6">
-                            <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-slate-800/60 px-2.5 py-1 rounded border border-indigo-100 dark:border-slate-700">
-                              {tenant.domain}
-                            </span>
-                          </td>
-                          <td className="py-4 px-6">
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                id={`tenant-status-${tenant.id}`}
-                                checked={tenant.status === "ACTIVE"}
-                                onCheckedChange={() => handleTenantStatusToggle(tenant.id, tenant.status)}
-                                disabled={submittingId === tenant.id}
-                              />
-                              <span className={`text-xs font-bold ${tenant.status === "ACTIVE" ? "text-emerald-600" : "text-amber-600"}`}>
-                                {tenant.status}
+                            </td>
+                            <td className="py-3.5 px-6">
+                              <span className="px-2 py-0.5 text-xs font-bold text-amber-700 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 rounded border border-amber-300">
+                                PENDING
                               </span>
-                            </div>
-                          </td>
-                          <td className="py-4 px-6">
-                            <div className="flex items-center gap-1.5">
+                            </td>
+                            <td className="py-3.5 px-6">
+                              <input
+                                type="number"
+                                min="1"
+                                value={userLimitAssignments[user.id] || 20}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  setUserLimitAssignments(prev => ({ ...prev, [user.id]: isNaN(val) ? 20 : val }));
+                                }}
+                                className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-amber-600 bg-white dark:bg-slate-800 text-default-850"
+                              />
+                            </td>
+                            <td className="py-3.5 px-6">
+                              <input
+                                type="number"
+                                min="1"
+                                value={maxBranchesAssignments[user.id] || 5}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  setMaxBranchesAssignments(prev => ({ ...prev, [user.id]: isNaN(val) ? 5 : val }));
+                                }}
+                                className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-amber-600 bg-white dark:bg-slate-800 text-default-850"
+                              />
+                            </td>
+                            <td className="py-3.5 px-6">
+                              <div className="flex bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-amber-500/20 w-fit">
+                                <button
+                                  onClick={() => handleMarketChange(user.id, "US")}
+                                  className={`px-2.5 py-1 rounded text-xs font-semibold ${selectedMarket === "US" ? "bg-indigo-600 text-white" : "text-default-500"}`}
+                                >
+                                  🇺🇸 US
+                                </button>
+                                <button
+                                  onClick={() => handleMarketChange(user.id, "IN")}
+                                  className={`px-2.5 py-1 rounded text-xs font-semibold ${selectedMarket === "IN" ? "bg-emerald-600 text-white" : "text-default-500"}`}
+                                >
+                                  🇮🇳 IN
+                                </button>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-6 text-right">
+                              <Button
+                                size="sm"
+                                onClick={() => handleApprove(user.id)}
+                                disabled={submittingId === user.id}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs"
+                              >
+                                Approve & Activate
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                      {/* Render Unlinked Pending Tenants */}
+                      {unlinkedPendingTenants.map((tenant) => {
+                        return (
+                          <tr key={`tenant-${tenant.id}`} className="hover:bg-amber-500/10 transition-colors">
+                            <td className="py-3.5 px-6">
+                              <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center font-bold text-base border border-amber-500/30">
+                                  <Icon icon="heroicons:building-office-2" className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <div className="font-bold text-default-900 text-sm">{tenant.name}</div>
+                                  <div className="text-[10px] text-default-400">ID: {tenant.id}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-6">
+                              <span className="text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-2.5 py-1 rounded border border-amber-300">
+                                {tenant.domain}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-6">
+                              <span className="px-2.5 py-0.5 text-xs font-bold text-amber-700 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 rounded border border-amber-300">
+                                PENDING
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-6">
                               <input
                                 type="number"
                                 min="1"
@@ -709,13 +561,10 @@ export default function ApprovalsPage() {
                                     handleTenantUserLimitChange(tenant.id, val);
                                   }
                                 }}
-                                className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-indigo-600 bg-transparent text-default-850"
+                                className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-amber-600 bg-white dark:bg-slate-800 text-default-850"
                               />
-                              <span className="text-[10px] text-default-500 font-medium">seats</span>
-                            </div>
-                          </td>
-                          <td className="py-4 px-6">
-                            <div className="flex items-center gap-1.5">
+                            </td>
+                            <td className="py-3.5 px-6">
                               <input
                                 type="number"
                                 min="1"
@@ -726,57 +575,217 @@ export default function ApprovalsPage() {
                                     handleTenantBranchLimitChange(tenant.id, val);
                                   }
                                 }}
-                                className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-indigo-600 bg-transparent text-default-850"
+                                className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-amber-600 bg-white dark:bg-slate-800 text-default-850"
                               />
-                              <span className="text-[10px] text-default-500 font-medium">branches</span>
-                            </div>
-                          </td>
-                          <td className="py-4 px-6">
-                            <div className="flex bg-default-100 dark:bg-slate-800 p-0.5 rounded-lg border border-default-200/50 w-fit">
-                              <button
-                                onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
+                            </td>
+                            <td className="py-3.5 px-6">
+                              <div className="flex bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-amber-500/20 w-fit">
+                                <button
+                                  onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
+                                  className={`px-2.5 py-1 rounded text-xs font-semibold ${tenant.defaultMarket === "US" ? "bg-indigo-600 text-white" : "text-default-500"}`}
+                                >
+                                  🇺🇸 US
+                                </button>
+                                <button
+                                  onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
+                                  className={`px-2.5 py-1 rounded text-xs font-semibold ${tenant.defaultMarket === "IN" ? "bg-emerald-600 text-white" : "text-default-500"}`}
+                                >
+                                  🇮🇳 IN
+                                </button>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-6 text-right">
+                              <Button
+                                size="sm"
+                                onClick={() => handleTenantStatusToggle(tenant.id, "PENDING")}
                                 disabled={submittingId === tenant.id}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-                                  tenant.defaultMarket === "US"
-                                    ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs"
-                                    : "text-default-500 hover:text-default-800"
-                                }`}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs"
                               >
-                                🇺🇸 US IT
-                              </button>
-                              <button
-                                onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
-                                disabled={submittingId === tenant.id}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-                                  tenant.defaultMarket === "IN"
-                                    ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs"
-                                    : "text-default-500 hover:text-default-800"
-                                }`}
-                              >
-                                🇮🇳 India
-                              </button>
-                            </div>
-                          </td>
-                          <td className="py-4 px-6 text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleViewTenantDetails(tenant)}
-                              className="font-semibold text-xs flex items-center gap-1.5 ml-auto cursor-pointer"
-                            >
-                              <Icon icon="heroicons:eye" className="h-3.5 w-3.5 text-indigo-600" />
-                              Details & Users
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                                {submittingId === tenant.id ? (
+                                  <div className="h-4 w-4 border-2 border-white border-t-transparent animate-spin rounded-full"></div>
+                                ) : (
+                                  <>
+                                    <Icon icon="heroicons:check" className="mr-1 h-4 w-4" />
+                                    Approve & Activate
+                                  </>
+                                )}
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          /* ========================================================
+             ACTIVE TENANTS & MARKETS DIRECTORY VIEW
+             ======================================================== */
+          <Card className="border border-default-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+            <CardHeader className="border-b border-default-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg font-semibold text-default-900 flex items-center gap-2">
+                    <Icon icon="heroicons:building-office-2" className="h-5 w-5 text-indigo-600" />
+                    Active Tenants & Market Configurations ({activeTenants.length})
+                  </CardTitle>
+                  <CardDescription className="mt-1 text-xs text-default-500">
+                    View active platform client companies and adjust their user seat limits, branch limits, and active market layouts on-the-fly.
+                  </CardDescription>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={loadData} 
+                  className="flex items-center gap-2 text-xs"
+                >
+                  <Icon icon="heroicons:arrow-path" className="h-3.5 w-3.5" /> Refresh
+                </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            
+            <CardContent className="p-0">
+              {activeTenants.length === 0 ? (
+                <div className="p-16 text-center flex flex-col items-center justify-center">
+                  <div className="inline-flex h-16 w-16 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 items-center justify-center text-3xl mb-4">
+                    <Icon icon="heroicons:building-office" />
+                  </div>
+                  <h3 className="text-lg font-bold text-default-900 mb-1">No Active Tenants</h3>
+                  <p className="text-sm text-default-500 max-w-sm">
+                    There are currently no active tenants registered on the platform.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-default-50 dark:bg-slate-800/50 border-b border-default-100">
+                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Company Details</th>
+                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Assigned Domain</th>
+                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Status</th>
+                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Seats Limit</th>
+                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Max Branches</th>
+                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Staffing Market Layout Configuration</th>
+                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-default-100">
+                      {activeTenants.map((tenant) => {
+                        return (
+                          <tr key={tenant.id} className="hover:bg-default-50/50 dark:hover:bg-slate-800/10 transition-colors">
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-lg bg-indigo-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg border border-indigo-100 dark:border-slate-700">
+                                  <Icon icon="heroicons:building-office-2" className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <div className="font-semibold text-default-900 text-sm">{tenant.name}</div>
+                                  <div className="text-[10px] text-default-400">ID: {tenant.id}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-slate-800/60 px-2.5 py-1 rounded border border-indigo-100 dark:border-slate-700">
+                                {tenant.domain}
+                              </span>
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  id={`tenant-status-${tenant.id}`}
+                                  checked={tenant.status === "ACTIVE"}
+                                  onCheckedChange={() => handleTenantStatusToggle(tenant.id, tenant.status)}
+                                  disabled={submittingId === tenant.id}
+                                />
+                                <span className={`text-xs font-bold ${tenant.status === "ACTIVE" ? "text-emerald-600" : "text-amber-600"}`}>
+                                  {tenant.status}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  defaultValue={tenant.userLimit || 20}
+                                  onBlur={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    if (!isNaN(val) && val !== tenant.userLimit) {
+                                      handleTenantUserLimitChange(tenant.id, val);
+                                    }
+                                  }}
+                                  className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-indigo-600 bg-transparent text-default-850"
+                                />
+                                <span className="text-[10px] text-default-500 font-medium">seats</span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  defaultValue={tenant.maxBranches || 5}
+                                  onBlur={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    if (!isNaN(val) && val !== tenant.maxBranches) {
+                                      handleTenantBranchLimitChange(tenant.id, val);
+                                    }
+                                  }}
+                                  className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-indigo-600 bg-transparent text-default-850"
+                                />
+                                <span className="text-[10px] text-default-500 font-medium">branches</span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="flex bg-default-100 dark:bg-slate-800 p-0.5 rounded-lg border border-default-200/50 w-fit">
+                                <button
+                                  onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
+                                  disabled={submittingId === tenant.id}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                                    tenant.defaultMarket === "US"
+                                      ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                                      : "text-default-500 hover:text-default-800"
+                                  }`}
+                                >
+                                  🇺🇸 US IT
+                                </button>
+                                <button
+                                  onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
+                                  disabled={submittingId === tenant.id}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                                    tenant.defaultMarket === "IN"
+                                      ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs"
+                                      : "text-default-500 hover:text-default-800"
+                                  }`}
+                                >
+                                  🇮🇳 India
+                                </button>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleViewTenantDetails(tenant)}
+                                className="font-semibold text-xs flex items-center gap-1.5 ml-auto cursor-pointer"
+                              >
+                                <Icon icon="heroicons:eye" className="h-3.5 w-3.5 text-indigo-600" />
+                                Details & Users
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Tenant Details & Users Modal */}
