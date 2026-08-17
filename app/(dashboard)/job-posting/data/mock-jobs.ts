@@ -4,6 +4,7 @@ export interface Job {
   jobTitle: string;
   businessUnit: string;
   client: string;
+  endClientName?: string;
   clientJobId: string;
   location: string;
   states: string;
@@ -49,6 +50,7 @@ export function mapApiJobToJob(api: any): Job {
     jobTitle: api.jobTitle || "",
     businessUnit: api.businessUnit || "Deb Technology",
     client: api.client || api.clientName || "",
+    endClientName: api.endClientName || api.endClient || api.client || "",
     clientJobId: api.clientJobId || "N/A",
     location: api.location || api.jobLocation || "",
     states: api.state || api.states || "",

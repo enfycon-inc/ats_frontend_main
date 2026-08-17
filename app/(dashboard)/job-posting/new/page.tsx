@@ -55,6 +55,7 @@ import ReactCountryFlag from "react-country-flag";
 
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
+import { showErrorModal } from "@/components/shared/global-error-modal";
 
 const WORK_AUTHORIZATION_OPTIONS = [
   "B1",
@@ -228,7 +229,24 @@ export default function NewJobPostingPage() {
   const { data: session, status } = useSession();
 
   // Workflow active screen state: 'landing' | 'manual' | 'parse'
-  const [activeWorkflow, setActiveWorkflow] = useState<"landing" | "manual" | "parse">("landing");
+  // Detect cloneFrom query parameter immediately to smoothly transition directly to manual edit page
+  const [activeWorkflow, setActiveWorkflow] = useState<"landing" | "manual" | "parse">(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("cloneFrom") || params.get("duplicateFrom") || params.get("copyFrom")) {
+        return "manual";
+      }
+    }
+    return "landing";
+  });
+
+  const [isCloningLoading, setIsCloningLoading] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return !!(params.get("cloneFrom") || params.get("duplicateFrom") || params.get("copyFrom"));
+    }
+    return false;
+  });
 
   // Collapse/Expand state for each form section
   const [collapsedSections, setCollapsedSections] = useState({
@@ -346,8 +364,9 @@ export default function NewJobPostingPage() {
     setValue,
     getValues,
     watch,
-    formState: { errors, isDirty },
+    formState: { errors, isDirty, isSubmitted },
   } = useForm<FormValues>({
+    mode: "onSubmit",
     resolver: zodResolver(formSchema),
     defaultValues: {
       businessUnit: "enfycon Inc",
@@ -384,7 +403,7 @@ export default function NewJobPostingPage() {
     if (market === "IN" && watchTaxTerms === "Permanent") {
       const commVal = commissionType === "custom" ? customCommission : commissionType;
       if (commVal) {
-        setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: true });
+        setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: false });
       }
     }
   }, [market, watchTaxTerms, commissionType, customCommission, setValue]);
@@ -403,7 +422,7 @@ export default function NewJobPostingPage() {
       setValue("taxTerms", "Permanent");
       setValue("workAuthorization", "Indian Citizen");
       const commVal = commissionType === "custom" ? customCommission : commissionType;
-      setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: true });
+      setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: false });
     } else if (selectedCountry === "United States") {
       setMarket("US");
       setBillCurrency("USD");
@@ -524,7 +543,7 @@ export default function NewJobPostingPage() {
               const mm = String(date.getMonth() + 1).padStart(2, '0');
               const dd = String(date.getDate()).padStart(2, '0');
               const sCode = isUsBranch ? 'N' : 'D';
-              setValue("jobCode", `GEN-${yy}${mm}${dd}-${sCode}0001`);
+              setValue("jobCode", `GEN-${yy}${mm}${dd}-${sCode}00001`);
             }
           } catch (e) {
             const date = new Date();
@@ -532,7 +551,7 @@ export default function NewJobPostingPage() {
             const mm = String(date.getMonth() + 1).padStart(2, '0');
             const dd = String(date.getDate()).padStart(2, '0');
             const sCode = isUsBranch ? 'N' : 'D';
-            setValue("jobCode", `GEN-${yy}${mm}${dd}-${sCode}0001`);
+            setValue("jobCode", `GEN-${yy}${mm}${dd}-${sCode}00001`);
           }
 
           const posterName = (session as any)?.user?.name || prof?.name || prof?.email || "Account Manager";
@@ -568,11 +587,75 @@ export default function NewJobPostingPage() {
       }
     }
 
+  async function checkAndLoadCloneData() {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const cloneFromId = params.get('cloneFrom') || params.get('duplicateFrom') || params.get('copyFrom');
+    if (!cloneFromId) {
+      setIsCloningLoading(false);
+      return;
+    }
+
+    try {
+      setIsCloningLoading(true);
+      const sourceJob = await atsApi.jobs.get(cloneFromId);
+      if (sourceJob) {
+        toast.success(`Duplicating job: Pre-filled form from ${sourceJob.jobCode}`, { id: "clone-toast" });
+        setActiveWorkflow("manual");
+
+        if (sourceJob.jobTitle) setValue("jobTitle", sourceJob.jobTitle);
+        if (sourceJob.businessUnit) setValue("businessUnit", sourceJob.businessUnit);
+        if (sourceJob.client) setValue("client", sourceJob.client);
+        if (sourceJob.endClientName) setValue("endClientName", sourceJob.endClientName);
+        if (sourceJob.clientJobId) setValue("clientJobId", sourceJob.clientJobId);
+        if (sourceJob.location) setValue("city", sourceJob.location);
+        if (sourceJob.state) setValue("states", sourceJob.state);
+        if (sourceJob.country) {
+          setValue("country", sourceJob.country);
+        }
+        if (sourceJob.type) setValue("jobType", sourceJob.type);
+        if (sourceJob.priority) {
+          const p = sourceJob.priority;
+          setValue("priority", p === "Hot" || p === "High" || p === "Urgent" ? "Hot" : p === "Cold" || p === "Low" ? "Cold" : "Warm");
+        }
+        if (sourceJob.remoteJob) setValue("remoteJob", sourceJob.remoteJob);
+        if (sourceJob.duration) setValue("duration", sourceJob.duration);
+        if (sourceJob.hoursPerWeek) setValue("hoursPerWeek", sourceJob.hoursPerWeek);
+        if (sourceJob.noOfPositions) setValue("numPositions", sourceJob.noOfPositions);
+        if (sourceJob.submissionRequired) setValue("maxSubmissions", sourceJob.submissionRequired);
+        if (sourceJob.industry) setValue("industry", sourceJob.industry);
+        if (sourceJob.degree) setValue("degree", sourceJob.degree);
+        if (sourceJob.expMin != null) setValue("expMin", sourceJob.expMin);
+        if (sourceJob.expMax != null) setValue("expMax", sourceJob.expMax);
+        if (sourceJob.taxTerms) setValue("taxTerms", sourceJob.taxTerms);
+        if ((sourceJob as any).workAuthorization || sourceJob.visaType) setValue("workAuthorization", (sourceJob as any).workAuthorization || sourceJob.visaType);
+        if (sourceJob.clientBillRate) setValue("clientBillRate", sourceJob.clientBillRate);
+        if (sourceJob.payRate) setValue("payRate", sourceJob.payRate);
+        if (sourceJob.description) {
+          setValue("jobDescription", sourceJob.description);
+        }
+        if (Array.isArray(sourceJob.skillsRequired) && sourceJob.skillsRequired.length > 0) {
+          setPrimarySkills(sourceJob.skillsRequired);
+        }
+        if (Array.isArray(sourceJob.secondarySkills) && sourceJob.secondarySkills.length > 0) {
+          setSecondarySkills(sourceJob.secondarySkills);
+        }
+        if ((sourceJob as any).payRateMin != null) setPayRateMin((sourceJob as any).payRateMin);
+        if ((sourceJob as any).payRateMax != null) setPayRateMax((sourceJob as any).payRateMax);
+      }
+    } catch (err) {
+      console.error("Failed to load clone job data:", err);
+    } finally {
+      setIsCloningLoading(false);
+    }
+  }
+
     async function fetchPods() { try { const res = await atsApi.pods.list(); setPodsList(res || []); } catch(e) { console.warn("Could not load pods", e); } }
 
     fetchProfile();
     fetchClients();
     fetchPods();
+    checkAndLoadCloneData();
   }, [status, session, setValue, fetchClients]);
 
   const getSelectedDisplayText = () => {
@@ -773,13 +856,31 @@ export default function NewJobPostingPage() {
           setValue("expMax", Number(res.experienceMax));
         }
 
-        // Pre-fill CTC / Pay Rate
-        const extractedPay = res.payRate || res.ctc || res.salary;
-        if (extractedPay) {
-          const currentPay = getValues("payRate");
-          if (!currentPay || currentPay.trim() === "") {
-            setValue("payRate", String(extractedPay), { shouldValidate: true, shouldDirty: true });
+        // Pre-fill CTC / Pay Rate & Budget Range (Min / Max)
+        const resAny = res as any;
+        const extractedPay = resAny.payRate || resAny.ctc || resAny.salary;
+        let minRate = resAny.payRateMin || resAny.budgetMin || resAny.ctcMin || "";
+        let maxRate = resAny.payRateMax || resAny.budgetMax || resAny.ctcMax || "";
+
+        if (!minRate && !maxRate && extractedPay) {
+          const match = String(extractedPay).match(/([\d\.]+)\s*[\–\—\-to\s]+\s*([\d\.]+)/);
+          if (match) {
+            minRate = match[1];
+            maxRate = match[2];
+          } else {
+            const singleMatch = String(extractedPay).match(/([\d\.]+)/);
+            if (singleMatch) {
+              maxRate = singleMatch[1];
+            }
           }
+        }
+
+        if (minRate) setPayRateMin(String(minRate));
+        if (maxRate) setPayRateMax(String(maxRate));
+
+        const combinedPay = minRate || maxRate ? `${minRate || "0"}-${maxRate || minRate}` : String(extractedPay || "");
+        if (combinedPay) {
+          setValue("payRate", combinedPay, { shouldValidate: false, shouldDirty: true });
         }
 
         if (pSkills.length > 0 || sSkills.length > 0 || res.experienceMin !== undefined || extractedTitle) {
@@ -891,7 +992,7 @@ export default function NewJobPostingPage() {
       router.push("/job-posting");
     } catch (err: any) {
       console.error("[NewJob] API error:", err);
-      toast.error("Failed to create job: " + (err.message || "Backend connection failed."));
+      showErrorModal(err.message || "Backend connection failed.", "Job Posting Error");
     }
   };
 
@@ -929,6 +1030,30 @@ export default function NewJobPostingPage() {
       </div>
   );
 };
+
+  if (isCloningLoading) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[65vh] py-16 px-4 font-sans">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 max-w-md w-full shadow-xl text-center space-y-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative w-14 h-14 mx-auto flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full border-3 border-blue-600/20 border-t-blue-600 animate-spin" />
+            <Briefcase className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+              Duplicating Job Requirement
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Loading source details and pre-filling the form...
+            </p>
+          </div>
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div className="bg-blue-600 h-full w-2/3 animate-pulse rounded-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-neutral-50/50 dark:bg-slate-900/10 font-sans">
@@ -1143,7 +1268,7 @@ export default function NewJobPostingPage() {
           <div className="flex-1 overflow-y-auto pb-12">
             <div className="w-full p-4 space-y-4">
               {/* Requisition Completeness Alert Banner with Recruitment Jargon */}
-              {Object.keys(errors).length > 0 && (
+              {isSubmitted && Object.keys(errors).length > 0 && (
                 <div className="p-3.5 bg-red-50 dark:bg-red-950/30 border-l-4 border-l-red-600 border border-red-200 dark:border-red-900/50 rounded-r-lg text-red-900 dark:text-red-300 shadow-xs space-y-2 font-sans">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 font-bold text-xs">

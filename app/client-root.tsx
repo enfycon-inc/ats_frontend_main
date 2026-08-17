@@ -13,6 +13,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { NavbarRight } from "@/components/layout/navbar-right";
 import { TopNavbar } from "@/components/layout/top-navbar";
+import { GlobalErrorModal } from "@/components/shared/global-error-modal";
 
 export function ClientRoot({
   children,
@@ -129,6 +130,7 @@ export function ClientRoot({
 
       {/* <ThemeCustomizer /> */}
       <Toaster position="top-center" reverseOrder={false} />
+      <GlobalErrorModal />
     </ThemeProvider>
   );
 }

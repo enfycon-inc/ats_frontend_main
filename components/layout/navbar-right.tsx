@@ -450,11 +450,28 @@ function AppsLauncherDropdown() {
 }
 
 // ─── Profile dropdown ─────────────────────────────────────────────────────────
+// ─── Profile dropdown ─────────────────────────────────────────────────────────
 function ProfileDropdownNav() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const { data: session } = useSession();
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
+  const [availableRoles, setAvailableRoles] = useState<any[]>([]);
+  const [rolesLoaded, setRolesLoaded] = useState(false);
+
+  const [liveUser, setLiveUser] = useState<any>(null);
+  const currentUser = liveUser || (typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null);
+
+  useEffect(() => {
+    atsApi.auth.me().then(profile => {
+      if (profile && profile.id) {
+        setLiveUser(profile);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("ats_current_user", JSON.stringify(profile));
+        }
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -468,6 +485,16 @@ function ProfileDropdownNav() {
   }, []);
 
   useEffect(() => {
+    atsApi.auth.listRoles().then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        setAvailableRoles(data);
+      }
+    }).catch(() => {}).finally(() => {
+      setRolesLoaded(true);
+    });
+  }, []);
+
+  useEffect(() => {
     const handle = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
@@ -475,10 +502,11 @@ function ProfileDropdownNav() {
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
-  const userName = session?.user?.name ?? "Sahadeb";
-  const actualRole = (session as any)?.user?.systemRole || (session as any)?.user?.roles?.[0] || "RECRUITER";
+  const userName = currentUser?.fullName || session?.user?.name || "Sahadeb";
+  const userRoles = currentUser?.roles || (session as any)?.user?.roles || [];
+  const systemRole = (session as any)?.user?.systemRole || userRoles[0];
 
-  const roleLabels: Record<string, string> = {
+  const systemRoleLabels: Record<string, string> = {
     SUPER_ADMIN: "Global Admin",
     ADMIN: "Tenant Admin",
     BRANCH_ADMIN: "Branch Admin",
@@ -486,10 +514,88 @@ function ProfileDropdownNav() {
     POD_LEAD: "Pod Lead",
     DELIVERY_HEAD: "Delivery Head",
     RECRUITER: "Recruiter",
-    TRACKER: "Tracker",
   };
 
-  const displayRole = roleLabels[actualRole] || actualRole.replace("_", " ");
+  // Dynamically resolve display label for any system role or tenant custom role alias
+  const getDynamicRoleLabel = (roleStr: string): string => {
+    if (!roleStr) return "User";
+    const upper = roleStr.toUpperCase();
+    if (systemRoleLabels[upper]) {
+      return systemRoleLabels[upper];
+    }
+    const customRole = availableRoles.find(
+      (r) => r.name.toUpperCase() === upper || r.id === roleStr
+    );
+    if (customRole) {
+      return customRole.name;
+    }
+    return roleStr.replace(/_/g, " ");
+  };
+
+  const userAssignedRoles: string[] = (currentUser?.roles && currentUser.roles.length > 0)
+    ? currentUser.roles
+    : (session as any)?.user?.roles && (session as any)?.user?.roles.length > 0
+    ? (session as any)?.user?.roles
+    : (systemRole ? [systemRole] : []);
+
+  const allPossibleRoles: { key: string; name: string; icon: string; replacesSystemRole?: string }[] = [
+    { key: "ADMIN", name: "Tenant Admin", icon: "⚙️" },
+    { key: "ACCOUNT_MANAGER", name: "Account Manager", icon: "💼" },
+    { key: "BRANCH_ADMIN", name: "Branch Admin", icon: "🏢" },
+    { key: "DELIVERY_HEAD", name: "Delivery Head", icon: "🚀" },
+    { key: "POD_LEAD", name: "Pod Lead", icon: "👑" },
+    { key: "RECRUITER", name: "Recruiter", icon: "👤" },
+    ...availableRoles.filter(r => !r.isSystem).map(r => ({
+      key: r.name,
+      name: r.name,
+      icon: "🎨",
+      replacesSystemRole: r.replacesSystemRole || r.systemRole
+    }))
+  ];
+
+  const assignedRoleOptions = allPossibleRoles.filter(rOpt => {
+    const rKeyUpper = rOpt.key.toUpperCase();
+    const rNameUpper = rOpt.name.toUpperCase();
+    return userAssignedRoles.some(uRole => {
+      const uUpper = uRole.toUpperCase();
+      return uUpper === rKeyUpper || 
+             uUpper === rNameUpper || 
+             (rOpt.replacesSystemRole && rOpt.replacesSystemRole.toUpperCase() === uUpper);
+    });
+  });
+
+  // Auto-clear invalid override_role from localStorage ONLY AFTER availableRoles has finished loading
+  useEffect(() => {
+    if (rolesLoaded && overrideRole && assignedRoleOptions.length > 0) {
+      const overrideUpper = overrideRole.toUpperCase();
+      const isValidOverride = assignedRoleOptions.some(
+        opt => opt.key.toUpperCase() === overrideUpper ||
+               opt.name.toUpperCase() === overrideUpper ||
+               (opt.replacesSystemRole && opt.replacesSystemRole.toUpperCase() === overrideUpper)
+      );
+      if (!isValidOverride) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("override_role");
+        }
+        setOverrideRole(null);
+      }
+    }
+  }, [rolesLoaded, overrideRole, assignedRoleOptions]);
+
+  const handleSwitchRole = (roleName: string | null) => {
+    if (typeof window !== "undefined") {
+      if (roleName) {
+        localStorage.setItem("override_role", roleName);
+      } else {
+        localStorage.removeItem("override_role");
+      }
+      window.location.reload();
+    }
+    setOpen(false);
+  };
+
+  const currentActiveRole = overrideRole || userRoles[0] || (userAssignedRoles.length > 0 ? userAssignedRoles[0] : "ACCOUNT_MANAGER");
+  const displayRole = getDynamicRoleLabel(currentActiveRole);
 
   return (
     <div ref={ref} className="relative">
@@ -508,29 +614,15 @@ function ProfileDropdownNav() {
         `}
       >
         {/* Avatar */}
-        <div className="relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-white/30">
-          {session?.user?.image ? (
-            <Image
-              src={session.user.image}
-              alt={userName}
-              fill
-              className="object-cover"
-            />
-          ) : (
-            <Image
-              src={userImg}
-              alt={userName}
-              fill
-              className="object-cover"
-            />
-          )}
+        <div className="relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-white/30 bg-white/20 text-white flex items-center justify-center font-bold text-xs">
+          {userName.charAt(0).toUpperCase()}
         </div>
 
         <div className="hidden xl:flex flex-col items-start leading-none min-w-0">
           <span className="text-[12px] font-semibold text-white truncate max-w-[100px]">
             {userName.split(" ")[0]}
           </span>
-          <span className="text-[9.5px] text-white/50 truncate max-w-[100px]">
+          <span className="text-[9.5px] text-blue-100/90 font-medium truncate max-w-[100px]">
             {displayRole}
           </span>
         </div>
@@ -549,19 +641,50 @@ function ProfileDropdownNav() {
           aria-label="User profile menu"
           className="
             absolute top-full right-0 mt-1 z-[300]
-            w-[240px]
-            bg-white dark:bg-[#1e2d50]
+            w-[260px]
+            bg-white dark:bg-[#182542]
             border border-neutral-200 dark:border-white/10
-            rounded shadow-xl shadow-black/25
+            rounded-lg shadow-xl shadow-black/20
             overflow-hidden
             animate-in fade-in-0 slide-in-from-top-2
           "
         >
           {/* User header */}
-          <div className="px-4 py-3 bg-[#1a4fa0] dark:bg-[#122f70]">
-            <p className="text-[13.5px] font-semibold text-white">{userName}</p>
-            <p className="text-[11px] text-blue-200/80">{displayRole}</p>
+          <div className="px-4 py-3 bg-[#1a4fa0] dark:bg-[#0f2d6b] border-b border-[#143e80] dark:border-[#091d45]">
+            <p className="text-[13px] font-semibold text-white">{userName}</p>
+            <p className="text-[11px] text-blue-100/90 font-medium flex items-center gap-1.5 mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+              <span>{displayRole}</span>
+            </p>
           </div>
+
+          {/* DYNAMIC ASSIGNED ROLE SWITCHER SECTION */}
+          {assignedRoleOptions.length > 1 && (
+            <div className="p-2 border-b border-neutral-100 dark:border-white/10 bg-neutral-50/90 dark:bg-[#14223d]">
+              <div className="px-2 pb-1.5 text-[9.5px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-white/40">
+                Switch Active Perspective
+              </div>
+              <div className="space-y-0.5 max-h-[160px] overflow-y-auto">
+                {assignedRoleOptions.map((r) => {
+                  const isActive = currentActiveRole.toUpperCase() === r.key.toUpperCase();
+                  return (
+                    <button
+                      key={r.key}
+                      onClick={() => handleSwitchRole(r.key)}
+                      className={`w-full text-left px-2.5 py-1.5 rounded text-[11.5px] transition-colors cursor-pointer flex justify-between items-center ${
+                        isActive
+                          ? "bg-[#1a4fa0] dark:bg-[#1f5bc0] text-white font-semibold shadow-xs"
+                          : "text-neutral-700 dark:text-white/85 hover:bg-neutral-200/60 dark:hover:bg-white/10 font-normal"
+                      }`}
+                    >
+                      <span className="truncate">{r.name}</span>
+                      {isActive && <CircleCheck className="w-3.5 h-3.5 flex-shrink-0 text-white" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Menu items */}
           <div className="py-1">
@@ -574,7 +697,7 @@ function ProfileDropdownNav() {
                 text-[12.5px] text-neutral-700 dark:text-white/80
                 hover:bg-blue-50 dark:hover:bg-white/8
                 hover:text-blue-700 dark:hover:text-white
-                transition-colors duration-100
+                transition-colors duration-100 font-medium
               "
             >
               <User className="w-3.5 h-3.5 flex-shrink-0 text-blue-500 dark:text-blue-400" />
@@ -590,7 +713,7 @@ function ProfileDropdownNav() {
                 text-[12.5px] text-neutral-700 dark:text-white/80
                 hover:bg-blue-50 dark:hover:bg-white/8
                 hover:text-blue-700 dark:hover:text-white
-                transition-colors duration-100
+                transition-colors duration-100 font-medium
               "
             >
               <Mail className="w-3.5 h-3.5 flex-shrink-0 text-blue-500 dark:text-blue-400" />
@@ -598,7 +721,7 @@ function ProfileDropdownNav() {
             </Link>
 
             <Link
-              href="/company"
+              href="/utility/roles-permissions"
               role="menuitem"
               onClick={() => setOpen(false)}
               className="
@@ -606,11 +729,11 @@ function ProfileDropdownNav() {
                 text-[12.5px] text-neutral-700 dark:text-white/80
                 hover:bg-blue-50 dark:hover:bg-white/8
                 hover:text-blue-700 dark:hover:text-white
-                transition-colors duration-100
+                transition-colors duration-100 font-medium
               "
             >
               <Settings className="w-3.5 h-3.5 flex-shrink-0 text-blue-500 dark:text-blue-400" />
-              Settings
+              Workspace Settings & RBAC
             </Link>
 
             <div className="border-t border-neutral-100 dark:border-white/8 mt-1 pt-1 px-4 pb-2">
@@ -627,10 +750,16 @@ function ProfileDropdownNav() {
 function SandboxSwitcher() {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState<any[]>([]);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
+    atsApi.auth.listRoles().then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        setAvailableRoles(data);
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -655,7 +784,7 @@ function SandboxSwitcher() {
     setOpen(false);
   };
 
-  const displayLabel = currentOverride ? `View: ${currentOverride.replace("_", " ")}` : "Switch View";
+  const displayLabel = currentOverride ? `VIEW: ${currentOverride.replace("_", " ")}` : "VIEW: DEFAULT";
 
   return (
     <div ref={ref} className="relative">
@@ -682,16 +811,16 @@ function SandboxSwitcher() {
           aria-label="Sandbox role override"
           className="
             absolute top-full right-0 mt-1.5 z-[350]
-            w-[180px]
+            w-[200px]
             bg-white dark:bg-[#1e2d50]
             border border-neutral-200 dark:border-white/10
-            rounded shadow-xl shadow-black/25
-            py-1
+            rounded-lg shadow-xl shadow-black/25
+            py-1 max-h-[300px] overflow-y-auto
             animate-in fade-in-0 slide-in-from-top-2
           "
         >
           <p className="px-3 pt-1 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-neutral-400 dark:text-white/30">
-            Select Dashboard View
+            Select Role View
           </p>
           <button
             onClick={() => handleSelectRole(null)}
@@ -700,48 +829,35 @@ function SandboxSwitcher() {
           >
             🔄 System Default
           </button>
-          <button
-            onClick={() => handleSelectRole("SUPER_ADMIN")}
-            role="menuitem"
-            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
-          >
-            🛡️ Global Admin
-          </button>
-          <button
-            onClick={() => handleSelectRole("ADMIN")}
-            role="menuitem"
-            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
-          >
-            ⚙️ Tenant Admin
-          </button>
-          <button
-            onClick={() => handleSelectRole("BRANCH_ADMIN")}
-            role="menuitem"
-            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
-          >
-            🏢 Branch Admin
-          </button>
-          <button
-            onClick={() => handleSelectRole("ACCOUNT_MANAGER")}
-            role="menuitem"
-            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
-          >
-            💼 Account Manager
-          </button>
-          <button
-            onClick={() => handleSelectRole("POD_LEAD")}
-            role="menuitem"
-            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
-          >
-            👑 Pod Lead
-          </button>
-          <button
-            onClick={() => handleSelectRole("RECRUITER")}
-            role="menuitem"
-            className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white transition-colors cursor-pointer font-medium"
-          >
-            👤 Recruiter
-          </button>
+          {[
+            { key: "ADMIN", name: "Tenant Admin", icon: "⚙️" },
+            { key: "ACCOUNT_MANAGER", name: "Account Manager", icon: "💼" },
+            { key: "BRANCH_ADMIN", name: "Branch Admin", icon: "🏢" },
+            { key: "DELIVERY_HEAD", name: "Delivery Head", icon: "🚀" },
+            { key: "POD_LEAD", name: "Pod Lead", icon: "👑" },
+            { key: "RECRUITER", name: "Recruiter", icon: "👤" },
+            ...availableRoles.filter(r => !r.isSystem).map(r => ({
+              key: r.name,
+              name: r.name,
+              icon: "🎨"
+            }))
+          ].map((r) => (
+            <button
+              key={r.key}
+              onClick={() => handleSelectRole(r.key)}
+              role="menuitem"
+              className={`w-full text-left px-3 py-1.5 text-[12px] transition-colors cursor-pointer font-medium flex justify-between items-center ${
+                currentOverride?.toUpperCase() === r.key.toUpperCase()
+                  ? "bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-bold"
+                  : "text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white"
+              }`}
+            >
+              <span className="truncate">{r.icon} {r.name}</span>
+              {currentOverride?.toUpperCase() === r.key.toUpperCase() && (
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
+              )}
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -936,11 +1052,6 @@ export function NavbarRight() {
   return (
     <div className="flex items-center gap-1.5">
       <BranchSwitcher />
-
-      {/* Divider */}
-      <div className="w-px h-5 bg-white/15 mx-0.5 flex-shrink-0" />
-
-      <SandboxSwitcher />
 
       {/* Divider */}
       <div className="w-px h-5 bg-white/15 mx-0.5 flex-shrink-0" />

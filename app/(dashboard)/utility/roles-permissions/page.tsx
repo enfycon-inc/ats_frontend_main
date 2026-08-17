@@ -24,6 +24,9 @@ interface CustomRole {
   name: string;
   description: string;
   isSystem: boolean;
+  systemRole?: string;
+  isExactSubstitution?: boolean;
+  replacesSystemRole?: string | null;
   permissions: string[];
 }
 
@@ -59,6 +62,7 @@ export default function RolesPermissionsPage() {
 
   // Core Dynamic RBAC state
   const [roles, setRoles] = useState<CustomRole[]>([]);
+  const [assignableRoles, setAssignableRoles] = useState<CustomRole[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [users, setUsers] = useState<TenantUser[]>([]);
   
@@ -103,14 +107,16 @@ export default function RolesPermissionsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [rolesData, permsData, usersData, profileData] = await Promise.all([
+      const [rolesData, assignableData, permsData, usersData, profileData] = await Promise.all([
         atsApi.auth.listRoles(),
+        atsApi.auth.listAssignableRoles().catch(() => []),
         atsApi.auth.listAllPermissions(),
         atsApi.auth.listUsers(),
         atsApi.auth.me()
       ]);
 
       setRoles(rolesData);
+      setAssignableRoles(assignableData.length > 0 ? assignableData : rolesData);
       setPermissions(permsData);
       setUsers(usersData);
       setProfile(profileData);
@@ -195,14 +201,17 @@ export default function RolesPermissionsPage() {
     }
   };
 
-  const handleDeleteRole = async (roleId: string) => {
-    if (!confirm("Are you sure you want to delete this custom role? Users holding this role will be reverted to 'RECRUITER'.")) return;
+  const handleDeleteRole = async (role: CustomRole) => {
+    if (role.isSystem) return;
+    const baseRole = role.systemRole || "ACCOUNT_MANAGER";
+    const confirmMsg = `Are you sure you want to delete custom role "${role.name}"?\n\nStaff currently assigned to this role will automatically revert to base System Role "${baseRole}".\nDefault System Role "${baseRole}" will reappear in your active role pool.`;
+    if (!confirm(confirmMsg)) return;
+
     try {
       setSubmitting(true);
-      await atsApi.auth.deleteCustomRole(roleId);
-      toast.success("Role deleted successfully.");
+      const res = await atsApi.auth.deleteCustomRole(role.id);
+      toast.success(res?.message || `Custom role "${role.name}" deleted. Staff reverted to ${baseRole}.`);
       
-      // Reload everything to sync users
       await loadData();
     } catch (err: any) {
       toast.error("Failed to delete role: " + err.message);
@@ -443,7 +452,6 @@ export default function RolesPermissionsPage() {
                       <option value="BRANCH_ADMIN">Branch Admin Template (Branch Head)</option>
                       <option value="ADMIN">Admin Template</option>
                       <option value="DELIVERY_HEAD">Delivery Head Template</option>
-                      <option value="TRACKER">Tracker Template</option>
                       <option value="POD_LEAD">Pod Lead Template</option>
                     </select>
                   </div>
@@ -470,7 +478,13 @@ export default function RolesPermissionsPage() {
               <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
                 {roles.map((role) => {
                   const isSelected = selectedRole?.id === role.id;
-                  const staffCount = users.filter((u) => u.roleId === role.id || (role.isSystem && u.roleName === role.name)).length;
+                  const staffCount = users.filter((u) => {
+                    if (u.roleId === role.id) return true;
+                    const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map(r => r.toUpperCase());
+                    const roleNameUpper = role.name.toUpperCase();
+                    const sysRoleUpper = (role.replacesSystemRole || role.systemRole || '').toUpperCase();
+                    return userRolesUpper.includes(roleNameUpper) || (sysRoleUpper !== '' && userRolesUpper.includes(sysRoleUpper));
+                  }).length;
                   return (
                     <div
                       key={role.id}
@@ -485,9 +499,17 @@ export default function RolesPermissionsPage() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-sm text-default-900">{role.name}</span>
-                            {role.isSystem && (
+                            {role.isSystem ? (
                               <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-600 text-[9px] uppercase tracking-wider font-semibold border-0">
                                 System
+                              </Badge>
+                            ) : role.isExactSubstitution ? (
+                              <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[9px] font-semibold border border-emerald-200">
+                                Substitutes: {role.replacesSystemRole || role.systemRole || "System Role"}
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 text-[9px] font-semibold border border-blue-200">
+                                Custom (Base: {role.systemRole || "RECRUITER"})
                               </Badge>
                             )}
                           </div>
@@ -504,7 +526,7 @@ export default function RolesPermissionsPage() {
                             <button
                               onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDeleteRole(role.id);
+                                  handleDeleteRole(role);
                               }}
                               className="text-red-500 hover:text-red-700 text-xs p-1 mt-1 transition cursor-pointer"
                               title="Delete custom role"

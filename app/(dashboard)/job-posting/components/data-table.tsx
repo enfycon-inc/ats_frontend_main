@@ -27,7 +27,9 @@ import {
   FolderPlus,
   Pencil,
   UserPlus,
+  Copy,
 } from "lucide-react";
+import { toast } from "react-hot-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +42,7 @@ import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
 import { Job } from "../data/mock-jobs";
 import AddCandidateModal from "@/components/dashboard/AddCandidateModal";
+import { AddClientModal } from "./add-client-modal";
 
 interface DataTableProps {
   data: Job[];
@@ -121,8 +124,54 @@ export default function DataTable({
   const [editingCell, setEditingCell] = useState<{ rowId: string; colId: string } | null>(null);
   const [editCellValue, setEditCellValue] = useState<string>("");
 
+  // Client search & Add Client modal state
+  const [clientList, setClientList] = useState<any[]>([]);
+  const [clientSearchText, setClientSearchText] = useState("");
+  const [addClientModalOpen, setAddClientModalOpen] = useState(false);
+
+  const fetchClientsList = async () => {
+    try {
+      const clients = await atsApi.clients.list();
+      setClientList(clients || []);
+    } catch (e) {
+      console.warn("Could not load clients list:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchClientsList();
+  }, []);
+
+  const availableClientNames = useMemo(() => {
+    const namesSet = new Set<string>();
+    
+    // 1. Collect from API clientList
+    if (Array.isArray(clientList)) {
+      clientList.forEach((cl) => {
+        const nameStr = typeof cl === 'string' ? cl : (cl?.name || cl?.companyName || cl?.clientName || cl?.title || '');
+        if (nameStr && nameStr.trim()) {
+          namesSet.add(nameStr.trim());
+        }
+      });
+    }
+
+    // 2. Collect from all job rows in dataset
+    if (Array.isArray(data)) {
+      data.forEach((job) => {
+        if (job.client && job.client !== "N/A" && job.client.trim()) {
+          namesSet.add(job.client.trim());
+        }
+      });
+    }
+
+    // 3. Fallback defaults
+    ["prolays", "Google", "Tcs", "Deb Tech Enterprise", "enfysync Inc"].forEach((n) => namesSet.add(n));
+
+    return Array.from(namesSet).sort((a, b) => a.localeCompare(b));
+  }, [clientList, data]);
+
   // Columns editable via double-click text input
-  const EDITABLE_TEXT_COLS = ["jobTitle", "client", "location", "states", "clientBillRate", "payRate", "recruitmentManager"];
+  const EDITABLE_TEXT_COLS = ["jobTitle", "location", "states", "clientBillRate", "payRate", "recruitmentManager"];
   // Columns editable via inline select
   const PRIORITY_OPTIONS = ["Hot", "Urgent", "High", "Warm", "Medium", "Low"];
 
@@ -142,6 +191,17 @@ export default function DataTable({
       setSelectedJobForSourcing(job);
       setSourceModalOpen(true);
     }, 50);
+  };
+
+  const handleDuplicateJob = async (job: Job) => {
+    try {
+      toast.loading(`Copying job ${job.jobCode}...`, { id: "dup-job-toast" });
+      const newJob = await atsApi.jobs.duplicate(job.id);
+      toast.success(`Job copied successfully! New Job Code: ${newJob.jobCode}`, { id: "dup-job-toast" });
+      onRefresh();
+    } catch (err: any) {
+      toast.error("Failed to copy job: " + (err.message || "Unknown error"), { id: "dup-job-toast" });
+    }
   };
 
   // Job Status Modal States
@@ -371,9 +431,13 @@ export default function DataTable({
   // Cell-level double-click edit handlers
   const handleCellDoubleClick = (rowId: string, colId: string, currentValue: string) => {
     if (!hasEditPermission) return;
-    if (EDITABLE_TEXT_COLS.includes(colId) || colId === "priority") {
+    if (EDITABLE_TEXT_COLS.includes(colId) || colId === "priority" || colId === "client" || colId === "endClientName") {
       setEditingCell({ rowId, colId });
       setEditCellValue(currentValue === "N/A" ? "" : currentValue);
+      if (colId === "client" || colId === "endClientName") {
+        setClientSearchText("");
+        fetchClientsList();
+      }
     }
   };
 
@@ -613,21 +677,117 @@ export default function DataTable({
                     {/* Columns */}
                     {activeSelectedColumns.map((colId) => {
                       const isCellEditing = editingCell?.rowId === job.id && editingCell?.colId === colId;
-                      const isEditable = EDITABLE_TEXT_COLS.includes(colId) || colId === "priority";
+                      const isEditable = EDITABLE_TEXT_COLS.includes(colId) || colId === "priority" || colId === "client" || colId === "endClientName";
                       const rawValue = String(job[colId as keyof Job] || "");
                       return (
                         <td
                           key={colId}
                           onDoubleClick={() => isEditable && handleCellDoubleClick(job.id, colId, rawValue)}
                           className={cn(
-                            "py-2 px-2 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap font-normal text-neutral-800 dark:text-neutral-200 transition-colors",
+                            "py-2 px-2 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap font-normal text-neutral-800 dark:text-neutral-200 transition-colors relative",
                             isEditable && !isCellEditing ? "hover:bg-blue-50 dark:hover:bg-blue-950/50 cursor-cell" : "",
                             isCellEditing ? "p-0 bg-blue-100/90 dark:bg-blue-950/90 ring-2 ring-blue-600" : ""
                           )}
                           title={isEditable && !isCellEditing ? "Double-click to edit" : undefined}
                         >
                           {/* === INLINE EDIT MODE === */}
-                          {isCellEditing && colId === "priority" ? (
+                          {isCellEditing && (colId === "client" || colId === "endClientName") ? (
+                            <div 
+                              onClick={(e) => e.stopPropagation()} 
+                              className="absolute left-0 top-0 z-[99] min-w-[260px] max-w-[300px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-2xl p-2.5 font-sans text-xs space-y-2 animate-in fade-in zoom-in-95"
+                            >
+                              {/* Header Title */}
+                              <div className="flex items-center justify-between px-1 pb-1 border-b border-slate-100 dark:border-slate-800">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  Select or Add {colId === "endClientName" ? "End Client" : "Client"}
+                                </span>
+                                <button onClick={handleCellCancel} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+                                  ✕
+                                </button>
+                              </div>
+
+                              {/* Search Input */}
+                              <div className="relative">
+                                <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  placeholder={`Search ${colId === "endClientName" ? "end clients..." : "clients..."}`}
+                                  value={clientSearchText}
+                                  onChange={(e) => setClientSearchText(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Escape") handleCellCancel();
+                                  }}
+                                  className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-xs outline-none focus:ring-1 focus:ring-[#1a4fa0] text-slate-900 dark:text-slate-100 font-medium"
+                                />
+                              </div>
+
+                              {/* Scrollable List of Clients */}
+                              <div className="max-h-44 overflow-y-auto space-y-0.5 border-y border-slate-100 dark:border-slate-800 py-1">
+                                {availableClientNames
+                                  .filter((cName) =>
+                                    cName.toLowerCase().includes(clientSearchText.trim().toLowerCase())
+                                  )
+                                  .map((cName, index) => {
+                                    const isCurrent = cName === String(job[colId as keyof Job] || "");
+                                    return (
+                                      <div
+                                        key={cName + index}
+                                        onClick={() => {
+                                          if (onUpdateJob) onUpdateJob(job.id, { [colId]: cName });
+                                          handleCellCancel();
+                                          toast.success(`${colId === "endClientName" ? "End Client" : "Client"} updated to ${cName}`);
+                                        }}
+                                        className={cn(
+                                          "px-2.5 py-1.5 rounded-md cursor-pointer transition-colors flex items-center justify-between text-xs font-medium",
+                                          isCurrent 
+                                            ? "bg-[#1a4fa0]/10 text-[#1a4fa0] dark:bg-blue-950/40 dark:text-blue-300 font-semibold"
+                                            : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200"
+                                        )}
+                                      >
+                                        <span>{cName}</span>
+                                        {isCurrent && (
+                                          <span className="text-[#1a4fa0] dark:text-blue-400 text-[10px] font-bold">Selected</span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+
+                                {clientSearchText.trim() !== "" && !availableClientNames.some(cn => cn.toLowerCase() === clientSearchText.trim().toLowerCase()) && (
+                                  <div
+                                    onClick={() => {
+                                      const customName = clientSearchText.trim();
+                                      if (onUpdateJob) onUpdateJob(job.id, { [colId]: customName });
+                                      handleCellCancel();
+                                      toast.success(`${colId === "endClientName" ? "End Client" : "Client"} set to ${customName}`);
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-md cursor-pointer bg-blue-50 dark:bg-blue-950/40 text-[#1a4fa0] dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center justify-between text-xs font-semibold"
+                                  >
+                                    <span>Use "{clientSearchText.trim()}"</span>
+                                    <span className="text-[10px] uppercase tracking-wider font-bold">Select</span>
+                                  </div>
+                                )}
+
+                                {availableClientNames.filter((cName) =>
+                                  cName.toLowerCase().includes(clientSearchText.trim().toLowerCase())
+                                ).length === 0 && clientSearchText.trim() === "" && (
+                                  <div className="px-2 py-3 text-center text-slate-400 italic text-[11px]">
+                                    No clients available
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Bottom Add Client Button */}
+                              <button
+                                type="button"
+                                onClick={() => setAddClientModalOpen(true)}
+                                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-[#1a4fa0] hover:bg-[#154185] text-white font-medium rounded-md text-xs transition-colors cursor-pointer shadow-xs"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>+ Add New Client</span>
+                              </button>
+                            </div>
+                          ) : isCellEditing && colId === "priority" ? (
                             <select
                               autoFocus
                               value={editCellValue}
@@ -652,9 +812,25 @@ export default function DataTable({
                               onClick={(e) => e.stopPropagation()}
                               className="w-full px-2 py-1 text-xs bg-white dark:bg-slate-900 border-0 outline-none focus:ring-2 focus:ring-inset focus:ring-primary rounded-none text-neutral-800 dark:text-neutral-200"
                             />
+                          ) : (colId === "client" || colId === "endClientName") ? (
+                            <div className="flex items-center justify-between gap-1 w-full group/client cursor-cell">
+                              <span className="font-medium text-slate-900 dark:text-slate-100">{String(job[colId as keyof Job] || "N/A")}</span>
+                              {hasEditPermission && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCellDoubleClick(job.id, colId, String(job[colId as keyof Job] || ""));
+                                  }}
+                                  className="opacity-0 group-hover/client:opacity-100 text-neutral-400 hover:text-blue-500 hover:bg-neutral-100 dark:hover:bg-slate-800 p-0.5 rounded transition-opacity cursor-pointer"
+                                  title={`Search or Add ${colId === "endClientName" ? "End Client" : "Client"}`}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
                           ) : colId === "jobCode" ? (
                             <Link href={`/job-posting/${job.id}`}>
-                              <span className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
+                              <span className="text-[#1a4fa0] dark:text-blue-400 font-semibold hover:underline cursor-pointer">
                                 {job.jobCode}
                               </span>
                             </Link>
@@ -662,16 +838,16 @@ export default function DataTable({
                             <div className="flex items-center gap-1.5 justify-between w-full">
                               <Badge
                                 className={cn(
-                                  "text-[10px] font-semibold px-1.5 py-0.2 rounded-xs border shadow-none",
+                                  "text-[10px] font-medium px-2 py-0.5 rounded-md border shadow-none",
                                   job.jobStatus === "Active"
-                                    ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800/30"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/40"
                                     : job.jobStatus === "Close" || job.jobStatus === "Closed"
-                                    ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800/30"
+                                    ? "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
                                     : job.jobStatus === "Filled"
-                                    ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800/30"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800/40"
                                     : job.jobStatus === "Draft"
-                                    ? "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700/50"
-                                    : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800/30"
+                                    ? "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400 dark:border-slate-700/50"
+                                    : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40"
                                 )}
                               >
                                 {job.jobStatus}
@@ -689,12 +865,12 @@ export default function DataTable({
                           ) : colId === "priority" ? (
                             <Badge
                               className={cn(
-                                "text-[10px] font-semibold px-1.5 py-0.2 rounded-xs border shadow-none cursor-cell",
+                                "text-[10px] font-medium px-2 py-0.5 rounded-md border shadow-none cursor-cell",
                                 job.priority === "Hot" || job.priority === "High" || job.priority === "Urgent"
-                                  ? "bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-450 dark:border-rose-800/30"
+                                  ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800/40"
                                   : job.priority === "Warm" || job.priority === "Medium"
-                                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800/30"
-                                  : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800/30"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40"
+                                  : "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
                               )}
                             >
                               {job.priority || "Warm"}
@@ -702,8 +878,8 @@ export default function DataTable({
                           ) : colId === "podName" ? (
                             job.podName ? (
                               <div className="flex items-center gap-1.5">
-                                <span className="inline-flex items-center gap-1 bg-violet-50 dark:bg-violet-950/20 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-800/30 rounded-xs px-1.5 py-0.2 text-[10px] font-semibold whitespace-nowrap">
-                                  <Users className="h-2.5 w-2.5 shrink-0" />
+                                <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80 rounded-md px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                                  <Users className="h-2.5 w-2.5 shrink-0 text-slate-500" />
                                   {job.podName}
                                 </span>
                               </div>
@@ -713,27 +889,27 @@ export default function DataTable({
                           ) : colId === "jobTitle" ? (
                             <div className="flex items-center gap-1">
                               <Link href={`/job-posting/${job.id}`}>
-                                <span className="whitespace-nowrap hover:underline cursor-pointer text-indigo-650 dark:text-indigo-400 font-medium">
+                                <span className="whitespace-nowrap hover:underline cursor-pointer text-slate-900 dark:text-slate-100 hover:text-[#1a4fa0] dark:hover:text-blue-400 font-medium">
                                   {job.jobTitle}
                                 </span>
                               </Link>
                               {job.agingDays > 30 && (
-                                <Badge className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/30 text-[9px] scale-90 flex items-center gap-0.5 shadow-none px-1 py-0">
+                                <Badge className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/30 text-[9px] scale-90 flex items-center gap-0.5 shadow-none px-1 py-0 font-medium">
                                   <AlertTriangle className="h-2.5 w-2.5" /> SLA
                                 </Badge>
                               )}
                             </div>
                           ) : colId === "submissionsCount" ? (
                             <div className="flex items-center gap-1.5">
-                              <span className="bg-neutral-100 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 px-1 py-0.2 rounded-xs font-semibold text-[10px]">
+                              <span className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md font-medium text-[10px]">
                                 {job.submissionsCount} Sub
                               </span>
-                              <div className="flex items-center gap-0.5 text-[9px] text-neutral-500 dark:text-neutral-400 scale-90">
-                                <span className="text-blue-600 dark:text-blue-400 font-semibold" title="Applied">{job.pipeline.applied}A</span>
+                              <div className="flex items-center gap-1 text-[9.5px] text-slate-500 dark:text-slate-400">
+                                <span className="text-slate-600 dark:text-slate-300 font-medium" title="Applied">{job.pipeline.applied}A</span>
                                 <span>/</span>
-                                <span className="text-amber-600 dark:text-amber-400 font-semibold" title="Interviewing">{job.pipeline.interviewing}I</span>
+                                <span className="text-slate-600 dark:text-slate-300 font-medium" title="Interviewing">{job.pipeline.interviewing}I</span>
                                 <span>/</span>
-                                <span className="text-green-600 dark:text-green-400 font-semibold" title="Offered">{job.pipeline.offered}O</span>
+                                <span className="text-slate-600 dark:text-slate-300 font-medium" title="Offered">{job.pipeline.offered}O</span>
                               </div>
                             </div>
                           ) : (colId === "assignedTo" || colId === "primaryRecruiter") ? (
@@ -817,6 +993,9 @@ export default function DataTable({
                                 )}
                                 <DropdownMenuItem onClick={() => router.push(`/job-posting/${job.id}/edit`)} className="cursor-pointer text-xs py-1 px-2">
                                   <Pencil className="h-3 w-3 mr-1.5 text-neutral-500" /> Edit Job
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => router.push(`/job-posting/new?cloneFrom=${job.id}`)} className="cursor-pointer text-xs py-1 px-2 text-blue-600 dark:text-blue-400 font-semibold">
+                                  <Copy className="h-3 w-3 mr-1.5 text-blue-500" /> Duplicate
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => startQuickEdit(job)} className="cursor-pointer text-xs py-1 px-2">
                                   <Edit className="h-3 w-3 mr-1.5 text-neutral-500" /> Quick Edit
@@ -1338,6 +1517,20 @@ export default function DataTable({
           job={selectedJobForSourcing}
         />
       )}
+
+      {/* Add Client Modal */}
+      <AddClientModal
+        open={addClientModalOpen}
+        onOpenChange={setAddClientModalOpen}
+        onClientAdded={(newClientName) => {
+          if (editingCell?.rowId && onUpdateJob) {
+            onUpdateJob(editingCell.rowId, { client: newClientName });
+          }
+          fetchClientsList();
+          handleCellCancel();
+          toast.success(`Client "${newClientName}" added and assigned!`);
+        }}
+      />
     </div>
   );
 }

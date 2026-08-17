@@ -53,14 +53,15 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
   const countries = Country.getAllCountries();
   const states = countryIso ? State.getStatesOfCountry(countryIso) : [];
 
-  // Pre-fill ownership with current logged-in user details
+  // Pre-fill ownership with current logged-in user details and business unit with active branch
   useEffect(() => {
     if (open) {
       const fetchProfile = async () => {
         try {
           const prof = await atsApi.auth.me();
           if (prof) {
-            setValue("ownership", prof.full_name || prof.email || "");
+            const onboardingUser = prof.fullName || prof.full_name || prof.name || prof.email || "";
+            setValue("ownership", onboardingUser);
           }
         } catch (e) {
           console.error("Failed to load user profile in modal", e);
@@ -73,6 +74,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
 
   const onSubmit = async (data: AddClientFormValues) => {
     try {
+      const activeBranch = (typeof window !== "undefined" ? localStorage.getItem("active_branch_name") : null) || "bbsr-domestic";
       const payload = {
         client_name: data.clientName,
         email_id: data.emailId,
@@ -80,6 +82,8 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
         status: data.status,
         category: "",
         ownership: data.ownership,
+        primary_owner: data.ownership,
+        business_unit: activeBranch,
         practice: "",
         country: Country.getCountryByCode(data.country)?.name || data.country,
         state: states.find((s: any) => s.isoCode === data.state)?.name || data.state,
@@ -199,8 +203,10 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
             <div className="space-y-1">
               <Label className="font-bold text-neutral-700 dark:text-neutral-300">Ownership <span className="text-red-500">*</span></Label>
               <Input 
-                className="h-8 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700" 
-                placeholder="Ownership" 
+                readOnly
+                disabled
+                className="h-8 text-xs bg-neutral-100 dark:bg-slate-900 border-neutral-300 dark:border-slate-700 cursor-not-allowed opacity-90 font-medium" 
+                placeholder="Auto-detected" 
                 {...register("ownership")} 
               />
               {errors.ownership && <p className="text-[10px] text-red-500 font-bold">{errors.ownership.message}</p>}

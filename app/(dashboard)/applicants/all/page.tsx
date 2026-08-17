@@ -82,7 +82,7 @@ export default function AllApplicantsPage() {
   const loadCandidates = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await atsApi.candidates.list();
+      const data = await atsApi.candidates.list({ allMarkets: true, allBranches: true, limit: 5000 });
       setDbCandidates(data);
     } catch (err) {
       console.error("Failed to load candidates from database:", err);
@@ -95,10 +95,12 @@ export default function AllApplicantsPage() {
     loadCandidates();
   }, [loadCandidates]);
 
+  const isTenantAdmin = systemRole === "TENANT_ADMIN" || systemRole === "ADMIN" || systemRole === "SUPER_ADMIN";
+
   // Source Counts for KPI banner
   const sourceCounts = useMemo(() => {
     const counts: Record<string, number> = {
-      total: dbCandidates.length + mockApplicants.length,
+      total: dbCandidates.length,
       cvUpload: 0,
       dice: 0,
       monster: 0,
@@ -107,15 +109,7 @@ export default function AllApplicantsPage() {
 
     dbCandidates.forEach((c) => {
       const src = c.source || "CV Upload";
-      if (src.includes("CV") || src.includes("Upload") || src.includes("Direct")) counts.cvUpload++;
-      else if (src.includes("Dice")) counts.dice++;
-      else if (src.includes("Monster")) counts.monster++;
-      else if (src.includes("LinkedIn")) counts.linkedIn++;
-    });
-
-    mockApplicants.forEach((m) => {
-      const src = m.source || "Direct Upload";
-      if (src.includes("CV") || src.includes("Upload") || src.includes("Direct")) counts.cvUpload++;
+      if (src.includes("CV") || src.includes("Upload") || src.includes("Direct") || src.includes("Manual")) counts.cvUpload++;
       else if (src.includes("Dice")) counts.dice++;
       else if (src.includes("Monster")) counts.monster++;
       else if (src.includes("LinkedIn")) counts.linkedIn++;
@@ -126,7 +120,9 @@ export default function AllApplicantsPage() {
 
   // ── Filtered data ───────────────────────────────────────
   const filteredData = useMemo(() => {
-    const dbMapped: Applicant[] = dbCandidates.map((c) => ({
+    const dbMapped: any[] = dbCandidates.map((c) => ({
+      candidateCode: c.candidateCode || `CAN-${String(c.dbId || c.id).padStart(6, '0')}`,
+      uploadedByName: c.uploadedByName || "System Upload",
       applicantId: c.applicantId || `APP-${c.id}`,
       applicantName: c.fullName,
       email: c.email,
@@ -137,8 +133,8 @@ export default function AllApplicantsPage() {
       status: c.status || "New lead",
       jobTitle: c.jobTitle || "Unknown",
       workAuthorization: c.workAuthorization || "US Citizen",
-      ownership: "System",
-      createdBy: "System",
+      ownership: c.uploadedByName || "System",
+      createdBy: c.uploadedByName || "System",
       createdOn: c.createdOn ? new Date(c.createdOn).toLocaleDateString() : new Date().toLocaleDateString(),
       createdDate: c.createdOn ? new Date(c.createdOn).toLocaleDateString() : new Date().toLocaleDateString(),
       skills: c.skills ? c.skills.join(", ") : "",
@@ -146,7 +142,7 @@ export default function AllApplicantsPage() {
       starred: false,
     }));
 
-    let result = [...dbMapped, ...mockApplicants];
+    let result = dbMapped;
 
     // Source filter
     if (filters.source && filters.source !== "All selected") {
@@ -314,6 +310,7 @@ export default function AllApplicantsPage() {
           selectedCount={selectedRowIds.length}
           onDeleteSelected={handleDeleteSelected}
           isRecruiter={isRecruiter}
+          isTenantAdmin={isTenantAdmin}
           onUploadCv={() => setUploadModalOpen(true)}
         />
 

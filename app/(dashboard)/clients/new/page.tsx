@@ -28,33 +28,32 @@ export default function NewClientPage() {
   });
 
   useEffect(() => {
-    async function loadTenantName() {
+    async function loadDefaults() {
       try {
         const prof = await atsApi.auth.me();
-        if (prof) {
-          let tName = prof.tenant?.name || prof.tenantDomain || "";
-          if (!tName) {
-            tName = typeof window !== 'undefined' ? getTenantIdentifier() : "";
-          }
-          if (!tName || tName === "temp") {
-            tName = "enfycon Inc";
-          } else if (tName.toLowerCase() === "deb") {
-            tName = "deb saas tenant";
-          } else {
-            if (tName.toLowerCase().endsWith(".com")) {
-              tName = tName.slice(0, -4);
-            }
-            if (/^[a-z0-9-]+$/.test(tName)) {
-              tName = tName.charAt(0).toUpperCase() + tName.slice(1);
-            }
-          }
-          setFormData((prev) => ({ ...prev, businessUnit: tName }));
+        
+        // Primary Owner: who is onboarding the client
+        const onboardingUser = prof?.fullName || prof?.full_name || prof?.name || (prof?.email ? prof.email.split('@')[0] : "");
+        
+        // Business Unit: auto detected as current branch
+        let activeBranch = typeof window !== 'undefined' ? localStorage.getItem('active_branch_name') : null;
+        if (!activeBranch && prof?.activeBranch?.name) {
+          activeBranch = prof.activeBranch.name;
         }
+        if (!activeBranch) {
+          activeBranch = "bbsr-domestic";
+        }
+
+        setFormData((prev) => ({
+          ...prev,
+          primaryOwner: prev.primaryOwner || onboardingUser,
+          businessUnit: activeBranch,
+        }));
       } catch (err) {
-        console.warn("Failed to load tenant info for default business unit", err);
+        console.warn("Failed to load user/branch context for defaults", err);
       }
     }
-    loadTenantName();
+    loadDefaults();
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -302,22 +301,24 @@ export default function NewClientPage() {
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">Primary Owner</label>
               <input
+                readOnly
+                disabled
                 name="primaryOwner"
                 value={formData.primaryOwner}
-                onChange={handleChange}
-                placeholder="e.g. Jane Doe"
-                className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                placeholder="Auto-detected"
+                className="w-full px-3 py-2 text-sm bg-neutral-100 dark:bg-slate-900/60 border border-neutral-200 dark:border-slate-800 rounded outline-none text-neutral-700 dark:text-neutral-300 cursor-not-allowed opacity-90 font-medium"
               />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">Business Unit</label>
               <input
+                readOnly
+                disabled
                 name="businessUnit"
                 value={formData.businessUnit}
-                onChange={handleChange}
-                placeholder="e.g. US Staffing"
-                className="w-full px-3 py-2 text-sm bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                placeholder="Auto-detected"
+                className="w-full px-3 py-2 text-sm bg-neutral-100 dark:bg-slate-900/60 border border-neutral-200 dark:border-slate-800 rounded outline-none text-neutral-700 dark:text-neutral-300 cursor-not-allowed opacity-90 font-medium"
               />
             </div>
           </div>

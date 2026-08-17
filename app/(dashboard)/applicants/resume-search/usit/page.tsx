@@ -98,6 +98,8 @@ export default function UsItSearchPage() {
   const displayList = candidatesList.length > 0 
     ? candidatesList.map(c => ({
         applicantId: String(c.id),
+        candidateCode: c.candidateCode || `CAN-${String(c.dbId || c.id).padStart(6, '0')}`,
+        uploadedByName: c.uploadedByName || "System",
         applicantName: c.fullName,
         jobTitle: c.jobTitle,
         skills: Array.isArray(c.skills) ? c.skills.join(', ') : (c.skills || ''),
@@ -495,6 +497,9 @@ export default function UsItSearchPage() {
                           {/* Candidate info */}
                           <div className="flex-1 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
+                              <span className="px-1.5 py-0.5 rounded border border-blue-200 text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
+                                {(candidate as any).candidateCode || `CAN-${String(candidate.applicantId).padStart(6, '0')}`}
+                              </span>
                               <Link href={`/applicants/${candidate.applicantId}`} className="text-sm font-bold text-primary dark:text-blue-400 hover:underline">
                                 {candidate.applicantName}
                               </Link>

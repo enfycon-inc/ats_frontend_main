@@ -64,6 +64,7 @@ export default function JobPostingDashboard({
     "jobTitle",
     "businessUnit",
     "client",
+    "endClientName",
     "location",
     "states",
     "jobStatus",
@@ -183,6 +184,7 @@ export default function JobPostingDashboard({
       { id: "jobTitle", label: "Job Title" },
       { id: "businessUnit", label: "Business Unit" },
       { id: "client", label: "Client" },
+      { id: "endClientName", label: "End Client" },
       { id: "clientJobId", label: "Client Job ID" },
       { id: "location", label: "Location" },
       { id: "states", label: "States" },
@@ -357,58 +359,6 @@ export default function JobPostingDashboard({
 
   return (
     <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
-      {/* Recruiter Metrics KPI Strip */}
-      <div className="w-full min-w-0 flex items-center gap-6 shrink-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 px-6 py-1.5 rounded-sm select-none shadow-xs text-[11px] overflow-x-auto">
-        {/* Total Jobs */}
-        <div className="flex items-center gap-1.5">
-          <Briefcase className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-          <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Total Jobs:</span>
-          <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs">{stats.total}</span>
-        </div>
-
-        <div className="h-4 w-px bg-neutral-200 dark:bg-slate-700" />
-
-        {/* Active */}
-        <div className="flex items-center gap-1.5">
-          <Activity className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-          <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Active:</span>
-          <span className="font-extrabold text-green-700 dark:text-green-400 text-xs">{stats.active}</span>
-        </div>
-
-        <div className="h-4 w-px bg-neutral-200 dark:bg-slate-700" />
-
-        {/* Submissions */}
-        <div className="flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-          <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Submissions:</span>
-          <span className="font-extrabold text-neutral-800 dark:text-neutral-100 text-xs">{stats.totalSubmissions}</span>
-        </div>
-
-        <div className="h-4 w-px bg-neutral-200 dark:bg-slate-700" />
-
-        {/* Placements */}
-        <div className="flex items-center gap-1.5">
-          <FileCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-          <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Placements:</span>
-          <span className="font-extrabold text-purple-700 dark:text-purple-400 text-xs">14</span>
-        </div>
-
-        {/* SLA Alerts — only show when there are alerts */}
-        {stats.slaAlerts > 0 && (
-          <>
-            <div className="h-4 w-px bg-neutral-200 dark:bg-slate-700" />
-            <div className="flex items-center gap-1.5">
-              <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-              <span className="text-neutral-500 dark:text-neutral-400 font-bold uppercase text-[10px] tracking-wider">SLA Alerts:</span>
-              <span className="font-extrabold text-red-600 dark:text-red-400 text-xs flex items-center gap-1">
-                {stats.slaAlerts}
-                <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />
-              </span>
-            </div>
-          </>
-        )}
-      </div>
-
       {/* Main Table Content */}
       {isLoading ? (
         <div className="flex-1 flex flex-col items-center justify-center min-h-[40vh] gap-3">

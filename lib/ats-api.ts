@@ -170,7 +170,14 @@ async function apiFetch<T = any>(
       }
     }
 
-    throw new Error(body.message || `API Error: ${res.status}`);
+    const errMsg = body.message || `API Error: ${res.status}`;
+    if (typeof window !== 'undefined' && (res.status === 403 || res.status === 401)) {
+      const event = new CustomEvent("app_show_error_modal", {
+        detail: { message: errMsg, title: res.status === 403 ? "Permission Access Required" : "Authentication Required" },
+      });
+      window.dispatchEvent(event);
+    }
+    throw new Error(errMsg);
   }
 
   // Handle 204 No Content
@@ -348,6 +355,10 @@ const auth = {
 
   async listRoles(): Promise<any[]> {
     return apiFetch<any[]>('/api/auth/rbac/roles');
+  },
+
+  async listAssignableRoles(): Promise<any[]> {
+    return apiFetch<any[]>('/api/auth/rbac/assignable-roles');
   },
 
   async createCustomRole(data: {
@@ -611,6 +622,12 @@ const jobs = {
     return apiFetch<JobPayload>(`/api/jobs/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+  },
+
+  async duplicate(id: string): Promise<JobPayload> {
+    return apiFetch<JobPayload>(`/api/jobs/${id}/duplicate`, {
+      method: 'POST',
     });
   },
 

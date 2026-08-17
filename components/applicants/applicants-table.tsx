@@ -29,6 +29,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 // ── Status badge colour map ─────────────────────────────────────
 const STATUS_STYLES: Record<string, string> = {
@@ -73,54 +74,42 @@ const getWorkAuthStyle = (auth: string) =>
 
 // ── Column definitions ──────────────────────────────────────────
 export const ALL_COLUMNS: { id: string; label: string }[] = [
-  { id: "applicantId", label: "App ID" },
+  { id: "candidateCode", label: "Candidate Code" },
   { id: "applicantName", label: "Applicant Name" },
+  { id: "jobTitle", label: "Designation / Profession" },
+  { id: "assignedJobCode", label: "Assigned Job" },
   { id: "email", label: "Email" },
   { id: "mobile", label: "Mobile" },
   { id: "city", label: "City" },
   { id: "state", label: "State" },
   { id: "source", label: "Source" },
+  { id: "uploadedByName", label: "Uploaded By" },
   { id: "status", label: "Status" },
-  { id: "jobTitle", label: "Job Title" },
-  { id: "ownership", label: "Ownership" },
   { id: "workAuthorization", label: "Work Auth" },
-  { id: "createdBy", label: "Created By" },
   { id: "createdOn", label: "Created On" },
   { id: "experience", label: "Experience" },
-  { id: "education", label: "Education" },
   { id: "skills", label: "Skills" },
-  { id: "expectedSalary", label: "Exp. Salary" },
-  { id: "currentSalary", label: "Curr. Salary" },
+  { id: "expectedSalary", label: "Exp. Salary (LPA)" },
+  { id: "currentSalary", label: "Curr. Salary (LPA)" },
   { id: "noticePeriod", label: "Notice Period" },
-  { id: "willingToRelocate", label: "Relocation" },
-  { id: "visaExpiry", label: "Visa Expiry" },
-  { id: "lastContacted", label: "Last Contact" },
-  { id: "notes", label: "Notes" },
 ];
 
 export const DEFAULT_COLUMNS = [
-  "applicantId",
+  "candidateCode",
   "applicantName",
+  "jobTitle",
+  "assignedJobCode",
   "email",
   "mobile",
   "city",
   "state",
   "source",
+  "uploadedByName",
   "status",
-  "jobTitle",
-  "ownership",
   "workAuthorization",
   "createdOn",
   "experience",
-  "education",
   "skills",
-  "expectedSalary",
-  "currentSalary",
-  "noticePeriod",
-  "willingToRelocate",
-  "visaExpiry",
-  "lastContacted",
-  "notes",
 ];
 
 // ── Props ───────────────────────────────────────────────────────
@@ -153,6 +142,7 @@ export default function ApplicantsTable({
   onSelectionChange,
   isRecruiter = false,
 }: ApplicantsTableProps) {
+  const router = useRouter();
   const [sortColumn, setSortColumn] = useState<keyof Applicant | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [starredIds, setStarredIds] = useState<string[]>(
@@ -163,6 +153,28 @@ export default function ApplicantsTable({
     y: number;
     applicantId: string;
   } | null>(null);
+
+  const extractDbId = (applicant: any): string => {
+    if (applicant.dbId) return String(applicant.dbId);
+    const match = String(applicant.applicantId || "").match(/(\d+)/);
+    return match ? match[1] : String(applicant.applicantId || "");
+  };
+
+  const handleDeleteSingleCandidate = async (applicant: any) => {
+    const candidateId = extractDbId(applicant);
+    if (!candidateId) {
+      toast.error("Could not find candidate ID for deletion");
+      return;
+    }
+    if (!confirm(`Are you sure you want to delete candidate ${applicant.applicantName}?`)) return;
+    try {
+      await atsApi.candidates.delete(parseInt(candidateId, 10));
+      toast.success(`Candidate ${applicant.applicantName} deleted successfully.`);
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete candidate.");
+    }
+  };
 
   // Submit to Job State
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
@@ -417,10 +429,22 @@ export default function ApplicantsTable({
       case "jobTitle":
         return (
           <span
-            className="truncate max-w-[170px] inline-block text-neutral-700 dark:text-neutral-300"
+            className="truncate max-w-[170px] inline-block font-medium text-neutral-800 dark:text-neutral-200"
             title={applicant.jobTitle}
           >
             {applicant.jobTitle}
+          </span>
+        );
+
+      case "assignedJobCode":
+        const jobCodeVal = (applicant as any).assignedJobCode;
+        return jobCodeVal ? (
+          <span className="inline-flex px-1.5 py-0.5 rounded border text-[10px] font-semibold bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
+            {jobCodeVal}
+          </span>
+        ) : (
+          <span className="inline-flex px-1.5 py-0.5 rounded border text-[10px] font-normal bg-neutral-50 text-neutral-500 border-neutral-200 dark:bg-slate-800 dark:text-neutral-400">
+            Unassigned (Lead)
           </span>
         );
 
@@ -618,25 +642,25 @@ export default function ApplicantsTable({
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="text-xs min-w-40">
-                          <DropdownMenuItem className="text-xs cursor-pointer gap-2">
+                          <DropdownMenuItem className="text-xs cursor-pointer gap-2" onClick={() => router.push(`/applicants/${extractDbId(applicant)}`)}>
                             <Eye className="h-3.5 w-3.5" /> View Profile
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-xs cursor-pointer gap-2">
+                          <DropdownMenuItem className="text-xs cursor-pointer gap-2" onClick={() => router.push(`/applicants/${extractDbId(applicant)}`)}>
                             <Edit className="h-3.5 w-3.5" /> Edit Applicant
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-xs cursor-pointer gap-2" onClick={() => handleOpenSubmitModal(applicant)}>
                             <ClipboardList className="h-3.5 w-3.5" /> Submit to Job
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-xs cursor-pointer gap-2">
+                          <DropdownMenuItem className="text-xs cursor-pointer gap-2" onClick={() => router.push(`/email?to=${encodeURIComponent(applicant.email || '')}`)}>
                             <Mail className="h-3.5 w-3.5" /> Send Email
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-xs cursor-pointer gap-2">
+                          <DropdownMenuItem className="text-xs cursor-pointer gap-2" onClick={() => window.open(`tel:${applicant.mobile || ''}`, '_self')}>
                             <Phone className="h-3.5 w-3.5" /> Call
                           </DropdownMenuItem>
                           {!isRecruiter && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-xs cursor-pointer gap-2 text-red-650 dark:text-red-400 focus:text-red-650">
+                              <DropdownMenuItem className="text-xs cursor-pointer gap-2 text-red-650 dark:text-red-400 focus:text-red-650" onClick={() => handleDeleteSingleCandidate(applicant)}>
                                 <Trash2 className="h-3.5 w-3.5" /> Delete
                               </DropdownMenuItem>
                             </>

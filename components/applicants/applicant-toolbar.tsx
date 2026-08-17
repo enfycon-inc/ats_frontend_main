@@ -34,6 +34,7 @@ interface ApplicantToolbarProps {
   selectedCount: number;
   onDeleteSelected: () => void;
   isRecruiter?: boolean;
+  isTenantAdmin?: boolean;
   onUploadCv?: () => void;
 }
 
@@ -47,6 +48,7 @@ export default function ApplicantToolbar({
   selectedCount,
   onDeleteSelected,
   isRecruiter = false,
+  isTenantAdmin = false,
   onUploadCv,
 }: ApplicantToolbarProps) {
   const router = useRouter();
@@ -125,7 +127,7 @@ export default function ApplicantToolbar({
             <span className="text-[10px] font-bold text-primary">
               {selectedCount} Selected
             </span>
-            {!isRecruiter && (
+            {isTenantAdmin && (
               <button
                 onClick={onDeleteSelected}
                 className="text-[10px] text-red-650 hover:text-red-755 font-bold hover:underline cursor-pointer"

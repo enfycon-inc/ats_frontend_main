@@ -118,6 +118,16 @@ export default function UserManagementPage() {
     return () => clearTimeout(timer);
   }, [addForm.emailPrefix, users, tenantDomain]);
 
+  // Role checkbox toggle function — independent selection for every system and custom role
+  const handleRoleToggle = (currentRoles: string[], targetRole: string, isChecking: boolean) => {
+    const upperTarget = targetRole.toUpperCase();
+    let updated = currentRoles.filter(r => r.toUpperCase() !== upperTarget);
+    if (isChecking) {
+      updated.push(targetRole);
+    }
+    return updated;
+  };
+
   // Edit Member Form
   const [editForm, setEditForm] = useState({
     firstName: "",
@@ -470,12 +480,14 @@ export default function UserManagementPage() {
     const nameParts = (user.fullName || "").trim().split(" ");
     const fName = nameParts[0] || "";
     const lName = nameParts.slice(1).join(" ") || "";
+    const rawRoles = user.roles && user.roles.length > 0 ? user.roles : [user.roleName || "RECRUITER"];
+
     setEditForm({
       firstName: fName,
       lastName: lName,
       email: user.email || "",
       branchId: user.branchId || "",
-      roles: user.roles && user.roles.length > 0 ? user.roles : [user.roleName || "RECRUITER"],
+      roles: [...rawRoles],
     });
     setIsEditModalOpen(true);
   };
@@ -848,14 +860,37 @@ export default function UserManagementPage() {
                       {/* Roles */}
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-1">
-                          {rolesDisplay.map((r) => (
-                            <span
-                              key={r}
-                              className="px-2 py-0.5 rounded text-[10px] font-semibold bg-default-100 text-default-700 dark:bg-slate-800 dark:text-neutral-300 border border-default-200 dark:border-slate-700"
-                            >
-                              {r === "BRANCH_ADMIN" ? "Branch Admin" : r.replace("_", " ")}
-                            </span>
-                          ))}
+                          {(() => {
+                            const rawRoles = user.roles && user.roles.length > 0 ? user.roles : [user.roleName || "RECRUITER"];
+                            const customSubstitutions: Record<string, string> = {};
+                            (rolesList || []).forEach(r => {
+                              if (!r.isSystem && (r.isExactSubstitution || r.systemRole)) {
+                                const baseKey = (r.replacesSystemRole || r.systemRole || '').toUpperCase();
+                                if (baseKey) customSubstitutions[baseKey] = r.name;
+                              }
+                            });
+
+                            const displayList: string[] = [];
+                            const seen = new Set<string>();
+
+                            rawRoles.forEach(r => {
+                              const uppercaseR = r.toUpperCase();
+                              const displayName = customSubstitutions[uppercaseR] || (r === "BRANCH_ADMIN" ? "Branch Admin" : r.replace("_", " "));
+                              if (!seen.has(displayName.toUpperCase())) {
+                                seen.add(displayName.toUpperCase());
+                                displayList.push(displayName);
+                              }
+                            });
+
+                            return displayList.map((r) => (
+                              <span
+                                key={r}
+                                className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-slate-800 dark:text-indigo-300 border border-indigo-200 dark:border-slate-700"
+                              >
+                                {r}
+                              </span>
+                            ));
+                          })()}
                         </div>
                       </td>
 
@@ -1108,53 +1143,88 @@ export default function UserManagementPage() {
                 <p className="text-[10px] font-semibold text-red-500 -mt-2">Passwords do not match</p>
               )}
 
-              {/* ASSIGNED SYSTEM ROLES SELECTION */}
-              <div className="space-y-1.5 pt-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                  Assign System Roles *
-                </label>
-                <div className="grid grid-cols-2 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
-                  {[
-                    { key: "RECRUITER", label: "Recruiter" },
-                    { key: "ACCOUNT_MANAGER", label: "Account Manager (BDM)" },
-                    { key: "POD_LEAD", label: "Pod Lead" },
-                    { key: "BRANCH_ADMIN", label: "Branch Admin" },
-                    { key: "DELIVERY_HEAD", label: "Delivery Head" },
-                    { key: "ADMIN", label: "Tenant Admin" },
-                  ].map((r) => {
-                    const isChecked = addForm.roles.includes(r.key);
-                    return (
-                      <label
-                        key={r.key}
-                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer transition-colors ${
-                          isChecked
-                            ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 font-bold"
-                            : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800 font-medium"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setAddForm({ ...addForm, roles: [...addForm.roles, r.key] });
-                            } else {
-                              if (addForm.roles.length > 1) {
-                                setAddForm({ ...addForm, roles: addForm.roles.filter((roleKey) => roleKey !== r.key) });
-                              } else {
-                                toast.error("User must have at least one assigned role.");
-                              }
-                            }
-                          }}
-                          className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
-                        />
-                        <span className="truncate">{r.label}</span>
-                      </label>
-                    );
-                  })}
+              {/* ASSIGNED SYSTEM & CUSTOM ROLES SELECTION */}
+              <div className="space-y-3 pt-1">
+                {/* SECTION 1: TENANT CUSTOM ROLES */}
+                {(rolesList || []).some(r => !r.isSystem) && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block">
+                      🎨 Tenant Custom Roles (Aliases)
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 bg-indigo-50/40 dark:bg-indigo-950/20 p-3 rounded-lg border border-indigo-200/60 dark:border-indigo-900/50">
+                      {(rolesList || []).filter(r => !r.isSystem).map((r) => {
+                        const isChecked = addForm.roles.some(
+                          roleItem => roleItem.toUpperCase() === r.name.toUpperCase()
+                        );
+                        return (
+                          <label
+                            key={r.name}
+                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer transition-colors ${
+                              isChecked
+                                ? "bg-indigo-600 text-white font-bold border-indigo-600 shadow-xs"
+                                : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-indigo-50/50 font-medium"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                const nextRoles = handleRoleToggle(addForm.roles, r.name, e.target.checked);
+                                setAddForm({ ...addForm, roles: nextRoles });
+                              }}
+                              className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                            />
+                            <span className="truncate">{r.name} {r.isExactSubstitution ? `(Alias: ${r.replacesSystemRole || r.systemRole})` : ''}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* SECTION 2: BASE SYSTEM ROLES */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider block">
+                    ⚙️ Standard System Roles
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
+                    {[
+                      { key: "RECRUITER", label: "Recruiter" },
+                      { key: "ACCOUNT_MANAGER", label: "Account Manager" },
+                      { key: "POD_LEAD", label: "Pod Lead" },
+                      { key: "BRANCH_ADMIN", label: "Branch Admin" },
+                      { key: "DELIVERY_HEAD", label: "Delivery Head" },
+                      { key: "ADMIN", label: "Tenant Admin" },
+                    ].map((r) => {
+                      const isChecked = addForm.roles.some(
+                        roleItem => roleItem.toUpperCase() === r.key.toUpperCase()
+                      );
+                      return (
+                        <label
+                          key={r.key}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer transition-colors ${
+                            isChecked
+                              ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 font-bold"
+                              : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800 font-medium"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const nextRoles = handleRoleToggle(addForm.roles, r.key, e.target.checked);
+                              setAddForm({ ...addForm, roles: nextRoles });
+                            }}
+                            className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                          />
+                          <span className="truncate">{r.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
                 <p className="text-[10px] text-neutral-400">
-                  Select initial system roles to assign permissions for this user.
+                  Select custom roles and standard system roles independently to assign team access.
                 </p>
               </div>
 
@@ -1237,53 +1307,88 @@ export default function UserManagementPage() {
                 </div>
               </div>
 
-              {/* ASSIGNED SYSTEM ROLES SELECTION */}
-              <div className="space-y-1.5 pt-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                  Assigned System Roles *
-                </label>
-                <div className="grid grid-cols-2 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
-                  {[
-                    { key: "RECRUITER", label: "Recruiter" },
-                    { key: "ACCOUNT_MANAGER", label: "Account Manager (BDM)" },
-                    { key: "POD_LEAD", label: "Pod Lead" },
-                    { key: "BRANCH_ADMIN", label: "Branch Admin" },
-                    { key: "DELIVERY_HEAD", label: "Delivery Head" },
-                    { key: "ADMIN", label: "Tenant Admin" },
-                  ].map((r) => {
-                    const isChecked = editForm.roles.includes(r.key);
-                    return (
-                      <label
-                        key={r.key}
-                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer transition-colors ${
-                          isChecked
-                            ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 font-bold"
-                            : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800 font-medium"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setEditForm({ ...editForm, roles: [...editForm.roles, r.key] });
-                            } else {
-                              if (editForm.roles.length > 1) {
-                                setEditForm({ ...editForm, roles: editForm.roles.filter((roleKey) => roleKey !== r.key) });
-                              } else {
-                                toast.error("User must have at least one assigned role.");
-                              }
-                            }
-                          }}
-                          className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
-                        />
-                        <span className="truncate">{r.label}</span>
-                      </label>
-                    );
-                  })}
+              {/* ASSIGNED SYSTEM & CUSTOM ROLES SELECTION */}
+              <div className="space-y-3 pt-1">
+                {/* SECTION 1: TENANT CUSTOM ROLES */}
+                {(rolesList || []).some(r => !r.isSystem) && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block">
+                      🎨 Tenant Custom Roles (Aliases)
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 bg-indigo-50/40 dark:bg-indigo-950/20 p-3 rounded-lg border border-indigo-200/60 dark:border-indigo-900/50">
+                      {(rolesList || []).filter(r => !r.isSystem).map((r) => {
+                        const isChecked = editForm.roles.some(
+                          roleItem => roleItem.toUpperCase() === r.name.toUpperCase()
+                        );
+                        return (
+                          <label
+                            key={r.name}
+                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer transition-colors ${
+                              isChecked
+                                ? "bg-indigo-600 text-white font-bold border-indigo-600 shadow-xs"
+                                : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-indigo-50/50 font-medium"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                const nextRoles = handleRoleToggle(editForm.roles, r.name, e.target.checked);
+                                setEditForm({ ...editForm, roles: nextRoles });
+                              }}
+                              className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                            />
+                            <span className="truncate">{r.name} {r.isExactSubstitution ? `(Alias: ${r.replacesSystemRole || r.systemRole})` : ''}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* SECTION 2: BASE SYSTEM ROLES */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider block">
+                    ⚙️ Standard System Roles
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
+                    {[
+                      { key: "RECRUITER", label: "Recruiter" },
+                      { key: "ACCOUNT_MANAGER", label: "Account Manager" },
+                      { key: "POD_LEAD", label: "Pod Lead" },
+                      { key: "BRANCH_ADMIN", label: "Branch Admin" },
+                      { key: "DELIVERY_HEAD", label: "Delivery Head" },
+                      { key: "ADMIN", label: "Tenant Admin" },
+                    ].map((r) => {
+                      const isChecked = editForm.roles.some(
+                        roleItem => roleItem.toUpperCase() === r.key.toUpperCase()
+                      );
+                      return (
+                        <label
+                          key={r.key}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer transition-colors ${
+                            isChecked
+                              ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 font-bold"
+                              : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800 font-medium"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const nextRoles = handleRoleToggle(editForm.roles, r.key, e.target.checked);
+                              setEditForm({ ...editForm, roles: nextRoles });
+                            }}
+                            className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                          />
+                          <span className="truncate">{r.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
                 <p className="text-[10px] text-neutral-400">
-                  Toggle one or multiple roles to assign permissions for this user.
+                  Select custom roles and standard system roles independently to assign team access.
                 </p>
               </div>
 

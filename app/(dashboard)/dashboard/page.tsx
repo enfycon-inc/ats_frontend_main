@@ -29,6 +29,15 @@ export default function DashboardPage() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
+  const [availableRoles, setAvailableRoles] = useState<any[]>([]);
+
+  useEffect(() => {
+    atsApi.auth.listRoles().then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        setAvailableRoles(data);
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -94,7 +103,22 @@ export default function DashboardPage() {
     );
   }
 
-  const systemRole = overrideRole || profile?.systemRole || "RECRUITER";
+  const resolveSystemRole = (roleStr: string | null | undefined): string => {
+    if (!roleStr) return profile?.systemRole || "RECRUITER";
+    const upper = roleStr.toUpperCase();
+    if (["SUPER_ADMIN", "ADMIN", "TENANT_ADMIN", "ACCOUNT_MANAGER", "POD_LEAD", "DELIVERY_HEAD", "RECRUITER"].includes(upper)) {
+      return upper;
+    }
+    const customRole = availableRoles.find(r => r.name.toUpperCase() === upper || r.id === roleStr);
+    if (customRole && (customRole.replacesSystemRole || customRole.systemRole)) {
+      return (customRole.replacesSystemRole || customRole.systemRole).toUpperCase();
+    }
+    return upper;
+  };
+
+  const rawRole = overrideRole || (profile?.roles && profile.roles.length > 0 ? profile.roles[0] : profile?.systemRole);
+  const systemRole = resolveSystemRole(rawRole);
+
   const roleName = overrideRole 
     ? overrideRole.replace("_", " ").toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())
     : (profile?.roleName || "Recruiter");
@@ -125,7 +149,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <Link href="/job-posting/new">
             <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-1.5 shadow-xs h-9 px-3.5 cursor-pointer">
               <Icon icon="heroicons:plus-circle" className="h-4 w-4" />
@@ -156,7 +180,7 @@ export default function DashboardPage() {
         />
       ) : systemRole === "POD_LEAD" ? (
         <PodLeadDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
-      ) : systemRole === "DELIVERY_HEAD" || systemRole === "TRACKER" ? (
+      ) : systemRole === "DELIVERY_HEAD" ? (
         <DeliveryHeadDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
       ) : (
         <RecruiterDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />

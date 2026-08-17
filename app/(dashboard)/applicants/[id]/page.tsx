@@ -427,6 +427,9 @@ export default function CandidateDetailPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2 py-0.5 rounded border border-blue-200 text-xs font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
+                    {candidate.candidateCode || `CAN-${String(candidate.dbId || candidateId).padStart(6, '0')}`}
+                  </span>
                   <h2 className="text-base font-extrabold text-neutral-900 dark:text-white truncate">
                     {candidate.fullName}
                   </h2>
@@ -434,11 +437,13 @@ export default function CandidateDetailPage() {
                     {candidate.status}
                   </Badge>
                 </div>
-                <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 mt-0.5 flex items-center gap-1.5">
+                <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 mt-0.5 flex flex-wrap items-center gap-1.5">
                   <Briefcase className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
                   {candidate.jobTitle}
                   <span className="text-neutral-350 dark:text-slate-705">•</span>
                   <span className="text-neutral-500">{candidate.experienceYears} Years Experience</span>
+                  <span className="text-neutral-350 dark:text-slate-705">•</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-bold">Uploaded By: {candidate.uploadedByName || "System Upload"}</span>
                 </p>
               </div>
             </div>
