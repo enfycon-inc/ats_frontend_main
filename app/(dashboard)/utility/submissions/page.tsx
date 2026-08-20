@@ -15,6 +15,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { ScheduleInterviewModal } from "@/components/interviews/schedule-interview-modal";
 
 interface Submission {
@@ -24,14 +32,18 @@ interface Submission {
   recruiterId: string;
   l1Status: "PENDING" | "SCHEDULED" | "CLEARED" | "REJECTED" | null;
   l1Date: string | null;
+  l1Remarks?: string | null;
   l2Status: "PENDING" | "SCHEDULED" | "CLEARED" | "REJECTED" | null;
   l2Date: string | null;
+  l2Remarks?: string | null;
   l3Status: "PENDING" | "SCHEDULED" | "CLEARED" | "REJECTED" | null;
   l3Date: string | null;
+  l3Remarks?: string | null;
   finalStatus: "PENDING_APPROVAL" | "SUBMITTED" | "REJECTED" | "OFFER" | "JOIN";
   remarks: string | null;
   recruiterComment: string | null;
   reviewFeedback: string | null; // AM/Pod Head feedback written during internal review
+  podLeadRemarks?: string | null;
   createdAt: string;
   updatedAt: string;
   
@@ -57,41 +69,92 @@ interface Submission {
   market?: string;
 }
 
+export const STANDARD_REMARKS_TEMPLATES = {
+  l1: [
+    "✓ Mandatory skills & tech stack 100% verified against JD",
+    "✓ Immediate joiner — notice period ≤ 30 days confirmed",
+    "✓ Valid work authorization & visa verified",
+    "✓ Candidate CTC expectation within approved budget bracket",
+    "✓ Excellent communication & profile presentation",
+    "✕ Rejected: Notice period exceeds 60 days (Client requires immediate)",
+    "✕ Rejected: Significant skill gap in core mandatory technologies",
+    "✕ Rejected: Expected CTC exceeds maximum budget ceiling",
+    "✕ Rejected: Location constraint / Candidate unwilling to relocate",
+  ],
+  l2: [
+    "✓ Passed technical screening call with strong hands-on coding",
+    "✓ Excellent project depth & system architecture knowledge",
+    "✓ Solved technical live coding & algorithmic challenge",
+    "✓ Strong technical communication & problem solving",
+    "✕ Rejected: Failed live coding / technical screening assessment",
+    "✕ Rejected: Lacked depth in framework fundamentals & design patterns",
+    "✕ Rejected: Hands-on experience does not match claimed CV experience",
+  ],
+  l3: [
+    "✓ Commercials & rate margin verified (>20% Gross Margin)",
+    "✓ Candidate rate confirmation email on record",
+    "✓ Client submission package formatted and validated",
+    "✓ Candidate available & briefed on client interview process",
+    "✕ Rejected: Commercial margin below minimum threshold (<15%)",
+    "✕ Rejected: Candidate declined rate confirmation / demanded higher CTC",
+  ],
+  final: [
+    "✓ Client shortlisted for Round 1 Interview",
+    "✓ Client interview round completed successfully",
+    "✓ Client released official offer letter",
+    "✓ Candidate accepted offer & joined client successfully",
+    "✕ Client rejected: Profile not aligned with hiring manager expectations",
+    "✕ Candidate declined offer / accepted counter-offer",
+    "✕ Position closed / Put on hold by client",
+  ],
+};
+
 function renderPipelineProgress(sub: Submission) {
-  const getStageColor = (status: string | null) => {
+  const getBadgeStyle = (status: string | null) => {
     const s = (status || "").toUpperCase();
-    if (s === "CLEARED") return "bg-emerald-500 border-emerald-600 dark:bg-emerald-600";
-    if (s === "REJECTED") return "bg-rose-500 border-rose-600 dark:bg-rose-600";
-    if (s === "SCHEDULED" || s === "PENDING") return "bg-indigo-500 border-indigo-600 dark:bg-indigo-600 ring-2 ring-indigo-200 dark:ring-indigo-950";
-    return "bg-slate-200 border-slate-350 dark:bg-slate-800 dark:border-slate-700";
+    if (s === "CLEARED") return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800";
+    if (s === "REJECTED") return "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800";
+    if (s === "SCHEDULED") return "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800";
+    if (s === "PENDING") return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800";
+    return "bg-slate-50 text-slate-400 border-slate-200 dark:bg-slate-800/30 dark:text-slate-500 dark:border-slate-800";
   };
 
-  const getStageText = (status: string | null) => {
+  const getLabel = (stage: string, status: string | null) => {
     const s = (status || "").toUpperCase();
-    return s || "Not Started";
+    if (s === "CLEARED") return `${stage}: Pass ✓`;
+    if (s === "REJECTED") return `${stage}: Fail ✕`;
+    if (s === "SCHEDULED") return `${stage}: Sched`;
+    if (s === "PENDING") return `${stage}: Pend`;
+    return `${stage}: —`;
   };
 
   return (
-    <div className="flex items-center space-x-2">
-      {/* L1 */}
-      <div className="flex flex-col items-center group relative">
-        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${getStageColor(sub.l1Status)}`} title={`L1: ${getStageText(sub.l1Status)}`} />
-        <span className="text-[10px] font-bold mt-1 text-default-500">L1</span>
+    <div className="flex flex-col gap-1 min-w-[130px]">
+      <div className="flex items-center gap-1">
+        <span
+          title={`L1 Internal Screening: ${sub.l1Status || 'Pending'}${sub.l1Remarks ? `\nFeedback: ${sub.l1Remarks}` : ''}`}
+          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getBadgeStyle(sub.l1Status)}`}
+        >
+          {getLabel("L1", sub.l1Status || "PENDING")}
+        </span>
+        <span
+          title={`L2 Technical Vetting: ${sub.l2Status || 'Not started'}${sub.l2Remarks ? `\nFeedback: ${sub.l2Remarks}` : ''}`}
+          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getBadgeStyle(sub.l2Status)}`}
+        >
+          {getLabel("L2", sub.l2Status)}
+        </span>
+        <span
+          title={`L3 Commercial Audit: ${sub.l3Status || 'Not started'}${sub.l3Remarks ? `\nFeedback: ${sub.l3Remarks}` : ''}`}
+          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getBadgeStyle(sub.l3Status)}`}
+        >
+          {getLabel("L3", sub.l3Status)}
+        </span>
       </div>
-      <div className={`w-5 h-[2px] mb-4.5 ${(sub.l1Status === "CLEARED") ? "bg-emerald-500" : "bg-default-200 dark:bg-slate-800"}`} />
-      
-      {/* L2 */}
-      <div className="flex flex-col items-center group relative">
-        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${getStageColor(sub.l2Status)}`} title={`L2: ${getStageText(sub.l2Status)}`} />
-        <span className="text-[10px] font-bold mt-1 text-default-500">L2</span>
-      </div>
-      <div className={`w-5 h-[2px] mb-4.5 ${(sub.l2Status === "CLEARED") ? "bg-emerald-500" : "bg-default-200 dark:bg-slate-800"}`} />
-
-      {/* L3 */}
-      <div className="flex flex-col items-center group relative">
-        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${getStageColor(sub.l3Status)}`} title={`L3: ${getStageText(sub.l3Status)}`} />
-        <span className="text-[10px] font-bold mt-1 text-default-500">L3</span>
-      </div>
+      {(sub.l1Remarks || sub.l2Remarks || sub.l3Remarks) && (
+        <div className="text-[9px] text-default-450 truncate max-w-[170px] italic font-medium" title={sub.l3Remarks || sub.l2Remarks || sub.l1Remarks || ''}>
+          "{sub.l3Remarks || sub.l2Remarks || sub.l1Remarks}"
+        </div>
+      )}
     </div>
   );
 }
@@ -146,15 +209,25 @@ export default function SubmissionsPage() {
   // Form fields state
   const [l1Status, setL1Status] = useState<any>("");
   const [l1Date, setL1Date] = useState("");
+  const [l1Remarks, setL1Remarks] = useState("");
   const [l2Status, setL2Status] = useState<any>("");
   const [l2Date, setL2Date] = useState("");
+  const [l2Remarks, setL2Remarks] = useState("");
   const [l3Status, setL3Status] = useState<any>("");
   const [l3Date, setL3Date] = useState("");
+  const [l3Remarks, setL3Remarks] = useState("");
   const [finalStatus, setFinalStatus] = useState<any>("");
   const [remarks, setRemarks] = useState("");
   const [recruiterComment, setRecruiterComment] = useState("");
   const [submittedRate, setSubmittedRate] = useState("");
   const [reviewFeedback, setReviewFeedback] = useState(""); // AM/Pod feedback for recruiter
+
+  // Tenant Custom Remarks Configuration State
+  const [customRemarks, setCustomRemarks] = useState<any[]>([]);
+  const [customRemarksModalOpen, setCustomRemarksModalOpen] = useState(false);
+  const [newRemarkStage, setNewRemarkStage] = useState("l1");
+  const [newRemarkText, setNewRemarkText] = useState("");
+  const [addingRemark, setAddingRemark] = useState(false);
 
   useEffect(() => {
     const user = atsApi.auth.getCurrentUser();
@@ -167,14 +240,17 @@ export default function SubmissionsPage() {
       setLoading(true);
       const user = atsApi.auth.getCurrentUser();
       
-      const [submissionsData, statsData] = await Promise.all([
+      const [submissionsData, statsData, customRemarksData] = await Promise.all([
         atsApi.submissions.list({
           startDate: startDate || undefined,
           endDate: endDate || undefined,
           finalStatus: statusFilter || undefined,
         }),
         atsApi.submissions.getTrackerStats(),
+        atsApi.submissions.getCustomRemarks().catch(() => []),
       ]);
+
+      setCustomRemarks(customRemarksData || []);
 
       // Apply search query locally on candidate name, candidate email, job code, or job title
       let list = submissionsData.data || submissionsData || [];
@@ -214,10 +290,13 @@ export default function SubmissionsPage() {
     setSelectedSubmission(sub);
     setL1Status(sub.l1Status || "");
     setL1Date(sub.l1Date ? sub.l1Date.slice(0, 16) : "");
+    setL1Remarks(sub.l1Remarks || "");
     setL2Status(sub.l2Status || "");
     setL2Date(sub.l2Date ? sub.l2Date.slice(0, 16) : "");
+    setL2Remarks(sub.l2Remarks || "");
     setL3Status(sub.l3Status || "");
     setL3Date(sub.l3Date ? sub.l3Date.slice(0, 16) : "");
+    setL3Remarks(sub.l3Remarks || "");
     setFinalStatus(sub.finalStatus);
     setRemarks(sub.remarks || "");
     setRecruiterComment(sub.recruiterComment || "");
@@ -231,35 +310,91 @@ export default function SubmissionsPage() {
     setSelectedSubmission(null);
   };
 
+  // Granular permission calculations
+  const userPerms = currentUser?.permissions || [];
+  const userRoles = currentUser?.roles || [];
+  const isAdmin = userRoles.includes("ADMIN") || userRoles.includes("SUPER_ADMIN") || currentUser?.systemRole === "ADMIN" || currentUser?.systemRole === "SUPER_ADMIN";
+  const isDeliveryHead = userRoles.includes("DELIVERY_HEAD") || currentUser?.systemRole === "DELIVERY_HEAD";
+  const isAm = userRoles.includes("ACCOUNT_MANAGER") || currentUser?.systemRole === "ACCOUNT_MANAGER";
+  const isPodLead = userRoles.includes("POD_LEAD") || currentUser?.systemRole === "POD_LEAD";
+
+  const canAuditRounds = isAdmin || isDeliveryHead || isAm || userPerms.includes("submission:audit_rounds");
+  const canAuditL1 = canAuditRounds || isAm || isPodLead || userPerms.includes("submission:audit_l1");
+  const canAuditL2 = canAuditRounds || isAm || userPerms.includes("submission:audit_l2");
+  const canAuditL3 = canAuditRounds || isAm || userPerms.includes("submission:audit_l3");
+  const canApproveClient = isAdmin || isDeliveryHead || isAm || userPerms.includes("submission:approve_client");
+  const canEditRate = isAdmin || isDeliveryHead || isAm || userPerms.includes("submission:edit_rate");
+  const isRecruiterOnly = userRoles.includes("RECRUITER") && !canAuditL1 && !canAuditL2 && !canAuditL3 && !canApproveClient && !canAuditRounds;
+  const canManageRemarks = isAdmin || userPerms.includes("tenant:settings") || userRoles.includes("SUPER_ADMIN") || userRoles.includes("ADMIN");
+
+  const resolvedTemplates = {
+    l1: [...STANDARD_REMARKS_TEMPLATES.l1, ...customRemarks.filter(r => r.stage?.toLowerCase() === "l1").map(r => r.remarkText)],
+    l2: [...STANDARD_REMARKS_TEMPLATES.l2, ...customRemarks.filter(r => r.stage?.toLowerCase() === "l2").map(r => r.remarkText)],
+    l3: [...STANDARD_REMARKS_TEMPLATES.l3, ...customRemarks.filter(r => r.stage?.toLowerCase() === "l3").map(r => r.remarkText)],
+    final: [...STANDARD_REMARKS_TEMPLATES.final, ...customRemarks.filter(r => r.stage?.toLowerCase() === "final").map(r => r.remarkText)],
+  };
+
+  const handleAddCustomRemark = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRemarkText.trim()) return;
+    try {
+      setAddingRemark(true);
+      const created = await atsApi.submissions.createCustomRemark({
+        stage: newRemarkStage,
+        remarkText: newRemarkText.trim(),
+      });
+      setCustomRemarks((prev) => [...prev, created]);
+      setNewRemarkText("");
+      toast.success("Custom stage remark added!");
+    } catch (err: any) {
+      toast.error("Failed to add remark: " + err.message);
+    } finally {
+      setAddingRemark(false);
+    }
+  };
+
+  const handleDeleteCustomRemark = async (id: number) => {
+    try {
+      await atsApi.submissions.deleteCustomRemark(id);
+      setCustomRemarks((prev) => prev.filter((r) => r.id !== id));
+      toast.success("Custom remark removed!");
+    } catch (err: any) {
+      toast.error("Failed to delete remark: " + err.message);
+    }
+  };
+
   const handleUpdateSubmission = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSubmission) return;
-
-    // Check user roles
-    const roles = currentUser?.roles || [];
-    const isRecruiterOnly = roles.includes("RECRUITER") && !roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN") && !roles.includes("ACCOUNT_MANAGER") && !roles.includes("POD_LEAD");
 
     try {
       setSubmitting(true);
       
       const payload: any = {};
-      if (isRecruiterOnly) {
-        // Recruiters can only update their own comment
-        payload.recruiterComment = recruiterComment.trim() || null;
-      } else {
-        // AM / Pod Lead / Admin can edit all
+      if (canAuditL1) {
         payload.l1Status = l1Status || null;
         payload.l1Date = l1Date ? new Date(l1Date).toISOString() : null;
+        payload.l1Remarks = l1Remarks.trim() || null;
+      }
+      if (canAuditL2) {
         payload.l2Status = l2Status || null;
         payload.l2Date = l2Date ? new Date(l2Date).toISOString() : null;
+        payload.l2Remarks = l2Remarks.trim() || null;
+      }
+      if (canAuditL3) {
         payload.l3Status = l3Status || null;
         payload.l3Date = l3Date ? new Date(l3Date).toISOString() : null;
+        payload.l3Remarks = l3Remarks.trim() || null;
+      }
+      if (canApproveClient) {
         payload.finalStatus = finalStatus;
         payload.remarks = remarks.trim() || null;
-        payload.recruiterComment = recruiterComment.trim() || null;
-        payload.submittedRate = submittedRate.trim() || null;
         payload.reviewFeedback = reviewFeedback.trim() || null;
       }
+      if (canEditRate) {
+        payload.submittedRate = submittedRate.trim() || null;
+      }
+      payload.recruiterComment = recruiterComment.trim() || null;
 
       await atsApi.submissions.update(selectedSubmission.id, payload);
       toast.success("Submission updated successfully!");
@@ -324,10 +459,6 @@ export default function SubmissionsPage() {
       toast.error("Failed to download resume: " + err.message);
     }
   };
-
-  // Determine user editing capabilities
-  const roles = currentUser?.roles || [];
-  const isRecruiterOnly = roles.includes("RECRUITER") && !roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN") && !roles.includes("ACCOUNT_MANAGER") && !roles.includes("POD_LEAD");
 
   // Sequential status dependencies check (Auto Rejection logic)
   const isL1Rejected = l1Status === "REJECTED";
@@ -409,6 +540,16 @@ export default function SubmissionsPage() {
                 Board
               </button>
             </div>
+            {canManageRemarks && (
+              <Button
+                onClick={() => setCustomRemarksModalOpen(true)}
+                variant="outline"
+                className="flex items-center gap-1.5 border-indigo-200 bg-indigo-50/60 hover:bg-indigo-100 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300 font-semibold text-xs h-9"
+              >
+                <Icon icon="heroicons:cog-6-tooth" className="h-4 w-4" />
+                Manage Stage Remarks
+              </Button>
+            )}
             <Button
               onClick={handleExportCSV}
               variant="outline"
@@ -520,7 +661,7 @@ export default function SubmissionsPage() {
               <table className="w-full text-left border-collapse min-w-[1200px]">
                 <thead>
                   <tr className="bg-default-50/50 dark:bg-slate-800/20 border-b border-default-150">
-                    {["Job Requisition", "Account Manager", "Recruiter", "Candidate Details", "Pay Rate", "Pipeline Progress", "Status", "Remarks / Feedback", "Sourced On", "Actions"].map((h) => (
+                    {["Job & Client", "Candidate & Pay Rate", "Internal Review", "Interview Rounds (L1, L2, L3)", "Final Status", "Remarks & Date", "Actions"].map((h) => (
                       <th key={h} className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">
                         {h}
                       </th>
@@ -530,7 +671,7 @@ export default function SubmissionsPage() {
                 <tbody className="divide-y divide-default-100 text-xs">
                   {loading ? (
                     <tr>
-                      <td colSpan={10} className="py-16 text-center text-default-500 font-semibold italic">
+                      <td colSpan={7} className="py-16 text-center text-default-500 font-semibold italic">
                         <div className="flex flex-col items-center gap-3">
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
                           <span>Loading candidate submissions…</span>
@@ -539,7 +680,7 @@ export default function SubmissionsPage() {
                     </tr>
                   ) : submissions.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-16 text-center text-default-500 font-semibold italic">
+                      <td colSpan={7} className="py-16 text-center text-default-500 font-semibold italic">
                         <div className="flex flex-col items-center gap-3">
                           <Icon icon="heroicons:clipboard-document-check" className="h-10 w-10 text-default-300" />
                           <span>No submissions match your query.</span>
@@ -555,8 +696,8 @@ export default function SubmissionsPage() {
                           selectedSubmission?.id === sub.id ? "bg-indigo-50/50 dark:bg-indigo-950/10" : ""
                         }`}
                       >
-                        {/* Job Requisition */}
-                        <td className="py-4 px-4 whitespace-nowrap">
+                        {/* 1. Job & Client */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
                           <div className="flex flex-col gap-1">
                             <div className="font-bold text-default-900 flex items-center gap-1.5">
                               <span className="text-xs">{sub.jobTitle}</span>
@@ -564,131 +705,121 @@ export default function SubmissionsPage() {
                                 {sub.jobCode}
                               </Badge>
                             </div>
-                            <div className="text-[10px] text-default-500 font-semibold">
-                              Client: <span className="text-default-700">{sub.clientName || "—"}</span>
+                            <div className="text-[11px] text-default-600 font-semibold flex items-center gap-1">
+                              <Icon icon="heroicons:building-office-2" className="h-3 w-3 text-default-400" />
+                              {sub.clientName || "Direct Client"}
                             </div>
                           </div>
                         </td>
 
-                        {/* Account Manager */}
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <div className="font-semibold text-default-855 text-xs">
-                            {sub.accountManagerName || "—"}
-                          </div>
-                        </td>
-
-                        {/* Recruiter */}
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <div className="font-semibold text-default-855 text-xs">
-                            {sub.recruiterName || "—"}
-                          </div>
-                        </td>
-
-                        {/* Candidate Details */}
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <div className="flex flex-col gap-0.5">
-                            <div className="text-default-900 font-bold text-sm">{sub.candidateName}</div>
-                            <div className="text-[10px] text-default-455 font-normal">{sub.candidateEmail}</div>
-                            {sub.candidatePhone && (
-                              <div className="text-[9px] text-default-400 font-normal">{sub.candidatePhone}</div>
-                            )}
-                            {sub.candidateCurrentLocation && (
-                              <div className="text-[9px] text-default-400 font-normal flex items-center gap-0.5 mt-0.5">
-                                <Icon icon="heroicons:map-pin" className="h-2.5 w-2.5" />
-                                {sub.candidateCurrentLocation}
-                              </div>
-                            )}
-                            <div 
-                              className="inline-flex items-center gap-1 mt-1.5 text-[9px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors w-fit"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate");
-                              }}
-                            >
-                              <Icon icon="heroicons:document-arrow-down" className="h-3 w-3" />
-                              View / Download CV
+                        {/* 2. Candidate & Pay Rate */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="flex flex-col gap-1">
+                            <div className="text-default-900 font-bold text-sm flex items-center gap-1.5">
+                              {sub.candidateName}
+                              {sub.submittedRate && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded">
+                                  {formatSubmittedRate(sub.submittedRate, sub.market, sub.jobCode, sub.jobTitle)}
+                                </span>
+                              )}
                             </div>
+                            <div className="text-[10px] text-default-500 font-normal">{sub.candidateEmail}</div>
                           </div>
                         </td>
 
-                        {/* Submitted Rate */}
-                        <td className="py-4 px-4 whitespace-nowrap text-xs font-semibold text-default-700">
-                          {formatSubmittedRate(sub.submittedRate, sub.market, sub.jobCode, sub.jobTitle)}
-                        </td>
-
-                        {/* Pipeline Progress (L1, L2, L3 visual) */}
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          {renderPipelineProgress(sub)}
-                        </td>
-
-                        {/* Status + Approve Action — compact inline */}
-                        <td className="py-4 px-4 whitespace-nowrap">
+                        {/* 3. Internal Review Status */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
                           {sub.finalStatus === "PENDING_APPROVAL" ? (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <Badge className="bg-amber-100 text-amber-800 text-[9px] uppercase tracking-wider font-bold border-0 px-2 py-1 shrink-0">
-                                Pending
-                              </Badge>
+                            <div className="flex flex-col gap-1.5">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300 border border-amber-200 dark:border-amber-900 w-fit">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                Pending Review
+                              </span>
                               {(() => {
                                 const roles = currentUser?.roles || [];
-                                const canApprove = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN") || roles.includes("ACCOUNT_MANAGER") || roles.includes("POD_LEAD") || roles.includes("DELIVERY_HEAD");
+                                const canApprove = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN") || roles.includes("ACCOUNT_MANAGER") || roles.includes("POD_LEAD") || roles.includes("DELIVERY_HEAD") || userPerms.includes("submission:approve_client");
                                 if (!canApprove) return null;
                                 return (
                                   <Button
+                                    size="sm"
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       try {
                                         await atsApi.submissions.update(sub.id, { finalStatus: "SUBMITTED" });
-                                        toast.success("Submission approved!");
+                                        toast.success("Submission approved and submitted to client!");
                                         loadData();
                                       } catch (err: any) {
                                         toast.error("Failed to approve: " + err.message);
                                       }
                                     }}
-                                    className="h-6 px-2 text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 font-bold rounded-md shrink-0"
+                                    className="h-6 px-2.5 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-md shadow-xs flex items-center gap-1 w-fit"
                                   >
-                                    ✓ Approve
+                                    <Icon icon="heroicons:check" className="h-3 w-3" />
+                                    Approve
                                   </Button>
                                 );
                               })()}
                             </div>
                           ) : (
-                            <Badge className={`text-[9px] uppercase tracking-wider font-bold border-0 px-2 py-1 ${
-                              sub.finalStatus === "JOIN" ? "bg-emerald-100 text-emerald-800" :
-                              sub.finalStatus === "OFFER" ? "bg-teal-50 text-teal-700" :
-                              sub.finalStatus === "REJECTED" ? "bg-rose-100 text-rose-800" :
-                              "bg-indigo-50 text-indigo-700"
-                            }`}>
-                              {sub.finalStatus === "SUBMITTED" ? "Submitted to Client" : sub.finalStatus}
-                            </Badge>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 w-fit">
+                              <Icon icon="heroicons:check-circle" className="h-3 w-3 text-emerald-600" />
+                              Approved
+                            </span>
                           )}
                         </td>
 
-                        {/* Remarks / Feedback */}
-                        <td className="py-4 px-4 max-w-[200px] truncate text-xs text-default-600 font-medium" title={`Recruiter Comment: ${sub.recruiterComment || '—'}\nManager Remarks: ${sub.remarks || '—'}`}>
-                          <div className="flex flex-col gap-0.5">
-                            {sub.recruiterComment && (
-                              <div>
-                                <span className="text-[9px] text-default-455 uppercase font-bold">Recruiter:</span>
-                                <p className="truncate text-default-700 font-medium mt-0.5">{sub.recruiterComment}</p>
+                        {/* 4. Interview Rounds (L1, L2, L3) */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {renderPipelineProgress(sub)}
+                        </td>
+
+                        {/* 5. Final Status */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {sub.finalStatus === "PENDING_APPROVAL" ? (
+                            <span className="text-[11px] text-default-400 italic">In Internal Review</span>
+                          ) : (
+                            <div className="flex flex-col gap-1">
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${
+                                sub.finalStatus === "JOIN" ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300" :
+                                sub.finalStatus === "OFFER" ? "bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-950/30 dark:text-teal-300" :
+                                sub.finalStatus === "REJECTED" ? "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300" :
+                                "bg-indigo-50 text-indigo-800 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300"
+                              }`}>
+                                {sub.finalStatus === "SUBMITTED" && "🚀 Submitted to Client"}
+                                {sub.finalStatus === "OFFER" && "🎉 Offer Released"}
+                                {sub.finalStatus === "JOIN" && "🏆 Joined / Placed"}
+                                {sub.finalStatus === "REJECTED" && "✕ Rejected"}
+                                {sub.finalStatus !== "SUBMITTED" && sub.finalStatus !== "OFFER" && sub.finalStatus !== "JOIN" && sub.finalStatus !== "REJECTED" && sub.finalStatus}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* 6. Remarks & Date */}
+                        <td className="py-3.5 px-4 max-w-[220px]">
+                          <div className="flex flex-col gap-1 text-xs">
+                            {sub.remarks ? (
+                              <div className="text-default-700 font-medium truncate" title={sub.remarks}>
+                                <span className="text-[9px] font-bold uppercase text-emerald-600 mr-1">Final:</span>
+                                {sub.remarks}
                               </div>
-                            )}
-                            {sub.remarks && (
-                              <div className="mt-1 border-t border-default-100 pt-1">
-                                <span className="text-[9px] text-default-455 uppercase font-bold">Remarks:</span>
-                                <p className="truncate text-default-600 italic font-semibold mt-0.5">{sub.remarks}</p>
+                            ) : sub.recruiterComment ? (
+                              <div className="text-default-700 font-medium truncate" title={sub.recruiterComment}>
+                                <span className="text-[9px] font-bold uppercase text-indigo-600 mr-1">Recruiter:</span>
+                                {sub.recruiterComment}
                               </div>
+                            ) : (
+                              <span className="text-default-400 italic text-[11px]">No remarks</span>
                             )}
-                            {!sub.recruiterComment && !sub.remarks && <span className="text-default-400 italic">—</span>}
+                            <div className="text-[9px] text-default-450 font-semibold flex items-center gap-1">
+                              <Icon icon="heroicons:calendar" className="h-2.5 w-2.5" />
+                              {new Date(sub.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </div>
                           </div>
                         </td>
 
-                        {/* Sourced On */}
-                        <td className="py-4 px-4 whitespace-nowrap text-default-500 font-medium">
-                          {new Date(sub.createdAt).toLocaleDateString()}
-                        </td>
-
-                        {/* Actions (Kebab Menu) */}
-                        <td className="py-4 px-4 whitespace-nowrap text-right">
+                        {/* 7. Actions (Kebab Menu) */}
+                        <td className="py-3.5 px-4 whitespace-nowrap text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
@@ -700,7 +831,7 @@ export default function SubmissionsPage() {
                                 <Icon icon="heroicons:ellipsis-vertical" className="h-5 w-5" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-36 rounded-xl shadow-lg border-default-200">
+                            <DropdownMenuContent align="end" className="w-40 rounded-xl shadow-lg border-default-200">
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -709,7 +840,7 @@ export default function SubmissionsPage() {
                                 className="text-xs cursor-pointer gap-2 font-medium"
                               >
                                 <Icon icon="heroicons:pencil-square" className="h-4 w-4 text-indigo-500" />
-                                Edit status
+                                Edit Status &amp; Rounds
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={(e) => {
@@ -719,7 +850,7 @@ export default function SubmissionsPage() {
                                 }}
                                 className="text-xs cursor-pointer gap-2 font-medium"
                               >
-                                <Icon icon="heroicons:calendar-days" className="h-4 w-4 text-purple-500" />
+                                <Icon icon="heroicons:calendar" className="h-4 w-4 text-cyan-500" />
                                 Schedule Interview
                               </DropdownMenuItem>
                               <DropdownMenuItem
@@ -730,7 +861,7 @@ export default function SubmissionsPage() {
                                 className="text-xs cursor-pointer gap-2 font-medium"
                               >
                                 <Icon icon="heroicons:document-arrow-down" className="h-4 w-4 text-emerald-500" />
-                                View Details (CV)
+                                Download CV
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1193,94 +1324,395 @@ export default function SubmissionsPage() {
                       <>
                         <div className="flex items-center gap-2 mb-1">
                           <div className="h-px flex-1 bg-default-150" />
-                          <span className="text-[10px] font-bold text-default-500 uppercase tracking-wider">Step 2 — Interview Rounds</span>
+                          <span className="text-[10px] font-bold text-default-500 uppercase tracking-wider">Interview Rounds (L1, L2, L3)</span>
                           <div className="h-px flex-1 bg-default-150" />
                         </div>
 
-                        {/* L1 Stage */}
-                        <div className="space-y-2 p-3 border border-default-100 rounded-lg dark:bg-slate-800/10">
+                        {/* ── STAGE 1: L1 Screening ── */}
+                        <div className="space-y-2 p-3 border border-default-150 rounded-xl bg-slate-50/50 dark:bg-slate-800/20">
                           <div className="flex justify-between items-center">
-                            <label className="text-xs font-bold text-default-850">L1 — Round 1</label>
-                            <Badge className="bg-slate-100 text-slate-600 text-[8px] border-0 py-0.5">{l1Status || "PENDING"}</Badge>
+                            <label className="text-xs font-bold text-default-850 flex items-center gap-1.5">
+                              <Icon icon="heroicons:document-magnifying-glass" className="h-4 w-4 text-indigo-600" />
+                              Round 1 (L1) — Screening
+                            </label>
+                            {canAuditL1 ? (
+                              <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 text-[9px] border-0 py-0.5">
+                                {l1Status || "PENDING"}
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-slate-100 text-slate-500 text-[9px] border-0 py-0.5 flex items-center gap-1">
+                                <Icon icon="heroicons:lock-closed" className="h-2.5 w-2.5" />
+                                Locked (View Only)
+                              </Badge>
+                            )}
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             <select
                               value={l1Status}
+                              disabled={!canAuditL1}
                               onChange={(e) => handleL1Change(e.target.value)}
-                              className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2 h-8 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                              className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2 h-8 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                               <option value="">— PENDING —</option>
                               <option value="SCHEDULED">SCHEDULED</option>
                               <option value="CLEARED">CLEARED</option>
                               <option value="REJECTED">REJECTED</option>
                             </select>
-                            <Input type="datetime-local" value={l1Date} onChange={(e) => setL1Date(e.target.value)} className="h-8 text-[10px]" />
+                            <Input
+                              type="datetime-local"
+                              value={l1Date}
+                              disabled={!canAuditL1}
+                              onChange={(e) => setL1Date(e.target.value)}
+                              className="h-8 text-[10px] disabled:opacity-60"
+                            />
+                          </div>
+
+                          {/* L1 Remarks & Standard Templates */}
+                          <div className="space-y-1 pt-1">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-bold text-default-600 uppercase tracking-wider">L1 Screening Remarks</span>
+                              {canAuditL1 && (
+                                <select
+                                  defaultValue=""
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      setL1Remarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                                      e.target.value = "";
+                                    }
+                                  }}
+                                  className="text-[10px] border border-default-200 dark:border-slate-700 rounded px-1.5 py-0.5 bg-white dark:bg-slate-800 text-indigo-600 font-semibold cursor-pointer"
+                                >
+                                  <option value="" disabled>+ Quick Pick Remark</option>
+                                  {resolvedTemplates.l1.map((opt) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                            <textarea
+                              rows={2}
+                              disabled={!canAuditL1}
+                              placeholder={canAuditL1 ? "Enter L1 screening remarks or select a quick pick template..." : "No L1 remarks recorded."}
+                              value={l1Remarks}
+                              onChange={(e) => setL1Remarks(e.target.value)}
+                              className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2.5 py-1.5 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
                           </div>
                         </div>
 
-                        {/* L2 Stage */}
-                        <div className={`space-y-2 p-3 border border-default-100 rounded-lg dark:bg-slate-800/10 transition-opacity ${isL1Rejected ? "opacity-40 pointer-events-none" : ""}` }>
+                        {/* ── STAGE 2: L2 Technical Evaluation ── */}
+                        <div className={`space-y-2 p-3 border border-default-150 rounded-xl bg-slate-50/50 dark:bg-slate-800/20 transition-opacity ${isL1Rejected ? "opacity-40 pointer-events-none" : ""}`}>
                           <div className="flex justify-between items-center">
-                            <label className="text-xs font-bold text-default-850">L2 — Round 2</label>
-                            <Badge className="bg-slate-100 text-slate-600 text-[8px] border-0 py-0.5">{l2Status || "Not Started"}</Badge>
+                            <label className="text-xs font-bold text-default-850 flex items-center gap-1.5">
+                              <Icon icon="heroicons:code-bracket" className="h-4 w-4 text-cyan-600" />
+                              Round 2 (L2) — Technical Evaluation
+                            </label>
+                            {canAuditL2 ? (
+                              <Badge className="bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 text-[9px] border-0 py-0.5">
+                                {l2Status || "Not Started"}
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-slate-100 text-slate-500 text-[9px] border-0 py-0.5 flex items-center gap-1">
+                                <Icon icon="heroicons:lock-closed" className="h-2.5 w-2.5" />
+                                Locked (View Only)
+                              </Badge>
+                            )}
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            <select value={l2Status} onChange={(e) => handleL2Change(e.target.value)} disabled={isL1Rejected} className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2 h-8 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600">
+                            <select
+                              value={l2Status}
+                              disabled={!canAuditL2 || isL1Rejected}
+                              onChange={(e) => handleL2Change(e.target.value)}
+                              className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2 h-8 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
                               <option value="">— Not Started —</option>
                               <option value="PENDING">PENDING</option>
                               <option value="SCHEDULED">SCHEDULED</option>
                               <option value="CLEARED">CLEARED</option>
                               <option value="REJECTED">REJECTED</option>
                             </select>
-                            <Input type="datetime-local" value={l2Date} onChange={(e) => setL2Date(e.target.value)} disabled={isL1Rejected} className="h-8 text-[10px]" />
+                            <Input
+                              type="datetime-local"
+                              value={l2Date}
+                              disabled={!canAuditL2 || isL1Rejected}
+                              onChange={(e) => setL2Date(e.target.value)}
+                              className="h-8 text-[10px] disabled:opacity-60"
+                            />
+                          </div>
+
+                          {/* L2 Remarks & Standard Templates */}
+                          <div className="space-y-1 pt-1">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-bold text-default-600 uppercase tracking-wider">L2 Technical Remarks</span>
+                              {canAuditL2 && !isL1Rejected && (
+                                <select
+                                  defaultValue=""
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      setL2Remarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                                      e.target.value = "";
+                                    }
+                                  }}
+                                  className="text-[10px] border border-default-200 dark:border-slate-700 rounded px-1.5 py-0.5 bg-white dark:bg-slate-800 text-cyan-600 font-semibold cursor-pointer"
+                                >
+                                  <option value="" disabled>+ Quick Pick Remark</option>
+                                  {resolvedTemplates.l2.map((opt) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                            <textarea
+                              rows={2}
+                              disabled={!canAuditL2 || isL1Rejected}
+                              placeholder={canAuditL2 ? "Enter L2 technical remarks or select a quick pick template..." : "No L2 remarks recorded."}
+                              value={l2Remarks}
+                              onChange={(e) => setL2Remarks(e.target.value)}
+                              className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2.5 py-1.5 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
                           </div>
                         </div>
 
-                        {/* L3 Stage */}
-                        <div className={`space-y-2 p-3 border border-default-100 rounded-lg dark:bg-slate-800/10 transition-opacity ${(isL1Rejected || isL2Rejected) ? "opacity-40 pointer-events-none" : ""}`}>
+                        {/* ── STAGE 3: L3 Commercial Verification ── */}
+                        <div className={`space-y-2 p-3 border border-default-150 rounded-xl bg-slate-50/50 dark:bg-slate-800/20 transition-opacity ${(isL1Rejected || isL2Rejected) ? "opacity-40 pointer-events-none" : ""}`}>
                           <div className="flex justify-between items-center">
-                            <label className="text-xs font-bold text-default-850">L3 — Final Round</label>
-                            <Badge className="bg-slate-100 text-slate-600 text-[8px] border-0 py-0.5">{l3Status || "Not Started"}</Badge>
+                            <label className="text-xs font-bold text-default-850 flex items-center gap-1.5">
+                              <Icon icon="heroicons:currency-dollar" className="h-4 w-4 text-purple-600" />
+                              Round 3 (L3) — Commercial Verification
+                            </label>
+                            {canAuditL3 ? (
+                              <Badge className="bg-purple-50 text-purple-700 dark:bg-purple-950/40 text-[9px] border-0 py-0.5">
+                                {l3Status || "Not Started"}
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-slate-100 text-slate-500 text-[9px] border-0 py-0.5 flex items-center gap-1">
+                                <Icon icon="heroicons:lock-closed" className="h-2.5 w-2.5" />
+                                Locked (View Only)
+                              </Badge>
+                            )}
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            <select value={l3Status} onChange={(e) => handleL3Change(e.target.value)} disabled={isL1Rejected || isL2Rejected} className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2 h-8 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600">
+                            <select
+                              value={l3Status}
+                              disabled={!canAuditL3 || isL1Rejected || isL2Rejected}
+                              onChange={(e) => handleL3Change(e.target.value)}
+                              className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2 h-8 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
                               <option value="">— Not Started —</option>
                               <option value="PENDING">PENDING</option>
                               <option value="SCHEDULED">SCHEDULED</option>
                               <option value="CLEARED">CLEARED</option>
                               <option value="REJECTED">REJECTED</option>
                             </select>
-                            <Input type="datetime-local" value={l3Date} onChange={(e) => setL3Date(e.target.value)} disabled={isL1Rejected || isL2Rejected} className="h-8 text-[10px]" />
+                            <Input
+                              type="datetime-local"
+                              value={l3Date}
+                              disabled={!canAuditL3 || isL1Rejected || isL2Rejected}
+                              onChange={(e) => setL3Date(e.target.value)}
+                              className="h-8 text-[10px] disabled:opacity-60"
+                            />
+                          </div>
+
+                          {/* L3 Remarks & Standard Templates */}
+                          <div className="space-y-1 pt-1">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-bold text-default-600 uppercase tracking-wider">L3 Commercial Remarks</span>
+                              {canAuditL3 && !isL1Rejected && !isL2Rejected && (
+                                <select
+                                  defaultValue=""
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      setL3Remarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                                      e.target.value = "";
+                                    }
+                                  }}
+                                  className="text-[10px] border border-default-200 dark:border-slate-700 rounded px-1.5 py-0.5 bg-white dark:bg-slate-800 text-purple-600 font-semibold cursor-pointer"
+                                >
+                                  <option value="" disabled>+ Quick Pick Remark</option>
+                                  {resolvedTemplates.l3.map((opt) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                            <textarea
+                              rows={2}
+                              disabled={!canAuditL3 || isL1Rejected || isL2Rejected}
+                              placeholder={canAuditL3 ? "Enter L3 commercial verification notes or select a quick pick..." : "No L3 remarks recorded."}
+                              value={l3Remarks}
+                              onChange={(e) => setL3Remarks(e.target.value)}
+                              className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2.5 py-1.5 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
                           </div>
                         </div>
 
-                        {/* Final Status override */}
-                        <div className="space-y-1">
-                          <label className="text-xs font-bold text-default-800 block">Final Status</label>
-                          <select value={finalStatus} onChange={(e) => setFinalStatus(e.target.value)} className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-3 h-8 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600">
+                        {/* ── FINAL STATUS & ACTIONS ── */}
+                        <div className="space-y-2 p-3.5 border border-default-200 rounded-xl bg-white dark:bg-slate-850">
+                          <div className="flex justify-between items-center">
+                            <label className="text-xs font-bold text-default-850 flex items-center gap-1.5">
+                              <Icon icon="heroicons:flag" className="h-4 w-4 text-emerald-600" />
+                              Final Status
+                            </label>
+                            {!canApproveClient && (
+                              <Badge className="bg-slate-100 text-slate-500 text-[9px] border-0 py-0.5 flex items-center gap-1">
+                                <Icon icon="heroicons:lock-closed" className="h-2.5 w-2.5" />
+                                Locked (Requires submission:approve_client)
+                              </Badge>
+                            )}
+                          </div>
+                          <select
+                            value={finalStatus}
+                            disabled={!canApproveClient}
+                            onChange={(e) => setFinalStatus(e.target.value)}
+                            className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-3 h-8.5 bg-transparent text-default-850 font-semibold focus:outline-none focus:border-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
                             <option value="SUBMITTED">SUBMITTED — Sent to Client</option>
                             <option value="REJECTED">REJECTED</option>
                             <option value="OFFER">OFFER — Offer Extended</option>
                             <option value="JOIN">JOIN — Placed / Joined</option>
                           </select>
-                        </div>
 
-                        {/* Remarks from AM for client feedback */}
-                        <div className="space-y-1">
-                          <label className="text-xs font-bold text-default-800 block flex items-center gap-1.5">
-                            <Icon icon="heroicons:document-text" className="h-3.5 w-3.5 text-default-400" />
-                            Client / Interview Remarks
-                          </label>
-                          <textarea
-                            placeholder="Client feedback, interview notes, reason for rejection..."
-                            value={remarks}
-                            onChange={(e) => setRemarks(e.target.value)}
-                            className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 resize-none"
-                            rows={3}
-                          />
+                          {/* Final Remarks & Standard Templates */}
+                          <div className="space-y-1 pt-1">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-bold text-default-600 uppercase tracking-wider">Final Remarks / Notes</span>
+                              {canApproveClient && (
+                                <select
+                                  defaultValue=""
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      setRemarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                                      e.target.value = "";
+                                    }
+                                  }}
+                                  className="text-[10px] border border-default-200 dark:border-slate-700 rounded px-1.5 py-0.5 bg-white dark:bg-slate-800 text-emerald-600 font-semibold cursor-pointer"
+                                >
+                                  <option value="" disabled>+ Quick Pick Remark</option>
+                                  {resolvedTemplates.final.map((opt) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                            <textarea
+                              placeholder={canApproveClient ? "Client feedback, interview outcomes, placement notes..." : "No final remarks recorded."}
+                              value={remarks}
+                              disabled={!canApproveClient}
+                              onChange={(e) => setRemarks(e.target.value)}
+                              className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2.5 py-2 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 resize-none disabled:opacity-60 disabled:cursor-not-allowed"
+                              rows={2.5}
+                            />
+                          </div>
                         </div>
                       </>
                     )}
+                  </div>
+                )}
+
+                {/* ── CARD: Complete Submission Audit Trail ── */}
+                {selectedSubmission && (
+                  <div className="p-3.5 border border-default-200 rounded-xl bg-default-50/50 dark:bg-slate-800/30 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Icon icon="heroicons:clock" className="h-4 w-4 text-indigo-600" />
+                      <span className="text-xs font-bold text-default-850 uppercase tracking-wider">Evaluation Audit Trail</span>
+                    </div>
+
+                    <div className="relative pl-5 border-l-2 border-indigo-200 dark:border-indigo-900/50 space-y-3.5 text-xs">
+                      {/* Sourced */}
+                      <div className="relative">
+                        <div className="absolute -left-[27px] top-0.5 h-3 w-3 rounded-full bg-indigo-600 ring-4 ring-white dark:ring-slate-900" />
+                        <div className="font-bold text-default-800">
+                          Sourced by {selectedSubmission.recruiterName || 'Recruiter'}
+                        </div>
+                        <div className="text-[10px] text-default-450">
+                          {new Date(selectedSubmission.createdAt).toLocaleString()}
+                        </div>
+                        {selectedSubmission.recruiterComment && (
+                          <div className="mt-1 text-[11px] text-default-700 bg-white dark:bg-slate-800/60 p-2 rounded border border-default-150">
+                            "{selectedSubmission.recruiterComment}"
+                          </div>
+                        )}
+                      </div>
+
+                      {/* L1 Stage */}
+                      {selectedSubmission.l1Status && (
+                        <div className="relative">
+                          <div className="absolute -left-[27px] top-0.5 h-3 w-3 rounded-full bg-indigo-500 ring-4 ring-white dark:ring-slate-900" />
+                          <div className="font-bold text-default-800 flex items-center gap-1.5">
+                            <span>L1 Screening:</span>
+                            <Badge className="text-[9px] py-0 px-1 font-bold">{selectedSubmission.l1Status}</Badge>
+                          </div>
+                          {selectedSubmission.l1Date && (
+                            <div className="text-[10px] text-default-450">
+                              {new Date(selectedSubmission.l1Date).toLocaleString()}
+                            </div>
+                          )}
+                          {selectedSubmission.l1Remarks && (
+                            <div className="mt-1 text-[11px] text-default-700 bg-white dark:bg-slate-800/60 p-2 rounded border border-default-150">
+                              "{selectedSubmission.l1Remarks}"
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* L2 Stage */}
+                      {selectedSubmission.l2Status && (
+                        <div className="relative">
+                          <div className="absolute -left-[27px] top-0.5 h-3 w-3 rounded-full bg-cyan-500 ring-4 ring-white dark:ring-slate-900" />
+                          <div className="font-bold text-default-800 flex items-center gap-1.5">
+                            <span>L2 Tech Screen:</span>
+                            <Badge className="text-[9px] py-0 px-1 font-bold bg-cyan-50 text-cyan-700">{selectedSubmission.l2Status}</Badge>
+                          </div>
+                          {selectedSubmission.l2Date && (
+                            <div className="text-[10px] text-default-450">
+                              {new Date(selectedSubmission.l2Date).toLocaleString()}
+                            </div>
+                          )}
+                          {selectedSubmission.l2Remarks && (
+                            <div className="mt-1 text-[11px] text-default-700 bg-white dark:bg-slate-800/60 p-2 rounded border border-default-150">
+                              "{selectedSubmission.l2Remarks}"
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* L3 Stage */}
+                      {selectedSubmission.l3Status && (
+                        <div className="relative">
+                          <div className="absolute -left-[27px] top-0.5 h-3 w-3 rounded-full bg-purple-500 ring-4 ring-white dark:ring-slate-900" />
+                          <div className="font-bold text-default-800 flex items-center gap-1.5">
+                            <span>L3 Commercial Audit:</span>
+                            <Badge className="text-[9px] py-0 px-1 font-bold bg-purple-50 text-purple-700">{selectedSubmission.l3Status}</Badge>
+                          </div>
+                          {selectedSubmission.l3Date && (
+                            <div className="text-[10px] text-default-450">
+                              {new Date(selectedSubmission.l3Date).toLocaleString()}
+                            </div>
+                          )}
+                          {selectedSubmission.l3Remarks && (
+                            <div className="mt-1 text-[11px] text-default-700 bg-white dark:bg-slate-800/60 p-2 rounded border border-default-150">
+                              "{selectedSubmission.l3Remarks}"
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Final Status */}
+                      {selectedSubmission.finalStatus && selectedSubmission.finalStatus !== 'PENDING_APPROVAL' && (
+                        <div className="relative">
+                          <div className="absolute -left-[27px] top-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-white dark:ring-slate-900" />
+                          <div className="font-bold text-default-800 flex items-center gap-1.5">
+                            <span>Client Milestone:</span>
+                            <Badge className="text-[9px] py-0 px-1 font-bold bg-emerald-50 text-emerald-700">{selectedSubmission.finalStatus}</Badge>
+                          </div>
+                          {selectedSubmission.remarks && (
+                            <div className="mt-1 text-[11px] text-default-700 bg-white dark:bg-slate-800/60 p-2 rounded border border-default-150">
+                              "{selectedSubmission.remarks}"
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1322,6 +1754,7 @@ export default function SubmissionsPage() {
           </div>
         </form>
       </div>
+
       {/* Schedule Interview Modal */}
       <ScheduleInterviewModal
         isOpen={interviewModalOpen}
@@ -1329,6 +1762,103 @@ export default function SubmissionsPage() {
         submission={selectedSubForInterview}
         onSuccess={loadData}
       />
+
+      {/* ── TENANT CUSTOM REMARKS SETTINGS MODAL ── */}
+      <Dialog open={customRemarksModalOpen} onOpenChange={setCustomRemarksModalOpen}>
+        <DialogContent className="sm:max-w-[600px] font-sans max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold text-neutral-800 dark:text-white flex items-center gap-2">
+              <Icon icon="heroicons:cog-6-tooth" className="h-5 w-5 text-indigo-600" />
+              Tenant Custom Stage Remarks Templates
+            </DialogTitle>
+            <DialogDescription className="text-xs text-neutral-500">
+              Configure company-wide standard remarks options for your recruiters, pod leads, and account managers.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 flex-1 overflow-y-auto pr-1">
+            {/* Add New Form */}
+            <form onSubmit={handleAddCustomRemark} className="p-3 border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-950/20 rounded-xl space-y-3">
+              <div className="text-xs font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+                <Icon icon="heroicons:plus-circle" className="h-4 w-4" />
+                Add New Custom Quick-Pick Remark
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-default-500 uppercase">Target Stage</label>
+                  <select
+                    value={newRemarkStage}
+                    onChange={(e) => setNewRemarkStage(e.target.value)}
+                    className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2 h-8.5 bg-white dark:bg-slate-800 text-default-850"
+                  >
+                    <option value="l1">L1 — Internal Screening</option>
+                    <option value="l2">L2 — Technical Vetting</option>
+                    <option value="l3">L3 — Commercial Audit</option>
+                    <option value="final">Final Client Milestone</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-[10px] font-bold text-default-500 uppercase">Remark Text / Template</label>
+                  <Input
+                    placeholder="e.g. ✓ Cleared System Design Assessment with Grade A"
+                    value={newRemarkText}
+                    onChange={(e) => setNewRemarkText(e.target.value)}
+                    className="h-8.5 text-xs"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={addingRemark || !newRemarkText.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-7.5 px-4"
+                >
+                  {addingRemark ? "Adding..." : "+ Add Option"}
+                </Button>
+              </div>
+            </form>
+
+            {/* List of Custom Remarks */}
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-default-700 uppercase tracking-wider">Active Custom Remarks by Stage</div>
+              {customRemarks.length === 0 ? (
+                <div className="text-xs text-default-400 p-4 border border-dashed border-default-200 rounded-lg text-center italic">
+                  No tenant-specific custom remarks configured yet. The standard system defaults are active.
+                </div>
+              ) : (
+                <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                  {customRemarks.map((rem) => (
+                    <div key={rem.id} className="flex items-center justify-between p-2.5 bg-default-50 dark:bg-slate-800/40 rounded-lg border border-default-150 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Badge className="text-[9px] uppercase font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                          {rem.stage}
+                        </Badge>
+                        <span className="text-default-800 dark:text-default-200 font-medium">{rem.remarkText}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteCustomRemark(rem.id)}
+                        className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 h-7 w-7 p-0"
+                      >
+                        <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2 border-t border-default-150">
+            <Button variant="outline" size="sm" onClick={() => setCustomRemarksModalOpen(false)} className="text-xs">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

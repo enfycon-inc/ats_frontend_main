@@ -103,9 +103,22 @@ export default function JobDetailPage() {
   }, []);
 
   const roles = useMemo(() => currentUser?.roles || [], [currentUser]);
+  const userPerms = useMemo(() => currentUser?.permissions || [], [currentUser]);
+  const isAdmin = useMemo(() => roles.includes("ADMIN") || roles.includes("SUPER_ADMIN") || currentUser?.systemRole === "ADMIN" || currentUser?.systemRole === "SUPER_ADMIN", [roles, currentUser]);
+  const isDeliveryHead = useMemo(() => roles.includes("DELIVERY_HEAD") || currentUser?.systemRole === "DELIVERY_HEAD", [roles, currentUser]);
+  const isAM = useMemo(() => roles.includes("ACCOUNT_MANAGER") || currentUser?.systemRole === "ACCOUNT_MANAGER", [roles, currentUser]);
+  const isPodLead = useMemo(() => roles.includes("POD_LEAD") || currentUser?.systemRole === "POD_LEAD", [roles, currentUser]);
+
+  const canAuditRounds = useMemo(() => isAdmin || isDeliveryHead || isAM || userPerms.includes("submission:audit_rounds"), [isAdmin, isDeliveryHead, isAM, userPerms]);
+  const canAuditL1 = useMemo(() => canAuditRounds || isAM || isPodLead || userPerms.includes("submission:audit_l1"), [canAuditRounds, isAM, isPodLead, userPerms]);
+  const canAuditL2 = useMemo(() => canAuditRounds || isAM || userPerms.includes("submission:audit_l2"), [canAuditRounds, isAM, userPerms]);
+  const canAuditL3 = useMemo(() => canAuditRounds || isAM || userPerms.includes("submission:audit_l3"), [canAuditRounds, isAM, userPerms]);
+  const canApproveClient = useMemo(() => isAdmin || isDeliveryHead || isAM || userPerms.includes("submission:approve_client"), [isAdmin, isDeliveryHead, isAM, userPerms]);
+  const canEditRate = useMemo(() => isAdmin || isDeliveryHead || isAM || userPerms.includes("submission:edit_rate"), [isAdmin, isDeliveryHead, isAM, userPerms]);
+
   const isRecruiterOnly = useMemo(() => {
-    return roles.includes("RECRUITER") && !roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN") && !roles.includes("ACCOUNT_MANAGER") && !roles.includes("POD_LEAD");
-  }, [roles]);
+    return roles.includes("RECRUITER") && !canAuditL1 && !canAuditL2 && !canAuditL3 && !canApproveClient && !canAuditRounds;
+  }, [roles, canAuditL1, canAuditL2, canAuditL3, canApproveClient, canAuditRounds]);
 
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
@@ -117,13 +130,51 @@ export default function JobDetailPage() {
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [l1Status, setL1Status] = useState("");
+  const [l1Remarks, setL1Remarks] = useState("");
   const [l2Status, setL2Status] = useState("");
+  const [l2Remarks, setL2Remarks] = useState("");
   const [l3Status, setL3Status] = useState("");
+  const [l3Remarks, setL3Remarks] = useState("");
   const [finalStatus, setFinalStatus] = useState("");
   const [remarks, setRemarks] = useState("");
   const [recruiterComment, setRecruiterComment] = useState("");
   const [submittedRate, setSubmittedRate] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [customRemarks, setCustomRemarks] = useState<any[]>([]);
+
+  const resolvedTemplates = useMemo(() => ({
+    l1: [
+      "✓ Mandatory skills 100% verified against JD",
+      "✓ Immediate joiner — notice period ≤ 30 days",
+      "✓ Work authorization & visa verified",
+      "✕ Rejected: Notice period exceeds 60 days",
+      "✕ Rejected: Skill gap in core mandatory stack",
+      "✕ Rejected: Expected CTC exceeds maximum budget",
+      ...customRemarks.filter((r) => r.stage?.toLowerCase() === "l1").map((r) => r.remarkText),
+    ],
+    l2: [
+      "✓ Passed technical screening with strong hands-on coding",
+      "✓ System architecture & design patterns depth verified",
+      "✕ Rejected: Failed live technical coding assessment",
+      "✕ Rejected: Insufficient experience in required tech stack",
+      ...customRemarks.filter((r) => r.stage?.toLowerCase() === "l2").map((r) => r.remarkText),
+    ],
+    l3: [
+      "✓ Commercials & margin verified (>20% Gross Margin)",
+      "✓ Candidate rate confirmation email on file",
+      "✕ Rejected: Commercial margin below threshold (<15%)",
+      "✕ Rejected: Candidate declined rate confirmation",
+      ...customRemarks.filter((r) => r.stage?.toLowerCase() === "l3").map((r) => r.remarkText),
+    ],
+    final: [
+      "✓ Client shortlisted for Round 1 Interview",
+      "✓ Client released official offer letter",
+      "✓ Candidate accepted offer & joined client",
+      "✕ Client rejected: Profile not aligned with expectations",
+      "✕ Candidate declined offer / accepted counter-offer",
+      ...customRemarks.filter((r) => r.stage?.toLowerCase() === "final").map((r) => r.remarkText),
+    ],
+  }), [customRemarks]);
 
   // Job Approval / Rejection states
   const [approveModalOpen, setApproveModalOpen] = useState(false);
@@ -185,13 +236,15 @@ export default function JobDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const [jobData, subsData] = await Promise.all([
+      const [jobData, subsData, remarksData] = await Promise.all([
         atsApi.jobs.get(id),
         atsApi.submissions.list({ jobId: id }),
+        atsApi.submissions.getCustomRemarks().catch(() => []),
       ]);
 
       setJob(mapApiJobToJob(jobData));
       setSubmissions(Array.isArray(subsData) ? subsData : subsData?.data || []);
+      setCustomRemarks(remarksData || []);
       
       // Fetch matches asynchronously so it doesn't block UI load
       loadMatches();
@@ -235,8 +288,11 @@ export default function JobDetailPage() {
   const openReviewPanel = (sub: any) => {
     setSelectedSub(sub);
     setL1Status(sub.l1Status || "");
+    setL1Remarks(sub.l1Remarks || "");
     setL2Status(sub.l2Status || "");
+    setL2Remarks(sub.l2Remarks || "");
     setL3Status(sub.l3Status || "");
+    setL3Remarks(sub.l3Remarks || "");
     setFinalStatus(sub.finalStatus || "PENDING_APPROVAL");
     setRemarks(sub.remarks || "");
     setRecruiterComment(sub.recruiterComment || "");
@@ -251,17 +307,26 @@ export default function JobDetailPage() {
     setSubmitting(true);
     try {
       const payload: any = {};
-      if (isRecruiterOnly) {
-        payload.recruiterComment = recruiterComment.trim() || null;
-      } else {
+      if (canAuditL1) {
         payload.l1Status = l1Status || null;
+        payload.l1Remarks = l1Remarks.trim() || null;
+      }
+      if (canAuditL2) {
         payload.l2Status = l2Status || null;
+        payload.l2Remarks = l2Remarks.trim() || null;
+      }
+      if (canAuditL3) {
         payload.l3Status = l3Status || null;
+        payload.l3Remarks = l3Remarks.trim() || null;
+      }
+      if (canApproveClient) {
         payload.finalStatus = finalStatus;
         payload.remarks = remarks.trim() || null;
-        payload.recruiterComment = recruiterComment.trim() || null;
+      }
+      if (canEditRate) {
         payload.submittedRate = submittedRate.trim() || null;
       }
+      payload.recruiterComment = recruiterComment.trim() || null;
 
       await atsApi.submissions.update(selectedSub.id, payload);
       toast.success("Submission updated successfully!");
@@ -1133,95 +1198,224 @@ export default function JobDetailPage() {
               </div>
             )}
 
-            {/* Status Selectors (Admins/AMs only) */}
-            {!isRecruiterOnly ? (
-              <div className="space-y-3.5 pt-2">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-450 uppercase">L1 Status</label>
-                    <select
-                      value={l1Status}
-                      onChange={(e) => setL1Status(e.target.value)}
-                      className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-transparent text-xs outline-none cursor-pointer"
-                    >
-                      <option value="">Pending</option>
-                      <option value="SCHEDULED">Scheduled</option>
-                      <option value="CLEARED">Cleared</option>
-                      <option value="REJECTED">Rejected</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-450 uppercase">L2 Status</label>
-                    <select
-                      value={l2Status}
-                      onChange={(e) => setL2Status(e.target.value)}
-                      className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-transparent text-xs outline-none cursor-pointer"
-                    >
-                      <option value="">Not Started</option>
-                      <option value="PENDING">Pending</option>
-                      <option value="SCHEDULED">Scheduled</option>
-                      <option value="CLEARED">Cleared</option>
-                      <option value="REJECTED">Rejected</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-450 uppercase">L3 Status</label>
-                    <select
-                      value={l3Status}
-                      onChange={(e) => setL3Status(e.target.value)}
-                      className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-transparent text-xs outline-none cursor-pointer"
-                    >
-                      <option value="">Not Started</option>
-                      <option value="PENDING">Pending</option>
-                      <option value="SCHEDULED">Scheduled</option>
-                      <option value="CLEARED">Cleared</option>
-                      <option value="REJECTED">Rejected</option>
-                    </select>
-                  </div>
+            {/* Status Selectors with Granular Permissions & Pre-configured Quick-Pick Remarks */}
+            <div className="space-y-3 pt-2">
+              {/* L1 Stage */}
+              <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                    L1 — Internal Screening &amp; Resume Audit
+                  </label>
+                  {!canAuditL1 && (
+                    <Badge className="bg-slate-100 text-slate-500 text-[9px] border-0">Locked (View Only)</Badge>
+                  )}
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-450 uppercase block">Submission Status</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={l1Status}
+                    disabled={!canAuditL1}
+                    onChange={(e) => setL1Status(e.target.value)}
+                    className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-transparent text-xs outline-none cursor-pointer disabled:opacity-60"
+                  >
+                    <option value="">Pending</option>
+                    <option value="SCHEDULED">Scheduled</option>
+                    <option value="CLEARED">Cleared</option>
+                    <option value="REJECTED">Rejected</option>
+                  </select>
+                  {canAuditL1 && (
                     <select
-                      value={finalStatus}
-                      onChange={(e) => setFinalStatus(e.target.value)}
-                      className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-transparent text-xs outline-none cursor-pointer font-bold"
+                      defaultValue=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setL1Remarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                          e.target.value = "";
+                        }
+                      }}
+                      className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-white dark:bg-slate-800 text-[11px] text-indigo-600 font-semibold cursor-pointer"
                     >
-                      <option value="PENDING_APPROVAL">Pending Review</option>
-                      <option value="SUBMITTED">Submitted to Client</option>
-                      <option value="OFFER">Offer Stage</option>
-                      <option value="JOIN">Joined / Placed</option>
-                      <option value="REJECTED">Rejected</option>
+                      <option value="" disabled>+ L1 Quick Remark</option>
+                      {resolvedTemplates.l1.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
                     </select>
-                  </div>
+                  )}
+                </div>
+                {canAuditL1 && (
+                  <textarea
+                    rows={1.5}
+                    placeholder="L1 screening feedback notes..."
+                    value={l1Remarks}
+                    onChange={(e) => setL1Remarks(e.target.value)}
+                    className="w-full border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-transparent outline-none focus:border-indigo-500 resize-none"
+                  />
+                )}
+              </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-450 uppercase block">Submitted Pay Rate</label>
-                    <Input
-                      value={submittedRate}
-                      onChange={(e) => setSubmittedRate(e.target.value)}
-                      className="h-8 text-xs font-semibold"
-                      placeholder="e.g. $70/hr or 15 LPA"
-                    />
-                  </div>
+              {/* L2 Stage */}
+              <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                    L2 — Technical Vetting &amp; Screening
+                  </label>
+                  {!canAuditL2 && (
+                    <Badge className="bg-slate-100 text-slate-500 text-[9px] border-0">Locked (View Only)</Badge>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={l2Status}
+                    disabled={!canAuditL2}
+                    onChange={(e) => setL2Status(e.target.value)}
+                    className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-transparent text-xs outline-none cursor-pointer disabled:opacity-60"
+                  >
+                    <option value="">Not Started</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="SCHEDULED">Scheduled</option>
+                    <option value="CLEARED">Cleared</option>
+                    <option value="REJECTED">Rejected</option>
+                  </select>
+                  {canAuditL2 && (
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setL2Remarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                          e.target.value = "";
+                        }
+                      }}
+                      className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-white dark:bg-slate-800 text-[11px] text-cyan-600 font-semibold cursor-pointer"
+                    >
+                      <option value="" disabled>+ L2 Quick Remark</option>
+                      {resolvedTemplates.l2.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                {canAuditL2 && (
+                  <textarea
+                    rows={1.5}
+                    placeholder="L2 technical feedback notes..."
+                    value={l2Remarks}
+                    onChange={(e) => setL2Remarks(e.target.value)}
+                    className="w-full border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-transparent outline-none focus:border-indigo-500 resize-none"
+                  />
+                )}
+              </div>
+
+              {/* L3 Stage */}
+              <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                    L3 — Commercial &amp; Client Readiness Audit
+                  </label>
+                  {!canAuditL3 && (
+                    <Badge className="bg-slate-100 text-slate-500 text-[9px] border-0">Locked (View Only)</Badge>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={l3Status}
+                    disabled={!canAuditL3}
+                    onChange={(e) => setL3Status(e.target.value)}
+                    className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-transparent text-xs outline-none cursor-pointer disabled:opacity-60"
+                  >
+                    <option value="">Not Started</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="SCHEDULED">Scheduled</option>
+                    <option value="CLEARED">Cleared</option>
+                    <option value="REJECTED">Rejected</option>
+                  </select>
+                  {canAuditL3 && (
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setL3Remarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                          e.target.value = "";
+                        }
+                      }}
+                      className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-white dark:bg-slate-800 text-[11px] text-purple-600 font-semibold cursor-pointer"
+                    >
+                      <option value="" disabled>+ L3 Quick Remark</option>
+                      {resolvedTemplates.l3.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                {canAuditL3 && (
+                  <textarea
+                    rows={1.5}
+                    placeholder="L3 commercial feedback notes..."
+                    value={l3Remarks}
+                    onChange={(e) => setL3Remarks(e.target.value)}
+                    className="w-full border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-transparent outline-none focus:border-indigo-500 resize-none"
+                  />
+                )}
+              </div>
+
+              {/* Final Status & Rate */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-450 uppercase block">Final Milestone Status</label>
+                  <select
+                    value={finalStatus}
+                    disabled={!canApproveClient}
+                    onChange={(e) => setFinalStatus(e.target.value)}
+                    className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-transparent text-xs outline-none cursor-pointer font-bold disabled:opacity-60"
+                  >
+                    <option value="PENDING_APPROVAL">Pending Review</option>
+                    <option value="SUBMITTED">Submitted to Client</option>
+                    <option value="OFFER">Offer Stage</option>
+                    <option value="JOIN">Joined / Placed</option>
+                    <option value="REJECTED">Rejected</option>
+                  </select>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-neutral-450 uppercase block">Manager Feedback / Remarks</label>
-                  <textarea
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                    className="w-full min-h-12 border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-transparent outline-none focus:border-indigo-500"
-                    placeholder="Enter manager feedback notes..."
+                  <label className="text-[10px] font-bold text-neutral-450 uppercase block">Submitted Pay Rate</label>
+                  <Input
+                    value={submittedRate}
+                    disabled={!canEditRate}
+                    onChange={(e) => setSubmittedRate(e.target.value)}
+                    className="h-8 text-xs font-semibold disabled:opacity-60"
+                    placeholder="e.g. $70/hr or 15 LPA"
                   />
                 </div>
               </div>
-            ) : (
-              <div className="p-3 bg-amber-50/15 rounded border border-amber-100 text-[11px] text-amber-800">
-                ⚠️ As a recruiter, you have view-only access to pipeline interview stages. You can update comments below.
+
+              {/* Final Client Remarks */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-bold text-neutral-450 uppercase block">Client / Final Remarks</label>
+                  {canApproveClient && (
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setRemarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                          e.target.value = "";
+                        }
+                      }}
+                      className="text-[10px] border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-0.5 bg-white dark:bg-slate-800 text-emerald-600 font-semibold cursor-pointer"
+                    >
+                      <option value="" disabled>+ Client Quick Remark</option>
+                      {resolvedTemplates.final.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <textarea
+                  value={remarks}
+                  disabled={!canApproveClient}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  className="w-full min-h-12 border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-transparent outline-none focus:border-indigo-500 disabled:opacity-60"
+                  placeholder={canApproveClient ? "Enter manager / client feedback notes..." : "No remarks recorded."}
+                />
               </div>
-            )}
+            </div>
 
             <div className="space-y-1 pt-1">
               <label className="text-[10px] font-bold text-neutral-450 uppercase block">Recruiter Submission Note</label>

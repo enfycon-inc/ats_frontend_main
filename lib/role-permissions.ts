@@ -195,16 +195,17 @@ export function getActiveRolePermissions(
       return [
         "job:view", "job:edit", "job:approve", "job:reject",
         "job:assign", "job:assign_recruiter", "job:assign_pod",
-        "candidate:view", "submission:view", "submission:edit",
-        "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle",
-        "candidate:search_all_branches", "job:view_all_branches",
+        "candidate:view", "candidate:create",
+        "submission:view", "submission:create", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+        "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
+        "candidate:search_all_branches", "job:view_all_branches", "candidate:search_all_markets",
         "client:view", "placement:view", "report:view"
       ];
     case "ACCOUNT_MANAGER":
       return [
-        "job:create", "job:edit", "job:view",
+        "job:create", "job:edit", "job:view", "job:approve",
         "candidate:view", "candidate:create",
-        "submission:view", "submission:edit",
+        "submission:view", "submission:audit_l3", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
         "client:view", "client:create", "client:edit",
         "placement:view", "placement:create",
         "report:view"
@@ -212,14 +213,15 @@ export function getActiveRolePermissions(
     case "POD_LEAD":
       return [
         "job:view", "job:edit", "job:approve", "job:reject",
-        "candidate:view", "submission:view", "submission:edit",
-        "pod:view", "report:view"
+        "candidate:view", "candidate:create",
+        "submission:view", "submission:create", "submission:audit_l1", "submission:schedule_interview", "submission:edit",
+        "pod:view", "pod:edit", "report:view"
       ];
     case "RECRUITER":
     default:
       return [
         "candidate:create", "candidate:view",
-        "submission:create", "submission:view",
+        "submission:create", "submission:view", "submission:edit",
         "job:view"
       ];
   }
