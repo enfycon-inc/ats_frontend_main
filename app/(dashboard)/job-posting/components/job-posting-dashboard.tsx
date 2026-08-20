@@ -16,8 +16,24 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
+import { getUserColumnPreferences, saveUserColumnPreferences } from "@/utils/user-column-preferences";
 
-
+const DEFAULT_JOB_COLUMNS = [
+  "jobCode",
+  "jobTitle",
+  "businessUnit",
+  "client",
+  "endClientName",
+  "location",
+  "states",
+  "jobStatus",
+  "podName",
+  "clientBillRate",
+  "payRate",
+  "recruitmentManager",
+  "primaryRecruiter",
+  "submissionsCount",
+];
 
 const matchStatus = (jobStatus: string, filter: string) => {
   if (filter === "All") return true;
@@ -31,18 +47,16 @@ const matchStatus = (jobStatus: string, filter: string) => {
 };
 
 interface JobPostingDashboardProps {
-  initialStatusFilter?: "Active" | "Close" | "Closed" | "Filled" | "Hold" | "Hold by Client" | "Draft" | "All";
+  initialStatusFilter?: string;
 }
 
 export default function JobPostingDashboard({
   initialStatusFilter = "All",
 }: JobPostingDashboardProps) {
-  // Market State (US or India)
-  const [market, setMarket] = useState<"US" | "IN">("IN");
-
   // Drawer States
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isColumnOpen, setIsColumnOpen] = useState(false);
+  const [market, setMarket] = useState<"US" | "IN">("IN");
 
   // User details & permission controls
   const currentUser = useMemo(() => {
@@ -58,23 +72,18 @@ export default function JobPostingDashboard({
     return permissions.includes("job:edit") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("ADMIN");
   }, [currentUser]);
 
-  // Table Configuration States
-  const [selectedColumns, setSelectedColumns] = useState<string[]>([
-    "jobCode",
-    "jobTitle",
-    "businessUnit",
-    "client",
-    "endClientName",
-    "location",
-    "states",
-    "jobStatus",
-    "podName",
-    "clientBillRate",
-    "payRate",
-    "recruitmentManager",
-    "primaryRecruiter",
-    "submissionsCount",
-  ]);
+  // Table Configuration States (User Persistent)
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() =>
+    getUserColumnPreferences("jobs", DEFAULT_JOB_COLUMNS)
+  );
+
+  // Sync user-specific columns when currentUser resolves or changes
+  useEffect(() => {
+    if (currentUser) {
+      const userSavedCols = getUserColumnPreferences("jobs", DEFAULT_JOB_COLUMNS);
+      setSelectedColumns(userSavedCols);
+    }
+  }, [currentUser]);
 
   const activeSelectedColumns = useMemo(() => {
     if (!hasEditPermission) {
@@ -152,7 +161,36 @@ export default function JobPostingDashboard({
         });
         
         // Prefer shift-filtered jobs; if empty, show all real tenant API jobs so real DB jobs are never hidden by mock data
-        const jobsToDisplay = shiftJobs.length > 0 ? shiftJobs : mapped;
+        let jobsToDisplay = shiftJobs.length > 0 ? shiftJobs : mapped;
+
+        // ── Recruiter scoping (frontend safety net) ──────────────────────────
+        // The backend already enforces this via SQL. This client-side guard
+        // covers mock/cached data paths (e.g. fallback mock data).
+        const PRIVILEGED_ROLES = ['SUPER_ADMIN', 'ADMIN', 'DELIVERY_HEAD', 'POD_LEAD', 'ACCOUNT_MANAGER'];
+        const isRecruiterOnly = currentUser?.roles?.includes('RECRUITER') &&
+          !currentUser?.roles?.some((r: string) => PRIVILEGED_ROLES.includes(r));
+
+        if (isRecruiterOnly && currentUser?.id) {
+          const userPodId = (currentUser as any)?.podId;
+          jobsToDisplay = jobsToDisplay.filter((job) => {
+            // 1. Assigned directly as primary recruiter or recruitment manager
+            if (job.primaryRecruiterId === currentUser.id || job.recruitmentManagerId === currentUser.id) {
+              return true;
+            }
+            // 2. Assigned to a Pod that the recruiter belongs to
+            if (userPodId && job.podId && job.podId === userPodId) {
+              return true;
+            }
+            // 3. Assigned to ALL branch recruiters
+            if (job.assignedTo && (job.assignedTo.toUpperCase() === 'ALL' || job.assignedTo.toUpperCase().startsWith('ALL'))) {
+              return true;
+            }
+            // 4. Otherwise (unassigned or other pod) -> hidden
+            return false;
+          });
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         const filteredByRoute = jobsToDisplay.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
 
         setAllJobs(jobsToDisplay);
@@ -395,7 +433,11 @@ export default function JobPostingDashboard({
         onClose={() => setIsColumnOpen(false)}
         allColumns={allColumns}
         selectedColumns={activeSelectedColumns}
-        onApply={(newCols) => setSelectedColumns(newCols)}
+        onApply={(newCols) => {
+          setSelectedColumns(newCols);
+          saveUserColumnPreferences("jobs", newCols);
+          toast.success("Column view saved for your account!");
+        }}
       />
     </div>
   );

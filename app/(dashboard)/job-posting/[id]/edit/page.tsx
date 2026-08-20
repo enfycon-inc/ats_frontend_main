@@ -306,7 +306,23 @@ export default function EditJobPostingPage() {
   
   // Pod selection (optional override — defaults to auto round-robin)
   const [podsList, setPodsList] = useState<any[]>([]);
+  const [branchUsers, setBranchUsers] = useState<any[]>([]);
   const [selectedPodId, setSelectedPodId] = useState("");
+  const [activeBranch, setActiveBranch] = useState<any>(null);
+
+  const deliveryHeads = useMemo(() => {
+    return branchUsers.filter((u) => {
+      const r = u.roles || [];
+      return r.includes("DELIVERY_HEAD") || r.includes("ADMIN") || r.includes("BRANCH_ADMIN") || r.includes("SUPER_ADMIN");
+    });
+  }, [branchUsers]);
+
+  const recruitersList = useMemo(() => {
+    return branchUsers.filter((u) => {
+      const r = u.roles || [];
+      return r.includes("RECRUITER") || r.length === 0;
+    });
+  }, [branchUsers]);
   
   const [tenantName, setTenantName] = useState("enfycon Inc");
   const [market, setMarket] = useState<"US" | "IN">("US");
@@ -456,19 +472,35 @@ export default function EditJobPostingPage() {
           setTenantName(tName);
         }
 
-        // Fetch client lists and pods lists
+        // Fetch active branch context
+        const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
+        const activeBranchName = typeof window !== 'undefined' ? localStorage.getItem('active_branch_name') || "" : "";
         try {
-          const clientsRes = await atsApi.clients.list();
-          setClientList(clientsRes || []);
+          const branchesList = await atsApi.branches.list().catch(() => []);
+          let activeBranchObj = null;
+          if (activeBranchId) {
+            activeBranchObj = branchesList.find((b: any) => b.id === activeBranchId);
+          }
+          if (!activeBranchObj && activeBranchName) {
+            activeBranchObj = branchesList.find((b: any) => b.name?.toLowerCase() === activeBranchName.toLowerCase());
+          }
+          setActiveBranch(activeBranchObj || null);
         } catch (e) {
-          console.warn("Failed to fetch clients", e);
+          console.warn("Failed to load branches list:", e);
         }
 
+        // Fetch client lists, pods, and users
         try {
-          const podsRes = await atsApi.pods.list();
+          const [clientsRes, podsRes, usersRes] = await Promise.all([
+            atsApi.clients.list().catch(() => []),
+            atsApi.pods.list().catch(() => []),
+            atsApi.auth.listUsers().catch(() => []),
+          ]);
+          setClientList(clientsRes || []);
           setPodsList(podsRes || []);
+          setBranchUsers(usersRes || []);
         } catch (e) {
-          console.warn("Failed to fetch pods", e);
+          console.warn("Failed to fetch clients/pods/users", e);
         }
 
         // Fetch job details to populate form
@@ -2302,38 +2334,40 @@ export default function EditJobPostingPage() {
                     {/* Skill Tag Inputs */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Primary Skills */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="font-bold text-neutral-700 dark:text-neutral-300 font-medium">Primary Skills (Press Enter to add)</label>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between h-5">
+                          <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300">
+                            Primary Skills <span className="text-[10px] text-neutral-400 font-normal">(Press Enter to add)</span>
+                          </label>
                           <button
                             type="button"
                             onClick={handleExtractSkillsFromDescription}
                             disabled={isExtractingSkills}
-                            className="text-[10px] text-primary dark:text-sky-400 font-bold flex items-center gap-1 hover:underline cursor-pointer disabled:opacity-50"
+                            className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 hover:underline cursor-pointer disabled:opacity-50"
                           >
                             {isExtractingSkills ? (
                               <>
-                                <span className="h-2.5 w-2.5 border border-primary dark:border-sky-400 border-t-transparent rounded-full animate-spin" />
+                                <span className="h-2.5 w-2.5 border border-indigo-600 dark:border-indigo-400 border-t-transparent rounded-full animate-spin" />
                                 Extracting...
                               </>
                             ) : (
                               <>
-                                <Sparkles className="h-2.5 w-2.5" /> Auto-Extract from JD below
+                                <Sparkles className="h-3 w-3" /> Auto-Extract from JD below
                               </>
                             )}
                           </button>
                         </div>
-                        <div className="flex flex-wrap gap-1.5 p-2 border border-neutral-300 dark:border-slate-700 rounded bg-white dark:bg-slate-950 min-h-[42px] items-center">
+                        <div className="flex flex-wrap gap-1.5 px-3 py-1.5 border border-neutral-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-950 min-h-[36px] items-center focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20">
                           {primarySkills.map((tag) => (
                             <Badge
                               key={tag}
-                              className="bg-primary/10 border border-primary text-primary text-[10px] font-bold flex items-center gap-1 shadow-none rounded-sm"
+                              className="bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-[10px] font-semibold flex items-center gap-1 shadow-none rounded px-1.5 py-0.5"
                             >
                               {tag}
                               <button
                                 type="button"
                                 onClick={() => removePrimarySkill(tag)}
-                                className="hover:text-red-500 text-primary/70 transition-colors cursor-pointer"
+                                className="hover:text-red-500 text-indigo-500/80 transition-colors cursor-pointer"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -2345,25 +2379,29 @@ export default function EditJobPostingPage() {
                             value={newPrimarySkill}
                             onChange={(e) => setNewPrimarySkill(e.target.value)}
                             onKeyDown={addPrimarySkill}
-                            className="bg-transparent border-none outline-hidden text-xs flex-1 min-w-[80px] text-neutral-800 dark:text-neutral-200"
+                            className="bg-transparent border-none outline-none text-xs flex-1 min-w-[80px] text-neutral-800 dark:text-neutral-200"
                           />
                         </div>
                       </div>
 
                       {/* Secondary Skills */}
-                      <div className="space-y-2">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300 font-medium">Secondary Skills (Press Enter to add)</label>
-                        <div className="flex flex-wrap gap-1.5 p-2 border border-neutral-300 dark:border-slate-700 rounded bg-white dark:bg-slate-950 min-h-[42px] items-center">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between h-5">
+                          <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300">
+                            Secondary Skills <span className="text-[10px] text-neutral-400 font-normal">(Press Enter to add)</span>
+                          </label>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 px-3 py-1.5 border border-neutral-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-950 min-h-[36px] items-center focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20">
                           {secondarySkills.map((tag) => (
                             <Badge
                               key={tag}
-                              className="bg-neutral-100 dark:bg-slate-800 border border-neutral-350 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 text-[10px] font-bold flex items-center gap-1 shadow-none rounded-sm"
+                              className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-semibold flex items-center gap-1 shadow-none rounded px-1.5 py-0.5"
                             >
                               {tag}
                               <button
                                 type="button"
                                 onClick={() => removeSecondarySkill(tag)}
-                                className="hover:text-red-500 text-neutral-500 transition-colors cursor-pointer"
+                                className="hover:text-red-500 text-slate-500 transition-colors cursor-pointer"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -2375,7 +2413,7 @@ export default function EditJobPostingPage() {
                             value={newSecondarySkill}
                             onChange={(e) => setNewSecondarySkill(e.target.value)}
                             onKeyDown={addSecondarySkill}
-                            className="bg-transparent border-none outline-hidden text-xs flex-1 min-w-[80px] text-neutral-800 dark:text-neutral-200"
+                            className="bg-transparent border-none outline-none text-xs flex-1 min-w-[80px] text-neutral-800 dark:text-neutral-200"
                           />
                         </div>
                       </div>
@@ -2388,85 +2426,118 @@ export default function EditJobPostingPage() {
               <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
                 <SectionHeader title="Organizational Information" sectionKey="orgInfo" />
                 {!collapsedSections.orgInfo && (
-                  <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                    {/* Positions */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Number of Positions <span className="text-red-500">*</span></label>
-                      <input
-                        type="number"
-                        {...register("numPositions", { valueAsNumber: true })}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
-                      />
-                    </div>
+                  <div className="p-4 space-y-4 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {/* Positions */}
+                      <div className="space-y-1.5">
+                        <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center h-5">
+                          Number of Positions <span className="text-red-500 ml-0.5">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          {...register("numPositions", { valueAsNumber: true })}
+                          className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 font-medium"
+                        />
+                      </div>
 
-                    {/* Max Submissions */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Maximum Allowed Submissions <span className="text-red-500">*</span></label>
-                      <input
-                        type="number"
-                        {...register("maxSubmissions", { valueAsNumber: true })}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
-                      />
-                    </div>
+                      {/* Max Submissions */}
+                      <div className="space-y-1.5">
+                        <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center h-5">
+                          Maximum Allowed Submissions <span className="text-red-500 ml-0.5">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          {...register("maxSubmissions", { valueAsNumber: true })}
+                          className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 font-medium"
+                        />
+                      </div>
 
-                    {/* Department (US Market Only) */}
-                    {market !== "IN" && (
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Department</label>
+                      {/* Job Assignment & Pod Routing */}
+                      <div className="space-y-1.5">
+                        <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 h-5">
+                          <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
+                            <User className="h-2.5 w-2.5" />
+                          </span>
+                          Job Assignment & Pod Routing
+                        </label>
                         <select
-                          {...register("department")}
-                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                          value={selectedPodId}
+                          onChange={(e) => setSelectedPodId(e.target.value)}
+                          className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-medium"
                         >
-                          <option value="IT Services">IT Services</option>
-                          <option value="Operations">Operations</option>
-                          <option value="Sales">Sales</option>
+                          {/* 1. Pod Leads */}
+                          <optgroup label="1. Recruitment Pod Leads (Review & Broadcast)">
+                            {podsList && podsList.length > 0 ? (
+                              podsList.map((pod: any) => (
+                                <option key={`pod:${pod.id}`} value={`pod:${pod.id}`}>
+                                  Pod Lead: {pod.podHeadName ? `${pod.podHeadName} (${pod.name})` : pod.name}
+                                </option>
+                              ))
+                            ) : (
+                              <option value="">Pod System (Auto Broadcast / Round-Robin)</option>
+                            )}
+                          </optgroup>
+
+                          {/* 2. Delivery Heads */}
+                          {deliveryHeads && deliveryHeads.length > 0 && (
+                            <optgroup label="2. Delivery Heads / Operations Leads">
+                              {deliveryHeads.map((dh: any) => (
+                                <option key={`dh:${dh.id}`} value={`dh:${dh.id}`}>
+                                  Delivery Head: {dh.fullName || dh.name || dh.email}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+
+                          {/* 3. Primary Recruiters */}
+                          {recruitersList && recruitersList.length > 0 && (
+                            <optgroup label="3. Primary Recruiter Assignment">
+                              {recruitersList.map((rec: any) => (
+                                <option key={`rec:${rec.id}`} value={`rec:${rec.id}`}>
+                                  Recruiter: {rec.fullName || rec.name || rec.email}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+
+                          {/* 4. Pooled Routing */}
+                          <optgroup label="4. Pooled & Branch Routing">
+                            <option value="all">All Branch Recruiters</option>
+                            <option value="none">Unassigned (Pending Allocation / Review)</option>
+                          </optgroup>
                         </select>
                       </div>
-                    )}
 
-                    {/* Sales Manager (US Market Only) */}
-                    {market !== "IN" && (
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Sales Manager</label>
-                        <select
-                          {...register("salesManager")}
-                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                        >
-                          <option value="Sanjay Kumar">Sanjay Kumar</option>
-                          <option value="Kunal Sharma">Kunal Sharma</option>
-                        </select>
-                      </div>
-                    )}
+                      {/* Department (US Market Only) */}
+                      {market !== "IN" && (
+                        <div className="space-y-1.5">
+                          <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center h-5">Department</label>
+                          <select
+                            {...register("department")}
+                            className="w-full h-9 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                          >
+                            <option value="IT Services">IT Services</option>
+                            <option value="Operations">Operations</option>
+                            <option value="Sales">Sales</option>
+                          </select>
+                        </div>
+                      )}
 
-                    {/* Recruitment Pod Assignment */}
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
-                        <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-violet-100 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400">
-                          <User className="h-2.5 w-2.5" />
-                        </span>
-                        Recruitment Pod Assignment
-                      </label>
-                      <select
-                        value={selectedPodId}
-                        onChange={(e) => setSelectedPodId(e.target.value)}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                      >
-                        <option value="">🔄 Auto — Round-Robin (Recommended)</option>
-                        <option value="none">📴 None — Keep Unassigned</option>
-                        {podsList.map((pod: any) => (
-                          <option key={pod.id} value={pod.id}>
-                            {pod.name}{pod.podHeadName ? ` — Lead: ${pod.podHeadName}` : ""}{" "}
-                            {pod.isAvailableForAssignment ? "✅" : "⏳"}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-[10px] text-neutral-400 leading-relaxed">
-                        Leave as <strong>Auto</strong> to let the system route via round-robin. Select a specific pod to override.{" "}
-                        {podsList.length === 0 && <span className="text-amber-500 font-semibold">No pods configured — create pods first in Utility → Recruitment Pods.</span>}
-                      </p>
+                      {/* Sales Manager (US Market Only) */}
+                      {market !== "IN" && (
+                        <div className="space-y-1.5">
+                          <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center h-5">Sales Manager</label>
+                          <select
+                            {...register("salesManager")}
+                            className="w-full h-9 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                          >
+                            <option value="Sanjay Kumar">Sanjay Kumar</option>
+                            <option value="Kunal Sharma">Kunal Sharma</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
                   </div>
-
                 )}
               </div>
 

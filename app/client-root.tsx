@@ -68,7 +68,11 @@ export function ClientRoot({
         setOverrideRole(localStorage.getItem("override_role"));
       };
       window.addEventListener("storage", handleStorageChange);
-      return () => window.removeEventListener("storage", handleStorageChange);
+      window.addEventListener("overrideRoleChanged", handleStorageChange);
+      return () => {
+        window.removeEventListener("storage", handleStorageChange);
+        window.removeEventListener("overrideRoleChanged", handleStorageChange);
+      };
     }
   }, []);
 

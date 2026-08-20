@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { atsApi } from "@/lib/ats-api";
+import toast from "react-hot-toast";
 
 export default function BranchManagementPage() {
   const [branches, setBranches] = useState<any[]>([]);
@@ -27,6 +28,7 @@ export default function BranchManagementPage() {
   const [selectedBranch, setSelectedBranch] = useState<any>(null);
   const [branchMembers, setBranchMembers] = useState<any[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [tenantRoles, setTenantRoles] = useState<any[]>([]);
 
   // Multi-role state for staff assignment
   const [selectedMember, setSelectedMember] = useState<any>(null);
@@ -42,6 +44,17 @@ export default function BranchManagementPage() {
     state: "",
     country: "India",
     market: "INDIA",
+    allowNone: false,
+    allowPods: true,
+    allowAll: true,
+    allowUnassigned: true,
+    podDistributionStrategy: "AUTO" as "AUTO" | "MANUAL",
+    requireAmJobApproval: true,
+    requireJobApproval: true,
+    rolesRequiringApproval: ["ACCOUNT_MANAGER", "BD", "RECRUITER"],
+    defaultJobApproverRole: "POD_LEAD",
+    allowedJobApproverRoles: ["POD_LEAD", "DELIVERY_HEAD", "PRIMARY_RECRUITER", "BRANCH_ADMIN"],
+    approvalRoutingMode: "FLEXIBLE" as "FLEXIBLE" | "ENFORCE_DEFAULT",
   });
   const [formError, setFormError] = useState("");
 
@@ -52,12 +65,14 @@ export default function BranchManagementPage() {
   const loadBranchesAndHierarchy = async () => {
     try {
       setLoading(true);
-      const [listData, hierData] = await Promise.all([
+      const [listData, hierData, rolesData] = await Promise.all([
         atsApi.branches.list().catch(() => []),
         atsApi.branches.getHierarchy().catch(() => null),
+        atsApi.auth.listRoles().catch(() => []),
       ]);
       setBranches(listData || []);
       setHierarchyData(hierData);
+      setTenantRoles(rolesData || []);
     } catch (err: any) {
       console.error("Failed to load branches:", err);
     } finally {
@@ -108,12 +123,25 @@ export default function BranchManagementPage() {
         state: formData.state,
         country: formData.country,
         market: formData.market,
+        allowNone: formData.allowNone,
+        allowPods: formData.allowNone ? false : formData.allowPods,
+        allowAll: formData.allowNone ? false : formData.allowAll,
+        allowUnassigned: formData.allowNone ? false : formData.allowUnassigned,
+        podDistributionStrategy: formData.podDistributionStrategy,
+        requireAmJobApproval: formData.requireJobApproval,
+        requireJobApproval: formData.requireJobApproval,
+        rolesRequiringApproval: formData.rolesRequiringApproval,
+        defaultJobApproverRole: formData.defaultJobApproverRole,
+        allowedJobApproverRoles: formData.allowedJobApproverRoles,
+        approvalRoutingMode: formData.approvalRoutingMode,
       });
+      toast.success("Branch details & routing policy updated successfully!");
       setIsEditOpen(false);
       resetForm();
-      loadBranchesAndHierarchy();
+      await loadBranchesAndHierarchy();
     } catch (err: any) {
       setFormError(err.message || "Failed to update branch");
+      toast.error(err.message || "Failed to update branch");
     }
   };
 
@@ -121,7 +149,7 @@ export default function BranchManagementPage() {
     if (!selectedBranch) return;
     try {
       await atsApi.branches.updateManager(selectedBranch.id, managerId);
-      loadBranchesAndHierarchy();
+      await loadBranchesAndHierarchy();
       if (selectedBranch) openMembersModal(selectedBranch);
     } catch (err: any) {
       alert(err.message || "Failed to set Branch Manager");
@@ -135,7 +163,7 @@ export default function BranchManagementPage() {
       await atsApi.branches.assignUser(selectedBranch.id, selectedMember.id, selectedRoles);
       setIsAssignUserOpen(false);
       openMembersModal(selectedBranch);
-      loadBranchesAndHierarchy();
+      await loadBranchesAndHierarchy();
     } catch (err: any) {
       alert(err.message || "Failed to update staff roles");
     }
@@ -143,6 +171,7 @@ export default function BranchManagementPage() {
 
   const openEditModal = (b: any) => {
     setSelectedBranch(b);
+    const allowNone = Boolean(b.allowNone);
     setFormData({
       name: b.name || "",
       code: b.code || "",
@@ -150,6 +179,21 @@ export default function BranchManagementPage() {
       state: b.state || "",
       country: b.country || "India",
       market: b.market || "INDIA",
+      allowNone: allowNone,
+      allowPods: allowNone ? false : b.allowPods !== false,
+      allowAll: allowNone ? false : b.allowAll !== false,
+      allowUnassigned: allowNone ? false : b.allowUnassigned !== false,
+      podDistributionStrategy: (b.podDistributionStrategy || "AUTO") as "AUTO" | "MANUAL",
+      requireAmJobApproval: b.requireJobApproval !== false && b.requireAmJobApproval !== false,
+      requireJobApproval: b.requireJobApproval !== false && b.requireAmJobApproval !== false,
+      rolesRequiringApproval: Array.isArray(b.rolesRequiringApproval) && b.rolesRequiringApproval.length > 0
+        ? b.rolesRequiringApproval
+        : ["ACCOUNT_MANAGER", "BD", "RECRUITER"],
+      defaultJobApproverRole: b.defaultJobApproverRole || "POD_LEAD",
+      allowedJobApproverRoles: Array.isArray(b.allowedJobApproverRoles) && b.allowedJobApproverRoles.length > 0
+        ? b.allowedJobApproverRoles
+        : ["POD_LEAD", "DELIVERY_HEAD", "PRIMARY_RECRUITER", "BRANCH_ADMIN"],
+      approvalRoutingMode: (b.approvalRoutingMode || "FLEXIBLE") as "FLEXIBLE" | "ENFORCE_DEFAULT",
     });
     setFormError("");
     setIsEditOpen(true);
@@ -198,8 +242,8 @@ export default function BranchManagementPage() {
     resetForm();
     setFormData((prev) => ({
       ...prev,
-      market: presetMarket,
       country: presetMarket === "US" ? "United States" : "India",
+      market: presetMarket,
     }));
     setIsCreateOpen(true);
   };
@@ -212,6 +256,17 @@ export default function BranchManagementPage() {
       state: "",
       country: "India",
       market: "INDIA",
+      allowNone: false,
+      allowPods: true,
+      allowAll: true,
+      allowUnassigned: true,
+      podDistributionStrategy: "AUTO",
+      requireAmJobApproval: true,
+      requireJobApproval: true,
+      rolesRequiringApproval: ["ACCOUNT_MANAGER", "BD", "RECRUITER"],
+      defaultJobApproverRole: "POD_LEAD",
+      allowedJobApproverRoles: ["POD_LEAD", "DELIVERY_HEAD", "PRIMARY_RECRUITER", "BRANCH_ADMIN"],
+      approvalRoutingMode: "FLEXIBLE",
     });
     setFormError("");
     setSelectedBranch(null);
@@ -571,11 +626,11 @@ export default function BranchManagementPage() {
         </div>
       )}
 
-      {/* CREATE BRANCH MODAL (PURE DYNAMIC FORM) */}
+      {/* CREATE BRANCH MODAL */}
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in-0 zoom-in-95">
-            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-xl overflow-hidden animate-in fade-in-0 zoom-in-95">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
                 <Plus className="h-4 w-4 text-indigo-650" /> Create New Branch
               </h3>
@@ -640,7 +695,7 @@ export default function BranchManagementPage() {
                 <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateOpen(false)} className="h-8 text-xs">
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" className="h-8 text-xs bg-indigo-650 hover:bg-indigo-700 text-white font-bold">
+                <Button type="submit" size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-4">
                   Save Branch
                 </Button>
               </div>
@@ -651,72 +706,287 @@ export default function BranchManagementPage() {
 
       {/* EDIT BRANCH MODAL */}
       {isEditOpen && selectedBranch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in-0 zoom-in-95">
-            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <Edit2 className="h-4 w-4 text-indigo-650" /> Edit Branch Details
-              </h3>
-              <button onClick={() => setIsEditOpen(false)} className="text-neutral-400 hover:text-neutral-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl lg:max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95 my-auto">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-200/80 dark:border-slate-800 bg-neutral-50/80 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-650 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/60">
+                  <Edit2 className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Edit Branch Details &amp; Routing Policy
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                    Configure office location parameters, recruiter assignment strategies, and job approval rules.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEditOpen(false)}
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 dark:hover:bg-slate-800 transition-colors"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateBranch} className="p-5 space-y-4">
-              {formError && (
-                <div className="p-3 bg-red-50 text-red-700 text-xs font-semibold rounded border border-red-200">
-                  {formError}
-                </div>
-              )}
+            {/* Modal Scrollable Body */}
+            <form onSubmit={handleUpdateBranch} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
+                {formError && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-xs font-semibold rounded-lg border border-red-200 dark:border-red-900/60 flex items-center gap-2">
+                    <X className="h-4 w-4 shrink-0" />
+                    <span>{formError}</span>
+                  </div>
+                )}
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Name *</label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="h-8 text-xs rounded border-neutral-300"
-                  required
-                />
+                {/* 1. Branch Identity & Region Info */}
+                <div className="bg-neutral-50/70 dark:bg-slate-800/40 p-4 rounded-xl border border-neutral-200/80 dark:border-slate-700/80 space-y-3">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 block">
+                    Branch General Information
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                        Branch Name <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700 font-semibold bg-white dark:bg-slate-900"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                        Market Segment <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.market}
+                        onChange={(e) => setFormData({ ...formData, market: e.target.value })}
+                        className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 font-semibold text-neutral-800 dark:text-neutral-200 outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="INDIA">Domestic India Segment (INR)</option>
+                        <option value="US">US IT Segment (USD)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                        Branch Code (Prefix)
+                      </label>
+                      <Input
+                        value={formData.code}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                        placeholder="e.g. BBS, VIZ, NY"
+                        className="h-8.5 text-xs font-mono rounded-lg border-neutral-300 dark:border-slate-700 uppercase font-semibold bg-white dark:bg-slate-900"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                        Office City
+                      </label>
+                      <Input
+                        value={formData.city}
+                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                        placeholder="e.g. Bhubaneswar"
+                        className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Job Assignment & Routing Policy */}
+                <div className="p-5 bg-white dark:bg-slate-900 rounded-xl border border-neutral-200 dark:border-slate-700/80 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-650 dark:text-indigo-400">
+                        <Shield className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
+                          Job Assignment &amp; Routing Policies
+                        </h4>
+                        <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                          Control how job orders are assigned and broadcast to recruitment personnel.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      Branch Isolated
+                    </span>
+                  </div>
+
+                  {/* Standard Assignment Modes 1 - 4 (Clean 2x2 Grid) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Option 1: None / Direct */}
+                    <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                      formData.allowNone
+                        ? "bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-800"
+                        : "bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={formData.allowNone}
+                        onChange={(e) => {
+                          const isNone = e.target.checked;
+                          setFormData({
+                            ...formData,
+                            allowNone: isNone,
+                            ...(isNone
+                              ? { allowPods: false, allowAll: false, allowUnassigned: false }
+                              : { allowPods: true, allowAll: true, allowUnassigned: true }),
+                          });
+                        }}
+                        className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-neutral-900 dark:text-white">1. Direct Assignment Only</span>
+                          {formData.allowNone && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-200 text-indigo-900 dark:bg-indigo-900 dark:text-indigo-200">
+                              Exclusive
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                          Direct individual recruiter assignment only. Pod and pooled routing options are disabled.
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* Option 3: All Branch Recruiters */}
+                    <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs transition-all ${
+                      formData.allowNone
+                        ? "opacity-40 cursor-not-allowed bg-neutral-100 dark:bg-slate-900"
+                        : "cursor-pointer bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={formData.allowAll}
+                        disabled={formData.allowNone}
+                        onChange={(e) => setFormData({ ...formData, allowAll: e.target.checked })}
+                        className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                      />
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-neutral-900 dark:text-white">3. All Branch Recruiters (Pool)</span>
+                        </div>
+                        <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                          Allow broadcast to all active recruiters belonging to this branch office.
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* Option 2: Pod System (with sub-strategy) */}
+                    <div className={`space-y-2.5 p-3 rounded-xl border text-xs transition-all ${
+                      formData.allowNone
+                        ? "opacity-40 pointer-events-none bg-neutral-100 dark:bg-slate-900 border-neutral-200"
+                        : "bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750"
+                    }`}>
+                      <label className={`flex items-start gap-2.5 ${formData.allowNone ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                        <input
+                          type="checkbox"
+                          checked={formData.allowPods}
+                          disabled={formData.allowNone}
+                          onChange={(e) => setFormData({ ...formData, allowPods: e.target.checked })}
+                          className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                        />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-neutral-900 dark:text-white">2. Recruitment Pod System</span>
+                          </div>
+                          <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                            Allow selecting and routing jobs to recruitment pods.
+                          </p>
+                        </div>
+                      </label>
+
+                      {formData.allowPods && !formData.allowNone && (
+                        <div className="ml-5 pl-3 border-l-2 border-indigo-200 dark:border-indigo-800 space-y-1.5 pt-1">
+                          <span className="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 block">Pod Strategy:</span>
+                          <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+                            <label className={`flex items-center gap-1.5 p-1.5 rounded-lg border cursor-pointer ${
+                              formData.podDistributionStrategy === "AUTO"
+                                ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-900 dark:text-indigo-200 font-bold"
+                                : "border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-neutral-600"
+                            }`}>
+                              <input
+                                type="radio"
+                                name="podStrategy"
+                                value="AUTO"
+                                checked={formData.podDistributionStrategy === "AUTO"}
+                                onChange={() => setFormData({ ...formData, podDistributionStrategy: "AUTO" })}
+                                className="sr-only"
+                              />
+                              <span>⚡ Auto Broadcast</span>
+                            </label>
+                            <label className={`flex items-center gap-1.5 p-1.5 rounded-lg border cursor-pointer ${
+                              formData.podDistributionStrategy === "MANUAL"
+                                ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-900 dark:text-indigo-200 font-bold"
+                                : "border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-neutral-600"
+                            }`}>
+                              <input
+                                type="radio"
+                                name="podStrategy"
+                                value="MANUAL"
+                                checked={formData.podDistributionStrategy === "MANUAL"}
+                                onChange={() => setFormData({ ...formData, podDistributionStrategy: "MANUAL" })}
+                                className="sr-only"
+                              />
+                              <span>👤 Manual Lead</span>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Option 4: Unassigned */}
+                    <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs transition-all ${
+                      formData.allowNone
+                        ? "opacity-40 cursor-not-allowed bg-neutral-100 dark:bg-slate-900"
+                        : "cursor-pointer bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={formData.allowUnassigned}
+                        disabled={formData.allowNone}
+                        onChange={(e) => setFormData({ ...formData, allowUnassigned: e.target.checked })}
+                        className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                      />
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-neutral-900 dark:text-white">4. Unassigned Allocation</span>
+                        </div>
+                        <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                          Hold job in unassigned queue for Delivery Head or Pod Lead manual assignment.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Code (Job Prefix)</label>
-                  <Input
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    placeholder="e.g. BBS, VIZ, NY"
-                    className="h-8 text-xs font-mono rounded border-neutral-300"
-                  />
-                  <span className="text-[10px] text-neutral-400 block">Used for Job Code (e.g. BBS-260212-N0001)</span>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">City</label>
-                  <Input
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="h-8 text-xs rounded border-neutral-300"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Market Segment *</label>
-                <select
-                  value={formData.market}
-                  onChange={(e) => setFormData({ ...formData, market: e.target.value })}
-                  className="w-full h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 font-semibold"
+              {/* Modal Footer (Sticky at Bottom) */}
+              <div className="flex justify-end items-center gap-3 px-6 py-4 border-t border-neutral-200/80 dark:border-slate-800 bg-neutral-50/80 dark:bg-slate-850 shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditOpen(false)}
+                  className="h-9 text-xs font-semibold px-5 rounded-lg border-neutral-300 dark:border-slate-700"
                 >
-                  <option value="INDIA">Domestic India Segment</option>
-                  <option value="US">US IT Segment</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
-                <Button type="button" variant="outline" size="sm" onClick={() => setIsEditOpen(false)} className="h-8 text-xs">
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" className="h-8 text-xs bg-indigo-650 hover:bg-indigo-700 text-white font-bold">
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="h-9 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 rounded-lg shadow-sm"
+                >
                   Update Branch
                 </Button>
               </div>
@@ -908,7 +1178,7 @@ export default function BranchManagementPage() {
                 <Button type="button" variant="outline" size="sm" onClick={() => setIsAssignUserOpen(false)} className="h-8 text-xs font-bold">
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" className="h-8 text-xs bg-indigo-650 hover:bg-indigo-700 text-white font-bold">
+                <Button type="submit" size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-4">
                   Save Roles & Permissions
                 </Button>
               </div>

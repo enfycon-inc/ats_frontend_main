@@ -8,12 +8,14 @@ export interface Job {
   clientJobId: string;
   location: string;
   states: string;
-  jobStatus: "Active" | "Close" | "Filled" | "Hold by Client" | "Draft" | "Closed" | "Hold" | "Archived";
+  jobStatus: "Active" | "Close" | "Filled" | "Hold by Client" | "Draft" | "Closed" | "Hold" | "Archived" | "Pending Approval";
   priority?: "Hot" | "Warm" | "Cold" | "High" | "Medium" | "Low" | "Urgent";
   clientBillRate: string;
   payRate: string;
   recruitmentManager: string;
+  recruitmentManagerId?: string;
   primaryRecruiter: string;
+  primaryRecruiterId?: string;
   assignedTo: string;
   createdBy: string;
   createdOn: string;
@@ -28,6 +30,8 @@ export interface Job {
   /** Recruitment pod assigned via round-robin on job creation */
   podId?: string;
   podName?: string;
+  branchId?: string;
+  branchName?: string;
   respondBy?: string;
   noticePeriod?: string;
   market?: "US" | "IN";
@@ -37,6 +41,13 @@ export interface Job {
   noOfPositions?: number;
   submissionRequired?: number;
   jobType?: string;
+  approvalStatus?: "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+  assignedApproverId?: string | null;
+  assignedApproverName?: string | null;
+  assignedApproverRole?: string | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  rejectionReason?: string | null;
 }
 
 /**
@@ -59,7 +70,9 @@ export function mapApiJobToJob(api: any): Job {
     clientBillRate: api.clientBillRate || "N/A",
     payRate: api.payRate || "N/A",
     recruitmentManager: api.recruitmentManager || "N/A",
+    recruitmentManagerId: api.recruitmentManagerId || undefined,
     primaryRecruiter: api.primaryRecruiter || "N/A",
+    primaryRecruiterId: api.primaryRecruiterId || undefined,
     assignedTo: api.assignedTo || "N/A",
     createdBy: api.createdBy || "System Admin",
     createdOn: api.createdOn || api.createdAt || new Date().toISOString().split("T")[0],
@@ -69,6 +82,8 @@ export function mapApiJobToJob(api: any): Job {
     agingDays: api.agingDays || 0,
     podId: api.podId || undefined,
     podName: api.podName || undefined,
+    branchId: api.branchId || undefined,
+    branchName: api.branchName || undefined,
     respondBy: api.respondBy || "",
     noticePeriod: api.noticePeriod || "30 Days",
     market: api.market || "IN",
@@ -78,6 +93,13 @@ export function mapApiJobToJob(api: any): Job {
     noOfPositions: api.noOfPositions || 1,
     submissionRequired: api.submissionRequired || 5,
     jobType: api.jobType || "Full Time",
+    approvalStatus: api.approvalStatus || (api.status === "Pending Approval" ? "PENDING_APPROVAL" : "APPROVED"),
+    assignedApproverId: api.assignedApproverId || null,
+    assignedApproverName: api.assignedApproverName || null,
+    assignedApproverRole: api.assignedApproverRole || null,
+    approvedBy: api.approvedBy || null,
+    approvedAt: api.approvedAt || null,
+    rejectionReason: api.rejectionReason || null,
   };
 }
 

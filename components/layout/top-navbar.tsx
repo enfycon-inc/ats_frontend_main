@@ -1,13 +1,7 @@
 "use client";
 
-import {
-  PRIMARY_NAV_ITEMS,
-  MORE_NAV_ITEMS,
-  GLOBAL_ADMIN_NAV_ITEMS,
-  GLOBAL_ADMIN_MORE_ITEMS,
-} from "@/constants/navigation";
 import { Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { atsApi } from "@/lib/ats-api";
 import { MobileNavbar } from "./mobile-navbar";
@@ -15,19 +9,48 @@ import { NavbarMenu } from "./navbar-menu";
 import { NavbarRight } from "./navbar-right";
 import { NavbarLogo } from "./navbar-logo";
 import { NavbarSearch } from "./navbar-search";
+import { getFilteredPrimaryNav, getFilteredMoreNav, CustomRoleDefinition } from "@/lib/role-permissions";
 
 export function TopNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: session } = useSession();
+  const [overrideRole, setOverrideRole] = useState<string | null>(null);
+  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
+
+  useEffect(() => {
+    atsApi.auth.listRoles().then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        setAvailableRoles(data);
+      }
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOverrideRole(localStorage.getItem("override_role"));
+      const handleStorage = () => {
+        setOverrideRole(localStorage.getItem("override_role"));
+      };
+      window.addEventListener("storage", handleStorage);
+      window.addEventListener("overrideRoleChanged", handleStorage);
+      return () => {
+        window.removeEventListener("storage", handleStorage);
+        window.removeEventListener("overrideRoleChanged", handleStorage);
+      };
+    }
+  }, []);
   
   const currentUser = typeof window !== 'undefined' ? atsApi.auth.getCurrentUser() : null;
   const user = session?.user || currentUser;
-  const isSuperAdmin = 
-    (user as any)?.roles?.includes("SUPER_ADMIN") || 
-    (user as any)?.systemRole === "SUPER_ADMIN";
+  const activeRoleName = overrideRole || (user as any)?.systemRole || (user as any)?.roles?.[0] || "RECRUITER";
 
-  const navItems = isSuperAdmin ? GLOBAL_ADMIN_NAV_ITEMS : PRIMARY_NAV_ITEMS;
-  const navMoreItems = isSuperAdmin ? GLOBAL_ADMIN_MORE_ITEMS : MORE_NAV_ITEMS;
+  const navItems = useMemo(() => {
+    return getFilteredPrimaryNav(activeRoleName, availableRoles, user);
+  }, [activeRoleName, availableRoles, user]);
+
+  const navMoreItems = useMemo(() => {
+    return getFilteredMoreNav(activeRoleName, availableRoles, user);
+  }, [activeRoleName, availableRoles, user]);
 
   return (
     <>

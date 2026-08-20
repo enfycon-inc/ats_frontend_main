@@ -28,12 +28,15 @@ import {
   Pencil,
   UserPlus,
   Copy,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -839,7 +842,9 @@ export default function DataTable({
                               <Badge
                                 className={cn(
                                   "text-[10px] font-medium px-2 py-0.5 rounded-md border shadow-none",
-                                  job.jobStatus === "Active"
+                                  job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL"
+                                    ? "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-800 font-bold"
+                                    : job.jobStatus === "Active"
                                     ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/40"
                                     : job.jobStatus === "Close" || job.jobStatus === "Closed"
                                     ? "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
@@ -850,7 +855,9 @@ export default function DataTable({
                                     : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40"
                                 )}
                               >
-                                {job.jobStatus}
+                                {job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL"
+                                  ? "Pending Approval"
+                                  : job.jobStatus}
                               </Badge>
                               {hasEditPermission && (
                                 <button
@@ -970,64 +977,167 @@ export default function DataTable({
                           </button>
                         </div>
                       ) : (
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
-                            <button className="p-0.5 hover:bg-neutral-200 dark:hover:bg-slate-800 rounded text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer">
-                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            <button className="p-1 hover:bg-[#1a4fa0]/10 dark:hover:bg-slate-800 rounded-md text-neutral-500 dark:text-neutral-400 hover:text-[#1a4fa0] dark:hover:text-blue-400 transition-colors cursor-pointer" title="Actions">
+                              <MoreHorizontal className="h-4 w-4" />
                             </button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-36 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 py-0.5">
-                            {hasEditPermission && (
-                              <>
-                                {job.jobStatus === "Draft" && (
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      if (onUpdateJob) {
-                                        onUpdateJob(job.id, { jobStatus: "Active" });
-                                      }
-                                    }}
-                                    className="cursor-pointer text-xs py-1 px-2 text-green-600 dark:text-green-400 font-semibold"
-                                  >
-                                    <CheckSquare className="h-3 w-3 mr-1.5 text-green-500" /> Publish Job
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem onClick={() => router.push(`/job-posting/${job.id}/edit`)} className="cursor-pointer text-xs py-1 px-2">
-                                  <Pencil className="h-3 w-3 mr-1.5 text-neutral-500" /> Edit Job
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => router.push(`/job-posting/new?cloneFrom=${job.id}`)} className="cursor-pointer text-xs py-1 px-2 text-blue-600 dark:text-blue-400 font-semibold">
-                                  <Copy className="h-3 w-3 mr-1.5 text-blue-500" /> Duplicate
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => startQuickEdit(job)} className="cursor-pointer text-xs py-1 px-2">
-                                  <Edit className="h-3 w-3 mr-1.5 text-neutral-500" /> Quick Edit
-                                </DropdownMenuItem>
-                              </>
-                            )}
+                          <DropdownMenuContent
+                            align="end"
+                            sideOffset={4}
+                            className="w-56 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-neutral-200/90 dark:border-slate-800 rounded-xl shadow-xl shadow-slate-900/10 dark:shadow-black/50 p-1.5 animate-in fade-in-0 zoom-in-95 z-[100] font-sans"
+                          >
+                            {/* Section 1: Candidate Sourcing & Pipeline */}
                             {job.jobStatus !== "Draft" && (
-                              <>
+                              <div className="space-y-0.5">
+                                <div className="px-2.5 pt-1 pb-1 text-[9.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                  Sourcing & Pipeline
+                                </div>
+
                                 <DropdownMenuItem
                                   onClick={() => handleOpenSourceModal(job)}
-                                  className="cursor-pointer text-xs py-1 px-2 text-emerald-600 hover:text-emerald-750 dark:text-emerald-400 font-semibold"
+                                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
                                 >
-                                  <UserPlus className="h-3 w-3 mr-1.5 text-emerald-500" /> Submit Candidate
+                                  <div className="h-6 w-6 rounded-md bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                    <UserPlus className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span className="font-semibold">Submit Candidate</span>
                                 </DropdownMenuItem>
+
                                 <DropdownMenuItem
                                   onClick={() => router.push(`/job-posting/${job.id}/matches`)}
-                                  className="cursor-pointer text-xs py-1 px-2"
+                                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/40 transition-colors"
                                 >
-                                  <Sparkles className="h-3 w-3 mr-1.5 text-violet-500" /> Find AI Matches
+                                  <div className="h-6 w-6 rounded-md bg-violet-100 dark:bg-violet-950/80 text-violet-600 dark:text-violet-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span className="font-semibold">Find AI Matches</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer text-xs py-1 px-2">
-                                  <Users className="h-3 w-3 mr-1.5 text-neutral-500" /> Pipeline
+
+                                <DropdownMenuItem
+                                  onClick={() => router.push(`/job-posting/${job.id}`)}
+                                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                  <div className="h-6 w-6 rounded-md bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                    <Users className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span className="font-semibold">View Pipeline</span>
                                 </DropdownMenuItem>
-                              </>
+                              </div>
                             )}
+
+                            {/* Section 2: Management Actions */}
                             {hasEditPermission && (
-                              <DropdownMenuItem
-                                onClick={() => onUpdateJob?.(job.id, { jobStatus: "Archived" })}
-                                className="text-amber-600 hover:text-amber-700 cursor-pointer text-xs py-1 px-2"
-                              >
-                                <Archive className="h-3 w-3 mr-1.5 text-amber-500" /> Archive Job
-                              </DropdownMenuItem>
+                              <>
+                                {job.jobStatus !== "Draft" && <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />}
+
+                                <div className="space-y-0.5">
+                                  <div className="px-2.5 pt-1 pb-1 text-[9.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                    Job Actions
+                                  </div>
+
+                                  {(job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL") && (
+                                    <>
+                                      <DropdownMenuItem
+                                        onClick={async () => {
+                                          try {
+                                            await atsApi.jobs.approve(job.id);
+                                            toast.success(`Job ${job.jobCode} approved & activated!`);
+                                            if (onUpdateJob) onUpdateJob(job.id, { jobStatus: "Active" });
+                                          } catch (e: any) {
+                                            toast.error("Failed to approve job: " + e.message);
+                                          }
+                                        }}
+                                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                                      >
+                                        <div className="h-6 w-6 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                          <CheckCircle className="h-3.5 w-3.5" />
+                                        </div>
+                                        <span className="font-semibold">Approve &amp; Activate</span>
+                                      </DropdownMenuItem>
+
+                                      <DropdownMenuItem
+                                        onClick={async () => {
+                                          const reason = window.prompt("Enter rejection feedback for Account Manager:");
+                                          if (reason === null) return;
+                                          if (!reason.trim()) {
+                                            toast.error("Rejection reason required");
+                                            return;
+                                          }
+                                          try {
+                                            await atsApi.jobs.reject(job.id, reason.trim());
+                                            toast.success(`Job ${job.jobCode} rejected.`);
+                                            if (onUpdateJob) onUpdateJob(job.id, { jobStatus: "Draft" });
+                                          } catch (e: any) {
+                                            toast.error("Failed to reject job: " + e.message);
+                                          }
+                                        }}
+                                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                                      >
+                                        <div className="h-6 w-6 rounded-md bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                          <XCircle className="h-3.5 w-3.5" />
+                                        </div>
+                                        <span className="font-semibold">Reject Job</span>
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+
+                                  {job.jobStatus === "Draft" && (
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        if (onUpdateJob) onUpdateJob(job.id, { jobStatus: "Active" });
+                                      }}
+                                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                                    >
+                                      <div className="h-6 w-6 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                        <CheckSquare className="h-3.5 w-3.5" />
+                                      </div>
+                                      <span className="font-semibold">Publish Job</span>
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  <DropdownMenuItem
+                                    onClick={() => router.push(`/job-posting/${job.id}/edit`)}
+                                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                  >
+                                    <div className="h-6 w-6 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </div>
+                                    <span className="font-semibold">Edit Job</span>
+                                  </DropdownMenuItem>
+
+                                  <DropdownMenuItem
+                                    onClick={() => router.push(`/job-posting/new?cloneFrom=${job.id}`)}
+                                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                                  >
+                                    <div className="h-6 w-6 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                      <Copy className="h-3.5 w-3.5" />
+                                    </div>
+                                    <span className="font-semibold">Duplicate Job</span>
+                                  </DropdownMenuItem>
+
+                                  <DropdownMenuItem
+                                    onClick={() => startQuickEdit(job)}
+                                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                  >
+                                    <div className="h-6 w-6 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </div>
+                                    <span className="font-semibold">Quick Edit</span>
+                                  </DropdownMenuItem>
+
+                                  <DropdownMenuItem
+                                    onClick={() => onUpdateJob?.(job.id, { jobStatus: "Archived" })}
+                                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+                                  >
+                                    <div className="h-6 w-6 rounded-md bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                      <Archive className="h-3.5 w-3.5" />
+                                    </div>
+                                    <span className="font-semibold">Archive Job</span>
+                                  </DropdownMenuItem>
+                                </div>
+                              </>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1141,10 +1251,50 @@ export default function DataTable({
       {contextMenu && (
         <div
           style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed z-50 bg-white dark:bg-slate-900 border border-neutral-250 dark:border-slate-800 rounded shadow-2xl w-40 p-1 flex flex-col divide-y divide-neutral-200 dark:divide-slate-800 text-xs select-none font-sans"
+          className="fixed z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-neutral-200/90 dark:border-slate-800 rounded-xl shadow-xl shadow-slate-900/10 dark:shadow-black/50 w-56 p-1.5 flex flex-col gap-1 text-xs select-none font-sans animate-in fade-in-0 zoom-in-95"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="py-1">
+          <div className="space-y-0.5">
+            <div className="px-2.5 pt-1 pb-1 text-[9.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              Quick Actions
+            </div>
+
+            <button
+              onClick={() => {
+                const job = data.find((j) => j.id === contextMenu.jobId);
+                if (job) handleOpenSourceModal(job);
+                closeContextMenu();
+              }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer font-semibold"
+            >
+              <div className="h-6 w-6 rounded-md bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-2xs">
+                <UserPlus className="h-3.5 w-3.5" />
+              </div>
+              <span>Submit Candidate</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const job = data.find((j) => j.id === contextMenu.jobId);
+                if (job) router.push(`/job-posting/${job.id}/matches`);
+                closeContextMenu();
+              }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/40 transition-colors cursor-pointer font-semibold"
+            >
+              <div className="h-6 w-6 rounded-md bg-violet-100 dark:bg-violet-950/80 text-violet-600 dark:text-violet-400 flex items-center justify-center shrink-0 shadow-2xs">
+                <Sparkles className="h-3.5 w-3.5" />
+              </div>
+              <span>Find AI Matches</span>
+            </button>
+          </div>
+
+          <div className="border-t border-neutral-100 dark:border-slate-800 my-0.5" />
+
+          <div className="space-y-0.5">
+            <div className="px-2.5 pt-1 pb-1 text-[9.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              Management
+            </div>
+
             {hasEditPermission && (
               <>
                 <button
@@ -1153,9 +1303,12 @@ export default function DataTable({
                     if (job) router.push(`/job-posting/${job.id}/edit`);
                     closeContextMenu();
                   }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer font-medium"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer font-semibold"
                 >
-                  <Pencil className="h-3 w-3 text-neutral-500" /> Edit Job
+                  <div className="h-6 w-6 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0 shadow-2xs">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </div>
+                  <span>Edit Job</span>
                 </button>
                 <button
                   onClick={() => {
@@ -1163,30 +1316,16 @@ export default function DataTable({
                     if (job) startQuickEdit(job);
                     closeContextMenu();
                   }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer font-medium"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer font-semibold"
                 >
-                  <Edit className="h-3 w-3 text-neutral-500" /> Quick Edit
+                  <div className="h-6 w-6 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0 shadow-2xs">
+                    <Edit className="h-3.5 w-3.5" />
+                  </div>
+                  <span>Quick Edit</span>
                 </button>
               </>
             )}
-            <button
-              onClick={() => {
-                const job = data.find((j) => j.id === contextMenu.jobId);
-                if (job) handleOpenSourceModal(job);
-                closeContextMenu();
-              }}
-              className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 cursor-pointer font-semibold"
-            >
-              <UserPlus className="h-3 w-3 text-emerald-500" /> Submit Candidate
-            </button>
-            <button
-              onClick={closeContextMenu}
-              className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer font-medium"
-            >
-              <Eye className="h-3 w-3 text-neutral-500" /> View Pipeline
-            </button>
-          </div>
-          <div className="py-1">
+
             <button
               onClick={() => {
                 if (contextMenu?.jobId) {
@@ -1194,9 +1333,12 @@ export default function DataTable({
                 }
                 closeContextMenu();
               }}
-              className="w-full text-left px-3 py-1.5 hover:bg-amber-50 dark:hover:bg-amber-950/20 rounded text-amber-700 dark:text-amber-400 flex items-center gap-1.5 cursor-pointer font-semibold"
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer font-semibold"
             >
-              <Archive className="h-3 w-3" /> Archive Job
+              <div className="h-6 w-6 rounded-md bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 shadow-2xs">
+                <Archive className="h-3.5 w-3.5" />
+              </div>
+              <span>Archive Job</span>
             </button>
           </div>
         </div>
@@ -1320,12 +1462,30 @@ export default function DataTable({
                     {assignActiveTab === "users" ? (
                       (() => {
                         const currentUser = atsApi.auth.getCurrentUser();
+                        const isSuperAdmin = currentUser?.roles?.includes("SUPER_ADMIN");
+                        const isTenantAdmin = isSuperAdmin || currentUser?.roles?.includes("ADMIN") || currentUser?.permissions?.includes("tenant:settings");
+                        const isBranchAdmin = 
+                          currentUser?.roles?.includes("BRANCH_ADMIN") || 
+                          currentUser?.permissions?.includes("branch_admin:manage") ||
+                          (assignModalJob?.branchId && (currentUser as any)?.branchRoles?.[assignModalJob.branchId]?.some((r: string) => ['ADMIN', 'BRANCH_ADMIN'].includes(r)));
+
+                        const hasDelegatedPermission = 
+                          currentUser?.permissions?.includes("job:assign") ||
+                          currentUser?.permissions?.includes("job:assign_recruiter") ||
+                          currentUser?.permissions?.includes("job:assign_pod") ||
+                          currentUser?.permissions?.includes("job:edit") ||
+                          currentUser?.permissions?.includes("pod:edit") ||
+                          currentUser?.permissions?.includes("pod:overlap") ||
+                          currentUser?.roles?.includes("DELIVERY_HEAD");
+
                         const isPodLead = currentUser?.systemRole === "POD_LEAD" || currentUser?.roles?.includes("POD_LEAD");
-                        const hasBypass = currentUser?.permissions?.includes("pod:edit") || currentUser?.roles?.includes("SUPER_ADMIN") || currentUser?.roles?.includes("ADMIN");
+                        const hasBypass = isTenantAdmin || isBranchAdmin || hasDelegatedPermission;
                         
                         let listToShow = usersList;
                         if (!hasBypass && isPodLead && currentUser?.podId) {
                           listToShow = usersList.filter((u) => u.podId === currentUser.podId);
+                        } else if (isBranchAdmin && !isTenantAdmin && assignModalJob?.branchId) {
+                          listToShow = usersList.filter((u) => u.branchId === assignModalJob.branchId || (u as any).assignedBranchIds?.includes(assignModalJob.branchId));
                         }
 
                         return (

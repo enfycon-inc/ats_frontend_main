@@ -107,9 +107,10 @@ export default function ApprovalsPage() {
     if (status === "loading") return;
 
     const user = session?.user || atsApi.auth.getCurrentUser();
-    const hasAdminRole =
-      (user as any)?.roles?.includes("SUPER_ADMIN") ||
-      (user as any)?.systemRole === "SUPER_ADMIN";
+    const override = typeof window !== "undefined" ? localStorage.getItem("override_role") : null;
+    const hasAdminRole = override 
+      ? override === "SUPER_ADMIN" 
+      : ((user as any)?.roles?.includes("SUPER_ADMIN") || (user as any)?.systemRole === "SUPER_ADMIN");
     setIsAdmin(!!hasAdminRole);
 
     if (hasAdminRole) {

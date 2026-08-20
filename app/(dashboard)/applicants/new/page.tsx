@@ -22,6 +22,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
 import { useSession } from "next-auth/react";
@@ -445,21 +446,17 @@ export default function NewApplicantPage() {
                 />
               </Field>
               <Field label="Mobile Number" required>
-                <input
-                  type="tel"
-                  className={inputCls}
-                  placeholder={isDomestic ? "+91 98765 43210" : "(555) 000-0000"}
+                <PhoneInput
                   value={form.mobile}
-                  onChange={(e) => updateForm("mobile", e.target.value)}
+                  onChange={(val) => updateForm("mobile", val || "")}
+                  market={form.market}
                 />
               </Field>
               <Field label="Phone / Secondary Number">
-                <input
-                  type="tel"
-                  className={inputCls}
-                  placeholder={isDomestic ? "+91 80 1234 5678" : "(555) 000-0000"}
+                <PhoneInput
                   value={form.phone}
-                  onChange={(e) => updateForm("phone", e.target.value)}
+                  onChange={(val) => updateForm("phone", val || "")}
+                  market={form.market}
                 />
               </Field>
               <Field label="City">

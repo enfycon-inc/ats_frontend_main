@@ -42,6 +42,22 @@ interface ClientData {
   [key: string]: any;
 }
 
+import { getUserColumnPreferences, saveUserColumnPreferences } from "@/utils/user-column-preferences";
+
+const DEFAULT_CLIENT_COLUMNS = [
+  "clientId",
+  "clientName",
+  "status",
+  "contactNumber",
+  "website",
+  "industry",
+  "state",
+  "city",
+  "primaryOwner",
+  "businessUnit",
+  "createdOn",
+];
+
 export default function ClientDashboard() {
   const router = useRouter();
   
@@ -49,20 +65,10 @@ export default function ClientDashboard() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isColumnOpen, setIsColumnOpen] = useState(false);
 
-  // Table Configuration States
-  const [selectedColumns, setSelectedColumns] = useState<string[]>([
-    "clientId",
-    "clientName",
-    "status",
-    "contactNumber",
-    "website",
-    "industry",
-    "state",
-    "city",
-    "primaryOwner",
-    "businessUnit",
-    "createdOn",
-  ]);
+  // Table Configuration States (User Persistent)
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() =>
+    getUserColumnPreferences("clients", DEFAULT_CLIENT_COLUMNS)
+  );
 
   // Saved Views State
   const [savedViews, setSavedViews] = useState<string[]>([
@@ -331,7 +337,10 @@ export default function ClientDashboard() {
         onClose={() => setIsColumnOpen(false)}
         allColumns={allColumns}
         selectedColumns={selectedColumns}
-        onApply={(newCols) => setSelectedColumns(newCols)}
+        onApply={(newCols) => {
+          setSelectedColumns(newCols);
+          saveUserColumnPreferences("clients", newCols);
+        }}
       />
     </div>
   );

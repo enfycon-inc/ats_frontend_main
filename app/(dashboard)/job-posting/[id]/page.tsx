@@ -125,6 +125,28 @@ export default function JobDetailPage() {
   const [submittedRate, setSubmittedRate] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Job Approval / Rejection states
+  const [approveModalOpen, setApproveModalOpen] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const canApproveJob = useMemo(() => {
+    if (!currentUser) return false;
+    const permissions = currentUser.permissions || [];
+    const isAssigned = Boolean(
+      job?.assignedApproverId &&
+      (currentUser.dbId === job.assignedApproverId || currentUser.keycloakId === job.assignedApproverId)
+    );
+    return (
+      isAssigned ||
+      permissions.includes("job:approve") ||
+      roles.includes("SUPER_ADMIN") ||
+      roles.includes("ADMIN") ||
+      roles.includes("BRANCH_ADMIN")
+    );
+  }, [currentUser, roles, job]);
+
   // AI Matches Submission modal states
   const [matchSubmitOpen, setMatchSubmitOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
@@ -260,6 +282,41 @@ export default function JobDetailPage() {
       loadData();
     } catch (err: any) {
       toast.error("Failed to approve submission: " + err.message);
+    }
+  };
+
+  const handleApproveJob = async () => {
+    if (!job) return;
+    setActionLoading(true);
+    try {
+      await atsApi.jobs.approve(job.id);
+      toast.success("Job requirement approved & activated for recruiters!");
+      setApproveModalOpen(false);
+      loadData();
+    } catch (err: any) {
+      toast.error("Failed to approve job: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectJob = async () => {
+    if (!job) return;
+    if (!rejectReason.trim()) {
+      toast.error("Please provide a reason for rejecting this job requisition.");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await atsApi.jobs.reject(job.id, rejectReason.trim());
+      toast.success("Job requisition rejected.");
+      setRejectModalOpen(false);
+      setRejectReason("");
+      loadData();
+    } catch (err: any) {
+      toast.error("Failed to reject job: " + err.message);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -419,6 +476,25 @@ export default function JobDetailPage() {
             <Button variant="outline" size="sm" onClick={loadData} className="border-neutral-250 text-xs font-semibold h-9">
               <RefreshCw className="h-3.5 w-3.5" />
             </Button>
+            {(job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL") && canApproveJob && (
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => setRejectModalOpen(true)}
+                  variant="outline"
+                  className="border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 font-bold text-xs h-9"
+                >
+                  <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setApproveModalOpen(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 shadow-sm"
+                >
+                  <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve Job
+                </Button>
+              </>
+            )}
             <Button
               size="sm"
               onClick={() => setUploadSubmitOpen(true)}
@@ -436,6 +512,50 @@ export default function JobDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* APPROVAL WORKFLOW NOTIFICATION BANNER */}
+      {(job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL") && (
+        <div className="p-4 bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 shrink-0 mt-0.5">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold text-amber-950 dark:text-amber-100">
+                  Job Requirement Pending Review &amp; Approval
+                </h3>
+                <Badge className="bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200 text-[9px] font-bold">
+                  Pending Approval
+                </Badge>
+              </div>
+              <p className="text-[11px] text-amber-800/90 dark:text-amber-300/80 mt-0.5">
+                Created by <strong>{job.createdBy || "Account Manager"}</strong>. Assigned Reviewer: <strong>{job.assignedApproverName || (job.assignedApproverRole === "POD_LEAD" ? "Recruitment Pod Lead" : job.assignedApproverRole === "DELIVERY_HEAD" ? "Delivery Head" : "Assigned Reviewer")}</strong>. This requirement is <strong>hidden from recruiters</strong> until approved.
+              </p>
+            </div>
+          </div>
+
+          {canApproveJob && (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                onClick={() => setRejectModalOpen(true)}
+                variant="outline"
+                className="border-rose-300 dark:border-rose-900/60 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-bold h-8.5"
+              >
+                <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setApproveModalOpen(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-8.5 shadow-sm"
+              >
+                <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve &amp; Activate Job
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* TABS NAVIGATION BAR (Ceipal style) */}
       <div className="flex border-b border-neutral-200 dark:border-slate-800 shrink-0 select-none">
@@ -1275,6 +1395,94 @@ export default function JobDetailPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* APPROVE JOB CONFIRMATION MODAL */}
+      <Dialog open={approveModalOpen} onOpenChange={setApproveModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
+              <CheckCircle className="h-5 w-5" /> Approve &amp; Activate Job Requirement
+            </DialogTitle>
+            <DialogDescription className="text-xs text-neutral-500">
+              Approving this requisition will change its status to <strong>Active</strong> and make it immediately visible to all eligible recruiters in the pod / branch.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="p-3.5 bg-neutral-50 dark:bg-slate-850 rounded-lg border border-neutral-200 dark:border-slate-750 text-xs space-y-2">
+            <div className="flex justify-between">
+              <span className="text-neutral-500 font-medium">Job Title:</span>
+              <strong className="text-neutral-900 dark:text-white">{job?.jobTitle}</strong>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-500 font-medium">Client Account:</span>
+              <span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.client}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-500 font-medium">Submitted By:</span>
+              <span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.createdBy}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-500 font-medium">Assigned To:</span>
+              <span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.assignedTo || "Pod / Recruiter"}</span>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+            <Button variant="outline" size="sm" onClick={() => setApproveModalOpen(false)} className="text-xs">
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={actionLoading}
+              onClick={handleApproveJob}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+            >
+              {actionLoading ? "Approving..." : "Confirm & Activate"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* REJECT JOB MODAL */}
+      <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-sm">
+              <XCircle className="h-5 w-5" /> Reject Job Requirement
+            </DialogTitle>
+            <DialogDescription className="text-xs text-neutral-500">
+              Please provide feedback or the reason for rejection to notify the Account Manager.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
+              Rejection Reason / Feedback <span className="text-rose-500">*</span>
+            </label>
+            <textarea
+              rows={3}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="e.g. Rate is too low for senior role / missing client bill rate details / incorrect tech stack..."
+              className="w-full p-2.5 border border-neutral-300 dark:border-slate-700 rounded-lg bg-transparent text-xs focus:outline-none focus:border-rose-500"
+            />
+          </div>
+
+          <DialogFooter className="gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+            <Button variant="outline" size="sm" onClick={() => setRejectModalOpen(false)} className="text-xs">
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={actionLoading || !rejectReason.trim()}
+              onClick={handleRejectJob}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs"
+            >
+              {actionLoading ? "Rejecting..." : "Confirm Rejection"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

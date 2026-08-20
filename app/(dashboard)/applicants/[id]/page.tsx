@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
 
@@ -834,10 +835,10 @@ export default function CandidateDetailPage() {
 
             <div className="flex flex-col gap-1">
               <label className="font-semibold text-neutral-700 dark:text-neutral-300">Phone Number</label>
-              <Input
+              <PhoneInput
                 value={editForm.phone}
-                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                className="h-8.5 text-xs"
+                onChange={(val) => setEditForm({ ...editForm, phone: val || "" })}
+                market={(candidate as any)?.market || (session?.user as any)?.market || "IN"}
               />
             </div>
 

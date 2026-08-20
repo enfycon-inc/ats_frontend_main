@@ -22,11 +22,22 @@ import { ChevronRight } from "lucide-react";
 import { SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton } from "@/components/ui/sidebar";
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useMemo } from "react";
+import { atsApi } from "@/lib/ats-api";
+import { getFilteredPrimaryNav, getFilteredMoreNav, CustomRoleDefinition } from "@/lib/role-permissions";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
+  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
+
+  useEffect(() => {
+    atsApi.auth.listRoles().then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        setAvailableRoles(data);
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -35,71 +46,28 @@ export function AppSidebar() {
         setOverrideRole(localStorage.getItem("override_role"));
       };
       window.addEventListener("storage", handleStorage);
-      return () => window.removeEventListener("storage", handleStorage);
+      window.addEventListener("overrideRoleChanged", handleStorage);
+      return () => {
+        window.removeEventListener("storage", handleStorage);
+        window.removeEventListener("overrideRoleChanged", handleStorage);
+      };
     }
   }, []);
 
-  const systemRole = useMemo(() => {
-    return overrideRole || (session as any)?.user?.systemRole || "RECRUITER";
+  const activeRoleName = useMemo(() => {
+    const sessionUser = (session as any)?.user;
+    return overrideRole || sessionUser?.systemRole || sessionUser?.roles?.[0] || "RECRUITER";
   }, [session, overrideRole]);
 
+  const userProfile = (session as any)?.user;
+
   const filteredPrimaryNav = useMemo(() => {
-    if (systemRole === "SUPER_ADMIN") {
-      return GLOBAL_ADMIN_NAV_ITEMS;
-    }
-
-    return PRIMARY_NAV_ITEMS.filter(item => {
-      // Recruiter filters
-      if (systemRole === "RECRUITER") {
-        const allowed = ["dashboard", "job-posting", "applicants", "submissions-tracker"];
-        return allowed.includes(item.id);
-      }
-      
-      // Pod Lead filters
-      if (systemRole === "POD_LEAD") {
-        const allowed = ["dashboard", "job-posting", "applicants", "submissions-tracker", "reports"];
-        return allowed.includes(item.id);
-      }
-      
-      // Account Manager filters
-      if (systemRole === "ACCOUNT_MANAGER") {
-        const allowed = ["dashboard", "job-posting", "applicants", "submissions-tracker", "clients", "placements"];
-        return allowed.includes(item.id);
-      }
-
-      // Other roles (Admin, Delivery Head, etc.) see everything
-      return true;
-    });
-  }, [systemRole]);
+    return getFilteredPrimaryNav(activeRoleName, availableRoles, userProfile);
+  }, [activeRoleName, availableRoles, userProfile]);
 
   const filteredMoreNav = useMemo(() => {
-    if (systemRole === "SUPER_ADMIN") {
-      return GLOBAL_ADMIN_MORE_ITEMS;
-    }
-
-    return MORE_NAV_ITEMS.filter(item => {
-      // Recruiter filters
-      if (systemRole === "RECRUITER") {
-        const allowed = ["email", "calendar", "documents", "settings", "help"];
-        return allowed.includes(item.id);
-      }
-      
-      // Pod Lead filters
-      if (systemRole === "POD_LEAD") {
-        const allowed = ["email", "calendar", "documents", "pod-management", "settings", "help"];
-        return allowed.includes(item.id);
-      }
-      
-      // Account Manager filters
-      if (systemRole === "ACCOUNT_MANAGER") {
-        const allowed = ["email", "calendar", "documents", "settings", "help"];
-        return allowed.includes(item.id);
-      }
-
-      // Other roles see everything
-      return true;
-    });
-  }, [systemRole]);
+    return getFilteredMoreNav(activeRoleName, availableRoles, userProfile);
+  }, [activeRoleName, availableRoles, userProfile]);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-default-200 dark:border-slate-800">

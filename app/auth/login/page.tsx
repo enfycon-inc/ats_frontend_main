@@ -2,127 +2,122 @@
 
 import React from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { useTheme } from "next-themes";
+import EnfyconLogo from "@/components/shared/enfycon-logo";
 import LoginForm from "@/components/auth/login-form";
 import Social from "@/components/auth/social";
-
-function Logo() {
-  const { theme } = useTheme();
-  return (
-    <div>
-      <Image
-        src={
-          theme === "dark"
-            ? "/images/logo/logo-white.svg"
-            : "/images/logo/logo.svg"
-        }
-        alt="Enfycon Logo"
-        width={144}
-        height={36}
-        className="w-36 h-auto"
-        priority
-      />
-    </div>
-  );
-}
+import { Building2 } from "lucide-react";
 
 function Copyright() {
   const currentYear = new Date().getFullYear();
-  return <>Copyright {currentYear}, Enfycon All Rights Reserved.</>;
+  return <>Copyright © {currentYear} Enfycon Inc. All Rights Reserved.</>;
 }
 
 const Login = () => {
   return (
-    <>
-      <div className="flex w-full items-center overflow-hidden min-h-screen h-screen basis-full">
-        <div className="overflow-y-auto flex flex-wrap w-full h-screen">
+    <div className="min-h-screen w-full bg-[#F8FAFC] text-slate-900 flex flex-col justify-between font-sans relative overflow-x-hidden">
+      
+      {/* Soft Ambient Glow Orbs spanning across full background */}
+      <div className="absolute -top-32 -left-32 w-[550px] h-[550px] bg-indigo-500/10 rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[160px] pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-[550px] h-[550px] bg-cyan-500/10 rounded-full blur-[140px] pointer-events-none" />
+
+      {/* Main Full Page Wrapper */}
+      <div className="flex w-full min-h-screen relative z-10">
+        
+        {/* Left Hero / Brand Canvas (Desktop Only) */}
+        <div className="hidden lg:flex flex-1 flex-col justify-between p-12 xl:p-16">
           
-          {/* Left panel (desktop only) */}
-          <div className="lg:block hidden flex-1 overflow-hidden text-[40px] leading-[48px] text-default-600 relative z-1 bg-default-50">
-            <div className="max-w-[520px] pt-20 ps-20 ">
-              <Link href="/" className="mb-6 inline-block">
-                <Logo />
-              </Link>
-              <h4 className="text-[40px] leading-[48px] text-default-600 font-normal">
-                Your AI-Powered
-                <span className="text-default-800 font-bold ms-2 block sm:inline">
-                  Recruitment Platform
-                </span>
-              </h4>
-              <p className="text-base text-default-500 mt-4 leading-relaxed max-w-[380px]">
-                Manage US IT &amp; Indian staffing, track candidates, and grow your recruiting business — all in one workspace.
-              </p>
-            </div>
-            <div className="absolute left-0 2xl:bottom-[-160px] bottom-[-130px] h-full w-full z-[-1]">
-              <Image
-                src="/images/auth/ils1.svg"
-                alt="Branding background"
-                priority
-                width={300}
-                height={300}
-                className="mb-10 w-full h-full object-cover"
-              />
-            </div>
+          {/* Top Brand Header */}
+          <div className="flex items-center justify-between">
+            <Link href="/" className="inline-block transition-transform hover:scale-105">
+              <EnfyconLogo variant="light" width={190} height={42} />
+            </Link>
           </div>
 
-          {/* Right panel: Login form */}
-          <div className="flex-1 relative">
-            <div className="h-full flex flex-col dark:bg-default-100 bg-white">
-              <div className="max-w-[524px] md:px-[42px] md:py-[44px] p-7 mx-auto w-full text-2xl text-default-900 mb-3 h-full flex flex-col justify-center">
-                <div className="flex justify-center items-center text-center mb-6 lg:hidden ">
-                  <Link href="/">
-                    <Logo />
-                  </Link>
-                </div>
-                
-                <div className="text-center 2xl:mb-10 mb-4">
-                  <h4 className="font-medium">Welcome Back</h4>
-                  <div className="text-default-500 text-base">
-                    Sign in to your ATS workspace
-                  </div>
-                </div>
+          {/* Middle Value Proposition (Clean & Uncluttered) */}
+          <div className="max-w-xl my-auto py-8 space-y-6">
+            <h1 className="text-4xl xl:text-5xl font-extrabold tracking-tight text-slate-900 leading-[1.15]">
+              Accelerate Hiring with{" "}
+              <span className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-blue-600 bg-clip-text text-transparent">
+                AI Precision
+              </span>
+            </h1>
+            <p className="text-base xl:text-lg text-slate-600 leading-relaxed">
+              Unified workspace for US IT &amp; Indian staffing. Match top candidates, automate bench tracking, and streamline client submissions — all in one platform.
+            </p>
+          </div>
 
-                <LoginForm />
+          {/* Bottom Spacer */}
+          <div className="h-6" />
+        </div>
 
-                <div className="relative border-b-[#9AA2AF] border-opacity-[16%] border-b pt-6">
-                  <div className="absolute inline-block bg-default-50 dark:bg-default-100 left-1/2 top-1/2 transform -translate-x-1/2 px-4 min-w-max text-sm text-default-500 font-normal">
-                    Or continue with
-                  </div>
-                </div>
+        {/* Right Authentication Panel */}
+        <div className="flex-1 flex flex-col justify-between p-6 sm:p-12 relative my-auto">
+          
+          <div className="my-auto w-full max-w-md mx-auto space-y-6">
+            
+            {/* Mobile Header Logo */}
+            <div className="flex justify-center mb-6 lg:hidden">
+              <Link href="/">
+                <EnfyconLogo variant="light" width={180} height={40} />
+              </Link>
+            </div>
 
-                <div className="max-w-[242px] mx-auto mt-8 w-full">
-                  <Social />
-                </div>
+            {/* Main Auth Form Light Card Container */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-8 sm:p-10 shadow-xl shadow-slate-200/50 space-y-6">
+              
+              {/* Form Title & Subtitle */}
+              <div className="text-center space-y-1.5">
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+                  Welcome Back
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Sign in to your Enfycon ATS workspace
+                </p>
+              </div>
 
-                <div className="md:max-w-[345px] mx-auto mt-8 space-y-3 w-full">
-                  <div className="relative border-b border-default-200">
-                    <span className="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-white dark:bg-default-100 px-3 text-xs text-default-400">
-                      New to Enfycon ATS?
-                    </span>
-                  </div>
-                  
+              {/* Login Form */}
+              <LoginForm />
+
+              {/* Social Login Divider */}
+              <div className="relative border-t border-slate-200 my-6">
+                <span className="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-white px-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Or continue with
+                </span>
+              </div>
+
+              {/* Social Login Buttons */}
+              <Social />
+
+              {/* Register Company Banner */}
+              <div className="pt-4">
+                <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-100 text-center space-y-2">
+                  <span className="text-xs text-slate-600 block font-medium">
+                    New to Enfycon ATS?
+                  </span>
                   <Link
                     href="/auth/register"
-                    className="flex items-center justify-center gap-2 w-full mt-6 px-4 py-2.5 rounded-lg border-2 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 font-semibold text-sm hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all"
+                    className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-white border border-indigo-200 text-indigo-600 font-semibold text-sm hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
-                    </svg>
+                    <Building2 className="w-4 h-4 text-indigo-500" />
                     Register Your Company
                   </Link>
                 </div>
+              </div>
 
-              </div>
-              <div className="text-xs font-normal text-default-500 z-999 pb-10 text-center">
-                <Copyright />
-              </div>
             </div>
+
+          </div>
+
+          {/* Right Footer Copyright */}
+          <div className="text-xs text-center text-slate-400 pt-8">
+            <Copyright />
           </div>
 
         </div>
+
       </div>
-    </>
+    </div>
   );
 };
 

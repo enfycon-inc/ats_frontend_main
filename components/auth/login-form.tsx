@@ -10,7 +10,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
@@ -18,7 +18,7 @@ import { handleLoginAction } from "./actions/login";
 import { getCurrentSubdomain, getBaseDomain, getTenantIdentifier } from "@/utils/subdomain-helper";
 
 const schema = z.object({
-  email: z.string().email({ message: "Your email is invalid." }),
+  email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(4, { message: "Password must be at least 4 characters." }),
 });
 
@@ -110,82 +110,108 @@ const LoginForm = () => {
   };
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="mt-5 2xl:mt-7 space-y-4">
+    <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
+      
       {/* Email Field */}
-      <div className="space-y-2">
-        <Label htmlFor="email" className="font-medium text-default-600">
-          Email{" "}
-        </Label>
-        <Input
-          disabled={isPending}
-          {...register("email")}
-          type="email"
-          id="email"
-          name="email"
-          className={cn("h-12 text-sm", {
-            "border-destructive": errors.email,
-          })}
-        />
-      </div>
-      {errors.email && (
-        <div className="text-destructive mt-2 text-sm">
-          {errors.email.message}
-        </div>
-      )}
-
-      {/* Password Field */}
-      <div className="mt-3.5 space-y-2">
-        <Label htmlFor="password" className="mb-2 font-medium text-default-600">
-          Password{" "}
+      <div className="space-y-1.5">
+        <Label htmlFor="email" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+          Work Email
         </Label>
         <div className="relative">
+          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          <Input
+            disabled={isPending}
+            {...register("email")}
+            type="email"
+            id="email"
+            name="email"
+            placeholder="name@company.com"
+            className={cn(
+              "pl-10 h-11 text-sm bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all rounded-lg",
+              { "border-red-500 focus-visible:ring-red-500/20": errors.email }
+            )}
+          />
+        </div>
+        {errors.email && (
+          <p className="text-red-500 text-xs font-medium mt-1">
+            {errors.email.message}
+          </p>
+        )}
+      </div>
+
+      {/* Password Field */}
+      <div className="space-y-1.5 pt-1">
+        <Label htmlFor="password" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+          Password
+        </Label>
+        <div className="relative">
+          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <Input
             disabled={isPending}
             {...register("password")}
             type={passwordType}
             id="password"
             name="password"
-            className="peer h-12 text-sm"
-            placeholder=" "
+            placeholder="••••••••"
+            className={cn(
+              "pl-10 pr-11 h-11 text-sm bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all rounded-lg",
+              { "border-red-500 focus-visible:ring-red-500/20": errors.password }
+            )}
           />
-
-          <div
-            className="absolute top-1/2 -translate-y-1/2 right-4 cursor-pointer"
+          <button
+            type="button"
+            tabIndex={-1}
             onClick={togglePasswordType}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
           >
             {passwordType === "password" ? (
-              <Eye className="w-5 h-5 text-default-400" />
+              <Eye className="w-4 h-4" />
             ) : (
-              <EyeOff className="w-5 h-5 text-default-400" />
+              <EyeOff className="w-4 h-4" />
             )}
-          </div>
+          </button>
         </div>
+        {errors.password && (
+          <p className="text-red-500 text-xs font-medium mt-1">
+            {errors.password.message}
+          </p>
+        )}
       </div>
-      {errors.password && (
-        <div className="text-destructive mt-2 text-sm">
-          {errors.password.message}
-        </div>
-      )}
 
       {/* Remember Me & Forgot Password */}
-      <div className="flex justify-between items-center pt-2">
-        <div className="flex gap-2 items-center">
-          <Checkbox id="checkbox" defaultChecked />
-          <Label htmlFor="checkbox" className="text-default-600 cursor-pointer">Keep Me Signed In</Label>
+      <div className="flex justify-between items-center pt-2 text-xs">
+        <div className="flex items-center gap-2">
+          <Checkbox id="checkbox" defaultChecked className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+          <Label htmlFor="checkbox" className="text-slate-600 cursor-pointer font-medium select-none">
+            Keep Me Signed In
+          </Label>
         </div>
         <Link
           href="/auth/forgot-password"
-          className="text-sm text-default-800 dark:text-default-400 leading-6 font-medium hover:underline"
+          className="text-indigo-600 font-semibold hover:text-indigo-700 hover:underline transition-colors"
         >
           Forgot Password?
         </Link>
       </div>
 
       {/* Submit Button */}
-      <Button disabled={isPending} className="w-full mt-4">
-        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {isPending ? "Loading..." : "Sign In"}
+      <Button
+        disabled={isPending}
+        className="w-full h-11 mt-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold text-sm rounded-lg shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center justify-center gap-2 group"
+      >
+        {isPending ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin text-white" />
+            <span>Signing in...</span>
+          </>
+        ) : (
+          <>
+            <span>Sign In to Workspace</span>
+            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+          </>
+        )}
       </Button>
+
     </form>
   );
 };

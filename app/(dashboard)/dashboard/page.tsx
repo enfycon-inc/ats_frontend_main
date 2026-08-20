@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { atsApi } from "@/lib/ats-api";
+import { resolveActiveSystemRole, CustomRoleDefinition } from "@/lib/role-permissions";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
@@ -29,7 +30,7 @@ export default function DashboardPage() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
-  const [availableRoles, setAvailableRoles] = useState<any[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
 
   useEffect(() => {
     atsApi.auth.listRoles().then(data => {
@@ -43,6 +44,15 @@ export default function DashboardPage() {
     if (typeof window !== "undefined") {
       const override = localStorage.getItem("override_role");
       setOverrideRole(override);
+      const handleStorage = () => {
+        setOverrideRole(localStorage.getItem("override_role"));
+      };
+      window.addEventListener("storage", handleStorage);
+      window.addEventListener("overrideRoleChanged", handleStorage);
+      return () => {
+        window.removeEventListener("storage", handleStorage);
+        window.removeEventListener("overrideRoleChanged", handleStorage);
+      };
     }
   }, []);
 
@@ -94,6 +104,53 @@ export default function DashboardPage() {
     }
   };
 
+  // Job Approval / Rejection Handlers
+  const [approvingJobId, setApprovingJobId] = useState<string | null>(null);
+  const [rejectingJob, setRejectingJob] = useState<any | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [submittingAction, setSubmittingAction] = useState(false);
+
+  const handleApproveJob = async (jobId: string) => {
+    setApprovingJobId(jobId);
+    try {
+      await atsApi.jobs.approve(jobId);
+      toast.success("Job requisition approved and activated live for recruiters!");
+      setJobs((prevJobs) =>
+        prevJobs.map((j) =>
+          j.id === jobId ? { ...j, jobStatus: "Active", approvalStatus: "APPROVED" } : j
+        )
+      );
+    } catch (err: any) {
+      toast.error("Failed to approve job: " + err.message);
+    } finally {
+      setApprovingJobId(null);
+    }
+  };
+
+  const handleRejectJob = async () => {
+    if (!rejectingJob) return;
+    if (!rejectReason.trim()) {
+      toast.error("Please provide a reason for rejecting this requisition.");
+      return;
+    }
+    setSubmittingAction(true);
+    try {
+      await atsApi.jobs.reject(rejectingJob.id, rejectReason.trim());
+      toast.success("Job requisition rejected.");
+      setJobs((prevJobs) =>
+        prevJobs.map((j) =>
+          j.id === rejectingJob.id ? { ...j, jobStatus: "Rejected", approvalStatus: "REJECTED" } : j
+        )
+      );
+      setRejectingJob(null);
+      setRejectReason("");
+    } catch (err: any) {
+      toast.error("Failed to reject job: " + err.message);
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -103,21 +160,8 @@ export default function DashboardPage() {
     );
   }
 
-  const resolveSystemRole = (roleStr: string | null | undefined): string => {
-    if (!roleStr) return profile?.systemRole || "RECRUITER";
-    const upper = roleStr.toUpperCase();
-    if (["SUPER_ADMIN", "ADMIN", "TENANT_ADMIN", "ACCOUNT_MANAGER", "POD_LEAD", "DELIVERY_HEAD", "RECRUITER"].includes(upper)) {
-      return upper;
-    }
-    const customRole = availableRoles.find(r => r.name.toUpperCase() === upper || r.id === roleStr);
-    if (customRole && (customRole.replacesSystemRole || customRole.systemRole)) {
-      return (customRole.replacesSystemRole || customRole.systemRole).toUpperCase();
-    }
-    return upper;
-  };
-
   const rawRole = overrideRole || (profile?.roles && profile.roles.length > 0 ? profile.roles[0] : profile?.systemRole);
-  const systemRole = resolveSystemRole(rawRole);
+  const systemRole = resolveActiveSystemRole(rawRole, availableRoles, profile);
 
   const roleName = overrideRole 
     ? overrideRole.replace("_", " ").toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())
@@ -127,6 +171,20 @@ export default function DashboardPage() {
   // Metric calculation helpers
   const activeJobs = jobs.filter(j => j.jobStatus === "Active");
   const highPriorityJobs = activeJobs.filter(j => j.priority === "Hot" || j.priority === "High" || j.priority === "Urgent");
+
+  // Approval capabilities
+  const canApproveJobs = Boolean(
+    (profile?.permissions || []).includes("job:approve") ||
+    (profile?.roles || []).includes("ADMIN") ||
+    (profile?.roles || []).includes("SUPER_ADMIN") ||
+    (profile?.roles || []).includes("BRANCH_ADMIN") ||
+    systemRole === "ADMIN" ||
+    systemRole === "DELIVERY_HEAD"
+  );
+
+  const pendingJobs = jobs.filter(
+    (j) => j.jobStatus === "Pending Approval" || j.approvalStatus === "PENDING_APPROVAL"
+  );
 
   return (
     <div className="space-y-6">
@@ -164,6 +222,175 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* ─── PENDING JOB REQUISITIONS APPROVAL QUEUE (Rendered if user has job:approve authority or pending jobs exist) ─── */}
+      {(canApproveJobs || pendingJobs.length > 0) && (
+        <Card className="border border-amber-300 dark:border-amber-900/80 bg-white dark:bg-slate-900 shadow-sm rounded-xl overflow-hidden ring-1 ring-amber-400/20">
+          <CardHeader className="border-b border-amber-200 dark:border-amber-900/60 pb-3 px-5 flex flex-row items-center justify-between bg-amber-50/70 dark:bg-amber-950/30">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 shrink-0">
+                <Icon icon="heroicons:clock" className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-black text-amber-950 dark:text-amber-100">
+                    Job Requisitions Pending Review &amp; Approval
+                  </CardTitle>
+                  <Badge className="bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200 text-[10px] font-extrabold px-2 py-0.5 border-0">
+                    {pendingJobs.length} Awaiting Action
+                  </Badge>
+                </div>
+                <CardDescription className="text-xs text-amber-800/80 dark:text-amber-300/70 mt-0.5">
+                  These requirements are currently hidden from recruiters. Review and sign-off to activate live broadcast.
+                </CardDescription>
+              </div>
+            </div>
+            <Link href="/job-posting?status=Pending+Approval">
+              <Button variant="ghost" size="sm" className="text-xs font-bold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/60 h-8">
+                All Jobs Table →
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            {pendingJobs.length === 0 ? (
+              <div className="p-8 text-center text-xs text-neutral-500 dark:text-neutral-400 flex flex-col items-center justify-center gap-1.5">
+                <Icon icon="heroicons:check-circle" className="h-8 w-8 text-emerald-500" />
+                <p className="font-bold text-neutral-800 dark:text-neutral-200">Approval Queue Clear</p>
+                <p className="text-[11px] text-neutral-400">All submitted requisitions have been approved or processed.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-amber-50/40 dark:bg-slate-850/60 border-b border-amber-200/60 dark:border-slate-800 text-neutral-700 dark:text-neutral-300 font-bold uppercase tracking-wider text-[10px]">
+                      <th className="py-2.5 px-4">Job Code &amp; Title</th>
+                      <th className="py-2.5 px-4">Client / Account</th>
+                      <th className="py-2.5 px-4">Submitted By</th>
+                      <th className="py-2.5 px-4">Budget / Pay Rate</th>
+                      <th className="py-2.5 px-4">Assigned Reviewer / Pod</th>
+                      <th className="py-2.5 px-4 text-right">Approval Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100 dark:divide-slate-800">
+                    {pendingJobs.map((job) => (
+                      <tr key={job.id} className="hover:bg-amber-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3 px-4">
+                          <Link href={`/job-posting/${job.id}`} className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline block leading-tight">
+                            {job.jobTitle}
+                          </Link>
+                          <span className="text-[10px] font-mono text-neutral-500 dark:text-neutral-400">{job.jobCode}</span>
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-neutral-800 dark:text-neutral-200">
+                          {job.client || "Client Account"}
+                          {job.endClientName && <span className="text-[10px] text-neutral-400 block font-normal">End Client: {job.endClientName}</span>}
+                        </td>
+                        <td className="py-3 px-4 text-neutral-700 dark:text-neutral-300 font-medium">
+                          {job.createdBy || "Account Manager"}
+                        </td>
+                        <td className="py-3 px-4 font-bold text-neutral-900 dark:text-white">
+                          {(() => {
+                            const rate = job.payRate;
+                            if (!rate || rate === "N/A") return "Standard";
+                            if (/[a-zA-Z$₹]/.test(rate)) return rate;
+                            return (job.market || "US") === "IN" ? `INR - ${rate} LPA` : `USD - $${rate}/hr`;
+                          })()}
+                          {job.clientBillRate && (
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-semibold">Bill: {job.clientBillRate}</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300">
+                            {job.assignedApproverName || (job.assignedApproverRole === "POD_LEAD" ? "Pod Lead" : job.assignedApproverRole === "DELIVERY_HEAD" ? "Delivery Head" : "Authorized Reviewer")}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setRejectingJob(job);
+                                setRejectReason("");
+                              }}
+                              className="border-rose-300 dark:border-rose-900/60 text-rose-700 dark:text-rose-400 hover:bg-rose-50 text-[11px] font-bold h-7.5 px-2.5"
+                            >
+                              <Icon icon="heroicons:x-circle" className="h-3.5 w-3.5 mr-1" />
+                              Reject
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={approvingJobId === job.id}
+                              onClick={() => handleApproveJob(job.id)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold h-7.5 px-3 shadow-xs"
+                            >
+                              {approvingJobId === job.id ? (
+                                <Icon icon="heroicons:arrow-path" className="h-3.5 w-3.5 animate-spin mr-1" />
+                              ) : (
+                                <Icon icon="heroicons:check-circle" className="h-3.5 w-3.5 mr-1" />
+                              )}
+                              Approve &amp; Activate
+                            </Button>
+                            <Link href={`/job-posting/${job.id}`}>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-neutral-600 dark:text-neutral-300 text-[11px] font-semibold h-7.5 px-2"
+                              >
+                                Details →
+                              </Button>
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* REJECT JOB MODAL */}
+      <Dialog open={Boolean(rejectingJob)} onOpenChange={(open) => !open && setRejectingJob(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-sm">
+              <Icon icon="heroicons:x-circle" className="h-5 w-5" /> Reject Job Requisition
+            </DialogTitle>
+            <DialogDescription className="text-xs text-neutral-500">
+              Provide feedback or rejection reason for <strong>{rejectingJob?.jobTitle}</strong> ({rejectingJob?.jobCode}).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
+              Rejection Reason / Feedback <span className="text-rose-500">*</span>
+            </label>
+            <textarea
+              rows={3}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="e.g. Budget rate requires adjustment / Missing job requirements..."
+              className="w-full p-2.5 border border-neutral-300 dark:border-slate-700 rounded-lg bg-transparent text-xs focus:outline-none focus:border-rose-500"
+            />
+          </div>
+
+          <DialogFooter className="gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+            <Button variant="outline" size="sm" onClick={() => setRejectingJob(null)} className="text-xs">
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={submittingAction || !rejectReason.trim()}
+              onClick={handleRejectJob}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs"
+            >
+              {submittingAction ? "Rejecting..." : "Confirm Rejection"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Render Dashboard Widgets based on resolved systemRole */}
       {systemRole === "SUPER_ADMIN" ? (

@@ -25,6 +25,7 @@ import { useEffect, useRef, useState } from "react";
 import userImg from "@/public/assets/images/user.png";
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { atsApi } from "@/lib/ats-api";
+import { isRoleAdmin } from "@/lib/role-permissions";
 
 // ─── Shared icon button base ─────────────────────────────────────────────────
 function NavIconBtn({
@@ -589,13 +590,20 @@ function ProfileDropdownNav() {
       } else {
         localStorage.removeItem("override_role");
       }
+      window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new CustomEvent("overrideRoleChanged", { detail: { role: roleName } }));
       window.location.reload();
     }
     setOpen(false);
   };
 
-  const currentActiveRole = overrideRole || userRoles[0] || (userAssignedRoles.length > 0 ? userAssignedRoles[0] : "ACCOUNT_MANAGER");
+  const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+  const branchSpecificRoles = (activeBranchId && (currentUser as any)?.branchRoles?.[activeBranchId]) || [];
+  const effectiveRoles = branchSpecificRoles.length > 0 ? branchSpecificRoles : userRoles;
+
+  const currentActiveRole = overrideRole || effectiveRoles[0] || (userAssignedRoles.length > 0 ? userAssignedRoles[0] : "RECRUITER");
   const displayRole = getDynamicRoleLabel(currentActiveRole);
+  const isAdminActive = isRoleAdmin(currentActiveRole, availableRoles, currentUser);
 
   return (
     <div ref={ref} className="relative">
@@ -720,21 +728,23 @@ function ProfileDropdownNav() {
               Inbox
             </Link>
 
-            <Link
-              href="/utility/roles-permissions"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="
-                flex items-center gap-2.5 px-4 py-2
-                text-[12.5px] text-neutral-700 dark:text-white/80
-                hover:bg-blue-50 dark:hover:bg-white/8
-                hover:text-blue-700 dark:hover:text-white
-                transition-colors duration-100 font-medium
-              "
-            >
-              <Settings className="w-3.5 h-3.5 flex-shrink-0 text-blue-500 dark:text-blue-400" />
-              Workspace Settings & RBAC
-            </Link>
+            {isAdminActive && (
+              <Link
+                href="/utility/roles-permissions"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="
+                  flex items-center gap-2.5 px-4 py-2
+                  text-[12.5px] text-neutral-700 dark:text-white/80
+                  hover:bg-blue-50 dark:hover:bg-white/8
+                  hover:text-blue-700 dark:hover:text-white
+                  transition-colors duration-100 font-medium
+                "
+              >
+                <Settings className="w-3.5 h-3.5 flex-shrink-0 text-blue-500 dark:text-blue-400" />
+                Workspace Settings & RBAC
+              </Link>
+            )}
 
             <div className="border-t border-neutral-100 dark:border-white/8 mt-1 pt-1 px-4 pb-2">
               <Logout />
@@ -880,37 +890,79 @@ function BranchSwitcher() {
   }, []);
 
   const loadLiveBranches = async () => {
-    const currentUser = atsApi.auth.getCurrentUser() || (session as any)?.user;
+    let currentUser = atsApi.auth.getCurrentUser() || (session as any)?.user;
+
+    if (currentUser?.id) {
+      try {
+        const freshProfile = await atsApi.auth.getProfile(currentUser.id);
+        if (freshProfile) {
+          currentUser = { ...currentUser, ...freshProfile };
+          if (typeof window !== "undefined") {
+            atsApi.auth.setCurrentUser(currentUser);
+          }
+        }
+      } catch (e) {
+        // Fall back to cached user
+      }
+    }
+
     const fallbackBranchName = currentUser?.branchName || "Domestic Branch";
 
     try {
       const data = await atsApi.branches.list();
       if (Array.isArray(data) && data.length > 0) {
-        setBranches(data);
-
         const sysRole = overrideRole || currentUser?.systemRole || (currentUser?.roles && currentUser.roles[0]) || "RECRUITER";
-        const perms = currentUser?.permissions || [];
-        const canSwitch = sysRole === "ADMIN" || sysRole === "SUPER_ADMIN" || sysRole === "DELIVERY_HEAD" || perms.includes("candidate:search_all_branches") || perms.includes("job:view_all_branches");
+        const isTenantAdmin = sysRole === "ADMIN" || sysRole === "SUPER_ADMIN";
 
-        let match = null;
+        // Extract user's assigned branch IDs
+        const assignedIds: string[] = Array.isArray(currentUser?.assignedBranchIds) && currentUser.assignedBranchIds.length > 0
+          ? currentUser.assignedBranchIds
+          : currentUser?.branchId ? [currentUser.branchId] : [];
 
-        if (currentUser?.branchId) {
-          match = data.find((b: any) => b.id === currentUser.branchId);
-        }
-
-        if (!match && currentUser?.branchName) {
-          match = data.find((b: any) => b.name?.toLowerCase() === currentUser.branchName.toLowerCase());
-        }
-
-        if (canSwitch && !match) {
-          const savedName = typeof window !== "undefined" ? localStorage.getItem("active_branch_name") : null;
-          if (savedName) {
-            match = data.find((b: any) => b.name === savedName);
+        // Access Control Rule:
+        // Tenant Admin sees ALL branches in the tenant.
+        // Non-tenant admin users ONLY see the branches they are explicitly assigned to.
+        let allowedBranches = data;
+        if (!isTenantAdmin) {
+          if (assignedIds.length > 0) {
+            allowedBranches = data.filter((b: any) =>
+              assignedIds.includes(b.id) ||
+              (currentUser?.branchId && b.id === currentUser.branchId) ||
+              (currentUser?.branchName && b.name.toLowerCase() === currentUser.branchName.toLowerCase())
+            );
+          } else if (currentUser?.branchId) {
+            allowedBranches = data.filter((b: any) => b.id === currentUser.branchId);
+          } else {
+            allowedBranches = data.slice(0, 1);
           }
         }
 
+        setBranches(allowedBranches);
+
+        let match = null;
+
+        const savedId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+        if (savedId) {
+          match = allowedBranches.find((b: any) => b.id === savedId);
+        }
+
         if (!match) {
-          match = data[0];
+          const savedName = typeof window !== "undefined" ? localStorage.getItem("active_branch_name") : null;
+          if (savedName) {
+            match = allowedBranches.find((b: any) => b.name === savedName);
+          }
+        }
+
+        if (!match && currentUser?.branchId) {
+          match = allowedBranches.find((b: any) => b.id === currentUser.branchId);
+        }
+
+        if (!match && currentUser?.branchName) {
+          match = allowedBranches.find((b: any) => b.name?.toLowerCase() === currentUser.branchName.toLowerCase());
+        }
+
+        if (!match) {
+          match = allowedBranches[0];
         }
 
         if (match) {
@@ -930,15 +982,12 @@ function BranchSwitcher() {
     }
   };
 
-  const systemRole = overrideRole || (session as any)?.user?.systemRole || "RECRUITER";
-  const userPermissions: string[] = (session as any)?.user?.permissions || [];
+  const currentUser = typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null;
+  const systemRole = overrideRole || currentUser?.systemRole || (session as any)?.user?.systemRole || "RECRUITER";
+  const isTenantAdmin = systemRole === "ADMIN" || systemRole === "SUPER_ADMIN";
 
-  const canSwitchBranch =
-    systemRole === "ADMIN" ||
-    systemRole === "SUPER_ADMIN" ||
-    systemRole === "DELIVERY_HEAD" ||
-    userPermissions.includes("candidate:search_all_branches") ||
-    userPermissions.includes("job:view_all_branches");
+  // Rule: Only Tenant Admin or users assigned to multiple branches can switch branch context.
+  const canSwitchBranch = isTenantAdmin || branches.length > 1;
 
   useEffect(() => {
     const handle = (e: MouseEvent) => {
@@ -962,17 +1011,17 @@ function BranchSwitcher() {
   if (!canSwitchBranch) {
     return (
       <div 
-        title="Your branch assignment is locked to your home branch. Contact Tenant Admin for cross-branch access."
+        title="Your branch context is assigned to your home office. Contact Tenant Admin for multi-branch access."
         className="
           flex items-center gap-1.5
-          h-7 px-2.5 rounded
+          h-7 px-2.5 rounded-lg
           text-[11px] font-bold tracking-wide
-          bg-emerald-900/60 text-emerald-200
-          border border-emerald-700/50 shadow-sm
+          bg-white/10 text-white/90
+          border border-white/15 shadow-2xs
           cursor-default select-none
         "
       >
-        <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-emerald-300" />
+        <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-indigo-200" />
         <span>Office: {activeBranch}</span>
       </div>
     );
@@ -984,17 +1033,17 @@ function BranchSwitcher() {
         onClick={() => setOpen((v) => !v)}
         className="
           flex items-center gap-1.5
-          h-7 px-2.5 rounded
+          h-7 px-2.5 rounded-lg
           text-[11px] font-bold tracking-wide
-          bg-emerald-600 hover:bg-emerald-700 text-white
-          transition-colors duration-150
+          bg-white/12 hover:bg-white/20 text-white
+          transition-all duration-150
           cursor-pointer whitespace-nowrap select-none
-          shadow-sm border border-emerald-500
+          shadow-2xs border border-white/20 backdrop-blur-xs
         "
       >
-        <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-emerald-200" />
+        <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-indigo-200" />
         <span>Office: {activeBranch}</span>
-        <ChevronDown className={`w-3 h-3 opacity-80 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`w-3 h-3 text-indigo-200 opacity-90 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
@@ -1003,41 +1052,33 @@ function BranchSwitcher() {
           aria-label="Select Active Branch Context"
           className="
             absolute top-full right-0 mt-1.5 z-[350]
-            w-[220px]
-            bg-white dark:bg-[#1e2d50]
-            border border-neutral-200 dark:border-white/10
-            rounded shadow-xl shadow-black/25
-            py-1
+            w-[230px]
+            bg-white dark:bg-slate-900
+            border border-neutral-200 dark:border-slate-800
+            rounded-xl shadow-xl shadow-black/20
+            py-1.5 overflow-hidden
             animate-in fade-in-0 slide-in-from-top-2
           "
         >
-          <div className="px-3 pt-1 pb-1 border-b border-neutral-100 dark:border-white/10 flex justify-between items-center">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 dark:text-white/30">
-              Active Branch Context
-            </span>
-            <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded">
-              Multi-Branch
-            </span>
-          </div>
           {branches.map((b) => (
             <button
               key={b.id}
               onClick={() => handleSelectBranch(b)}
               role="menuitem"
               className={`
-                w-full text-left px-3 py-2 text-[12px] transition-colors cursor-pointer flex justify-between items-center
+                w-full text-left px-3 py-2 text-[12px] transition-all cursor-pointer flex justify-between items-center
                 ${activeBranch === b.name
-                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold"
-                  : "text-neutral-700 dark:text-white/80 hover:bg-neutral-50 dark:hover:bg-white/8 font-medium"
+                  ? "bg-indigo-50/90 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 font-bold border-l-2 border-indigo-600 dark:border-indigo-400"
+                  : "text-neutral-700 dark:text-slate-200 hover:bg-neutral-50 dark:hover:bg-slate-800/80 font-medium"
                 }
               `}
             >
               <div className="flex flex-col">
-                <span>🏢 {b.name}</span>
+                <span className="font-bold">🏢 {b.name}</span>
                 <span className="text-[9.5px] text-neutral-400 font-normal">{b.city} • {b.market === "US" ? "US IT" : "Domestic India"}</span>
               </div>
               {activeBranch === b.name && (
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="h-2 w-2 rounded-full bg-indigo-600 dark:bg-indigo-400 shrink-0" />
               )}
             </button>
           ))}

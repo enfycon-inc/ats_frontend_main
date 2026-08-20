@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
+import { isRoleAdmin } from "@/lib/role-permissions";
 
 interface Permission {
   id: string;
@@ -93,8 +94,14 @@ export default function RolesPermissionsPage() {
 
   useEffect(() => {
     const user = atsApi.auth.getCurrentUser();
-    // Allow SUPER_ADMIN or tenant ADMIN to access this panel
-    const hasAccess = user?.roles?.includes("ADMIN") || user?.roles?.includes("SUPER_ADMIN") || user?.permissions?.includes("user:manage");
+    const override = typeof window !== "undefined" ? localStorage.getItem("override_role") : null;
+    const activeRole = override || user?.systemRole || user?.roles?.[0];
+    
+    // Check if active role perspective has admin access
+    const hasAccess = override
+      ? isRoleAdmin(override, roles, user)
+      : (user?.roles?.includes("ADMIN") || user?.roles?.includes("SUPER_ADMIN") || user?.permissions?.includes("user:manage"));
+    
     setIsAdmin(hasAccess);
 
     if (hasAccess) {

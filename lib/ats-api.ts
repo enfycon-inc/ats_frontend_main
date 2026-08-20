@@ -1,3 +1,4 @@
+
 /**
  * ats-api.ts — Typed API client for the NestJS ATS backend
  *
@@ -222,6 +223,18 @@ const auth = {
     clearToken();
   },
 
+  async getProfile(userId?: string): Promise<any> {
+    const uid = userId || getCurrentUser()?.id;
+    if (!uid) return null;
+    return apiFetch<any>(`/api/auth/profile/${uid}`);
+  },
+
+  setCurrentUser(user: any) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+    }
+  },
+
   getToken,
   getCurrentUser,
   isAuthenticated(): boolean {
@@ -329,7 +342,7 @@ const auth = {
     });
   },
 
-  async updateUserDetail(userId: string, data: { fullName?: string; email?: string; password?: string; branchId?: string; businessUnitId?: string; roles?: string[] }): Promise<any> {
+  async updateUserDetail(userId: string, data: { fullName?: string; email?: string; password?: string; branchId?: string; assignedBranchIds?: string[]; branchRoles?: Record<string, string[]>; businessUnitId?: string; roles?: string[] }): Promise<any> {
     return apiFetch<any>(`/api/auth/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -410,7 +423,12 @@ const auth = {
     });
   },
 
-  async updateMySettings(settings: { podSystemEnabled?: boolean; candidatePoolMode?: string }): Promise<any> {
+  async updateMySettings(settings: {
+    podSystemEnabled?: boolean;
+    candidatePoolMode?: string;
+    jobAssignmentMode?: string;
+    jobAssignmentOptions?: any;
+  }): Promise<any> {
     return apiFetch<any>('/api/auth/tenants/my-settings', {
       method: 'PATCH',
       body: JSON.stringify(settings),
@@ -549,6 +567,13 @@ export interface JobPayload {
   city?: string;
   noticePeriod?: string;
   respondBy?: string;
+  approvalStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  assignedApproverId?: string | null;
+  assignedApproverName?: string | null;
+  assignedApproverRole?: string | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  rejectionReason?: string | null;
 }
 
 export interface CandidateMatch {
@@ -622,6 +647,20 @@ const jobs = {
     return apiFetch<JobPayload>(`/api/jobs/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+  },
+
+  async approve(id: string, overrides?: { assignedTo?: string; primaryRecruiterId?: string; podId?: string }): Promise<JobPayload> {
+    return apiFetch<JobPayload>(`/api/jobs/${id}/approve`, {
+      method: 'PATCH',
+      body: JSON.stringify(overrides || {}),
+    });
+  },
+
+  async reject(id: string, reason: string): Promise<JobPayload> {
+    return apiFetch<JobPayload>(`/api/jobs/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
     });
   },
 
@@ -948,7 +987,26 @@ const branches = {
       body: JSON.stringify(data),
     });
   },
-  async update(id: string, data: { name?: string; code?: string; city?: string; state?: string; country?: string; market?: string; isActive?: boolean }): Promise<any> {
+  async update(id: string, data: {
+    name?: string;
+    code?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    market?: string;
+    isActive?: boolean;
+    allowNone?: boolean;
+    allowPods?: boolean;
+    allowAll?: boolean;
+    allowUnassigned?: boolean;
+    podDistributionStrategy?: 'AUTO' | 'MANUAL';
+    requireAmJobApproval?: boolean;
+    requireJobApproval?: boolean;
+    rolesRequiringApproval?: string[];
+    defaultJobApproverRole?: string;
+    allowedJobApproverRoles?: string[];
+    approvalRoutingMode?: 'FLEXIBLE' | 'ENFORCE_DEFAULT';
+  }): Promise<any> {
     return apiFetch<any>(`/api/branches/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

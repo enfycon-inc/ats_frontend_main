@@ -17,6 +17,7 @@ import { mockApplicants, Applicant } from "../data/mock-applicants";
 import { atsApi } from "@/lib/ats-api";
 import { useSession } from "next-auth/react";
 import { CheckCircle2, AlertCircle, Users, FileText, UploadCloud, Database } from "lucide-react";
+import { getUserColumnPreferences, saveUserColumnPreferences } from "@/utils/user-column-preferences";
 
 export default function AllApplicantsPage() {
   // ── View state ────────────────────────────────────────────
@@ -43,9 +44,17 @@ export default function AllApplicantsPage() {
 
   const isRecruiter = systemRole === "RECRUITER";
 
-  // ── Column state ─────────────────────────────────────────
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(DEFAULT_COLUMNS);
+  // ── Column state (User Persistent) ─────────────────────────
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() =>
+    getUserColumnPreferences("applicants", DEFAULT_COLUMNS)
+  );
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false);
+
+  useEffect(() => {
+    if (session?.user) {
+      setSelectedColumns(getUserColumnPreferences("applicants", DEFAULT_COLUMNS));
+    }
+  }, [session]);
 
   // ── Filter state ─────────────────────────────────────────
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
@@ -387,7 +396,10 @@ export default function AllApplicantsPage() {
         onClose={() => setIsColumnManagerOpen(false)}
         allColumns={ALL_COLUMNS}
         selectedColumns={selectedColumns}
-        onApply={setSelectedColumns}
+        onApply={(newCols) => {
+          setSelectedColumns(newCols);
+          saveUserColumnPreferences("applicants", newCols);
+        }}
       />
 
       {toast && (

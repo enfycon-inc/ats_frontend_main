@@ -632,41 +632,98 @@ export default function ApplicantsTable({
 
                     {/* Actions */}
                     <td className="w-10 px-1 py-0.5 text-center sticky right-0 bg-inherit z-10 border-l border-neutral-100 dark:border-slate-800">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            className="p-1 rounded-sm text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                            onClick={(e) => e.stopPropagation()}
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              className="p-1 rounded-md text-neutral-500 dark:text-neutral-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                              title="Actions"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            sideOffset={4}
+                            className="w-52 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-neutral-200/90 dark:border-slate-800 rounded-xl shadow-xl shadow-slate-900/10 dark:shadow-black/50 p-1.5 animate-in fade-in-0 zoom-in-95 z-[100] font-sans"
                           >
-                            <MoreHorizontal className="h-3.5 w-3.5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="text-xs min-w-40">
-                          <DropdownMenuItem className="text-xs cursor-pointer gap-2" onClick={() => router.push(`/applicants/${extractDbId(applicant)}`)}>
-                            <Eye className="h-3.5 w-3.5" /> View Profile
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-xs cursor-pointer gap-2" onClick={() => router.push(`/applicants/${extractDbId(applicant)}`)}>
-                            <Edit className="h-3.5 w-3.5" /> Edit Applicant
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-xs cursor-pointer gap-2" onClick={() => handleOpenSubmitModal(applicant)}>
-                            <ClipboardList className="h-3.5 w-3.5" /> Submit to Job
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-xs cursor-pointer gap-2" onClick={() => router.push(`/email?to=${encodeURIComponent(applicant.email || '')}`)}>
-                            <Mail className="h-3.5 w-3.5" /> Send Email
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-xs cursor-pointer gap-2" onClick={() => window.open(`tel:${applicant.mobile || ''}`, '_self')}>
-                            <Phone className="h-3.5 w-3.5" /> Call
-                          </DropdownMenuItem>
-                          {!isRecruiter && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-xs cursor-pointer gap-2 text-red-650 dark:text-red-400 focus:text-red-650" onClick={() => handleDeleteSingleCandidate(applicant)}>
-                                <Trash2 className="h-3.5 w-3.5" /> Delete
+                            <div className="space-y-0.5">
+                              <div className="px-2.5 pt-1 pb-1 text-[9.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                Candidate Actions
+                              </div>
+
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/applicants/${extractDbId(applicant)}`)}
+                                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              >
+                                <div className="h-6 w-6 rounded-md bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                  <Eye className="h-3.5 w-3.5" />
+                                </div>
+                                <span className="font-semibold">View Profile</span>
                               </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+
+                              <DropdownMenuItem
+                                onClick={() => handleOpenSubmitModal(applicant)}
+                                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                              >
+                                <div className="h-6 w-6 rounded-md bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                  <ClipboardList className="h-3.5 w-3.5" />
+                                </div>
+                                <span className="font-semibold">Submit to Job</span>
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/applicants/${extractDbId(applicant)}`)}
+                                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              >
+                                <div className="h-6 w-6 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                  <Edit className="h-3.5 w-3.5" />
+                                </div>
+                                <span className="font-semibold">Edit Applicant</span>
+                              </DropdownMenuItem>
+                            </div>
+
+                            <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
+
+                            <div className="space-y-0.5">
+                              <div className="px-2.5 pt-1 pb-1 text-[9.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                Contact & Operations
+                              </div>
+
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/email?to=${encodeURIComponent(applicant.email || '')}`)}
+                                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+                              >
+                                <div className="h-6 w-6 rounded-md bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                  <Mail className="h-3.5 w-3.5" />
+                                </div>
+                                <span className="font-semibold">Send Email</span>
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem
+                                onClick={() => window.open(`tel:${applicant.mobile || ''}`, '_self')}
+                                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 transition-colors"
+                              >
+                                <div className="h-6 w-6 rounded-md bg-teal-100 dark:bg-teal-950 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                  <Phone className="h-3.5 w-3.5" />
+                                </div>
+                                <span className="font-semibold">Call Applicant</span>
+                              </DropdownMenuItem>
+
+                              {!isRecruiter && (
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteSingleCandidate(applicant)}
+                                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                >
+                                  <div className="h-6 w-6 rounded-md bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span className="font-semibold">Delete Applicant</span>
+                                </DropdownMenuItem>
+                              )}
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                     </td>
                   </tr>
                 );

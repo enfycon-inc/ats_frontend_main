@@ -8,6 +8,7 @@ import { atsApi } from "@/lib/ats-api";
 import { User, Mail, ShieldCheck, MapPin, Building, Phone, Calendar, Key, CheckCircle, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import toast from "react-hot-toast";
 
 const TABS = [
@@ -214,11 +215,10 @@ export default function ViewProfilePage() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Contact Phone Number</label>
-                <Input
+                <PhoneInput
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="e.g. +91 98765 43210"
-                  className="h-9 text-xs rounded border-neutral-300"
+                  onChange={(val) => setPhone(val || "")}
+                  market={(session?.user as any)?.market || "IN"}
                 />
               </div>
             </div>
