@@ -1,19 +1,55 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
 import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Send,
+  Award,
+  Calendar,
+  Building2,
+  MoreHorizontal,
+  FileText,
+  UserCheck,
+  Sparkles,
+  Check,
+  X,
+  CalendarDays,
+  Pencil,
+  Mail,
+  Phone,
+  MessageSquare,
+} from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import { getActiveRolePermissions, resolveActiveSystemRole, CustomRoleDefinition } from "@/lib/role-permissions";
 import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from "@/components/ui/hover-card";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -71,94 +107,232 @@ interface Submission {
 }
 
 function renderPipelineProgress(sub: Submission) {
-  const getBadgeStyle = (status: string | null) => {
+  const getStagePill = (stage: string, status: string | null, remarks?: string | null) => {
     const s = (status || "").toUpperCase();
-    if (s === "CLEARED") return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800";
-    if (s === "REJECTED") return "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800";
-    if (s === "SCHEDULED") return "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800";
-    if (s === "PENDING") return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800";
-    return "bg-slate-50 text-slate-400 border-slate-200 dark:bg-slate-800/30 dark:text-slate-500 dark:border-slate-800";
-  };
+    let badgeStyle = "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+    let label = "—";
 
-  const getLabel = (stage: string, status: string | null) => {
-    const s = (status || "").toUpperCase();
-    if (s === "CLEARED") return `${stage}: Pass ✓`;
-    if (s === "REJECTED") return `${stage}: Fail ✕`;
-    if (s === "SCHEDULED") return `${stage}: Sched`;
-    if (s === "PENDING") return `${stage}: Pend`;
-    return `${stage}: —`;
+    if (s === "CLEARED" || s === "PASSED") {
+      badgeStyle = "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/40";
+      label = "Pass";
+    } else if (s === "REJECTED") {
+      badgeStyle = "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800/40";
+      label = "Fail";
+    } else if (s === "SCHEDULED") {
+      badgeStyle = "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-800/40";
+      label = "Sched";
+    } else if (s === "PENDING") {
+      badgeStyle = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40";
+      label = "Pend";
+    }
+
+    return (
+      <span
+        key={stage}
+        title={`${stage}: ${status || "Not started"}${remarks ? `\nFeedback: ${remarks}` : ""}`}
+        className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded-md border shadow-none inline-flex items-center gap-0.5 select-none", badgeStyle)}
+      >
+        <span className="opacity-70 font-semibold">{stage}:</span>
+        <span>{label}</span>
+      </span>
+    );
   };
 
   return (
-    <div className="flex flex-col gap-1 min-w-[130px]">
-      <div className="flex items-center gap-1">
-        <span
-          title={`Round 1 (L1) Interview: ${sub.l1Status || 'Pending'}${sub.l1Remarks ? `\nFeedback: ${sub.l1Remarks}` : ''}`}
-          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getBadgeStyle(sub.l1Status)}`}
-        >
-          {getLabel("L1", sub.l1Status || "PENDING")}
-        </span>
-        <span
-          title={`L2 Technical Vetting: ${sub.l2Status || 'Not started'}${sub.l2Remarks ? `\nFeedback: ${sub.l2Remarks}` : ''}`}
-          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getBadgeStyle(sub.l2Status)}`}
-        >
-          {getLabel("L2", sub.l2Status)}
-        </span>
-        <span
-          title={`L3 Commercial Audit: ${sub.l3Status || 'Not started'}${sub.l3Remarks ? `\nFeedback: ${sub.l3Remarks}` : ''}`}
-          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getBadgeStyle(sub.l3Status)}`}
-        >
-          {getLabel("L3", sub.l3Status)}
-        </span>
-      </div>
-      {(sub.l1Remarks || sub.l2Remarks || sub.l3Remarks) && (
-        <div className="text-[9px] text-default-450 truncate max-w-[170px] italic font-medium" title={sub.l3Remarks || sub.l2Remarks || sub.l1Remarks || ''}>
-          "{sub.l3Remarks || sub.l2Remarks || sub.l1Remarks}"
-        </div>
-      )}
+    <div className="flex items-center gap-1">
+      {getStagePill("L1", sub.l1Status || "PENDING", sub.l1Remarks)}
+      {getStagePill("L2", sub.l2Status, sub.l2Remarks)}
+      {getStagePill("L3", sub.l3Status, sub.l3Remarks)}
     </div>
   );
 }
 
-function renderClutterFreeRemarks(sub: Submission) {
-  const allRemarks: { label: string; text: string; color: string }[] = [];
-  if (sub.remarks) allRemarks.push({ label: "Final", text: sub.remarks, color: "text-emerald-700 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300" });
-  if (sub.l3Remarks) allRemarks.push({ label: "L3", text: sub.l3Remarks, color: "text-purple-700 bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300" });
-  if (sub.l2Remarks) allRemarks.push({ label: "L2", text: sub.l2Remarks, color: "text-cyan-700 bg-cyan-50 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300" });
-  if (sub.l1Remarks) allRemarks.push({ label: "L1", text: sub.l1Remarks, color: "text-indigo-700 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300" });
-  if (sub.reviewFeedback || sub.podLeadRemarks) allRemarks.push({ label: "Internal", text: (sub.reviewFeedback || sub.podLeadRemarks)!, color: "text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300" });
-  if (sub.recruiterComment) allRemarks.push({ label: "Recruiter", text: sub.recruiterComment, color: "text-slate-700 bg-slate-100 border-slate-200 dark:bg-slate-800 dark:text-slate-300" });
+function formatRemarkTimestamp(dateStr?: string | null, fallbackDateStr?: string | null) {
+  const d = dateStr || fallbackDateStr;
+  if (!d) return null;
+  try {
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return null;
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    }) + " • " + date.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  } catch {
+    return null;
+  }
+}
 
-  const primary = allRemarks[0];
-  const fullTooltip = allRemarks.map(r => `[${r.label}] ${r.text}`).join('\n\n');
+function renderClutterFreeRemarks(sub: Submission) {
+  const allRemarks: { stage: string; label: string; text: string; timestamp?: string | null; dotColor: string; labelColor: string; bgBadge: string }[] = [];
+
+  if (sub.remarks) {
+    allRemarks.push({
+      stage: "Final Decision",
+      label: "Final",
+      text: sub.remarks,
+      timestamp: formatRemarkTimestamp(sub.updatedAt, sub.createdAt),
+      dotColor: "bg-emerald-500 ring-emerald-100 dark:ring-emerald-950",
+      labelColor: "text-emerald-700 dark:text-emerald-400",
+      bgBadge: "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300"
+    });
+  }
+  if (sub.l3Remarks) {
+    allRemarks.push({
+      stage: "Round 3 (L3)",
+      label: "L3",
+      text: sub.l3Remarks,
+      timestamp: formatRemarkTimestamp(sub.l3Date, sub.updatedAt || sub.createdAt),
+      dotColor: "bg-purple-500 ring-purple-100 dark:ring-purple-950",
+      labelColor: "text-purple-700 dark:text-purple-400",
+      bgBadge: "bg-purple-50 border-purple-200 text-purple-700 dark:bg-purple-950/40 dark:border-purple-800 dark:text-purple-300"
+    });
+  }
+  if (sub.l2Remarks) {
+    allRemarks.push({
+      stage: "Round 2 (L2)",
+      label: "L2",
+      text: sub.l2Remarks,
+      timestamp: formatRemarkTimestamp(sub.l2Date, sub.updatedAt || sub.createdAt),
+      dotColor: "bg-cyan-500 ring-cyan-100 dark:ring-cyan-950",
+      labelColor: "text-cyan-700 dark:text-cyan-400",
+      bgBadge: "bg-cyan-50 border-cyan-200 text-cyan-700 dark:bg-cyan-950/40 dark:border-cyan-800 dark:text-cyan-300"
+    });
+  }
+  if (sub.l1Remarks) {
+    allRemarks.push({
+      stage: "Round 1 (L1)",
+      label: "L1",
+      text: sub.l1Remarks,
+      timestamp: formatRemarkTimestamp(sub.l1Date, sub.updatedAt || sub.createdAt),
+      dotColor: "bg-indigo-500 ring-indigo-100 dark:ring-indigo-950",
+      labelColor: "text-indigo-700 dark:text-indigo-400",
+      bgBadge: "bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300"
+    });
+  }
+  if (sub.reviewFeedback || sub.podLeadRemarks) {
+    allRemarks.push({
+      stage: "Internal Review",
+      label: "Internal",
+      text: (sub.reviewFeedback || sub.podLeadRemarks)!,
+      timestamp: formatRemarkTimestamp(sub.updatedAt, sub.createdAt),
+      dotColor: "bg-amber-500 ring-amber-100 dark:ring-amber-950",
+      labelColor: "text-amber-700 dark:text-amber-400",
+      bgBadge: "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300"
+    });
+  }
+  if (sub.recruiterComment) {
+    allRemarks.push({
+      stage: "Recruiter Note",
+      label: "Recruiter",
+      text: sub.recruiterComment,
+      timestamp: formatRemarkTimestamp(sub.createdAt),
+      dotColor: "bg-slate-400 ring-slate-100 dark:ring-slate-800",
+      labelColor: "text-slate-700 dark:text-slate-300",
+      bgBadge: "bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
+    });
+  }
+
+  const latest = allRemarks[0];
+
+  if (!latest) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-neutral-400 italic text-[11px]">No remarks</span>
+        {sub.createdAt && (
+          <div className="text-[10px] text-neutral-400 flex items-center gap-1 font-normal">
+            <Calendar className="h-3 w-3 text-neutral-400 shrink-0" />
+            {new Date(sub.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-1 text-xs max-w-[240px]">
-      {primary ? (
-        <div className="flex items-center gap-1.5" title={fullTooltip}>
-          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase shrink-0 ${primary.color}`}>
-            {primary.label}
-          </span>
-          <span className="text-default-750 font-medium truncate max-w-[150px]">
-            {primary.text}
-          </span>
-          {allRemarks.length > 1 && (
-            <span 
-              className="text-[9px] font-semibold bg-default-100 text-default-500 hover:bg-default-200 px-1 py-0.2 rounded shrink-0 cursor-help"
-              title={fullTooltip}
-            >
-              +{allRemarks.length - 1}
+    <HoverCard openDelay={150} closeDelay={150}>
+      <HoverCardTrigger asChild>
+        <div className="flex flex-col justify-center gap-0.5 min-w-[180px] max-w-[280px] cursor-pointer group/remark select-none">
+          <div className="flex items-center gap-1 text-xs text-neutral-800 dark:text-neutral-200 overflow-hidden">
+            <span className={cn("font-semibold shrink-0 text-xs", latest.labelColor)}>
+              {latest.label}:
             </span>
-          )}
+            <span className="font-normal truncate text-xs text-neutral-800 dark:text-neutral-200">
+              {latest.text}
+            </span>
+            {allRemarks.length > 1 && (
+              <span className="shrink-0 text-[9.5px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/60 rounded px-1 py-0">
+                +{allRemarks.length - 1}
+              </span>
+            )}
+          </div>
+          <div className="text-[10.5px] text-neutral-400 flex items-center gap-1 font-normal group-hover/remark:text-blue-500 transition-colors">
+            <Calendar className="h-3 w-3 text-neutral-400 shrink-0" />
+            {new Date(sub.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+          </div>
         </div>
-      ) : (
-        <span className="text-default-400 italic text-[11px]">No remarks</span>
-      )}
-      <div className="text-[9px] text-default-400 font-medium flex items-center gap-1">
-        <Icon icon="heroicons:calendar" className="h-3 w-3 text-default-400" />
-        {new Date(sub.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-      </div>
-    </div>
+      </HoverCardTrigger>
+      <HoverCardContent
+        align="start"
+        side="left"
+        className="w-96 p-0 overflow-hidden shadow-2xl border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl z-50"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-slate-50 dark:bg-slate-800/80 px-3.5 py-2.5 border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1 rounded bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+              <MessageSquare className="h-3.5 w-3.5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Remarks &amp; Feedback History</p>
+              <p className="text-[10px] text-neutral-500 truncate max-w-[200px]">{sub.candidateName}</p>
+            </div>
+          </div>
+          <span className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-neutral-200 dark:border-slate-700">
+            {allRemarks.length} {allRemarks.length === 1 ? "entry" : "entries"}
+          </span>
+        </div>
+
+        <div className="p-4 max-h-[320px] overflow-y-auto space-y-3">
+          <div className="relative pl-5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-neutral-200 dark:before:bg-slate-800 space-y-4">
+            {allRemarks.map((item, i) => (
+              <div key={i} className="relative group/timeline">
+                <div className={cn(
+                  "absolute -left-5 top-0.5 h-2.5 w-2.5 rounded-full ring-4",
+                  item.dotColor
+                )} />
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn("text-[10px] font-bold px-1.5 py-0.2 rounded border", item.bgBadge)}>
+                        {item.stage}
+                      </span>
+                      {i === 0 && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 px-1 rounded">
+                          Latest
+                        </span>
+                      )}
+                    </div>
+                    {item.timestamp && (
+                      <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-normal flex items-center gap-1">
+                        <Clock className="h-2.5 w-2.5 shrink-0" />
+                        {item.timestamp}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed font-normal bg-neutral-50 dark:bg-slate-800/40 p-2 rounded-md border border-neutral-100 dark:border-slate-800/60">
+                    {item.text}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 
@@ -707,89 +881,124 @@ export default function SubmissionsPage() {
 
         {/* SUBMISSIONS LIST VS KANBAN PIPELINE */}
         {viewMode === "list" ? (
-          <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl mt-6">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[1200px]">
-                <thead>
-                  <tr className="bg-default-50/50 dark:bg-slate-800/20 border-b border-default-150">
-                    {["Job & Client", "Candidate & Pay Rate", "Internal Review", "Interview Rounds (L1, L2, L3)", "Final Status", "Remarks & Date", "Actions"].map((h) => (
-                      <th key={h} className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">
-                        {h}
-                      </th>
-                    ))}
+          <div className="border border-neutral-200 dark:border-slate-800 rounded-sm bg-white dark:bg-slate-900 overflow-hidden shadow-xs mt-6">
+            <div className="overflow-auto max-h-[calc(100vh-270px)] relative">
+              <table className="w-full border-collapse text-left table-auto border-neutral-200 dark:border-slate-800 min-w-[1200px]">
+                <thead className="sticky top-0 z-20 bg-blue-50 dark:bg-slate-800 border-b border-neutral-250 dark:border-slate-700 shadow-xs select-none">
+                  <tr>
+                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                      Job Code
+                    </th>
+                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                      Candidate
+                    </th>
+                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                      Job Title &amp; Client
+                    </th>
+                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                      Pay Rate
+                    </th>
+                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                      Internal Review
+                    </th>
+                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                      Interview Rounds
+                    </th>
+                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                      Final Status
+                    </th>
+                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                      Remarks &amp; Date
+                    </th>
+                    <th className="sticky top-0 z-20 p-2 text-center text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap w-[56px]">
+                      Action
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-default-100 text-xs">
+                <tbody className="divide-y divide-neutral-200 dark:divide-slate-800 text-xs">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="py-16 text-center text-default-500 font-semibold italic">
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
-                          <span>Loading candidate submissions…</span>
+                      <td colSpan={9} className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent" />
+                          <span className="text-xs">Loading candidate submissions…</span>
                         </div>
                       </td>
                     </tr>
                   ) : submissions.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-16 text-center text-default-500 font-semibold italic">
-                        <div className="flex flex-col items-center gap-3">
-                          <Icon icon="heroicons:clipboard-document-check" className="h-10 w-10 text-default-300" />
-                          <span>No submissions match your query.</span>
-                        </div>
+                      <td colSpan={9} className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900">
+                        No submissions found. Try adjusting your search queries or date filters.
                       </td>
                     </tr>
                   ) : (
-                    submissions.map((sub) => (
+                    submissions.map((sub, idx) => (
                       <tr
                         key={sub.id}
                         onClick={() => openEditPanel(sub)}
-                        className={`hover:bg-indigo-50/30 dark:hover:bg-slate-850/15 cursor-pointer transition-colors ${
-                          selectedSubmission?.id === sub.id ? "bg-indigo-50/50 dark:bg-indigo-950/10" : ""
-                        }`}
+                        className={cn(
+                          "group transition-colors cursor-pointer border-b border-neutral-200 dark:border-slate-800/80 h-[52px]",
+                          selectedSubmission?.id === sub.id
+                            ? "bg-primary/10 hover:bg-primary/10 dark:bg-primary/15 dark:hover:bg-primary/15"
+                            : idx % 2 === 0
+                            ? "bg-white dark:bg-slate-900 hover:bg-blue-50/40 dark:hover:bg-slate-800/60"
+                            : "bg-slate-50 dark:bg-slate-800/40 hover:bg-blue-50/40 dark:hover:bg-slate-800/60"
+                        )}
                       >
-                        {/* 1. Job & Client */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="flex flex-col gap-1">
-                            <div className="font-bold text-default-900 flex items-center gap-1.5">
-                              <span className="text-xs">{sub.jobTitle}</span>
-                              <Badge className="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-0 text-[9px] py-0 px-1 font-bold">
-                                {sub.jobCode}
-                              </Badge>
-                            </div>
-                            <div className="text-[11px] text-default-600 font-semibold flex items-center gap-1">
-                              <Icon icon="heroicons:building-office-2" className="h-3 w-3 text-default-400" />
-                              {sub.clientName || "Direct Client"}
-                            </div>
-                          </div>
+                        {/* 1. Job Code (Leftmost Column) */}
+                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+                          {sub.jobId ? (
+                            <Link href={`/job-posting/${sub.jobId}`} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                              <span className="text-[#1a4fa0] dark:text-blue-400 font-semibold hover:underline cursor-pointer font-mono">
+                                {sub.jobCode || "—"}
+                              </span>
+                            </Link>
+                          ) : (
+                            <span className="text-[#1a4fa0] dark:text-blue-400 font-semibold font-mono">
+                              {sub.jobCode || "—"}
+                            </span>
+                          )}
                         </td>
 
-                        {/* 2. Candidate & Pay Rate */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="flex flex-col gap-1">
-                            <div className="text-default-900 font-bold text-sm flex items-center gap-1.5">
+                        {/* 2. Candidate */}
+                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+                          <div className="flex flex-col justify-center gap-0.5 max-w-[200px]">
+                            <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 group-hover:text-[#1a4fa0] dark:group-hover:text-blue-400 transition-colors truncate">
                               {sub.candidateName}
-                              {sub.submittedRate && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded">
-                                  {formatSubmittedRate(sub.submittedRate, sub.market, sub.jobCode, sub.jobTitle)}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-default-500 font-normal">{sub.candidateEmail}</div>
+                            </span>
+                            <span className="text-[10.5px] text-neutral-400 font-normal truncate">
+                              {sub.candidateEmail || "—"}
+                            </span>
                           </div>
                         </td>
 
-                        {/* 3. Internal Review Status */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
+                        {/* 3. Job Title & Client */}
+                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+                          <div className="flex flex-col justify-center gap-0.5 max-w-[220px]">
+                            <span className="font-medium text-xs text-slate-900 dark:text-slate-100 truncate">
+                              {sub.jobTitle || "—"}
+                            </span>
+                            <span className="text-[10.5px] text-neutral-500 truncate">
+                              {sub.clientName || "Direct Client"}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 4. Pay Rate */}
+                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle font-normal text-xs text-neutral-800 dark:text-neutral-200">
+                          {formatSubmittedRate(sub.submittedRate, sub.market, sub.jobCode, sub.jobTitle)}
+                        </td>
+
+                        {/* 5. Internal Review Status (Pure clean text, no dots) */}
+                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
                           {sub.finalStatus === "PENDING_APPROVAL" ? (
-                            <div className="flex flex-col gap-1.5">
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300 border border-amber-200 dark:border-amber-900 w-fit">
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold select-none">
                                 Pending Review
                               </span>
                               {canInternalScreen && (
-                                <div className="flex items-center gap-1.5 pt-0.5">
-                                  <Button
-                                    size="sm"
+                                <div className="flex items-center gap-1 ml-1">
+                                  <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setQuickReviewSub(sub);
@@ -797,14 +1006,11 @@ export default function SubmissionsPage() {
                                       setQuickReviewRemark("");
                                       setQuickReviewModalOpen(true);
                                     }}
-                                    className="h-6 px-2 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-2xs flex items-center gap-0.5 cursor-pointer"
+                                    className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded shadow-xs cursor-pointer"
                                   >
-                                    <Icon icon="heroicons:check" className="h-3 w-3" />
                                     Approve
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
+                                  </button>
+                                  <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setQuickReviewSub(sub);
@@ -812,107 +1018,95 @@ export default function SubmissionsPage() {
                                       setQuickReviewRemark("");
                                       setQuickReviewModalOpen(true);
                                     }}
-                                    className="h-6 px-2 text-[10px] text-rose-600 border-rose-200 hover:bg-rose-50 dark:border-rose-900 dark:hover:bg-rose-950/30 font-bold rounded flex items-center gap-0.5 cursor-pointer"
+                                    className="px-1.5 py-0.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 dark:bg-slate-900 dark:border-rose-900 font-semibold text-[10px] rounded cursor-pointer"
                                   >
-                                    <Icon icon="heroicons:x-mark" className="h-3 w-3" />
                                     Reject
-                                  </Button>
+                                  </button>
                                 </div>
                               )}
                             </div>
+                          ) : sub.finalStatus === "REJECTED" ? (
+                            <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold select-none">
+                              Rejected Internally
+                            </span>
                           ) : (
-                            <div className="flex flex-col gap-1 max-w-[200px]">
-                              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${
-                                sub.finalStatus === "REJECTED" ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800" :
-                                "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800"
-                              }`}>
-                                <Icon icon={sub.finalStatus === "REJECTED" ? "heroicons:x-circle" : "heroicons:check-circle"} className="h-3 w-3" />
-                                {sub.finalStatus === "REJECTED" ? "Rejected Internally" : "Approved"}
-                              </span>
-                              {(sub.reviewFeedback || sub.podLeadRemarks) && (
-                                <span className="text-[10px] text-amber-800 dark:text-amber-300 font-medium italic truncate" title={sub.reviewFeedback || sub.podLeadRemarks || ""}>
-                                  "{sub.reviewFeedback || sub.podLeadRemarks}"
-                                </span>
-                              )}
-                            </div>
+                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold select-none">
+                              Approved
+                            </span>
                           )}
                         </td>
 
-                        {/* 4. Interview Rounds (L1, L2, L3) */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {renderPipelineProgress(sub)}
+                        {/* 6. Interview Rounds (L1, L2, L3) */}
+                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+                          <div className="flex items-center gap-1">
+                            {renderPipelineProgress(sub)}
+                          </div>
                         </td>
 
-                        {/* 5. Final Status */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
+                        {/* 7. Final Status (Pure clean text, no dots) */}
+                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
                           {sub.finalStatus === "PENDING_APPROVAL" ? (
-                            <span className="text-[11px] text-default-400 italic">In Internal Review</span>
+                            <span className="text-xs text-neutral-400 italic select-none">In Review</span>
+                          ) : sub.finalStatus === "SUBMITTED" ? (
+                            <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold select-none">
+                              Submitted to Client
+                            </span>
+                          ) : sub.finalStatus === "OFFER" ? (
+                            <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold select-none">
+                              Offer Released
+                            </span>
+                          ) : sub.finalStatus === "JOIN" ? (
+                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold select-none">
+                              Joined / Placed
+                            </span>
+                          ) : sub.finalStatus === "REJECTED" ? (
+                            <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold select-none">
+                              Rejected
+                            </span>
                           ) : (
-                            <div className="flex flex-col gap-1">
-                              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${
-                                sub.finalStatus === "JOIN" ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300" :
-                                sub.finalStatus === "OFFER" ? "bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-950/30 dark:text-teal-300" :
-                                sub.finalStatus === "REJECTED" ? "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300" :
-                                "bg-indigo-50 text-indigo-800 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300"
-                              }`}>
-                                {sub.finalStatus === "SUBMITTED" && "🚀 Submitted to Client"}
-                                {sub.finalStatus === "OFFER" && "🎉 Offer Released"}
-                                {sub.finalStatus === "JOIN" && "🏆 Joined / Placed"}
-                                {sub.finalStatus === "REJECTED" && "✕ Rejected"}
-                                {sub.finalStatus !== "SUBMITTED" && sub.finalStatus !== "OFFER" && sub.finalStatus !== "JOIN" && sub.finalStatus !== "REJECTED" && sub.finalStatus}
-                              </span>
-                            </div>
+                            <span className="text-xs text-neutral-700 dark:text-neutral-300 font-semibold select-none">
+                              {sub.finalStatus}
+                            </span>
                           )}
                         </td>
 
-                        {/* 6. Remarks & Date */}
-                        <td className="py-3.5 px-4 max-w-[240px]">
+                        {/* 8. Remarks & Date */}
+                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 min-w-[220px] max-w-[320px] whitespace-nowrap align-middle">
                           {renderClutterFreeRemarks(sub)}
                         </td>
 
-                        {/* 7. Actions (Kebab Menu) */}
-                        <td className="py-3.5 px-4 whitespace-nowrap text-right">
+                        {/* 9. Action */}
+                        <td className="h-[52px] py-1 px-2.5 text-center whitespace-nowrap align-middle" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-default-500 hover:text-default-900 rounded-full"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Icon icon="heroicons:ellipsis-vertical" className="h-5 w-5" />
-                              </Button>
+                              <button className="p-1 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40 rounded-xl shadow-lg border-default-200">
+                            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-border/70 font-sans p-1">
                               <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openEditPanel(sub);
-                                }}
-                                className="text-xs cursor-pointer gap-2 font-medium"
+                                onClick={() => openEditPanel(sub)}
+                                className="text-xs cursor-pointer gap-2 font-medium py-1.5"
                               >
-                                <Icon icon="heroicons:pencil-square" className="h-4 w-4 text-indigo-500" />
+                                <Pencil className="h-3.5 w-3.5 text-indigo-500" />
                                 Edit Status &amp; Rounds
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
+                                onClick={() => {
                                   setSelectedSubForInterview(sub);
                                   setInterviewModalOpen(true);
                                 }}
-                                className="text-xs cursor-pointer gap-2 font-medium"
+                                className="text-xs cursor-pointer gap-2 font-medium py-1.5"
                               >
-                                <Icon icon="heroicons:calendar" className="h-4 w-4 text-cyan-500" />
+                                <CalendarDays className="h-3.5 w-3.5 text-cyan-500" />
                                 Schedule Interview
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate");
-                                }}
-                                className="text-xs cursor-pointer gap-2 font-medium"
+                                onClick={() => handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate")}
+                                className="text-xs cursor-pointer gap-2 font-medium py-1.5"
                               >
-                                <Icon icon="heroicons:document-arrow-down" className="h-4 w-4 text-emerald-500" />
+                                <FileText className="h-3.5 w-3.5 text-emerald-500" />
                                 Download CV
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -924,7 +1118,7 @@ export default function SubmissionsPage() {
                 </tbody>
               </table>
             </div>
-          </Card>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4 mt-6 overflow-x-auto pb-4">
             {[

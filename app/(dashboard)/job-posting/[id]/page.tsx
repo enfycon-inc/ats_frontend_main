@@ -28,16 +28,43 @@ import {
   FileText,
   Activity,
   CheckCircle,
+  CheckCircle2,
   XCircle,
   Eye,
   Lock,
   Upload,
+  Calendar,
+  MoreHorizontal,
+  Send,
+  Award,
+  MessageSquare,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from "@/components/ui/hover-card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
 import { mapApiJobToJob, type Job } from "../data/mock-jobs";
 import toast from "react-hot-toast";
@@ -51,32 +78,243 @@ const TIER_STYLES: Record<string, { chip: string; label: string; text: string }>
   Low:    { chip: "bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-slate-800 dark:text-neutral-400 dark:border-slate-700", label: "Low Match",    text: "text-neutral-500 dark:text-neutral-400" },
 };
 
-function renderPipelineCircles(sub: any) {
-  const getStageColor = (status: string | null) => {
+function renderPipelineProgress(sub: any) {
+  const getStageItem = (stage: string, status: string | null, remarks?: string | null) => {
     const s = (status || "").toUpperCase();
-    if (s === "CLEARED") return "bg-emerald-500 border-emerald-600 dark:bg-emerald-600";
-    if (s === "REJECTED") return "bg-rose-500 border-rose-600 dark:bg-rose-600";
-    if (s === "SCHEDULED" || s === "PENDING") return "bg-indigo-500 border-indigo-600 dark:bg-indigo-650 ring-2 ring-indigo-150";
-    return "bg-neutral-200 border-neutral-300 dark:bg-slate-850 dark:border-slate-750";
+    let dotColor = "bg-muted-foreground/30";
+    let textColor = "text-muted-foreground";
+    let label = "—";
+
+    if (s === "CLEARED" || s === "PASSED") {
+      dotColor = "bg-emerald-500";
+      textColor = "text-emerald-700 dark:text-emerald-400 font-medium";
+      label = "Pass";
+    } else if (s === "REJECTED") {
+      dotColor = "bg-rose-500";
+      textColor = "text-rose-700 dark:text-rose-400 font-medium";
+      label = "Fail";
+    } else if (s === "SCHEDULED") {
+      dotColor = "bg-sky-500";
+      textColor = "text-sky-700 dark:text-sky-400 font-medium";
+      label = "Sched";
+    } else if (s === "PENDING") {
+      dotColor = "bg-amber-500 animate-pulse";
+      textColor = "text-amber-700 dark:text-amber-400 font-medium";
+      label = "Pend";
+    }
+
+    return (
+      <span
+        key={stage}
+        title={`${stage}: ${status || "Not started"}${remarks ? `\nFeedback: ${remarks}` : ""}`}
+        className="inline-flex items-center gap-1 cursor-default select-none"
+      >
+        <span className="text-muted-foreground/80 font-normal">{stage}:</span>
+        <span className={cn("flex items-center gap-1", textColor)}>
+          <span className={cn("h-1.5 w-1.5 rounded-full inline-block", dotColor)} />
+          {label}
+        </span>
+      </span>
+    );
   };
 
   return (
-    <div className="flex items-center space-x-1">
-      <div className="flex flex-col items-center group relative">
-        <div className={`w-3 h-3 rounded-full border ${getStageColor(sub.l1Status)}`} title={`L1: ${sub.l1Status || "PENDING"}`} />
-        <span className="text-[9px] font-bold mt-0.5 text-neutral-405">L1</span>
-      </div>
-      <div className="w-2.5 h-[1.5px] bg-neutral-200 dark:bg-slate-800 mb-2.5" />
-      <div className="flex flex-col items-center group relative">
-        <div className={`w-3 h-3 rounded-full border ${getStageColor(sub.l2Status)}`} title={`L2: ${sub.l2Status || "Not Started"}`} />
-        <span className="text-[9px] font-bold mt-0.5 text-neutral-405">L2</span>
-      </div>
-      <div className="w-2.5 h-[1.5px] bg-neutral-200 dark:bg-slate-800 mb-2.5" />
-      <div className="flex flex-col items-center group relative">
-        <div className={`w-3 h-3 rounded-full border ${getStageColor(sub.l3Status)}`} title={`L3: ${sub.l3Status || "Not Started"}`} />
-        <span className="text-[9px] font-bold mt-0.5 text-neutral-405">L3</span>
-      </div>
+    <div className="flex items-center gap-2 text-xs font-normal">
+      {getStageItem("L1", sub.l1Status || "PENDING", sub.l1Remarks)}
+      <span className="text-muted-foreground/30">·</span>
+      {getStageItem("L2", sub.l2Status, sub.l2Remarks)}
+      <span className="text-muted-foreground/30">·</span>
+      {getStageItem("L3", sub.l3Status, sub.l3Remarks)}
     </div>
+  );
+}
+
+function formatRemarkTimestamp(dateStr?: string | null, fallbackDateStr?: string | null) {
+  const d = dateStr || fallbackDateStr;
+  if (!d) return null;
+  try {
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return null;
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    }) + " • " + date.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  } catch {
+    return null;
+  }
+}
+
+function renderClutterFreeRemarks(sub: any) {
+  const allRemarks: { stage: string; label: string; text: string; timestamp?: string | null; dotColor: string; labelColor: string; bgBadge: string }[] = [];
+
+  if (sub.remarks) {
+    allRemarks.push({
+      stage: "Final Decision",
+      label: "Final",
+      text: sub.remarks,
+      timestamp: formatRemarkTimestamp(sub.updatedAt, sub.createdAt),
+      dotColor: "bg-emerald-500 ring-emerald-100 dark:ring-emerald-950",
+      labelColor: "text-emerald-700 dark:text-emerald-400",
+      bgBadge: "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300"
+    });
+  }
+  if (sub.l3Remarks) {
+    allRemarks.push({
+      stage: "Round 3 (L3)",
+      label: "L3",
+      text: sub.l3Remarks,
+      timestamp: formatRemarkTimestamp(sub.l3Date, sub.updatedAt || sub.createdAt),
+      dotColor: "bg-purple-500 ring-purple-100 dark:ring-purple-950",
+      labelColor: "text-purple-700 dark:text-purple-400",
+      bgBadge: "bg-purple-50 border-purple-200 text-purple-700 dark:bg-purple-950/40 dark:border-purple-800 dark:text-purple-300"
+    });
+  }
+  if (sub.l2Remarks) {
+    allRemarks.push({
+      stage: "Round 2 (L2)",
+      label: "L2",
+      text: sub.l2Remarks,
+      timestamp: formatRemarkTimestamp(sub.l2Date, sub.updatedAt || sub.createdAt),
+      dotColor: "bg-cyan-500 ring-cyan-100 dark:ring-cyan-950",
+      labelColor: "text-cyan-700 dark:text-cyan-400",
+      bgBadge: "bg-cyan-50 border-cyan-200 text-cyan-700 dark:bg-cyan-950/40 dark:border-cyan-800 dark:text-cyan-300"
+    });
+  }
+  if (sub.l1Remarks) {
+    allRemarks.push({
+      stage: "Round 1 (L1)",
+      label: "L1",
+      text: sub.l1Remarks,
+      timestamp: formatRemarkTimestamp(sub.l1Date, sub.updatedAt || sub.createdAt),
+      dotColor: "bg-indigo-500 ring-indigo-100 dark:ring-indigo-950",
+      labelColor: "text-indigo-700 dark:text-indigo-400",
+      bgBadge: "bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300"
+    });
+  }
+  if (sub.reviewFeedback || sub.podLeadRemarks) {
+    allRemarks.push({
+      stage: "Internal Review",
+      label: "Internal",
+      text: (sub.reviewFeedback || sub.podLeadRemarks)!,
+      timestamp: formatRemarkTimestamp(sub.updatedAt, sub.createdAt),
+      dotColor: "bg-amber-500 ring-amber-100 dark:ring-amber-950",
+      labelColor: "text-amber-700 dark:text-amber-400",
+      bgBadge: "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300"
+    });
+  }
+  if (sub.recruiterComment) {
+    allRemarks.push({
+      stage: "Recruiter Note",
+      label: "Recruiter",
+      text: sub.recruiterComment,
+      timestamp: formatRemarkTimestamp(sub.createdAt),
+      dotColor: "bg-slate-400 ring-slate-100 dark:ring-slate-800",
+      labelColor: "text-slate-700 dark:text-slate-300",
+      bgBadge: "bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
+    });
+  }
+
+  const latest = allRemarks[0];
+
+  if (!latest) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-neutral-400 italic text-[11px]">No remarks</span>
+        {sub.createdAt && (
+          <div className="text-[10px] text-neutral-400 flex items-center gap-1 font-normal">
+            <Calendar className="h-3 w-3 text-neutral-400 shrink-0" />
+            {new Date(sub.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <HoverCard openDelay={150} closeDelay={150}>
+      <HoverCardTrigger asChild>
+        <div className="flex flex-col justify-center gap-0.5 min-w-[180px] max-w-[280px] cursor-pointer group/remark select-none">
+          <div className="flex items-center gap-1 text-xs text-neutral-800 dark:text-neutral-200 overflow-hidden">
+            <span className={cn("font-semibold shrink-0 text-xs", latest.labelColor)}>
+              {latest.label}:
+            </span>
+            <span className="font-normal truncate text-xs text-neutral-800 dark:text-neutral-200">
+              {latest.text}
+            </span>
+            {allRemarks.length > 1 && (
+              <span className="shrink-0 text-[9.5px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/60 rounded px-1 py-0">
+                +{allRemarks.length - 1}
+              </span>
+            )}
+          </div>
+          <div className="text-[10.5px] text-neutral-400 flex items-center gap-1 font-normal group-hover/remark:text-blue-500 transition-colors">
+            <Calendar className="h-3 w-3 text-neutral-400 shrink-0" />
+            {new Date(sub.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+          </div>
+        </div>
+      </HoverCardTrigger>
+      <HoverCardContent
+        align="start"
+        side="left"
+        className="w-96 p-0 overflow-hidden shadow-2xl border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl z-50"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-slate-50 dark:bg-slate-800/80 px-3.5 py-2.5 border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1 rounded bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+              <MessageSquare className="h-3.5 w-3.5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Remarks &amp; Feedback History</p>
+              <p className="text-[10px] text-neutral-500 truncate max-w-[200px]">{sub.candidateName}</p>
+            </div>
+          </div>
+          <span className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-neutral-200 dark:border-slate-700">
+            {allRemarks.length} {allRemarks.length === 1 ? "entry" : "entries"}
+          </span>
+        </div>
+
+        <div className="p-4 max-h-[320px] overflow-y-auto space-y-3">
+          <div className="relative pl-5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-neutral-200 dark:before:bg-slate-800 space-y-4">
+            {allRemarks.map((item, i) => (
+              <div key={i} className="relative group/timeline">
+                <div className={cn(
+                  "absolute -left-5 top-0.5 h-2.5 w-2.5 rounded-full ring-4",
+                  item.dotColor
+                )} />
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn("text-[10px] font-bold px-1.5 py-0.2 rounded border", item.bgBadge)}>
+                        {item.stage}
+                      </span>
+                      {i === 0 && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 px-1 rounded">
+                          Latest
+                        </span>
+                      )}
+                    </div>
+                    {item.timestamp && (
+                      <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-normal flex items-center gap-1">
+                        <Clock className="h-2.5 w-2.5 shrink-0" />
+                        {item.timestamp}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed font-normal bg-neutral-50 dark:bg-slate-800/40 p-2 rounded-md border border-neutral-100 dark:border-slate-800/60">
+                    {item.text}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 
@@ -877,130 +1115,206 @@ export default function JobDetailPage() {
 
             {/* PIPELINE LIST VIEW */}
             {pipelineView === "list" && (
-              <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-none overflow-hidden rounded-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[900px] text-xs">
-                    <thead>
-                      <tr className="bg-neutral-50 dark:bg-slate-800/40 border-b border-neutral-200 dark:border-slate-800">
-                        {["Candidate Details", "Recruiter", "Sourced Rate", "Interview Progress", "Final Status", "Feedback Logs", "Actions"].map((h) => (
-                          <th key={h} className="py-2.5 px-4 font-extrabold uppercase text-[10px] tracking-wider text-neutral-500">
-                            {h}
-                          </th>
-                        ))}
+              <div className="border border-neutral-200 dark:border-slate-800 rounded-sm bg-white dark:bg-slate-900 overflow-hidden shadow-xs">
+                <div className="overflow-auto max-h-[calc(100vh-320px)] relative">
+                  <table className="w-full border-collapse text-left table-auto border-neutral-200 dark:border-slate-800 min-w-[1000px]">
+                    <thead className="sticky top-0 z-20 bg-blue-50 dark:bg-slate-800 border-b border-neutral-250 dark:border-slate-700 shadow-xs select-none">
+                      <tr>
+                        <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                          Candidate
+                        </th>
+                        <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                          Recruiter
+                        </th>
+                        <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                          Pay Rate
+                        </th>
+                        <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                          Internal Review
+                        </th>
+                        <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                          Interview Rounds
+                        </th>
+                        <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                          Final Status
+                        </th>
+                        <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                          Remarks &amp; Date
+                        </th>
+                        <th className="sticky top-0 z-20 p-2 text-center text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap w-[56px]">
+                          Action
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-100 dark:divide-slate-850">
+                    <tbody className="divide-y divide-neutral-200 dark:divide-slate-800 text-xs">
                       {submissions.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="py-12 text-center text-neutral-450 italic">
-                            No candidates have been submitted to this requisition pipeline yet.
+                          <td colSpan={8} className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900">
+                            No candidate submissions yet. Click "+ Upload &amp; Submit CV" or add matches to begin screening.
                           </td>
                         </tr>
                       ) : (
-                        submissions.map((sub) => (
+                        submissions.map((sub, idx) => (
                           <tr
                             key={sub.id}
                             onClick={() => openReviewPanel(sub)}
-                            className="hover:bg-neutral-50/50 dark:hover:bg-slate-850/20 cursor-pointer transition-all"
+                            className={cn(
+                              "group transition-colors cursor-pointer border-b border-neutral-200 dark:border-slate-800/80 h-[52px]",
+                              idx % 2 === 0
+                                ? "bg-white dark:bg-slate-900 hover:bg-blue-50/40 dark:hover:bg-slate-800/60"
+                                : "bg-slate-50 dark:bg-slate-800/40 hover:bg-blue-50/40 dark:hover:bg-slate-800/60"
+                            )}
                           >
-                            <td className="py-3 px-4">
-                              <div className="font-bold text-neutral-800 dark:text-neutral-200 text-sm">
-                                {sub.candidateName}
+                            {/* 1. Candidate Details */}
+                            <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+                              <div className="flex flex-col justify-center gap-0.5 max-w-[200px]">
+                                <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 group-hover:text-[#1a4fa0] dark:group-hover:text-blue-400 transition-colors truncate">
+                                  {sub.candidateName}
+                                </span>
+                                <span className="text-[10.5px] text-neutral-400 font-normal truncate">
+                                  {sub.candidateEmail || "—"}
+                                </span>
                               </div>
-                              <div className="text-[10px] text-neutral-400 mt-0.5">{sub.candidateEmail}</div>
-                              {sub.candidateCurrentLocation && (
-                                <div className="text-[9px] text-neutral-450 mt-0.5 flex items-center gap-0.5">
-                                  <MapPin className="h-3 w-3 text-neutral-400 shrink-0" /> {sub.candidateCurrentLocation}
-                                </div>
-                              )}
                             </td>
-                            <td className="py-3 px-4 text-neutral-600 dark:text-neutral-350 font-semibold">
+
+                            {/* 2. Recruiter */}
+                            <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle text-xs font-medium text-neutral-800 dark:text-neutral-200">
                               {sub.recruiterName || "System / API"}
                             </td>
-                            <td className="py-3 px-4 font-bold text-neutral-805 dark:text-neutral-200">
+
+                            {/* 3. Pay Rate */}
+                            <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle font-normal text-xs text-neutral-800 dark:text-neutral-200">
                               {sub.submittedRate || "—"}
                             </td>
-                            <td className="py-3 px-4">
-                              {renderPipelineCircles(sub)}
+
+                            {/* 4. Internal Review */}
+                            <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+                              {sub.finalStatus === "PENDING_APPROVAL" ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold select-none">
+                                    Pending Review
+                                  </span>
+                                  {canInternalScreen && (
+                                    <div className="flex items-center gap-1 ml-1">
+                                      <button
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          try {
+                                            await atsApi.submissions.update(sub.id, { finalStatus: "SUBMITTED" });
+                                            toast.success("Submission approved and submitted to client!");
+                                            loadData();
+                                          } catch (err: any) {
+                                            toast.error("Failed: " + err.message);
+                                          }
+                                        }}
+                                        className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded shadow-xs cursor-pointer"
+                                      >
+                                        Approve
+                                      </button>
+                                      <button
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          try {
+                                            await atsApi.submissions.update(sub.id, { finalStatus: "REJECTED" });
+                                            toast.success("Submission rejected internally.");
+                                            loadData();
+                                          } catch (err: any) {
+                                            toast.error("Failed: " + err.message);
+                                          }
+                                        }}
+                                        className="px-1.5 py-0.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 dark:bg-slate-900 dark:border-rose-900 font-semibold text-[10px] rounded cursor-pointer"
+                                      >
+                                        Reject
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : sub.finalStatus === "REJECTED" ? (
+                                <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold select-none">
+                                  Rejected Internally
+                                </span>
+                              ) : (
+                                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold select-none">
+                                  Approved
+                                </span>
+                              )}
                             </td>
-                            <td className="py-3 px-4">
-                              <Badge
-                                className={`text-[9px] uppercase tracking-wide font-extrabold border-0 px-2 py-0.5 ${
-                                  sub.finalStatus === "JOIN"
-                                    ? "bg-emerald-100 text-emerald-800"
-                                    : sub.finalStatus === "OFFER"
-                                    ? "bg-teal-50 text-teal-700"
-                                    : sub.finalStatus === "REJECTED"
-                                    ? "bg-rose-100 text-rose-800"
-                                    : sub.finalStatus === "PENDING_APPROVAL"
-                                    ? "bg-amber-100 text-amber-805"
-                                    : "bg-indigo-50 text-indigo-700"
-                                }`}
-                              >
-                                {sub.finalStatus === "PENDING_APPROVAL" ? "Internal Review" : sub.finalStatus === "SUBMITTED" ? "Sent to Client" : sub.finalStatus}
-                              </Badge>
-                            </td>
-                            <td className="py-3 px-4 max-w-[200px] truncate text-neutral-500 font-medium">
-                              {sub.remarks || sub.recruiterComment || "—"}
-                            </td>
-                            <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center gap-1.5">
-                                {sub.finalStatus === "PENDING_APPROVAL" && canInternalScreen && (
-                                  <>
-                                    <Button
-                                      size="sm"
-                                      onClick={async () => {
-                                        try {
-                                          await atsApi.submissions.update(sub.id, { finalStatus: "SUBMITTED" });
-                                          toast.success("Submission approved and submitted to client!");
-                                          loadData();
-                                        } catch (err: any) {
-                                          toast.error("Failed: " + err.message);
-                                        }
-                                      }}
-                                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] py-1 h-7 font-bold"
-                                    >
-                                      Approve
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={async () => {
-                                        try {
-                                          await atsApi.submissions.update(sub.id, { finalStatus: "REJECTED" });
-                                          toast.success("Submission rejected internally.");
-                                          loadData();
-                                        } catch (err: any) {
-                                          toast.error("Failed: " + err.message);
-                                        }
-                                      }}
-                                      className="border-rose-200 text-rose-600 hover:bg-rose-50 text-[10px] py-1 h-7 font-bold"
-                                    >
-                                      Reject
-                                    </Button>
-                                  </>
-                                )}
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedSubForInterview(sub);
-                                    setInterviewModalOpen(true);
-                                  }}
-                                  className="h-7 text-[10px] font-bold border-neutral-300 text-indigo-650 hover:bg-indigo-50"
-                                >
-                                  <CalendarDays className="h-3 w-3 mr-1" /> Schedule
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate")}
-                                  className="h-7 text-indigo-650 p-1 hover:bg-indigo-50/50"
-                                  title="Download Resume"
-                                >
-                                  <FileText className="h-4 w-4" />
-                                </Button>
+
+                            {/* 5. Interview Progress */}
+                            <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+                              <div className="flex items-center gap-1">
+                                {renderPipelineProgress(sub)}
                               </div>
+                            </td>
+
+                            {/* 6. Final Status */}
+                            <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+                              {sub.finalStatus === "PENDING_APPROVAL" ? (
+                                <span className="text-xs text-neutral-400 italic select-none">In Review</span>
+                              ) : sub.finalStatus === "SUBMITTED" ? (
+                                <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold select-none">
+                                  Submitted to Client
+                                </span>
+                              ) : sub.finalStatus === "OFFER" ? (
+                                <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold select-none">
+                                  Offer Released
+                                </span>
+                              ) : sub.finalStatus === "JOIN" ? (
+                                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold select-none">
+                                  Joined / Placed
+                                </span>
+                              ) : sub.finalStatus === "REJECTED" ? (
+                                <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold select-none">
+                                  Rejected
+                                </span>
+                              ) : (
+                                <span className="text-xs text-neutral-700 dark:text-neutral-300 font-semibold select-none">
+                                  {sub.finalStatus}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* 7. Remarks & Date */}
+                            <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 min-w-[220px] max-w-[320px] whitespace-nowrap align-middle">
+                              {renderClutterFreeRemarks(sub)}
+                            </td>
+
+                            {/* 8. Action */}
+                            <td className="h-[52px] py-1 px-2.5 text-center whitespace-nowrap align-middle" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="p-1 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-border/70 font-sans p-1">
+                                  <DropdownMenuItem
+                                    onClick={() => openReviewPanel(sub)}
+                                    className="text-xs cursor-pointer gap-2 font-medium py-1.5"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5 text-indigo-500" />
+                                    Edit Status &amp; Rounds
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedSubForInterview(sub);
+                                      setInterviewModalOpen(true);
+                                    }}
+                                    className="text-xs cursor-pointer gap-2 font-medium py-1.5"
+                                  >
+                                    <CalendarDays className="h-3.5 w-3.5 text-cyan-500" />
+                                    Schedule Interview
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate")}
+                                    className="text-xs cursor-pointer gap-2 font-medium py-1.5"
+                                  >
+                                    <FileText className="h-3.5 w-3.5 text-emerald-500" />
+                                    Download CV
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </td>
                           </tr>
                         ))
@@ -1008,7 +1322,7 @@ export default function JobDetailPage() {
                     </tbody>
                   </table>
                 </div>
-              </Card>
+              </div>
             )}
 
             {/* PIPELINE KANBAN BOARD VIEW */}
@@ -1045,7 +1359,7 @@ export default function JobDetailPage() {
                           
                           <div className="flex justify-between items-center mt-2 pt-2 border-t border-neutral-100 dark:border-slate-850 text-[10px] font-semibold">
                             <span className="text-neutral-400">{sub.submittedRate || "—"}</span>
-                            {renderPipelineCircles(sub)}
+                            {renderPipelineProgress(sub)}
                           </div>
                           
                           <Button
