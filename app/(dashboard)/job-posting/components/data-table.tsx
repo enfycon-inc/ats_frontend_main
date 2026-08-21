@@ -838,37 +838,32 @@ export default function DataTable({
                               </span>
                             </Link>
                           ) : colId === "jobStatus" ? (
-                            <div className="flex items-center gap-1.5 justify-between w-full">
-                              <Badge
-                                className={cn(
-                                  "text-[10px] font-medium px-2 py-0.5 rounded-md border shadow-none",
-                                  job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL"
-                                    ? "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-800 font-bold"
-                                    : job.jobStatus === "Active"
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/40"
-                                    : job.jobStatus === "Close" || job.jobStatus === "Closed"
-                                    ? "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
-                                    : job.jobStatus === "Filled"
-                                    ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800/40"
-                                    : job.jobStatus === "Draft"
-                                    ? "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400 dark:border-slate-700/50"
-                                    : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40"
-                                )}
-                              >
-                                {job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL"
-                                  ? "Pending Approval"
-                                  : job.jobStatus}
-                              </Badge>
-                              {hasEditPermission && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); openStatusModal(job); }}
-                                  className="text-neutral-400 hover:text-blue-500 hover:bg-neutral-100 dark:hover:bg-slate-800 p-0.5 rounded transition-colors cursor-pointer"
-                                  title="Change Job Status"
+                            (() => {
+                              const isPending = job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL";
+                              const status = isPending ? "Pending Approval" : (job.jobStatus || "Active");
+                              return (
+                                <span
+                                  className={cn(
+                                    "text-xs font-semibold select-none",
+                                    isPending
+                                      ? "text-amber-600 dark:text-amber-400"
+                                      : status === "Active"
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : status === "Archived"
+                                      ? "text-amber-600 dark:text-amber-400"
+                                      : status === "Close" || status === "Closed"
+                                      ? "text-rose-600 dark:text-rose-400"
+                                      : status === "Filled"
+                                      ? "text-blue-600 dark:text-blue-400"
+                                      : status === "Draft"
+                                      ? "text-slate-400 dark:text-slate-500 italic"
+                                      : "text-neutral-600 dark:text-neutral-300"
+                                  )}
                                 >
-                                  <Pencil className="h-3 w-3" />
-                                </button>
-                              )}
-                            </div>
+                                  {status}
+                                </span>
+                              );
+                            })()
                           ) : colId === "priority" ? (
                             <Badge
                               className={cn(
@@ -919,14 +914,18 @@ export default function DataTable({
                                 <span className="text-slate-600 dark:text-slate-300 font-medium" title="Offered">{job.pipeline.offered}O</span>
                               </div>
                             </div>
-                          ) : (colId === "assignedTo" || colId === "primaryRecruiter") ? (
+                          ) : colId === "primaryRecruiter" ? (
+                            <span className="text-xs text-neutral-800 dark:text-neutral-200">
+                              {String(job.primaryRecruiter || "N/A")}
+                            </span>
+                          ) : colId === "assignedTo" ? (
                             <div className="flex items-center justify-between gap-1.5 w-full">
-                              <span>{String(job[colId as keyof Job] || "N/A")}</span>
+                              <span>{String(job.assignedTo || "N/A")}</span>
                               {hasEditPermission && (
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); openAssignModal(job, colId as "assignedTo" | "primaryRecruiter"); }}
+                                  onClick={(e) => { e.stopPropagation(); openAssignModal(job, "assignedTo"); }}
                                   className="text-neutral-400 hover:text-blue-500 hover:bg-neutral-100 dark:hover:bg-slate-800 p-0.5 rounded transition-colors cursor-pointer"
-                                  title={`Change ${colId === "assignedTo" ? "Assigned To" : "Primary Recruiter"}`}
+                                  title="Change Assigned To"
                                 >
                                   <Pencil className="h-3 w-3" />
                                 </button>
