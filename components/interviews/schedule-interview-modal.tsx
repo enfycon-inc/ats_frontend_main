@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { DateTimePicker } from "@/components/ui/date-picker";
 import {
   CalendarDays,
   Clock,
@@ -235,13 +236,12 @@ export function ScheduleInterviewModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-450 flex items-center gap-1">
-                  <CalendarDays className="h-3 w-3 text-indigo-500" /> Date & Time
+                  <CalendarDays className="h-3 w-3 text-indigo-500" /> Date &amp; Time
                 </label>
-                <Input
-                  type="datetime-local"
+                <DateTimePicker
                   value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                  className="h-9 text-xs"
+                  onChange={setScheduledAt}
+                  placeholder="Select Date &amp; Time"
                 />
               </div>
 

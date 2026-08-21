@@ -38,6 +38,7 @@ import {
   Send,
   Award,
   MessageSquare,
+  UserCheck,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -79,53 +80,175 @@ const TIER_STYLES: Record<string, { chip: string; label: string; text: string }>
 };
 
 function renderPipelineProgress(sub: any) {
-  const getStageItem = (stage: string, status: string | null, remarks?: string | null) => {
+  // If candidate was rejected internally (before reaching interview stages)
+  const isInternallyRejected = sub.finalStatus === "REJECTED" && (!sub.l1Status || sub.l1Status === "PENDING") && !sub.l1Date;
+  // If candidate is still awaiting internal review
+  const isPendingReview = sub.finalStatus === "PENDING_APPROVAL" && (!sub.l1Status || sub.l1Status === "PENDING") && !sub.l1Date;
+
+  if (isInternallyRejected || isPendingReview) {
+    return <span className="text-neutral-400 dark:text-neutral-500 italic text-xs select-none">—</span>;
+  }
+
+  const getStagePill = (stage: "L1" | "L2" | "L3", status: string | null, remarks?: string | null, dateStr?: string | null) => {
     const s = (status || "").toUpperCase();
-    let dotColor = "bg-muted-foreground/30";
-    let textColor = "text-muted-foreground";
+    let badgeStyle = "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
     let label = "—";
+    let statusTitle = "Not Started";
 
     if (s === "CLEARED" || s === "PASSED") {
-      dotColor = "bg-emerald-500";
-      textColor = "text-emerald-700 dark:text-emerald-400 font-medium";
+      badgeStyle = "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/40";
       label = "Pass";
+      statusTitle = "Passed";
     } else if (s === "REJECTED") {
-      dotColor = "bg-rose-500";
-      textColor = "text-rose-700 dark:text-rose-400 font-medium";
+      badgeStyle = "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800/40";
       label = "Fail";
+      statusTitle = "Rejected";
     } else if (s === "SCHEDULED") {
-      dotColor = "bg-sky-500";
-      textColor = "text-sky-700 dark:text-sky-400 font-medium";
+      badgeStyle = "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-800/40";
       label = "Sched";
+      statusTitle = "Scheduled";
     } else if (s === "PENDING") {
-      dotColor = "bg-amber-500 animate-pulse";
-      textColor = "text-amber-700 dark:text-amber-400 font-medium";
+      badgeStyle = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40";
       label = "Pend";
+      statusTitle = "Pending";
     }
 
+    const roundName = stage === "L1" ? "Round 1 (L1) - Screening" : stage === "L2" ? "Round 2 (L2) - Technical" : "Round 3 (L3) - Client Final";
+
     return (
-      <span
-        key={stage}
-        title={`${stage}: ${status || "Not started"}${remarks ? `\nFeedback: ${remarks}` : ""}`}
-        className="inline-flex items-center gap-1 cursor-default select-none"
-      >
-        <span className="text-muted-foreground/80 font-normal">{stage}:</span>
-        <span className={cn("flex items-center gap-1", textColor)}>
-          <span className={cn("h-1.5 w-1.5 rounded-full inline-block", dotColor)} />
-          {label}
-        </span>
-      </span>
+      <HoverCard key={stage} openDelay={150} closeDelay={150}>
+        <HoverCardTrigger asChild>
+          <span
+            className={cn(
+              "text-[10px] font-medium px-1.5 py-0.5 rounded-md border shadow-none inline-flex items-center gap-0.5 select-none cursor-pointer transition-all hover:scale-105",
+              badgeStyle
+            )}
+          >
+            <span className="opacity-70 font-semibold">{stage}:</span>
+            <span>{label}</span>
+          </span>
+        </HoverCardTrigger>
+        <HoverCardContent
+          align="center"
+          side="top"
+          className="w-80 p-0 overflow-hidden shadow-xl border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl z-50 text-left font-sans"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="bg-slate-50 dark:bg-slate-800/80 px-3.5 py-2.5 border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={cn("p-1 rounded text-xs font-bold", badgeStyle)}>
+                <UserCheck className="h-3.5 w-3.5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-900 dark:text-slate-100">{roundName}</p>
+                <p className="text-[10px] text-neutral-500 truncate max-w-[150px]">{sub.candidateName}</p>
+              </div>
+            </div>
+            <span className={cn("text-[10px] font-bold px-1.5 py-0.2 rounded border", badgeStyle)}>
+              {statusTitle}
+            </span>
+          </div>
+          <div className="p-3 space-y-2.5">
+            {dateStr && (
+              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5">
+                <Calendar className="h-3 w-3 text-neutral-400 shrink-0" />
+                <span>Interview Date: <strong className="text-neutral-700 dark:text-neutral-200 font-semibold">{new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</strong></span>
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">Feedback &amp; Remarks</span>
+              {remarks ? (
+                <p className="text-xs text-neutral-800 dark:text-neutral-200 bg-neutral-50 dark:bg-slate-800/50 p-2.5 rounded-md border border-neutral-100 dark:border-slate-800/60 leading-relaxed break-words font-normal">
+                  {remarks}
+                </p>
+              ) : (
+                <p className="text-[11px] italic text-neutral-400 dark:text-neutral-500 bg-neutral-50/50 dark:bg-slate-800/30 p-2 rounded-md border border-neutral-100 dark:border-slate-800/40">
+                  No feedback remarks recorded yet for this round.
+                </p>
+              )}
+            </div>
+          </div>
+        </HoverCardContent>
+      </HoverCard>
     );
   };
 
   return (
-    <div className="flex items-center gap-2 text-xs font-normal">
-      {getStageItem("L1", sub.l1Status || "PENDING", sub.l1Remarks)}
-      <span className="text-muted-foreground/30">·</span>
-      {getStageItem("L2", sub.l2Status, sub.l2Remarks)}
-      <span className="text-muted-foreground/30">·</span>
-      {getStageItem("L3", sub.l3Status, sub.l3Remarks)}
+    <div className="flex items-center gap-1">
+      {getStagePill("L1", sub.l1Status || "PENDING", sub.l1Remarks, sub.l1Date)}
+      {getStagePill("L2", sub.l2Status, sub.l2Remarks, sub.l2Date)}
+      {getStagePill("L3", sub.l3Status, sub.l3Remarks, sub.l3Date)}
     </div>
+  );
+}
+
+function renderInternalReviewStatus(sub: any) {
+  const isPending = sub.finalStatus === "PENDING_APPROVAL";
+  const isRejected = sub.finalStatus === "REJECTED";
+
+  const statusLabel = isPending ? "Pending Review" : isRejected ? "Rejected Internally" : "Approved";
+  const statusColor = isPending ? "text-amber-600 dark:text-amber-400" : isRejected ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400";
+  const badgeStyle = isPending
+    ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300"
+    : isRejected
+    ? "bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300"
+    : "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300";
+
+  return (
+    <HoverCard openDelay={150} closeDelay={150}>
+      <HoverCardTrigger asChild>
+        <span className={cn("text-xs font-semibold select-none cursor-pointer transition-opacity hover:opacity-80", statusColor)}>
+          {statusLabel}
+        </span>
+      </HoverCardTrigger>
+      <HoverCardContent
+        align="start"
+        side="top"
+        className="w-80 p-0 overflow-hidden shadow-xl border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl z-50 text-left font-sans"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-slate-50 dark:bg-slate-800/80 px-3.5 py-2.5 border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className={cn("p-1 rounded text-xs font-bold", badgeStyle)}>
+              <FileText className="h-3.5 w-3.5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Internal Screening Status</p>
+              <p className="text-[10px] text-neutral-500 truncate max-w-[150px]">{sub.candidateName}</p>
+            </div>
+          </div>
+          <span className={cn("text-[10px] font-bold px-1.5 py-0.2 rounded border", badgeStyle)}>
+            {statusLabel}
+          </span>
+        </div>
+        <div className="p-3 space-y-2.5">
+          {sub.accountManagerName && (
+            <div className="text-[11px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5">
+              <UserCheck className="h-3 w-3 text-neutral-400 shrink-0" />
+              <span>Reviewer: <strong className="text-neutral-700 dark:text-neutral-200 font-semibold">{sub.accountManagerName}</strong></span>
+            </div>
+          )}
+          {sub.updatedAt && (
+            <div className="text-[11px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-neutral-400 shrink-0" />
+              <span>Timestamp: <strong className="text-neutral-700 dark:text-neutral-200 font-semibold">{formatRemarkTimestamp(sub.updatedAt, sub.createdAt)}</strong></span>
+            </div>
+          )}
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">Internal Remarks &amp; Feedback</span>
+            {(sub.reviewFeedback || sub.podLeadRemarks) ? (
+              <p className="text-xs text-neutral-800 dark:text-neutral-200 bg-neutral-50 dark:bg-slate-800/50 p-2.5 rounded-md border border-neutral-100 dark:border-slate-800/60 leading-relaxed break-words font-normal">
+                {sub.reviewFeedback || sub.podLeadRemarks}
+              </p>
+            ) : (
+              <p className="text-[11px] italic text-neutral-400 dark:text-neutral-500 bg-neutral-50/50 dark:bg-slate-800/30 p-2 rounded-md border border-neutral-100 dark:border-slate-800/40">
+                {isPending ? "Awaiting screening decision from Account Manager or Pod Lead." : "No internal review remarks recorded."}
+              </p>
+            )}
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 
@@ -1189,55 +1312,43 @@ export default function JobDetailPage() {
 
                             {/* 4. Internal Review */}
                             <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
-                              {sub.finalStatus === "PENDING_APPROVAL" ? (
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold select-none">
-                                    Pending Review
-                                  </span>
-                                  {canInternalScreen && (
-                                    <div className="flex items-center gap-1 ml-1">
-                                      <button
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          try {
-                                            await atsApi.submissions.update(sub.id, { finalStatus: "SUBMITTED" });
-                                            toast.success("Submission approved and submitted to client!");
-                                            loadData();
-                                          } catch (err: any) {
-                                            toast.error("Failed: " + err.message);
-                                          }
-                                        }}
-                                        className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded shadow-xs cursor-pointer"
-                                      >
-                                        Approve
-                                      </button>
-                                      <button
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          try {
-                                            await atsApi.submissions.update(sub.id, { finalStatus: "REJECTED" });
-                                            toast.success("Submission rejected internally.");
-                                            loadData();
-                                          } catch (err: any) {
-                                            toast.error("Failed: " + err.message);
-                                          }
-                                        }}
-                                        className="px-1.5 py-0.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 dark:bg-slate-900 dark:border-rose-900 font-semibold text-[10px] rounded cursor-pointer"
-                                      >
-                                        Reject
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              ) : sub.finalStatus === "REJECTED" ? (
-                                <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold select-none">
-                                  Rejected Internally
-                                </span>
-                              ) : (
-                                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold select-none">
-                                  Approved
-                                </span>
-                              )}
+                              <div className="flex items-center gap-1.5">
+                                {renderInternalReviewStatus(sub)}
+                                {sub.finalStatus === "PENDING_APPROVAL" && canInternalScreen && (
+                                  <div className="flex items-center gap-1 ml-1" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                          await atsApi.submissions.update(sub.id, { finalStatus: "SUBMITTED" });
+                                          toast.success("Submission approved and submitted to client!");
+                                          loadData();
+                                        } catch (err: any) {
+                                          toast.error("Failed: " + err.message);
+                                        }
+                                      }}
+                                      className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded shadow-xs cursor-pointer"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                          await atsApi.submissions.update(sub.id, { finalStatus: "REJECTED" });
+                                          toast.success("Submission rejected internally.");
+                                          loadData();
+                                        } catch (err: any) {
+                                          toast.error("Failed: " + err.message);
+                                        }
+                                      }}
+                                      className="px-1.5 py-0.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 dark:bg-slate-900 dark:border-rose-900 font-semibold text-[10px] rounded cursor-pointer"
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </td>
 
                             {/* 5. Interview Progress */}

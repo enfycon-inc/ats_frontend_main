@@ -22,9 +22,11 @@ function HoverCardTrigger({
 function HoverCardContent({
   className,
   align = "center",
-  sideOffset = 4,
+  sideOffset = 10,
+  showArrow = false,
+  children,
   ...props
-}: React.ComponentProps<typeof HoverCardPrimitive.Content>) {
+}: React.ComponentProps<typeof HoverCardPrimitive.Content> & { showArrow?: boolean }) {
   return (
     <HoverCardPrimitive.Portal>
       <HoverCardPrimitive.Content
@@ -32,13 +34,38 @@ function HoverCardContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-80 origin-(--radix-hover-card-content-transform-origin) rounded-xl border border-border/80 p-4 shadow-xl outline-hidden",
+          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-80 origin-(--radix-hover-card-content-transform-origin) rounded-xl border border-border shadow-2xl outline-hidden overflow-visible",
           className
         )}
         {...props}
-      />
+      >
+        {children}
+        {showArrow && (
+          <HoverCardPrimitive.Arrow
+            width={16}
+            height={8}
+            className="fill-white dark:fill-slate-900 stroke-neutral-300 dark:stroke-slate-600 stroke-[1.5px] drop-shadow-sm"
+          />
+        )}
+      </HoverCardPrimitive.Content>
     </HoverCardPrimitive.Portal>
   )
 }
 
-export { HoverCard, HoverCardTrigger, HoverCardContent }
+function HoverCardArrow({
+  className,
+  width = 16,
+  height = 8,
+  ...props
+}: React.ComponentProps<typeof HoverCardPrimitive.Arrow>) {
+  return (
+    <HoverCardPrimitive.Arrow
+      width={width}
+      height={height}
+      className={cn("fill-white dark:fill-slate-900 stroke-neutral-300 dark:stroke-slate-600 stroke-[1.5px] drop-shadow-sm", className)}
+      {...props}
+    />
+  )
+}
+
+export { HoverCard, HoverCardTrigger, HoverCardContent, HoverCardArrow }
