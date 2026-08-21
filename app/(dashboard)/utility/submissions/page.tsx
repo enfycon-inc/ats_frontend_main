@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
+import { getActiveRolePermissions, resolveActiveSystemRole, CustomRoleDefinition } from "@/lib/role-permissions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,6 +71,22 @@ interface Submission {
 }
 
 export const STANDARD_REMARKS_TEMPLATES = {
+  review: [
+    "NA",
+    "Internal Screening NA - Submitted to Client",
+    "Internal Screening Pending",
+    "Internal Screening Scheduled",
+    "Candidate Noshow",
+    "Internal Screening Rescheduled",
+    "Internal Screening Completed - Pending Feedback",
+    "Selected in Internal Screening - Position went on Hold",
+    "Selected in Internal Screening - Submitted to Client",
+    "Selected in Internal Screening - Yet to Submit to Client",
+    "Rejected in Internal Screening",
+    "Candidate Not Responding",
+    "Selected in Internal Screening - Position Closed by Client",
+    "Rejected - Duplicate",
+  ],
   l1: [
     "✓ Mandatory skills & tech stack 100% verified against JD",
     "✓ Immediate joiner — notice period ≤ 30 days confirmed",
@@ -132,7 +149,7 @@ function renderPipelineProgress(sub: Submission) {
     <div className="flex flex-col gap-1 min-w-[130px]">
       <div className="flex items-center gap-1">
         <span
-          title={`L1 Internal Screening: ${sub.l1Status || 'Pending'}${sub.l1Remarks ? `\nFeedback: ${sub.l1Remarks}` : ''}`}
+          title={`Round 1 (L1) Interview: ${sub.l1Status || 'Pending'}${sub.l1Remarks ? `\nFeedback: ${sub.l1Remarks}` : ''}`}
           className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getBadgeStyle(sub.l1Status)}`}
         >
           {getLabel("L1", sub.l1Status || "PENDING")}
@@ -155,6 +172,48 @@ function renderPipelineProgress(sub: Submission) {
           "{sub.l3Remarks || sub.l2Remarks || sub.l1Remarks}"
         </div>
       )}
+    </div>
+  );
+}
+
+function renderClutterFreeRemarks(sub: Submission) {
+  const allRemarks: { label: string; text: string; color: string }[] = [];
+  if (sub.remarks) allRemarks.push({ label: "Final", text: sub.remarks, color: "text-emerald-700 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300" });
+  if (sub.l3Remarks) allRemarks.push({ label: "L3", text: sub.l3Remarks, color: "text-purple-700 bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300" });
+  if (sub.l2Remarks) allRemarks.push({ label: "L2", text: sub.l2Remarks, color: "text-cyan-700 bg-cyan-50 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300" });
+  if (sub.l1Remarks) allRemarks.push({ label: "L1", text: sub.l1Remarks, color: "text-indigo-700 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300" });
+  if (sub.reviewFeedback) allRemarks.push({ label: "Review", text: sub.reviewFeedback, color: "text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300" });
+  if (sub.recruiterComment) allRemarks.push({ label: "Recruiter", text: sub.recruiterComment, color: "text-slate-700 bg-slate-100 border-slate-200 dark:bg-slate-800 dark:text-slate-300" });
+
+  const primary = allRemarks[0];
+  const fullTooltip = allRemarks.map(r => `[${r.label}] ${r.text}`).join('\n\n');
+
+  return (
+    <div className="flex flex-col gap-1 text-xs max-w-[240px]">
+      {primary ? (
+        <div className="flex items-center gap-1.5" title={fullTooltip}>
+          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase shrink-0 ${primary.color}`}>
+            {primary.label}
+          </span>
+          <span className="text-default-750 font-medium truncate max-w-[150px]">
+            {primary.text}
+          </span>
+          {allRemarks.length > 1 && (
+            <span 
+              className="text-[9px] font-semibold bg-default-100 text-default-500 hover:bg-default-200 px-1 py-0.2 rounded shrink-0 cursor-help"
+              title={fullTooltip}
+            >
+              +{allRemarks.length - 1}
+            </span>
+          )}
+        </div>
+      ) : (
+        <span className="text-default-400 italic text-[11px]">No remarks</span>
+      )}
+      <div className="text-[9px] text-default-400 font-medium flex items-center gap-1">
+        <Icon icon="heroicons:calendar" className="h-3 w-3 text-default-400" />
+        {new Date(sub.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+      </div>
     </div>
   );
 }
@@ -225,9 +284,16 @@ export default function SubmissionsPage() {
   // Tenant Custom Remarks Configuration State
   const [customRemarks, setCustomRemarks] = useState<any[]>([]);
   const [customRemarksModalOpen, setCustomRemarksModalOpen] = useState(false);
-  const [newRemarkStage, setNewRemarkStage] = useState("l1");
+  const [newRemarkStage, setNewRemarkStage] = useState("review");
   const [newRemarkText, setNewRemarkText] = useState("");
   const [addingRemark, setAddingRemark] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
+
+  // Quick Decision Modal state (for inline Table Approve / Reject)
+  const [quickReviewModalOpen, setQuickReviewModalOpen] = useState(false);
+  const [quickReviewSub, setQuickReviewSub] = useState<Submission | null>(null);
+  const [quickReviewAction, setQuickReviewAction] = useState<"APPROVE" | "REJECT">("APPROVE");
+  const [quickReviewRemark, setQuickReviewRemark] = useState("");
 
   useEffect(() => {
     const user = atsApi.auth.getCurrentUser();
@@ -240,16 +306,18 @@ export default function SubmissionsPage() {
       setLoading(true);
       const user = atsApi.auth.getCurrentUser();
       
-      const [submissionsData, statsData, customRemarksData] = await Promise.all([
+      const [submissionsData, statsData, customRemarksData, rolesData] = await Promise.all([
         atsApi.submissions.list({
           startDate: startDate || undefined,
           endDate: endDate || undefined,
           finalStatus: statusFilter || undefined,
         }),
         atsApi.submissions.getTrackerStats(),
-        atsApi.submissions.getCustomRemarks().catch(() => []),
+        atsApi.submissions.getCustomRemarks(user?.branchId || undefined).catch(() => []),
+        atsApi.auth.listRoles().catch(() => []),
       ]);
 
+      setAvailableRoles(rolesData || []);
       setCustomRemarks(customRemarksData || []);
 
       // Apply search query locally on candidate name, candidate email, job code, or job title
@@ -310,28 +378,65 @@ export default function SubmissionsPage() {
     setSelectedSubmission(null);
   };
 
-  // Granular permission calculations
-  const userPerms = currentUser?.permissions || [];
-  const userRoles = currentUser?.roles || [];
-  const isAdmin = userRoles.includes("ADMIN") || userRoles.includes("SUPER_ADMIN") || currentUser?.systemRole === "ADMIN" || currentUser?.systemRole === "SUPER_ADMIN";
-  const isDeliveryHead = userRoles.includes("DELIVERY_HEAD") || currentUser?.systemRole === "DELIVERY_HEAD";
-  const isAm = userRoles.includes("ACCOUNT_MANAGER") || currentUser?.systemRole === "ACCOUNT_MANAGER";
-  const isPodLead = userRoles.includes("POD_LEAD") || currentUser?.systemRole === "POD_LEAD";
+  // Active Perspective & Dynamic Role Permissions
+  const activeRoleName = useMemo(() => {
+    if (typeof window !== "undefined") {
+      const override = localStorage.getItem("override_role");
+      if (override) return override;
+    }
+    return currentUser?.systemRole || currentUser?.roles?.[0] || "RECRUITER";
+  }, [currentUser]);
 
-  const canAuditRounds = isAdmin || isDeliveryHead || isAm || userPerms.includes("submission:audit_rounds");
-  const canAuditL1 = canAuditRounds || isAm || isPodLead || userPerms.includes("submission:audit_l1");
-  const canAuditL2 = canAuditRounds || isAm || userPerms.includes("submission:audit_l2");
-  const canAuditL3 = canAuditRounds || isAm || userPerms.includes("submission:audit_l3");
-  const canApproveClient = isAdmin || isDeliveryHead || isAm || userPerms.includes("submission:approve_client");
-  const canEditRate = isAdmin || isDeliveryHead || isAm || userPerms.includes("submission:edit_rate");
-  const isRecruiterOnly = userRoles.includes("RECRUITER") && !canAuditL1 && !canAuditL2 && !canAuditL3 && !canApproveClient && !canAuditRounds;
-  const canManageRemarks = isAdmin || userPerms.includes("tenant:settings") || userRoles.includes("SUPER_ADMIN") || userRoles.includes("ADMIN");
+  const activeSystemRole = useMemo(() => {
+    return resolveActiveSystemRole(activeRoleName, availableRoles, currentUser);
+  }, [activeRoleName, availableRoles, currentUser]);
 
+  const effectivePerms = useMemo(() => {
+    return getActiveRolePermissions(activeRoleName, availableRoles, currentUser);
+  }, [activeRoleName, availableRoles, currentUser]);
+
+  const isAdmin = activeSystemRole === "ADMIN" || activeSystemRole === "SUPER_ADMIN" || activeSystemRole === "TENANT_ADMIN";
+  const isDeliveryHead = activeSystemRole === "DELIVERY_HEAD";
+  const isAm = activeSystemRole === "ACCOUNT_MANAGER";
+  const isPodLead = activeSystemRole === "POD_LEAD";
+
+  const canAuditRounds = isAdmin || isDeliveryHead || effectivePerms.includes("submission:audit_rounds");
+  const canAuditL1 = canAuditRounds || isPodLead || effectivePerms.includes("submission:audit_l1");
+  const canAuditL2 = canAuditRounds || effectivePerms.includes("submission:audit_l2");
+  const canAuditL3 = canAuditRounds || effectivePerms.includes("submission:audit_l3");
+  const canInternalScreen = isAdmin || isDeliveryHead || isPodLead || effectivePerms.includes("submission:internal_screening");
+  const canFinalStatus = isAdmin || isDeliveryHead || isAm || effectivePerms.includes("submission:final_status");
+  const canApproveClient = canInternalScreen || canFinalStatus;
+  const canEditRate = isAdmin || isDeliveryHead || effectivePerms.includes("submission:edit_rate");
+  const isRecruiterOnly = activeSystemRole === "RECRUITER" && !canAuditL1 && !canAuditL2 && !canAuditL3 && !canInternalScreen && !canFinalStatus && !canAuditRounds;
+  const canManageRemarks = isAdmin || effectivePerms.includes("tenant:settings");
   const resolvedTemplates = {
+    review: [...STANDARD_REMARKS_TEMPLATES.review, ...customRemarks.filter(r => r.stage?.toLowerCase() === "review" || r.stage?.toLowerCase() === "internal_review").map(r => r.remarkText)],
     l1: [...STANDARD_REMARKS_TEMPLATES.l1, ...customRemarks.filter(r => r.stage?.toLowerCase() === "l1").map(r => r.remarkText)],
     l2: [...STANDARD_REMARKS_TEMPLATES.l2, ...customRemarks.filter(r => r.stage?.toLowerCase() === "l2").map(r => r.remarkText)],
     l3: [...STANDARD_REMARKS_TEMPLATES.l3, ...customRemarks.filter(r => r.stage?.toLowerCase() === "l3").map(r => r.remarkText)],
     final: [...STANDARD_REMARKS_TEMPLATES.final, ...customRemarks.filter(r => r.stage?.toLowerCase() === "final").map(r => r.remarkText)],
+  };
+
+  const handleConfirmQuickReview = async () => {
+    if (!quickReviewSub) return;
+    try {
+      setSubmitting(true);
+      const targetStatus = quickReviewAction === "APPROVE" ? "SUBMITTED" : "REJECTED";
+      await atsApi.submissions.update(quickReviewSub.id, {
+        finalStatus: targetStatus,
+        reviewFeedback: quickReviewRemark.trim() || (quickReviewAction === "APPROVE" ? "Approved for client submission" : "Rejected internally"),
+      });
+      toast.success(quickReviewAction === "APPROVE" ? "✅ Approved & submitted to client!" : "Submission rejected internally.");
+      setQuickReviewModalOpen(false);
+      setQuickReviewSub(null);
+      setQuickReviewRemark("");
+      await loadData();
+    } catch (err: any) {
+      toast.error("Failed: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleAddCustomRemark = async (e: React.FormEvent) => {
@@ -573,7 +678,7 @@ export default function SubmissionsPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
           {[
             { label: "Total Submissions", value: stats.total, icon: "heroicons:clipboard-document", color: "indigo" },
-            { label: "L1 Pending Review", value: stats.l1Pending, icon: "heroicons:user", color: "amber" },
+            { label: "Pending Internal Review", value: stats.l1Pending, icon: "heroicons:user", color: "amber" },
             { label: "L2 Scheduled", value: stats.l2Pending, icon: "heroicons:calendar", color: "cyan" },
             { label: "L3 Direct Interview", value: stats.l3Pending, icon: "heroicons:academic-cap", color: "purple" },
           ].map(({ label, value, icon, color }) => (
@@ -735,30 +840,39 @@ export default function SubmissionsPage() {
                                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                                 Pending Review
                               </span>
-                              {(() => {
-                                const roles = currentUser?.roles || [];
-                                const canApprove = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN") || roles.includes("ACCOUNT_MANAGER") || roles.includes("POD_LEAD") || roles.includes("DELIVERY_HEAD") || userPerms.includes("submission:approve_client");
-                                if (!canApprove) return null;
-                                return (
+                              {canInternalScreen && (
+                                <div className="flex items-center gap-1.5 pt-0.5">
                                   <Button
                                     size="sm"
-                                    onClick={async (e) => {
+                                    onClick={(e) => {
                                       e.stopPropagation();
-                                      try {
-                                        await atsApi.submissions.update(sub.id, { finalStatus: "SUBMITTED" });
-                                        toast.success("Submission approved and submitted to client!");
-                                        loadData();
-                                      } catch (err: any) {
-                                        toast.error("Failed to approve: " + err.message);
-                                      }
+                                      setQuickReviewSub(sub);
+                                      setQuickReviewAction("APPROVE");
+                                      setQuickReviewRemark("");
+                                      setQuickReviewModalOpen(true);
                                     }}
-                                    className="h-6 px-2.5 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-md shadow-xs flex items-center gap-1 w-fit"
+                                    className="h-6 px-2 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-2xs flex items-center gap-0.5 cursor-pointer"
                                   >
                                     <Icon icon="heroicons:check" className="h-3 w-3" />
                                     Approve
                                   </Button>
-                                );
-                              })()}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setQuickReviewSub(sub);
+                                      setQuickReviewAction("REJECT");
+                                      setQuickReviewRemark("");
+                                      setQuickReviewModalOpen(true);
+                                    }}
+                                    className="h-6 px-2 text-[10px] text-rose-600 border-rose-200 hover:bg-rose-50 dark:border-rose-900 dark:hover:bg-rose-950/30 font-bold rounded flex items-center gap-0.5 cursor-pointer"
+                                  >
+                                    <Icon icon="heroicons:x-mark" className="h-3 w-3" />
+                                    Reject
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 w-fit">
@@ -796,26 +910,8 @@ export default function SubmissionsPage() {
                         </td>
 
                         {/* 6. Remarks & Date */}
-                        <td className="py-3.5 px-4 max-w-[220px]">
-                          <div className="flex flex-col gap-1 text-xs">
-                            {sub.remarks ? (
-                              <div className="text-default-700 font-medium truncate" title={sub.remarks}>
-                                <span className="text-[9px] font-bold uppercase text-emerald-600 mr-1">Final:</span>
-                                {sub.remarks}
-                              </div>
-                            ) : sub.recruiterComment ? (
-                              <div className="text-default-700 font-medium truncate" title={sub.recruiterComment}>
-                                <span className="text-[9px] font-bold uppercase text-indigo-600 mr-1">Recruiter:</span>
-                                {sub.recruiterComment}
-                              </div>
-                            ) : (
-                              <span className="text-default-400 italic text-[11px]">No remarks</span>
-                            )}
-                            <div className="text-[9px] text-default-450 font-semibold flex items-center gap-1">
-                              <Icon icon="heroicons:calendar" className="h-2.5 w-2.5" />
-                              {new Date(sub.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </div>
-                          </div>
+                        <td className="py-3.5 px-4 max-w-[240px]">
+                          {renderClutterFreeRemarks(sub)}
                         </td>
 
                         {/* 7. Actions (Kebab Menu) */}
@@ -878,7 +974,7 @@ export default function SubmissionsPage() {
             {[
               {
                 id: "l1",
-                title: "L1 Review",
+                title: "Internal Review",
                 color: "border-t-amber-500 bg-amber-50/10 dark:bg-amber-950/5",
                 badge: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
                 subs: submissions.filter(s => s.finalStatus === "PENDING_APPROVAL" && s.l1Status !== "REJECTED"),
@@ -1188,12 +1284,12 @@ export default function SubmissionsPage() {
                   </div>
                 </div>
 
-                {/* ── ZONE A: Internal Review (only shown when PENDING_APPROVAL) ── */}
+                {/* ── ZONE A: Internal Screening Review & Submission Approval (only shown when PENDING_APPROVAL) ── */}
                 {selectedSubmission?.finalStatus === "PENDING_APPROVAL" && (
                   <div className="border border-amber-200 dark:border-amber-900/40 rounded-xl overflow-hidden">
                     <div className="bg-amber-50 dark:bg-amber-950/20 px-4 py-2.5 flex items-center gap-2 border-b border-amber-200 dark:border-amber-900/40">
                       <Icon icon="heroicons:clock" className="h-3.5 w-3.5 text-amber-600" />
-                      <span className="text-[11px] font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider">Step 1 — Internal Review</span>
+                      <span className="text-[11px] font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider">Internal Screening Review & Submission Approval</span>
                       <Badge className="ml-auto bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 border-0 text-[8px] font-bold">Awaiting Your Decision</Badge>
                     </div>
                     <div className="p-4 space-y-3">
@@ -1210,13 +1306,30 @@ export default function SubmissionsPage() {
                       </div>
 
                       {/* AM / Pod Lead writes feedback for recruiter */}
-                      {!isRecruiterOnly && (
+                      {canInternalScreen && (
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-default-700 uppercase tracking-wider flex items-center gap-1.5">
-                            <Icon icon="heroicons:pencil" className="h-3 w-3 text-indigo-500" />
-                            Your Feedback to Recruiter
-                            <span className="text-default-400 font-normal normal-case tracking-normal">— visible to recruiter</span>
-                          </label>
+                          <div className="flex justify-between items-center">
+                            <label className="text-[10px] font-bold text-default-700 uppercase tracking-wider flex items-center gap-1.5">
+                              <Icon icon="heroicons:pencil" className="h-3 w-3 text-indigo-500" />
+                              Your Feedback to Recruiter
+                              <span className="text-default-400 font-normal normal-case tracking-normal">— visible to recruiter</span>
+                            </label>
+                            <select
+                              defaultValue=""
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  setReviewFeedback((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                                  e.target.value = "";
+                                }
+                              }}
+                              className="text-[10px] border border-amber-200 dark:border-amber-900 rounded px-1.5 py-0.5 bg-amber-50/60 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-semibold cursor-pointer"
+                            >
+                              <option value="" disabled>+ Quick Pick Review Remark</option>
+                              {resolvedTemplates.review.map((opt) => (
+                                <option key={opt} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          </div>
                           <textarea
                             placeholder="e.g. Rate is too high, candidate's notice period is a concern, ask for lower expectation..."
                             value={reviewFeedback}
@@ -1228,59 +1341,64 @@ export default function SubmissionsPage() {
                       )}
 
                       {/* Approve / Reject actions */}
-                      {!isRecruiterOnly && (() => {
-                        const roles = currentUser?.roles || [];
-                        const canApprove = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN") || roles.includes("ACCOUNT_MANAGER") || roles.includes("POD_LEAD") || roles.includes("DELIVERY_HEAD");
-                        if (!canApprove) return null;
-                        return (
-                          <div className="grid grid-cols-2 gap-2 pt-1">
-                            <Button
-                              type="button"
-                              disabled={submitting}
-                              onClick={async () => {
-                                try {
-                                  setSubmitting(true);
-                                  await atsApi.submissions.update(selectedSubmission.id, {
-                                    finalStatus: "REJECTED",
-                                    reviewFeedback: reviewFeedback.trim() || null,
-                                  });
-                                  toast.success("Submission rejected internally.");
-                                  closePanel();
-                                  await loadData();
-                                } catch (err: any) {
-                                  toast.error("Failed: " + err.message);
-                                } finally { setSubmitting(false); }
-                              }}
-                              className="h-8 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-400 rounded-lg"
-                            >
-                              <Icon icon="heroicons:x-mark" className="h-3.5 w-3.5 mr-1" />
-                              Reject
-                            </Button>
-                            <Button
-                              type="button"
-                              disabled={submitting}
-                              onClick={async () => {
-                                try {
-                                  setSubmitting(true);
-                                  await atsApi.submissions.update(selectedSubmission.id, {
-                                    finalStatus: "SUBMITTED",
-                                    reviewFeedback: reviewFeedback.trim() || null,
-                                  });
-                                  toast.success("✅ Approved & submitted to client!");
-                                  closePanel();
-                                  await loadData();
-                                } catch (err: any) {
-                                  toast.error("Failed: " + err.message);
-                                } finally { setSubmitting(false); }
-                              }}
-                              className="h-8 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm"
-                            >
-                              <Icon icon="heroicons:check-badge" className="h-3.5 w-3.5 mr-1" />
-                              Approve & Submit
-                            </Button>
+                      {canInternalScreen ? (
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <Button
+                            type="button"
+                            disabled={submitting}
+                            onClick={async () => {
+                              try {
+                                setSubmitting(true);
+                                await atsApi.submissions.update(selectedSubmission.id, {
+                                  finalStatus: "REJECTED",
+                                  reviewFeedback: reviewFeedback.trim() || null,
+                                });
+                                toast.success("Submission rejected internally.");
+                                closePanel();
+                                await loadData();
+                              } catch (err: any) {
+                                toast.error("Failed: " + err.message);
+                              } finally { setSubmitting(false); }
+                            }}
+                            className="h-8 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-400 rounded-lg"
+                          >
+                            <Icon icon="heroicons:x-mark" className="h-3.5 w-3.5 mr-1" />
+                            Reject
+                          </Button>
+                          <Button
+                            type="button"
+                            disabled={submitting}
+                            onClick={async () => {
+                              try {
+                                setSubmitting(true);
+                                await atsApi.submissions.update(selectedSubmission.id, {
+                                  finalStatus: "SUBMITTED",
+                                  reviewFeedback: reviewFeedback.trim() || null,
+                                });
+                                toast.success("✅ Approved & submitted to client!");
+                                closePanel();
+                                await loadData();
+                              } catch (err: any) {
+                                toast.error("Failed: " + err.message);
+                              } finally { setSubmitting(false); }
+                            }}
+                            className="h-8 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm"
+                          >
+                            <Icon icon="heroicons:check-badge" className="h-3.5 w-3.5 mr-1" />
+                            Approve & Submit to Client
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                          <Icon icon="heroicons:lock-closed" className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-semibold block">Internal Screening Gate in Progress</span>
+                            <span className="text-[11px] text-amber-700/90 dark:text-amber-300/80">
+                              This candidate submission is awaiting review & clearance by an authorized Pod Lead or Delivery Head before client release.
+                            </span>
                           </div>
-                        );
-                      })()}
+                        </div>
+                      )}
 
                       {/* Recruiter view — show AM feedback if exists */}
                       {isRecruiterOnly && selectedSubmission.reviewFeedback && (
@@ -1328,12 +1446,12 @@ export default function SubmissionsPage() {
                           <div className="h-px flex-1 bg-default-150" />
                         </div>
 
-                        {/* ── STAGE 1: L1 Screening ── */}
+                        {/* ── STAGE 1: Round 1 (L1) Interview ── */}
                         <div className="space-y-2 p-3 border border-default-150 rounded-xl bg-slate-50/50 dark:bg-slate-800/20">
                           <div className="flex justify-between items-center">
                             <label className="text-xs font-bold text-default-850 flex items-center gap-1.5">
                               <Icon icon="heroicons:document-magnifying-glass" className="h-4 w-4 text-indigo-600" />
-                              Round 1 (L1) — Screening
+                              Round 1 (L1) — Interview Stage
                             </label>
                             {canAuditL1 ? (
                               <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 text-[9px] border-0 py-0.5">
@@ -1551,18 +1669,18 @@ export default function SubmissionsPage() {
                           <div className="flex justify-between items-center">
                             <label className="text-xs font-bold text-default-850 flex items-center gap-1.5">
                               <Icon icon="heroicons:flag" className="h-4 w-4 text-emerald-600" />
-                              Final Status
+                              Final Status (Offer &amp; Placement Outcome)
                             </label>
-                            {!canApproveClient && (
+                            {!canFinalStatus && (
                               <Badge className="bg-slate-100 text-slate-500 text-[9px] border-0 py-0.5 flex items-center gap-1">
                                 <Icon icon="heroicons:lock-closed" className="h-2.5 w-2.5" />
-                                Locked (Requires submission:approve_client)
+                                Locked (Requires submission:final_status)
                               </Badge>
                             )}
                           </div>
                           <select
                             value={finalStatus}
-                            disabled={!canApproveClient}
+                            disabled={!canFinalStatus}
                             onChange={(e) => setFinalStatus(e.target.value)}
                             className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-3 h-8.5 bg-transparent text-default-850 font-semibold focus:outline-none focus:border-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed"
                           >
@@ -1576,7 +1694,7 @@ export default function SubmissionsPage() {
                           <div className="space-y-1 pt-1">
                             <div className="flex justify-between items-center">
                               <span className="text-[10px] font-bold text-default-600 uppercase tracking-wider">Final Remarks / Notes</span>
-                              {canApproveClient && (
+                              {canFinalStatus && (
                                 <select
                                   defaultValue=""
                                   onChange={(e) => {
@@ -1595,9 +1713,9 @@ export default function SubmissionsPage() {
                               )}
                             </div>
                             <textarea
-                              placeholder={canApproveClient ? "Client feedback, interview outcomes, placement notes..." : "No final remarks recorded."}
+                              placeholder={canFinalStatus ? "Client feedback, interview outcomes, placement notes..." : "No final remarks recorded."}
                               value={remarks}
-                              disabled={!canApproveClient}
+                              disabled={!canFinalStatus}
                               onChange={(e) => setRemarks(e.target.value)}
                               className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2.5 py-2 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 resize-none disabled:opacity-60 disabled:cursor-not-allowed"
                               rows={2.5}
@@ -1791,16 +1909,17 @@ export default function SubmissionsPage() {
                     onChange={(e) => setNewRemarkStage(e.target.value)}
                     className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2 h-8.5 bg-white dark:bg-slate-800 text-default-850"
                   >
-                    <option value="l1">L1 — Internal Screening</option>
-                    <option value="l2">L2 — Technical Vetting</option>
-                    <option value="l3">L3 — Commercial Audit</option>
+                    <option value="review">Internal Screening &amp; Review Gate</option>
+                    <option value="l1">Round 1 (L1) — Interview</option>
+                    <option value="l2">Round 2 (L2) — Technical Vetting</option>
+                    <option value="l3">Round 3 (L3) — Commercial Audit</option>
                     <option value="final">Final Client Milestone</option>
                   </select>
                 </div>
                 <div className="sm:col-span-2 space-y-1">
                   <label className="text-[10px] font-bold text-default-500 uppercase">Remark Text / Template</label>
                   <Input
-                    placeholder="e.g. ✓ Cleared System Design Assessment with Grade A"
+                    placeholder="e.g. ✓ Resume screened & profile cleared for client submission"
                     value={newRemarkText}
                     onChange={(e) => setNewRemarkText(e.target.value)}
                     className="h-8.5 text-xs"
@@ -1855,6 +1974,126 @@ export default function SubmissionsPage() {
           <DialogFooter className="pt-2 border-t border-default-150">
             <Button variant="outline" size="sm" onClick={() => setCustomRemarksModalOpen(false)} className="text-xs">
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── QUICK REVIEW DECISION MODAL (Approve / Reject from Table) ── */}
+      <Dialog open={quickReviewModalOpen} onOpenChange={setQuickReviewModalOpen}>
+        <DialogContent className="sm:max-w-[500px] font-sans">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+              {quickReviewAction === "APPROVE" ? (
+                <>
+                  <Icon icon="heroicons:check-badge" className="h-5 w-5 text-emerald-600" />
+                  Approve &amp; Submit to Client
+                </>
+              ) : (
+                <>
+                  <Icon icon="heroicons:x-circle" className="h-5 w-5 text-rose-600" />
+                  Reject Candidate Internally
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-neutral-500">
+              {quickReviewAction === "APPROVE" ? (
+                <>
+                  Confirm internal clearance for <strong>{quickReviewSub?.candidateName}</strong> on requirement <strong>{quickReviewSub?.jobTitle} ({quickReviewSub?.jobCode})</strong>.
+                </>
+              ) : (
+                <>
+                  Provide internal rejection feedback for <strong>{quickReviewSub?.candidateName}</strong>. This feedback will be logged and visible to the recruiter.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3.5 py-2 text-xs">
+            {/* Candidate & Rate Summary Card */}
+            <div className="p-3 bg-neutral-50 dark:bg-slate-800/40 rounded-lg border border-neutral-200 dark:border-slate-700 flex justify-between items-center text-xs">
+              <div>
+                <span className="font-bold text-neutral-900 dark:text-white block text-sm">{quickReviewSub?.candidateName}</span>
+                <span className="text-neutral-500 text-[11px]">{quickReviewSub?.candidateEmail}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-bold text-neutral-450 block">Pay Rate</span>
+                <span className="font-bold text-emerald-600 text-xs">
+                  {formatSubmittedRate(quickReviewSub?.submittedRate, quickReviewSub?.market, quickReviewSub?.jobCode, quickReviewSub?.jobTitle)}
+                </span>
+              </div>
+            </div>
+
+            {/* Recruiter's Note if any */}
+            {quickReviewSub?.recruiterComment && (
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800/30 rounded-md border border-slate-200 dark:border-slate-700 text-[11px]">
+                <span className="font-bold text-neutral-500 uppercase text-[9px] block mb-0.5">Recruiter's Submission Note:</span>
+                <span className="text-neutral-700 dark:text-neutral-300 italic">{quickReviewSub.recruiterComment}</span>
+              </div>
+            )}
+
+            {/* Pre-defined Remarks Template Picker */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
+                  Review Remarks &amp; Feedback
+                </label>
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setQuickReviewRemark((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                      e.target.value = "";
+                    }
+                  }}
+                  className="text-[10px] border border-amber-300 dark:border-amber-900 rounded px-2 py-0.5 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-semibold cursor-pointer"
+                >
+                  <option value="" disabled>+ Quick Pick Pre-Defined Remark</option>
+                  {resolvedTemplates.review.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+              <textarea
+                rows={3}
+                placeholder={quickReviewAction === "APPROVE" ? "e.g. ✓ Resume screened & profile approved for client submission" : "e.g. ✕ Rejected: Expected CTC is too high for this budget..."}
+                value={quickReviewRemark}
+                onChange={(e) => setQuickReviewRemark(e.target.value)}
+                className="w-full p-2.5 border border-neutral-300 dark:border-slate-700 rounded-lg bg-transparent text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 resize-none font-sans"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={submitting}
+              onClick={() => {
+                setQuickReviewModalOpen(false);
+                setQuickReviewSub(null);
+              }}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={submitting}
+              onClick={handleConfirmQuickReview}
+              className={`text-xs font-bold text-white ${
+                quickReviewAction === "APPROVE"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-rose-600 hover:bg-rose-700"
+              }`}
+            >
+              {submitting
+                ? "Processing..."
+                : quickReviewAction === "APPROVE"
+                ? "Confirm & Submit to Client"
+                : "Confirm Internal Rejection"}
             </Button>
           </DialogFooter>
         </DialogContent>

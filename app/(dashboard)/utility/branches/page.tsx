@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Building2, MapPin, Plus, Edit2, Users, CheckCircle2, XCircle, 
   Search, ShieldAlert, Sparkles, X, Globe, UserPlus, Briefcase, Crown, Shield,
-  GitFork, ChevronRight, ChevronDown, Layers, Rocket, ArrowRight
+  GitFork, ChevronRight, ChevronDown, Layers, Rocket, ArrowRight, MessageSquare, ListChecks, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,16 @@ export default function BranchManagementPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [isAssignUserOpen, setIsAssignUserOpen] = useState(false);
+
+  // Branch Stage Remarks Modal State
+  const [isRemarksOpen, setIsRemarksOpen] = useState(false);
+  const [selectedBranchForRemarks, setSelectedBranchForRemarks] = useState<any>(null);
+  const [branchRemarks, setBranchRemarks] = useState<any[]>([]);
+  const [loadingRemarks, setLoadingRemarks] = useState(false);
+  const [branchRemarkStage, setBranchRemarkStage] = useState("review");
+  const [branchRemarkText, setBranchRemarkText] = useState("");
+  const [addingBranchRemark, setAddingBranchRemark] = useState(false);
+  const [remarksStageFilter, setRemarksStageFilter] = useState("all");
 
   const [selectedBranch, setSelectedBranch] = useState<any>(null);
   const [branchMembers, setBranchMembers] = useState<any[]>([]);
@@ -272,6 +282,50 @@ export default function BranchManagementPage() {
     setSelectedBranch(null);
   };
 
+  const openBranchRemarksModal = async (branch: any) => {
+    setSelectedBranchForRemarks(branch);
+    setIsRemarksOpen(true);
+    setLoadingRemarks(true);
+    try {
+      const data = await atsApi.submissions.getCustomRemarks(branch.id);
+      setBranchRemarks(data || []);
+    } catch (err: any) {
+      toast.error("Failed to load branch remarks: " + err.message);
+    } finally {
+      setLoadingRemarks(false);
+    }
+  };
+
+  const handleAddBranchRemark = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBranchForRemarks || !branchRemarkText.trim()) return;
+    try {
+      setAddingBranchRemark(true);
+      const created = await atsApi.submissions.createCustomRemark({
+        stage: branchRemarkStage,
+        remarkText: branchRemarkText.trim(),
+        branchId: selectedBranchForRemarks.id,
+      });
+      setBranchRemarks((prev) => [...prev, created]);
+      setBranchRemarkText("");
+      toast.success("Branch remark template added!");
+    } catch (err: any) {
+      toast.error("Failed to add remark: " + err.message);
+    } finally {
+      setAddingBranchRemark(false);
+    }
+  };
+
+  const handleDeleteBranchRemark = async (id: number) => {
+    try {
+      await atsApi.submissions.deleteCustomRemark(id);
+      setBranchRemarks((prev) => prev.filter((r) => r.id !== id));
+      toast.success("Branch remark removed!");
+    } catch (err: any) {
+      toast.error("Failed to delete remark: " + err.message);
+    }
+  };
+
   const filteredBranches = branches.filter((b) =>
     (b.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
     (b.city || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -467,6 +521,15 @@ export default function BranchManagementPage() {
                             </span>
 
                             <Button
+                              onClick={() => openBranchRemarksModal(b)}
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px] font-semibold border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300 rounded flex items-center gap-1"
+                            >
+                              <MessageSquare className="h-3 w-3 mr-1" /> Stage Remarks
+                            </Button>
+
+                            <Button
                               onClick={() => openEditModal(b)}
                               size="sm"
                               variant="outline"
@@ -601,14 +664,23 @@ export default function BranchManagementPage() {
                 </div>
 
                 {/* ACTIONS */}
-                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 dark:border-slate-800">
+                <div className="flex items-center justify-between pt-2 border-t border-neutral-100 dark:border-slate-800 gap-1.5 flex-wrap">
                   <Button
                     onClick={() => openMembersModal(b)}
                     variant="outline"
                     size="sm"
                     className="h-7 text-[11px] font-semibold border-neutral-300 rounded flex items-center gap-1"
                   >
-                    <Users className="h-3.5 w-3.5 text-indigo-650" /> Users & Roles ({b.usersCount || 0})
+                    <Users className="h-3.5 w-3.5 text-indigo-650" /> Users ({b.usersCount || 0})
+                  </Button>
+
+                  <Button
+                    onClick={() => openBranchRemarksModal(b)}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-[11px] font-semibold border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300 rounded flex items-center gap-1"
+                  >
+                    <MessageSquare className="h-3 w-3" /> Remarks
                   </Button>
 
                   <Button
@@ -617,7 +689,7 @@ export default function BranchManagementPage() {
                     size="sm"
                     className="h-7 text-[11px] font-semibold text-neutral-600 hover:text-indigo-650"
                   >
-                    <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit Branch
+                    <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
                   </Button>
                 </div>
               </CardContent>
@@ -1183,6 +1255,232 @@ export default function BranchManagementPage() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── BRANCH-SPECIFIC STAGE REMARKS MODAL (CLEAN & WIDE) ── */}
+      {isRemarksOpen && selectedBranchForRemarks && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95 my-auto">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-neutral-150 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-indigo-600/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 flex items-center justify-center font-bold">
+                  <MessageSquare className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Stage Remarks Templates: {selectedBranchForRemarks.name}
+                  </h3>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => {
+                  setIsRemarksOpen(false);
+                  setSelectedBranchForRemarks(null);
+                }} 
+                className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Stage Filter Navigation Tabs */}
+            <div className="px-6 pt-3 pb-2 border-b border-neutral-150 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-1.5 overflow-x-auto shrink-0 scrollbar-none">
+              {[
+                { key: "all", label: "All Stages", count: branchRemarks.length },
+                { key: "review", label: "Internal Review Gate", count: branchRemarks.filter(r => r.stage === "review").length },
+                { key: "l1", label: "Round 1 (L1)", count: branchRemarks.filter(r => r.stage === "l1").length },
+                { key: "l2", label: "Round 2 (L2)", count: branchRemarks.filter(r => r.stage === "l2").length },
+                { key: "l3", label: "Round 3 (L3)", count: branchRemarks.filter(r => r.stage === "l3").length },
+                { key: "final", label: "Final Milestone", count: branchRemarks.filter(r => r.stage === "final").length },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setRemarksStageFilter(tab.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                    remarksStageFilter === tab.key
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
+                    remarksStageFilter === tab.key
+                      ? "bg-white/20 text-white"
+                      : "bg-neutral-200 text-neutral-600 dark:bg-slate-700 dark:text-slate-300"
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              
+              {/* Add New Template Form Card */}
+              <form onSubmit={handleAddBranchRemark} className="p-4 bg-neutral-50/80 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-xl space-y-3">
+                <div className="text-xs font-bold text-neutral-900 dark:text-white flex items-center gap-1.5">
+                  <Plus className="h-4 w-4 text-indigo-600" />
+                  Add New Template
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                  <div className="sm:col-span-4 space-y-1">
+                    <label className="text-[10.5px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
+                      Target Stage
+                    </label>
+                    <select
+                      value={branchRemarkStage}
+                      onChange={(e) => setBranchRemarkStage(e.target.value)}
+                      className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg px-2.5 h-9 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="review">Internal Screening &amp; Review Gate</option>
+                      <option value="l1">Round 1 (L1) — Interview Screening</option>
+                      <option value="l2">Round 2 (L2) — Technical Vetting</option>
+                      <option value="l3">Round 3 (L3) — Commercial &amp; HR</option>
+                      <option value="final">Final Client Placement Milestone</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-8 space-y-1">
+                    <label className="text-[10.5px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
+                      Remark Text / Template
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Type standard template remark text..."
+                        value={branchRemarkText}
+                        onChange={(e) => setBranchRemarkText(e.target.value)}
+                        className="h-9 text-xs bg-white dark:bg-slate-800 rounded-lg flex-1"
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={addingBranchRemark || !branchRemarkText.trim()}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 rounded-lg shadow-xs shrink-0 cursor-pointer"
+                      >
+                        {addingBranchRemark ? "Saving..." : "+ Add Template"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+
+              {/* Active Configured Remarks List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider flex items-center gap-2">
+                    <ListChecks className="h-4 w-4 text-indigo-600" />
+                    Active Templates
+                  </span>
+                  <span className="text-xs text-neutral-500">
+                    Showing {
+                      branchRemarks.filter(r => remarksStageFilter === "all" || r.stage === remarksStageFilter).length
+                    } of {branchRemarks.length} templates
+                  </span>
+                </div>
+
+                {loadingRemarks ? (
+                  <div className="p-8 text-center text-xs text-neutral-400 italic">
+                    <div className="h-5 w-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                    Loading templates...
+                  </div>
+                ) : branchRemarks.filter(r => remarksStageFilter === "all" || r.stage === remarksStageFilter).length === 0 ? (
+                  <div className="p-8 border border-dashed border-neutral-200 dark:border-slate-800 rounded-xl text-center space-y-1.5 bg-neutral-50/40 dark:bg-slate-850/40">
+                    <div className="h-9 w-9 rounded-full bg-neutral-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-neutral-400">
+                      <MessageSquare className="h-4 w-4" />
+                    </div>
+                    <p className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                      No custom templates configured for {remarksStageFilter === "all" ? "this branch" : `this stage`}.
+                    </p>
+                    <p className="text-[11px] text-neutral-400">
+                      Use the form above to add custom pre-defined remarks.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-[360px] overflow-y-auto pr-1">
+                    {branchRemarks
+                      .filter(r => remarksStageFilter === "all" || r.stage === remarksStageFilter)
+                      .map((rem) => {
+                        const stageMeta: Record<string, { label: string; bg: string; text: string; border: string }> = {
+                          review: { label: "Review Gate", bg: "bg-amber-50 dark:bg-amber-950/40", text: "text-amber-800 dark:text-amber-300", border: "border-amber-200 dark:border-amber-900" },
+                          l1: { label: "Round 1 (L1)", bg: "bg-indigo-50 dark:bg-indigo-950/40", text: "text-indigo-800 dark:text-indigo-300", border: "border-indigo-200 dark:border-indigo-900" },
+                          l2: { label: "Round 2 (L2)", bg: "bg-cyan-50 dark:bg-cyan-950/40", text: "text-cyan-800 dark:text-cyan-300", border: "border-cyan-200 dark:border-cyan-900" },
+                          l3: { label: "Round 3 (L3)", bg: "bg-purple-50 dark:bg-purple-950/40", text: "text-purple-800 dark:text-purple-300", border: "border-purple-200 dark:border-purple-900" },
+                          final: { label: "Final Outcome", bg: "bg-emerald-50 dark:bg-emerald-950/40", text: "text-emerald-800 dark:text-emerald-300", border: "border-emerald-200 dark:border-emerald-900" },
+                        };
+                        const meta = stageMeta[rem.stage] || { label: rem.stage.toUpperCase(), bg: "bg-slate-100", text: "text-slate-800", border: "border-slate-200" };
+
+                        return (
+                          <div 
+                            key={rem.id} 
+                            className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-neutral-200 dark:border-slate-700 shadow-2xs flex flex-col justify-between gap-2 group hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${meta.bg} ${meta.text} ${meta.border}`}>
+                                {meta.label}
+                              </span>
+
+                              <div className="flex items-center gap-1">
+                                {rem.branchId ? (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                    Branch Custom
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 dark:bg-slate-800">
+                                    Global
+                                  </span>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteBranchRemark(rem.id)}
+                                  className="text-neutral-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 h-6 w-6 p-0 rounded cursor-pointer"
+                                  title="Delete template"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-neutral-800 dark:text-neutral-200 font-medium leading-relaxed">
+                              {rem.remarkText}
+                            </p>
+
+                            <div className="text-[10px] text-neutral-400 pt-1 border-t border-neutral-100 dark:border-slate-700/60 flex items-center justify-between">
+                              <span>Added by: {rem.createdBy || 'Admin'}</span>
+                              {rem.createdAt && <span>{new Date(rem.createdAt).toLocaleDateString()}</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 border-t border-neutral-150 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 flex justify-end shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsRemarksOpen(false);
+                  setSelectedBranchForRemarks(null);
+                }}
+                className="text-xs font-bold px-5 rounded-lg cursor-pointer"
+              >
+                Close &amp; Finish
+              </Button>
+            </div>
+
           </div>
         </div>
       )}

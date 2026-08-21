@@ -972,10 +972,10 @@ const submissions = {
   async getTrackerStats(): Promise<any> {
     return apiFetch<any>('/api/recruiter-submissions/tracker-stats');
   },
-  async getCustomRemarks(): Promise<any[]> {
-    return apiFetch<any[]>('/api/recruiter-submissions/custom-remarks');
+  async getCustomRemarks(branchId?: string): Promise<any[]> {
+    return apiFetch<any[]>(`/api/recruiter-submissions/custom-remarks${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''}`);
   },
-  async createCustomRemark(data: { stage: string; remarkText: string }): Promise<any> {
+  async createCustomRemark(data: { stage: string; remarkText: string; branchId?: string }): Promise<any> {
     return apiFetch<any>('/api/recruiter-submissions/custom-remarks', {
       method: 'POST',
       body: JSON.stringify(data),

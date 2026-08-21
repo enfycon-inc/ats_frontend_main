@@ -595,40 +595,60 @@ export default function RolesPermissionsPage() {
                     </div>
                   )}
 
-                  <div className="space-y-6 max-h-[520px] overflow-y-auto pr-1">
-                    {Object.entries(permissionGroups).map(([groupName, groupPerms]) => (
-                      <div key={groupName} className="space-y-2 border-b border-default-100 pb-4 last:border-b-0 last:pb-0">
-                        <h3 className="text-xs font-bold text-default-800 uppercase tracking-wider">{groupName}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                          {groupPerms.map((perm) => {
-                            const isChecked = selectedPermissions.includes(perm.id);
-                            return (
-                              <div
-                                key={perm.id}
-                                onClick={() => handlePermissionToggle(perm.id)}
-                                className={`flex items-start gap-3 p-2.5 rounded-lg border transition ${
-                                  selectedRole.isSystem ? "cursor-default" : "cursor-pointer hover:bg-default-50/50"
-                                } ${isChecked ? "bg-emerald-50/10 border-emerald-500/20" : "border-default-100"}`}
-                              >
-                                <Checkbox
-                                  id={perm.id}
-                                  checked={isChecked}
-                                  disabled={selectedRole.isSystem}
-                                  onCheckedChange={() => handlePermissionToggle(perm.id)}
-                                  className="mt-0.5"
-                                />
-                                <div>
-                                  <label htmlFor={perm.id} className="text-xs font-semibold text-default-900 cursor-pointer block leading-none">
-                                    {perm.name}
-                                  </label>
-                                  <span className="text-[10px] text-default-400 mt-1 block">Permission Token: `{perm.id}`</span>
+                  <div className="space-y-6 max-h-[540px] overflow-y-auto pr-1">
+                    {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
+                      const getGroupIcon = (name: string) => {
+                        if (name.includes("Jobs")) return "heroicons:briefcase";
+                        if (name.includes("Candidates")) return "heroicons:users";
+                        if (name.includes("Sourcing") || name.includes("Submissions")) return "heroicons:arrow-up-tray";
+                        if (name.includes("Screening") || name.includes("Review Gate")) return "heroicons:shield-check";
+                        if (name.includes("Interview") || name.includes("Audits")) return "heroicons:chat-bubble-left-right";
+                        if (name.includes("Clients") || name.includes("Placements")) return "heroicons:building-office-2";
+                        if (name.includes("Pods")) return "heroicons:user-group";
+                        if (name.includes("Branch")) return "heroicons:map-pin";
+                        return "heroicons:cog-6-tooth";
+                      };
+
+                      return (
+                        <div key={groupName} className="space-y-2 border-b border-default-150 pb-5 last:border-b-0 last:pb-0">
+                          <div className="flex items-center gap-2">
+                            <Icon icon={getGroupIcon(groupName)} className="h-4 w-4 text-indigo-600" />
+                            <h3 className="text-xs font-bold text-default-850 uppercase tracking-wider">{groupName}</h3>
+                            <span className="text-[10px] text-default-400 font-medium ml-auto">
+                              {groupPerms.filter(p => selectedPermissions.includes(p.id)).length} / {groupPerms.length} enabled
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                            {groupPerms.map((perm) => {
+                              const isChecked = selectedPermissions.includes(perm.id);
+                              return (
+                                <div
+                                  key={perm.id}
+                                  onClick={() => handlePermissionToggle(perm.id)}
+                                  className={`flex items-start gap-3 p-2.5 rounded-lg border transition ${
+                                    selectedRole.isSystem ? "cursor-default" : "cursor-pointer hover:bg-default-50/50"
+                                  } ${isChecked ? "bg-emerald-50/10 border-emerald-500/20" : "border-default-100"}`}
+                                >
+                                  <Checkbox
+                                    id={perm.id}
+                                    checked={isChecked}
+                                    disabled={selectedRole.isSystem}
+                                    onCheckedChange={() => handlePermissionToggle(perm.id)}
+                                    className="mt-0.5"
+                                  />
+                                  <div>
+                                    <label htmlFor={perm.id} className="text-xs font-semibold text-default-900 cursor-pointer block leading-none">
+                                      {perm.name}
+                                    </label>
+                                    <span className="text-[10px] text-default-400 mt-1 block">Permission Token: `{perm.id}`</span>
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {!selectedRole.isSystem && (

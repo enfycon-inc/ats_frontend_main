@@ -42,6 +42,7 @@ import { atsApi } from "@/lib/ats-api";
 import { mapApiJobToJob, type Job } from "../data/mock-jobs";
 import toast from "react-hot-toast";
 import { ScheduleInterviewModal } from "@/components/interviews/schedule-interview-modal";
+import { getActiveRolePermissions, resolveActiveSystemRole, CustomRoleDefinition } from "@/lib/role-permissions";
 
 const TIER_STYLES: Record<string, { chip: string; label: string; text: string }> = {
   Strong: { chip: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900", label: "Strong Match", text: "text-emerald-600 dark:text-emerald-400" },
@@ -103,28 +104,52 @@ export default function JobDetailPage() {
   }, []);
 
   const roles = useMemo(() => currentUser?.roles || [], [currentUser]);
-  const userPerms = useMemo(() => currentUser?.permissions || [], [currentUser]);
-  const isAdmin = useMemo(() => roles.includes("ADMIN") || roles.includes("SUPER_ADMIN") || currentUser?.systemRole === "ADMIN" || currentUser?.systemRole === "SUPER_ADMIN", [roles, currentUser]);
-  const isDeliveryHead = useMemo(() => roles.includes("DELIVERY_HEAD") || currentUser?.systemRole === "DELIVERY_HEAD", [roles, currentUser]);
-  const isAM = useMemo(() => roles.includes("ACCOUNT_MANAGER") || currentUser?.systemRole === "ACCOUNT_MANAGER", [roles, currentUser]);
-  const isPodLead = useMemo(() => roles.includes("POD_LEAD") || currentUser?.systemRole === "POD_LEAD", [roles, currentUser]);
+  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
 
-  const canAuditRounds = useMemo(() => isAdmin || isDeliveryHead || isAM || userPerms.includes("submission:audit_rounds"), [isAdmin, isDeliveryHead, isAM, userPerms]);
-  const canAuditL1 = useMemo(() => canAuditRounds || isAM || isPodLead || userPerms.includes("submission:audit_l1"), [canAuditRounds, isAM, isPodLead, userPerms]);
-  const canAuditL2 = useMemo(() => canAuditRounds || isAM || userPerms.includes("submission:audit_l2"), [canAuditRounds, isAM, userPerms]);
-  const canAuditL3 = useMemo(() => canAuditRounds || isAM || userPerms.includes("submission:audit_l3"), [canAuditRounds, isAM, userPerms]);
-  const canApproveClient = useMemo(() => isAdmin || isDeliveryHead || isAM || userPerms.includes("submission:approve_client"), [isAdmin, isDeliveryHead, isAM, userPerms]);
-  const canEditRate = useMemo(() => isAdmin || isDeliveryHead || isAM || userPerms.includes("submission:edit_rate"), [isAdmin, isDeliveryHead, isAM, userPerms]);
+  useEffect(() => {
+    atsApi.auth.listRoles().then((data) => {
+      setAvailableRoles(data || []);
+    }).catch(() => {});
+  }, []);
+
+  const activeRoleName = useMemo(() => {
+    if (typeof window !== "undefined") {
+      const override = localStorage.getItem("override_role");
+      if (override) return override;
+    }
+    return currentUser?.systemRole || currentUser?.roles?.[0] || "RECRUITER";
+  }, [currentUser]);
+
+  const activeSystemRole = useMemo(() => {
+    return resolveActiveSystemRole(activeRoleName, availableRoles, currentUser);
+  }, [activeRoleName, availableRoles, currentUser]);
+
+  const effectivePerms = useMemo(() => {
+    return getActiveRolePermissions(activeRoleName, availableRoles, currentUser);
+  }, [activeRoleName, availableRoles, currentUser]);
+
+  const isAdmin = activeSystemRole === "ADMIN" || activeSystemRole === "SUPER_ADMIN" || activeSystemRole === "TENANT_ADMIN";
+  const isDeliveryHead = activeSystemRole === "DELIVERY_HEAD";
+  const isAM = activeSystemRole === "ACCOUNT_MANAGER";
+  const isPodLead = activeSystemRole === "POD_LEAD";
+
+  const canAuditRounds = useMemo(() => isAdmin || isDeliveryHead || effectivePerms.includes("submission:audit_rounds"), [isAdmin, isDeliveryHead, effectivePerms]);
+  const canAuditL1 = useMemo(() => canAuditRounds || isPodLead || effectivePerms.includes("submission:audit_l1"), [canAuditRounds, isPodLead, effectivePerms]);
+  const canAuditL2 = useMemo(() => canAuditRounds || effectivePerms.includes("submission:audit_l2"), [canAuditRounds, effectivePerms]);
+  const canAuditL3 = useMemo(() => canAuditRounds || effectivePerms.includes("submission:audit_l3"), [canAuditRounds, effectivePerms]);
+  const canInternalScreen = useMemo(() => isAdmin || isDeliveryHead || isPodLead || effectivePerms.includes("submission:internal_screening"), [isAdmin, isDeliveryHead, isPodLead, effectivePerms]);
+  const canFinalStatus = useMemo(() => isAdmin || isDeliveryHead || isAM || effectivePerms.includes("submission:final_status"), [isAdmin, isDeliveryHead, isAM, effectivePerms]);
+  const canApproveClient = useMemo(() => canInternalScreen || canFinalStatus, [canInternalScreen, canFinalStatus]);
+  const canEditRate = useMemo(() => isAdmin || isDeliveryHead || effectivePerms.includes("submission:edit_rate"), [isAdmin, isDeliveryHead, effectivePerms]);
 
   const isRecruiterOnly = useMemo(() => {
-    return roles.includes("RECRUITER") && !canAuditL1 && !canAuditL2 && !canAuditL3 && !canApproveClient && !canAuditRounds;
-  }, [roles, canAuditL1, canAuditL2, canAuditL3, canApproveClient, canAuditRounds]);
+    return activeSystemRole === "RECRUITER" && !canAuditL1 && !canAuditL2 && !canAuditL3 && !canInternalScreen && !canFinalStatus && !canAuditRounds;
+  }, [activeSystemRole, canAuditL1, canAuditL2, canAuditL3, canInternalScreen, canFinalStatus, canAuditRounds]);
 
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
-    const permissions = currentUser.permissions || [];
-    return permissions.includes("job:edit") || roles.includes("SUPER_ADMIN") || roles.includes("ADMIN") || roles.includes("ACCOUNT_MANAGER") || roles.includes("POD_LEAD");
-  }, [currentUser, roles]);
+    return effectivePerms.includes("job:edit") || isAdmin || isAM || isPodLead;
+  }, [currentUser, effectivePerms, isAdmin, isAM, isPodLead]);
 
   // Submission Review Dialog states
   const [selectedSub, setSelectedSub] = useState<any>(null);
@@ -947,14 +972,40 @@ export default function JobDetailPage() {
                             </td>
                             <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-1.5">
-                                {sub.finalStatus === "PENDING_APPROVAL" && !isRecruiterOnly && (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleApproveSubmission(sub.id)}
-                                    className="bg-emerald-650 hover:bg-emerald-755 text-white text-[10px] py-1 h-7 font-bold"
-                                  >
-                                    Approve
-                                  </Button>
+                                {sub.finalStatus === "PENDING_APPROVAL" && canInternalScreen && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      onClick={async () => {
+                                        try {
+                                          await atsApi.submissions.update(sub.id, { finalStatus: "SUBMITTED" });
+                                          toast.success("Submission approved and submitted to client!");
+                                          loadData();
+                                        } catch (err: any) {
+                                          toast.error("Failed: " + err.message);
+                                        }
+                                      }}
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] py-1 h-7 font-bold"
+                                    >
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={async () => {
+                                        try {
+                                          await atsApi.submissions.update(sub.id, { finalStatus: "REJECTED" });
+                                          toast.success("Submission rejected internally.");
+                                          loadData();
+                                        } catch (err: any) {
+                                          toast.error("Failed: " + err.message);
+                                        }
+                                      }}
+                                      className="border-rose-200 text-rose-600 hover:bg-rose-50 text-[10px] py-1 h-7 font-bold"
+                                    >
+                                      Reject
+                                    </Button>
+                                  </>
                                 )}
                                 <Button
                                   variant="outline"
@@ -991,7 +1042,7 @@ export default function JobDetailPage() {
             {pipelineView === "kanban" && (
               <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3 pb-4 overflow-x-auto min-w-max select-none">
                 {[
-                  { id: "l1", title: "L1 Review", color: "border-t-amber-500 bg-amber-50/5", badge: "bg-amber-100 text-amber-800", subs: submissions.filter((s) => s.finalStatus === "PENDING_APPROVAL" && s.l1Status !== "REJECTED") },
+                  { id: "l1", title: "Internal Review", color: "border-t-amber-500 bg-amber-50/5", badge: "bg-amber-100 text-amber-800", subs: submissions.filter((s) => s.finalStatus === "PENDING_APPROVAL" && s.l1Status !== "REJECTED") },
                   { id: "submitted", title: "Client Submitted", color: "border-t-blue-500 bg-blue-50/5", badge: "bg-blue-100 text-blue-800", subs: submissions.filter((s) => (s.finalStatus === "SUBMITTED" || s.finalStatus === "POD_APPROVED") && s.l1Status !== "SCHEDULED" && s.l2Status !== "SCHEDULED" && s.l3Status !== "SCHEDULED" && s.l1Status !== "REJECTED" && s.l2Status !== "REJECTED" && s.l3Status !== "REJECTED") },
                   { id: "interviews", title: "Client Interviews", color: "border-t-cyan-500 bg-cyan-50/5", badge: "bg-cyan-100 text-cyan-800", subs: submissions.filter((s) => (s.l1Status === "SCHEDULED" || s.l1Status === "PASSED" || s.l1Status === "CLEARED" || s.l2Status === "SCHEDULED" || s.l2Status === "PASSED" || s.l2Status === "CLEARED" || s.l3Status === "SCHEDULED" || s.l3Status === "PASSED" || s.l3Status === "CLEARED" || (s.finalStatus && s.finalStatus.includes("PASSED"))) && s.finalStatus !== "OFFER" && s.finalStatus !== "JOIN" && s.finalStatus !== "REJECTED") },
                   { id: "offers", title: "Offer Stage", color: "border-t-teal-500 bg-teal-50/5", badge: "bg-teal-100 text-teal-800", subs: submissions.filter((s) => s.finalStatus === "OFFER") },
@@ -1204,7 +1255,7 @@ export default function JobDetailPage() {
               <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                    L1 — Internal Screening &amp; Resume Audit
+                    Round 1 (L1) — Interview Stage
                   </label>
                   {!canAuditL1 && (
                     <Badge className="bg-slate-100 text-slate-500 text-[9px] border-0">Locked (View Only)</Badge>

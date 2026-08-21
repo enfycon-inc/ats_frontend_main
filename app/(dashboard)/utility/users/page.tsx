@@ -267,16 +267,21 @@ export default function UserManagementPage() {
 
     try {
       setSubmitting(true);
-      const allBranchRoleValues = Object.values(editForm.branchRoles || {}).flat();
-      const combinedRoles = Array.from(new Set([...allBranchRoleValues, ...editForm.roles]));
-      const finalRoles = combinedRoles.length > 0 ? combinedRoles : editForm.roles;
+      const assignedBranchIds = editForm.assignedBranchIds || [];
+      const cleanBranchRoles: Record<string, string[]> = {};
+      assignedBranchIds.forEach((bId) => {
+        if (editForm.branchRoles?.[bId]) {
+          cleanBranchRoles[bId] = editForm.branchRoles[bId];
+        }
+      });
+      const finalRoles = editForm.roles.length > 0 ? editForm.roles : ["RECRUITER"];
 
       await atsApi.auth.updateUserDetail(selectedUser.id, {
         fullName: trimmedName,
         email: editForm.email.trim().toLowerCase(),
         branchId: editForm.branchId || undefined,
-        assignedBranchIds: editForm.assignedBranchIds,
-        branchRoles: editForm.branchRoles,
+        assignedBranchIds: assignedBranchIds,
+        branchRoles: cleanBranchRoles,
         roles: finalRoles,
       });
 

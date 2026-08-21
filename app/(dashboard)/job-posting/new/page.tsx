@@ -554,38 +554,37 @@ export default function NewJobPostingPage() {
           }
           setActiveBranch(activeBranchObj || null);
           if (activeBranchObj) {
-            const defaultRole = activeBranchObj.defaultJobApproverRole || "POD_LEAD";
-            if (defaultRole === "POD_LEAD" && fetchedPods.length > 0) {
-              setSelectedPodId(`pod:${fetchedPods[0].id}`);
-              setSelectedApproverRole("POD_LEAD");
-              setSelectedApproverId(fetchedPods[0].podHeadId || "");
-            } else if (defaultRole === "DELIVERY_HEAD") {
-              const dh = fetchedUsers.find((u: any) => u.roles?.includes("DELIVERY_HEAD"));
-              if (dh) {
-                setSelectedPodId(`dh:${dh.id}`);
-                setSelectedApproverRole("DELIVERY_HEAD");
-                setSelectedApproverId(dh.id);
-              }
-            } else if (defaultRole === "PRIMARY_RECRUITER") {
-              const rec = fetchedUsers.find((u: any) => u.roles?.includes("RECRUITER"));
-              if (rec) {
-                setSelectedPodId(`rec:${rec.id}`);
-                setSelectedApproverRole("PRIMARY_RECRUITER");
-                setSelectedApproverId(rec.id);
-              }
-            } else if (activeBranchObj.allowNone) {
-              setSelectedPodId("");
-            } else if (!activeBranchObj.allowPods && activeBranchObj.allowAll) {
+            const allowPods = (activeBranchObj.allowPods ?? activeBranchObj.allow_pods) !== false;
+            const allowAll = (activeBranchObj.allowAll ?? activeBranchObj.allow_all) !== false;
+            const allowUnassigned = (activeBranchObj.allowUnassigned ?? activeBranchObj.allow_unassigned) !== false;
+            const isDirectOnly = !!(activeBranchObj.allowNone ?? activeBranchObj.allow_none);
+
+            if (!isDirectOnly && allowAll) {
               setSelectedPodId("all");
-            } else if (fetchedPods.length > 0) {
+              setSelectedApproverRole("BRANCH_ADMIN");
+              setSelectedApproverId("");
+            } else if (!isDirectOnly && allowPods && fetchedPods.length > 0) {
               setSelectedPodId(`pod:${fetchedPods[0].id}`);
               setSelectedApproverRole("POD_LEAD");
               setSelectedApproverId(fetchedPods[0].podHeadId || "");
+            } else if (fetchedUsers.length > 0) {
+              const rec = fetchedUsers.find((u: any) => u.roles?.includes("RECRUITER")) || fetchedUsers[0];
+              setSelectedPodId(`rec:${rec.id}`);
+              setSelectedApproverRole("PRIMARY_RECRUITER");
+              setSelectedApproverId(rec.id);
+            } else if (!isDirectOnly && allowUnassigned) {
+              setSelectedPodId("none");
+              setSelectedApproverRole("BRANCH_ADMIN");
+              setSelectedApproverId("");
             }
           } else if (fetchedPods.length > 0) {
             setSelectedPodId(`pod:${fetchedPods[0].id}`);
             setSelectedApproverRole("POD_LEAD");
             setSelectedApproverId(fetchedPods[0].podHeadId || "");
+          } else {
+            setSelectedPodId("all");
+            setSelectedApproverRole("BRANCH_ADMIN");
+            setSelectedApproverId("");
           }
 
           let branchMarketStr = activeBranchObj?.market || activeBranchMarket || "";
@@ -1078,9 +1077,8 @@ export default function NewJobPostingPage() {
         state: data.states,
         city: data.city || undefined,
         country: data.country,
-        clientJobId: data.clientJobId || undefined,
-        status: requireApproval ? "Pending Approval" : (data.jobStatus || "Active"),
-        approvalStatus: requireApproval ? "PENDING_APPROVAL" : "APPROVED",
+        status: data.jobStatus || "Active",
+        approvalStatus: "APPROVED",
         assignedApproverId: resolvedApproverId,
         assignedApproverRole: resolvedApproverRole,
         visaType: data.workAuthorization,
@@ -1111,11 +1109,7 @@ export default function NewJobPostingPage() {
 
       const created = await atsApi.jobs.create(payload);
 
-      if (requireApproval) {
-        toast.success(`Job requirement submitted for approval! Code: ${created.jobCode}`);
-      } else {
-        toast.success(`Job posting created successfully! Code: ${created.jobCode}`);
-      }
+      toast.success(`Job requirement published successfully! Code: ${created.jobCode}`);
       router.push("/job-posting");
     } catch (err: any) {
       console.error("[NewJob] API error:", err);
@@ -1384,20 +1378,10 @@ export default function NewJobPostingPage() {
               <Button
                 type="submit"
                 size="sm"
-                className={`h-8.5 font-bold text-white shadow-xs cursor-pointer text-xs flex items-center gap-1.5 ${
-                  requireApproval
-                    ? "bg-amber-600 hover:bg-amber-700"
-                    : "bg-primary hover:bg-primary/95"
-                }`}
+                className="h-8.5 font-bold text-white shadow-xs cursor-pointer text-xs flex items-center gap-1.5 bg-primary hover:bg-primary/95"
               >
-                {requireApproval ? (
-                  <>
-                    <Send className="h-3.5 w-3.5" />
-                    Submit for Approval
-                  </>
-                ) : (
-                  "Save Posting"
-                )}
+                <Send className="h-3.5 w-3.5" />
+                Publish Job Requirement
               </Button>
             </div>
           </div>
@@ -2718,13 +2702,8 @@ export default function NewJobPostingPage() {
                             <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
                               <User className="h-2.5 w-2.5" />
                             </span>
-                            Job Assignment &amp; Routing {requireApproval && "(Approval Workflow)"}
+                            Job Assignment &amp; Recruiter Allocation
                           </span>
-                          {requireApproval && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
-                              <Clock className="h-2.5 w-2.5" /> Reviewer Required
-                            </span>
-                          )}
                         </label>
                         <select
                           value={selectedPodId}
@@ -2736,13 +2715,13 @@ export default function NewJobPostingPage() {
                               const pod = podsList.find((p) => p.id === pid);
                               setSelectedApproverRole("POD_LEAD");
                               setSelectedApproverId(pod?.podHeadId || "");
-                            } else if (val.startsWith("dh:")) {
-                              setSelectedApproverRole("DELIVERY_HEAD");
-                              setSelectedApproverId(val.replace("dh:", ""));
                             } else if (val.startsWith("rec:")) {
                               setSelectedApproverRole("PRIMARY_RECRUITER");
                               setSelectedApproverId(val.replace("rec:", ""));
                             } else if (val === "all") {
+                              setSelectedApproverRole("BRANCH_ADMIN");
+                              setSelectedApproverId("");
+                            } else if (val === "none") {
                               setSelectedApproverRole("BRANCH_ADMIN");
                               setSelectedApproverId("");
                             } else {
@@ -2752,33 +2731,20 @@ export default function NewJobPostingPage() {
                           }}
                           className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-medium"
                         >
-                          {/* 1. Pod Leads */}
-                          <optgroup label="1. Recruitment Pod Leads (Review & Broadcast)">
-                            {podsList && podsList.length > 0 ? (
-                              podsList.map((pod: any) => (
+                          {/* 1. Recruitment Pods (if allowed by branch policy) */}
+                          {(!activeBranch || ((activeBranch.allowPods ?? activeBranch.allow_pods) !== false)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && podsList && podsList.length > 0 && (
+                            <optgroup label="1. Recruitment Pods">
+                              {podsList.map((pod: any) => (
                                 <option key={`pod:${pod.id}`} value={`pod:${pod.id}`}>
-                                  Pod Lead: {pod.podHeadName ? `${pod.podHeadName} (${pod.name})` : pod.name}
-                                </option>
-                              ))
-                            ) : (
-                              <option value="">Pod System (Auto Broadcast / Round-Robin)</option>
-                            )}
-                          </optgroup>
-
-                          {/* 2. Delivery Heads */}
-                          {deliveryHeads && deliveryHeads.length > 0 && (
-                            <optgroup label="2. Delivery Heads / Operations Leads">
-                              {deliveryHeads.map((dh: any) => (
-                                <option key={`dh:${dh.id}`} value={`dh:${dh.id}`}>
-                                  Delivery Head: {dh.fullName || dh.name || dh.email}
+                                  Pod: {pod.name} {pod.podHeadName ? `(Lead: ${pod.podHeadName})` : ""}
                                 </option>
                               ))}
                             </optgroup>
                           )}
 
-                          {/* 3. Primary Recruiters */}
+                          {/* 2. Direct Recruiter Assignment */}
                           {recruitersList && recruitersList.length > 0 && (
-                            <optgroup label="3. Primary Recruiter Assignment">
+                            <optgroup label="2. Direct Recruiter Assignment">
                               {recruitersList.map((rec: any) => (
                                 <option key={`rec:${rec.id}`} value={`rec:${rec.id}`}>
                                   Recruiter: {rec.fullName || rec.name || rec.email}
@@ -2787,27 +2753,18 @@ export default function NewJobPostingPage() {
                             </optgroup>
                           )}
 
-                          {/* 4. Pooled Routing */}
-                          <optgroup label="4. Pooled & Branch Routing">
-                            <option value="all">All Branch Recruiters</option>
-                            <option value="none">Unassigned (Pending Allocation / Review)</option>
-                          </optgroup>
+                          {/* 3. Branch Pool & Allocation (if allowed by branch policy) */}
+                          {!(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
+                            <optgroup label="3. Branch Pool & Allocation">
+                              {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) !== false)) && (
+                                <option value="all">All Branch Recruiters (Pool Broadcast)</option>
+                              )}
+                              {(!activeBranch || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) !== false)) && (
+                                <option value="none">Unassigned Allocation (Hold for Manager Assignment)</option>
+                              )}
+                            </optgroup>
+                          )}
                         </select>
-
-                        {requireApproval && (
-                          <div className="p-2.5 mt-2 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 rounded-md text-[11px] text-amber-900 dark:text-amber-200 flex items-start gap-2">
-                            <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                            <div className="space-y-0.5">
-                              <span className="font-bold block">Approval Workflow &amp; Recruiter Gating:</span>
-                              <p className="text-amber-800/90 dark:text-amber-300/90">
-                                This requirement will be submitted in <strong>Pending Approval</strong> state and remain hidden from recruiters.
-                              </p>
-                              <p className="text-emerald-700 dark:text-emerald-400 font-semibold text-[10px] pt-0.5">
-                                ⚡ <strong>Any-One Approval Rule:</strong> When approved by any authorized reviewer (Pod Lead, Delivery Head, or Admin), the job immediately becomes <strong>Active &amp; Live</strong>.
-                              </p>
-                            </div>
-                          </div>
-                        )}
                       </div>
 
                       {/* Department (US Market Only) */}

@@ -144,7 +144,25 @@ export function getActiveRolePermissions(
   availableRoles: CustomRoleDefinition[] = [],
   userProfile?: any
 ): string[] {
-  let roleStr = Array.isArray(roleInput) ? roleInput[0] : roleInput;
+  // If an array of multiple roles is passed, compute the UNION of all permissions across all assigned roles
+  if (Array.isArray(roleInput)) {
+    if (roleInput.length === 0) {
+      return userProfile?.permissions || [];
+    }
+    if (roleInput.length > 1) {
+      const unionSet = new Set<string>();
+      for (const singleRole of roleInput) {
+        if (singleRole) {
+          const perms = getActiveRolePermissions(singleRole, availableRoles, userProfile);
+          perms.forEach((p) => unionSet.add(p));
+        }
+      }
+      return Array.from(unionSet);
+    }
+    roleInput = roleInput[0];
+  }
+
+  let roleStr = roleInput;
   if (!roleStr || typeof roleStr !== "string") {
     return userProfile?.permissions || [];
   }
@@ -175,7 +193,7 @@ export function getActiveRolePermissions(
         "job:create", "job:edit", "job:view", "job:publish_direct", "job:approve", "job:reject",
         "job:assign", "job:assign_recruiter", "job:assign_pod",
         "candidate:create", "candidate:view",
-        "submission:create", "submission:view", "submission:edit",
+        "submission:view", "submission:create", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
         "tenant:settings", "user:manage",
         "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle",
         "branch_admin:manage", "candidate:search_all_branches", "job:view_all_branches",
@@ -187,7 +205,7 @@ export function getActiveRolePermissions(
         "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
         "job:assign", "job:assign_recruiter", "job:assign_pod",
         "candidate:create", "candidate:view",
-        "submission:create", "submission:view", "submission:edit",
+        "submission:create", "submission:view", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
         "branch_admin:manage", "user:manage", "pod:view", "pod:edit",
         "client:view", "placement:view", "report:view"
       ];
@@ -196,7 +214,7 @@ export function getActiveRolePermissions(
         "job:view", "job:edit", "job:approve", "job:reject",
         "job:assign", "job:assign_recruiter", "job:assign_pod",
         "candidate:view", "candidate:create",
-        "submission:view", "submission:create", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+        "submission:view", "submission:create", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
         "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
         "candidate:search_all_branches", "job:view_all_branches", "candidate:search_all_markets",
         "client:view", "placement:view", "report:view"
@@ -205,7 +223,8 @@ export function getActiveRolePermissions(
       return [
         "job:create", "job:edit", "job:view", "job:approve",
         "candidate:view", "candidate:create",
-        "submission:view", "submission:audit_l3", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+        "submission:view", "submission:create", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+        "pod:view",
         "client:view", "client:create", "client:edit",
         "placement:view", "placement:create",
         "report:view"
@@ -214,7 +233,7 @@ export function getActiveRolePermissions(
       return [
         "job:view", "job:edit", "job:approve", "job:reject",
         "candidate:view", "candidate:create",
-        "submission:view", "submission:create", "submission:audit_l1", "submission:schedule_interview", "submission:edit",
+        "submission:view", "submission:create", "submission:internal_screening", "submission:schedule_interview", "submission:edit",
         "pod:view", "pod:edit", "report:view"
       ];
     case "RECRUITER":
