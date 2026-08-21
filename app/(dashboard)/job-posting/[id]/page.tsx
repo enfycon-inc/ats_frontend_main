@@ -168,37 +168,10 @@ export default function JobDetailPage() {
   const [customRemarks, setCustomRemarks] = useState<any[]>([]);
 
   const resolvedTemplates = useMemo(() => ({
-    l1: [
-      "✓ Mandatory skills 100% verified against JD",
-      "✓ Immediate joiner — notice period ≤ 30 days",
-      "✓ Work authorization & visa verified",
-      "✕ Rejected: Notice period exceeds 60 days",
-      "✕ Rejected: Skill gap in core mandatory stack",
-      "✕ Rejected: Expected CTC exceeds maximum budget",
-      ...customRemarks.filter((r) => r.stage?.toLowerCase() === "l1").map((r) => r.remarkText),
-    ],
-    l2: [
-      "✓ Passed technical screening with strong hands-on coding",
-      "✓ System architecture & design patterns depth verified",
-      "✕ Rejected: Failed live technical coding assessment",
-      "✕ Rejected: Insufficient experience in required tech stack",
-      ...customRemarks.filter((r) => r.stage?.toLowerCase() === "l2").map((r) => r.remarkText),
-    ],
-    l3: [
-      "✓ Commercials & margin verified (>20% Gross Margin)",
-      "✓ Candidate rate confirmation email on file",
-      "✕ Rejected: Commercial margin below threshold (<15%)",
-      "✕ Rejected: Candidate declined rate confirmation",
-      ...customRemarks.filter((r) => r.stage?.toLowerCase() === "l3").map((r) => r.remarkText),
-    ],
-    final: [
-      "✓ Client shortlisted for Round 1 Interview",
-      "✓ Client released official offer letter",
-      "✓ Candidate accepted offer & joined client",
-      "✕ Client rejected: Profile not aligned with expectations",
-      "✕ Candidate declined offer / accepted counter-offer",
-      ...customRemarks.filter((r) => r.stage?.toLowerCase() === "final").map((r) => r.remarkText),
-    ],
+    l1: Array.from(new Set(customRemarks.filter((r) => r.stage?.toLowerCase() === "l1").map((r) => r.remarkText))),
+    l2: Array.from(new Set(customRemarks.filter((r) => r.stage?.toLowerCase() === "l2").map((r) => r.remarkText))),
+    l3: Array.from(new Set(customRemarks.filter((r) => r.stage?.toLowerCase() === "l3").map((r) => r.remarkText))),
+    final: Array.from(new Set(customRemarks.filter((r) => r.stage?.toLowerCase() === "final").map((r) => r.remarkText))),
   }), [customRemarks]);
 
   // Job Approval / Rejection states

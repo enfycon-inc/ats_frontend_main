@@ -70,62 +70,6 @@ interface Submission {
   market?: string;
 }
 
-export const STANDARD_REMARKS_TEMPLATES = {
-  review: [
-    "NA",
-    "Internal Screening NA - Submitted to Client",
-    "Internal Screening Pending",
-    "Internal Screening Scheduled",
-    "Candidate Noshow",
-    "Internal Screening Rescheduled",
-    "Internal Screening Completed - Pending Feedback",
-    "Selected in Internal Screening - Position went on Hold",
-    "Selected in Internal Screening - Submitted to Client",
-    "Selected in Internal Screening - Yet to Submit to Client",
-    "Rejected in Internal Screening",
-    "Candidate Not Responding",
-    "Selected in Internal Screening - Position Closed by Client",
-    "Rejected - Duplicate",
-  ],
-  l1: [
-    "✓ Mandatory skills & tech stack 100% verified against JD",
-    "✓ Immediate joiner — notice period ≤ 30 days confirmed",
-    "✓ Valid work authorization & visa verified",
-    "✓ Candidate CTC expectation within approved budget bracket",
-    "✓ Excellent communication & profile presentation",
-    "✕ Rejected: Notice period exceeds 60 days (Client requires immediate)",
-    "✕ Rejected: Significant skill gap in core mandatory technologies",
-    "✕ Rejected: Expected CTC exceeds maximum budget ceiling",
-    "✕ Rejected: Location constraint / Candidate unwilling to relocate",
-  ],
-  l2: [
-    "✓ Passed technical screening call with strong hands-on coding",
-    "✓ Excellent project depth & system architecture knowledge",
-    "✓ Solved technical live coding & algorithmic challenge",
-    "✓ Strong technical communication & problem solving",
-    "✕ Rejected: Failed live coding / technical screening assessment",
-    "✕ Rejected: Lacked depth in framework fundamentals & design patterns",
-    "✕ Rejected: Hands-on experience does not match claimed CV experience",
-  ],
-  l3: [
-    "✓ Commercials & rate margin verified (>20% Gross Margin)",
-    "✓ Candidate rate confirmation email on record",
-    "✓ Client submission package formatted and validated",
-    "✓ Candidate available & briefed on client interview process",
-    "✕ Rejected: Commercial margin below minimum threshold (<15%)",
-    "✕ Rejected: Candidate declined rate confirmation / demanded higher CTC",
-  ],
-  final: [
-    "✓ Client shortlisted for Round 1 Interview",
-    "✓ Client interview round completed successfully",
-    "✓ Client released official offer letter",
-    "✓ Candidate accepted offer & joined client successfully",
-    "✕ Client rejected: Profile not aligned with hiring manager expectations",
-    "✕ Candidate declined offer / accepted counter-offer",
-    "✕ Position closed / Put on hold by client",
-  ],
-};
-
 function renderPipelineProgress(sub: Submission) {
   const getBadgeStyle = (status: string | null) => {
     const s = (status || "").toUpperCase();
@@ -182,7 +126,7 @@ function renderClutterFreeRemarks(sub: Submission) {
   if (sub.l3Remarks) allRemarks.push({ label: "L3", text: sub.l3Remarks, color: "text-purple-700 bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300" });
   if (sub.l2Remarks) allRemarks.push({ label: "L2", text: sub.l2Remarks, color: "text-cyan-700 bg-cyan-50 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300" });
   if (sub.l1Remarks) allRemarks.push({ label: "L1", text: sub.l1Remarks, color: "text-indigo-700 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300" });
-  if (sub.reviewFeedback) allRemarks.push({ label: "Review", text: sub.reviewFeedback, color: "text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300" });
+  if (sub.reviewFeedback || sub.podLeadRemarks) allRemarks.push({ label: "Internal", text: (sub.reviewFeedback || sub.podLeadRemarks)!, color: "text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300" });
   if (sub.recruiterComment) allRemarks.push({ label: "Recruiter", text: sub.recruiterComment, color: "text-slate-700 bg-slate-100 border-slate-200 dark:bg-slate-800 dark:text-slate-300" });
 
   const primary = allRemarks[0];
@@ -369,7 +313,7 @@ export default function SubmissionsPage() {
     setRemarks(sub.remarks || "");
     setRecruiterComment(sub.recruiterComment || "");
     setSubmittedRate(sub.submittedRate || "");
-    setReviewFeedback(sub.reviewFeedback || "");
+    setReviewFeedback(sub.reviewFeedback || sub.podLeadRemarks || "");
     setPanelOpen(true);
   };
 
@@ -410,22 +354,24 @@ export default function SubmissionsPage() {
   const canEditRate = isAdmin || isDeliveryHead || effectivePerms.includes("submission:edit_rate");
   const isRecruiterOnly = activeSystemRole === "RECRUITER" && !canAuditL1 && !canAuditL2 && !canAuditL3 && !canInternalScreen && !canFinalStatus && !canAuditRounds;
   const canManageRemarks = isAdmin || effectivePerms.includes("tenant:settings");
-  const resolvedTemplates = {
-    review: [...STANDARD_REMARKS_TEMPLATES.review, ...customRemarks.filter(r => r.stage?.toLowerCase() === "review" || r.stage?.toLowerCase() === "internal_review").map(r => r.remarkText)],
-    l1: [...STANDARD_REMARKS_TEMPLATES.l1, ...customRemarks.filter(r => r.stage?.toLowerCase() === "l1").map(r => r.remarkText)],
-    l2: [...STANDARD_REMARKS_TEMPLATES.l2, ...customRemarks.filter(r => r.stage?.toLowerCase() === "l2").map(r => r.remarkText)],
-    l3: [...STANDARD_REMARKS_TEMPLATES.l3, ...customRemarks.filter(r => r.stage?.toLowerCase() === "l3").map(r => r.remarkText)],
-    final: [...STANDARD_REMARKS_TEMPLATES.final, ...customRemarks.filter(r => r.stage?.toLowerCase() === "final").map(r => r.remarkText)],
-  };
+  const resolvedTemplates = useMemo(() => ({
+    review: Array.from(new Set(customRemarks.filter(r => r.stage?.toLowerCase() === "review" || r.stage?.toLowerCase() === "internal_review").map(r => r.remarkText))),
+    l1: Array.from(new Set(customRemarks.filter(r => r.stage?.toLowerCase() === "l1").map(r => r.remarkText))),
+    l2: Array.from(new Set(customRemarks.filter(r => r.stage?.toLowerCase() === "l2").map(r => r.remarkText))),
+    l3: Array.from(new Set(customRemarks.filter(r => r.stage?.toLowerCase() === "l3").map(r => r.remarkText))),
+    final: Array.from(new Set(customRemarks.filter(r => r.stage?.toLowerCase() === "final").map(r => r.remarkText))),
+  }), [customRemarks]);
 
   const handleConfirmQuickReview = async () => {
     if (!quickReviewSub) return;
     try {
       setSubmitting(true);
       const targetStatus = quickReviewAction === "APPROVE" ? "SUBMITTED" : "REJECTED";
+      const note = quickReviewRemark.trim() || (quickReviewAction === "APPROVE" ? "Approved for client submission" : "Rejected internally");
       await atsApi.submissions.update(quickReviewSub.id, {
         finalStatus: targetStatus,
-        reviewFeedback: quickReviewRemark.trim() || (quickReviewAction === "APPROVE" ? "Approved for client submission" : "Rejected internally"),
+        reviewFeedback: note,
+        podLeadRemarks: note,
       });
       toast.success(quickReviewAction === "APPROVE" ? "✅ Approved & submitted to client!" : "Submission rejected internally.");
       setQuickReviewModalOpen(false);
@@ -875,10 +821,20 @@ export default function SubmissionsPage() {
                               )}
                             </div>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 w-fit">
-                              <Icon icon="heroicons:check-circle" className="h-3 w-3 text-emerald-600" />
-                              Approved
-                            </span>
+                            <div className="flex flex-col gap-1 max-w-[200px]">
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${
+                                sub.finalStatus === "REJECTED" ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800" :
+                                "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800"
+                              }`}>
+                                <Icon icon={sub.finalStatus === "REJECTED" ? "heroicons:x-circle" : "heroicons:check-circle"} className="h-3 w-3" />
+                                {sub.finalStatus === "REJECTED" ? "Rejected Internally" : "Approved"}
+                              </span>
+                              {(sub.reviewFeedback || sub.podLeadRemarks) && (
+                                <span className="text-[10px] text-amber-800 dark:text-amber-300 font-medium italic truncate" title={sub.reviewFeedback || sub.podLeadRemarks || ""}>
+                                  "{sub.reviewFeedback || sub.podLeadRemarks}"
+                                </span>
+                              )}
+                            </div>
                           )}
                         </td>
 

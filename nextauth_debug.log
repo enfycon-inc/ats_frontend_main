@@ -1111,3 +1111,31 @@
 [2026-08-20T16:51:06.299Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
 [2026-08-20T16:51:07.526Z] Localhost backend response status: 200
 [2026-08-20T16:51:07.531Z] Backend login successful. User data: {"id":"fa6898d0-39fb-4550-b5b3-3a5a3f0e07e6","email":"deb@deb.com","fullName":"deb User","roles":["ADMIN","BD MANAGER","BD_MANAGER","DEFAULT_ROLES_ENFYCON_ATS","OFFLINE_ACCESS","UMA_AUTHORIZATION","MANAGE_ACCOUNT","MANAGE_ACCOUNT_LINKS","VIEW_PROFILE"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:assign","job:assign_pod","job:assign_recruiter","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","assignedBranchIds":["4ca219ac-cb28-4a77-90dc-352158b2b772"],"branchRoles":{},"branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":false}
+[2026-08-21T10:18:35.474Z] Authorize started for email: debam@deb.com
+[2026-08-21T10:18:35.479Z] Parsed credentials: email=debam@deb.com, subdomain=deb
+[2026-08-21T10:18:35.480Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-21T10:18:36.498Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-21T10:18:36.499Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-21T10:18:37.433Z] Localhost backend response status: 200
+[2026-08-21T10:18:37.445Z] Backend login successful. User data: {"id":"d2ec2da8-816c-410a-8c0c-4737b5ae21cf","email":"debam@deb.com","fullName":"debam barman","roles":["ACCOUNT_MANAGER"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:create","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"ACCOUNT_MANAGER","podId":null,"branchId":"c6dcb074-4fda-44e8-a8bf-7c337f0ca108","assignedBranchIds":["c6dcb074-4fda-44e8-a8bf-7c337f0ca108","4ca219ac-cb28-4a77-90dc-352158b2b772"],"branchRoles":{"4ca219ac-cb28-4a77-90dc-352158b2b772":["ACCOUNT_MANAGER"],"c6dcb074-4fda-44e8-a8bf-7c337f0ca108":["ACCOUNT_MANAGER","dummy_am"]},"branchName":"indbbsr","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":false}
+[2026-08-21T10:19:58.386Z] Authorize started for email: deb@deb.com
+[2026-08-21T10:19:58.389Z] Parsed credentials: email=deb@deb.com, subdomain=deb
+[2026-08-21T10:19:58.392Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-21T10:19:59.402Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-21T10:19:59.404Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-21T10:20:00.593Z] Localhost backend response status: 200
+[2026-08-21T10:20:00.603Z] Backend login successful. User data: {"id":"fa6898d0-39fb-4550-b5b3-3a5a3f0e07e6","email":"deb@deb.com","fullName":"deb User","roles":["ADMIN","BD MANAGER","BD_MANAGER","DEFAULT_ROLES_ENFYCON_ATS","OFFLINE_ACCESS","UMA_AUTHORIZATION","MANAGE_ACCOUNT","MANAGE_ACCOUNT_LINKS","VIEW_PROFILE"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:create","candidate:view","job:assign","job:assign_pod","job:assign_recruiter","job:create","job:edit","job:view","pod:create","pod:delete","pod:edit","pod:reset_cycle","pod:view","submission:create","submission:edit","tenant:settings","user:manage"],"systemRole":"ADMIN","podId":null,"branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","assignedBranchIds":["4ca219ac-cb28-4a77-90dc-352158b2b772"],"branchRoles":{},"branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":false}
+[2026-08-21T10:24:33.973Z] Authorize started for email: debrec1@deb.com
+[2026-08-21T10:24:33.977Z] Parsed credentials: email=debrec1@deb.com, subdomain=deb
+[2026-08-21T10:24:33.979Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-21T10:24:34.989Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-21T10:24:34.994Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-21T10:24:35.928Z] Localhost backend response status: 200
+[2026-08-21T10:24:35.932Z] Backend login successful. User data: {"id":"faf6694d-3a03-445a-b73a-724206d50cb5","email":"debrec1@deb.com","fullName":"debrec1","roles":["POD_LEAD"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"POD_LEAD","podId":"b04b43b7-9195-410c-9a47-54ed0b8250c6","branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","assignedBranchIds":["4ca219ac-cb28-4a77-90dc-352158b2b772"],"branchRoles":{},"branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":false}
+[2026-08-21T10:49:57.516Z] Authorize started for email: debrec1@deb.com
+[2026-08-21T10:49:57.525Z] Parsed credentials: email=debrec1@deb.com, subdomain=deb
+[2026-08-21T10:49:57.529Z] Attempting fetch to Docker backend: http://backend:5000/api/auth/login
+[2026-08-21T10:49:58.545Z] Docker backend failed: This operation was aborted. Trying localhost fallback.
+[2026-08-21T10:49:58.547Z] Attempting fetch to localhost backend: http://127.0.0.1:5000/api/auth/login
+[2026-08-21T10:49:59.540Z] Localhost backend response status: 200
+[2026-08-21T10:49:59.546Z] Backend login successful. User data: {"id":"faf6694d-3a03-445a-b73a-724206d50cb5","email":"debrec1@deb.com","fullName":"debrec1","roles":["POD_LEAD"],"tenantId":"fad0ccbf-db00-4560-bbfc-216eea7b107b","defaultMarket":"IN","tenantDomain":"deb","permissions":["candidate:view","job:edit","job:view","pod:view","submission:edit","submission:view"],"systemRole":"POD_LEAD","podId":"b04b43b7-9195-410c-9a47-54ed0b8250c6","branchId":"4ca219ac-cb28-4a77-90dc-352158b2b772","assignedBranchIds":["4ca219ac-cb28-4a77-90dc-352158b2b772"],"branchRoles":{},"branchName":"bbsr-domestic","businessUnitId":null,"businessUnitName":null,"podSystemEnabled":false}
