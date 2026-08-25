@@ -16,6 +16,8 @@ import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
 import { handleLoginAction } from "./actions/login";
 import { getCurrentSubdomain, getBaseDomain, getTenantIdentifier } from "@/utils/subdomain-helper";
+import Social from "./social";
+import { useSearchParams } from "next/navigation";
 
 const schema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -23,9 +25,20 @@ const schema = z.object({
 });
 
 const LoginForm = () => {
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [passwordType, setPasswordType] = useState("password");
   const formRef = useRef<HTMLFormElement>(null);
+
+  React.useEffect(() => {
+    const errorParam = searchParams.get("error");
+    if (errorParam === "AccessDenied" || errorParam === "Callback") {
+      toast.error(
+        "Access Denied: You have not been invited to this workspace. Please contact your administrator for an invite.",
+        { duration: 6000 }
+      );
+    }
+  }, [searchParams]);
 
   const togglePasswordType = () => {
     setPasswordType((prev) => (prev === "password" ? "text" : "password"));
@@ -197,7 +210,7 @@ const LoginForm = () => {
       {/* Submit Button */}
       <Button
         disabled={isPending}
-        className="w-full h-11 mt-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold text-sm rounded-lg shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center justify-center gap-2 group"
+        className="w-full h-11 mt-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold text-sm rounded-lg shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center justify-center gap-2 group cursor-pointer"
       >
         {isPending ? (
           <>
@@ -211,6 +224,17 @@ const LoginForm = () => {
           </>
         )}
       </Button>
+
+      {/* Social Login Options */}
+      <div className="pt-3">
+        <div className="relative flex items-center justify-center mb-4">
+          <div className="border-t border-slate-200 w-full" />
+          <span className="bg-white px-3 text-xs uppercase font-semibold text-slate-400">
+            Or Sign In With
+          </span>
+        </div>
+        <Social />
+      </div>
 
     </form>
   );

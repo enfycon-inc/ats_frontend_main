@@ -2,6 +2,7 @@ import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import GitHub from "next-auth/providers/github"
 import Google from "next-auth/providers/google"
+import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id"
 import { ZodError } from "zod"
 import { loginSchema } from "./lib/zod"
 import { getUserFromDb } from "./utils/db"
@@ -21,7 +22,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         sameSite: "lax",
         path: "/",
         secure: process.env.NODE_ENV === "production",
-        domain: process.env.NODE_ENV === "production" ? ".enfycon.com" : undefined,
+        domain: process.env.NODE_ENV === "production" ? ".enfyjobs.com" : undefined,
       },
     },
   },
@@ -149,6 +150,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         },
       },
     }),
+    MicrosoftEntraID({
+      clientId: process.env.MICROSOFT_CLIENT_ID,
+      clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+      issuer: "https://login.microsoftonline.com/common/v2.0",
+    }),
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
@@ -162,6 +168,57 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (account?.provider === "google" || account?.provider === "microsoft-entra-id" || account?.provider === "microsoft") {
+        try {
+          const provider = account.provider.includes("microsoft") ? "microsoft" : "google";
+          let apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000";
+          if (process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_API_URL) {
+            apiBase = "http://backend:5000";
+          }
+
+          const res = await fetch(`${apiBase}/api/auth/sso-login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              provider,
+              email: user.email,
+              name: user.name,
+              picture: user.image,
+              microsoftTenantId: (profile as any)?.tid || null,
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.user) {
+              user.id = data.user.id;
+              user.name = data.user.fullName;
+              user.email = data.user.email;
+              (user as any).permissions = data.user.permissions || [];
+              (user as any).roles = data.user.roles || [];
+              (user as any).accessToken = data.accessToken;
+              (user as any).tenantDomain = data.user.tenantDomain || "";
+              (user as any).systemRole = data.user.systemRole || "RECRUITER";
+              (user as any).podId = data.user.podId || null;
+              (user as any).branchId = data.user.branchId || null;
+              (user as any).branchName = data.user.branchName || null;
+              (user as any).tenantId = data.user.tenantId || DEFAULT_TENANT_ID;
+              (user as any).defaultMarket = data.user.defaultMarket || "US";
+              return true;
+            }
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            console.warn(`SSO authentication rejected: ${errData.message || res.statusText}`);
+            return false;
+          }
+        } catch (err) {
+          console.error("SSO signIn callback error:", err);
+          return false;
+        }
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id

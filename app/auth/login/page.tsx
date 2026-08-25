@@ -77,20 +77,12 @@ const Login = () => {
               </div>
 
               {/* Login Form */}
-              <LoginForm />
-
-              {/* Social Login Divider */}
-              <div className="relative border-t border-slate-200 my-6">
-                <span className="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-white px-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Or continue with
-                </span>
-              </div>
-
-              {/* Social Login Buttons */}
-              <Social />
+              <React.Suspense fallback={<div className="text-center py-6 text-xs text-slate-400">Loading form...</div>}>
+                <LoginForm />
+              </React.Suspense>
 
               {/* Register Company Banner */}
-              <div className="pt-4">
+              <div className="pt-2">
                 <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-100 text-center space-y-2">
                   <span className="text-xs text-slate-600 block font-medium">
                     New to Enfycon ATS?

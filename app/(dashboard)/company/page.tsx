@@ -42,6 +42,10 @@ interface DomainMapping {
   id: string | number;
   domain_name: string;
   is_primary: boolean;
+  verification_token?: string;
+  verification_status?: string;
+  ssl_status?: string;
+  verified_at?: string;
   created_at: string;
 }
 
@@ -264,6 +268,26 @@ export default function CompanySettingsPage() {
     }
   };
 
+  const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null);
+
+  const handleVerifyDomain = async (domainName: string) => {
+    try {
+      setVerifyingDomain(domainName);
+      const res = await atsApi.auth.verifyMyDomain(domainName);
+      if (res.verified) {
+        toast.success(res.message || `Domain ${domainName} verified and SSL activated!`);
+      } else {
+        toast(res.message || "DNS verification in progress. Please ensure TXT/CNAME records are created.", { icon: "ℹ️" });
+      }
+      const updatedDomains = await atsApi.auth.listMyDomains();
+      setCustomDomains(updatedDomains || []);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to verify domain.");
+    } finally {
+      setVerifyingDomain(null);
+    }
+  };
+
   const handleCreateBranch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!branchName.trim()) return toast.error("Branch name is required.");
@@ -409,6 +433,8 @@ export default function CompanySettingsPage() {
           addingDomain={addingDomain}
           handleAddDomain={handleAddDomain}
           handleDeleteDomain={handleDeleteDomain}
+          handleVerifyDomain={handleVerifyDomain}
+          verifyingDomain={verifyingDomain}
           isSuperAdmin={isSuperAdmin}
         />
       ) : systemRole === "ACCOUNT_MANAGER" ? (
@@ -933,26 +959,60 @@ function TenantAdminSettingsView(props: any) {
                 )}
 
                 {props.customDomains.map((d: any) => (
-                  <div key={d.id} className="flex items-center justify-between p-2 rounded border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Globe className="h-3.5 w-3.5 text-neutral-400 flex-shrink-0" />
-                      <span className="font-mono text-neutral-800 dark:text-neutral-200 truncate">{d.domain_name}</span>
-                      {d.is_primary && (
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 border-emerald-300 text-emerald-700 bg-emerald-50 flex-shrink-0">
-                          Primary
+                  <div key={d.id} className="flex flex-col gap-2 p-2.5 rounded border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs">
+                    <div className="flex items-center justify-between min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        <Globe className="h-3.5 w-3.5 text-neutral-400 flex-shrink-0" />
+                        <span className="font-mono font-semibold text-neutral-800 dark:text-neutral-200 truncate">{d.domain_name}</span>
+                        {d.is_primary && (
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 border-emerald-300 text-emerald-700 bg-emerald-50 flex-shrink-0">
+                            Primary
+                          </Badge>
+                        )}
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] px-1.5 py-0 font-medium ${
+                            d.verification_status === "VERIFIED"
+                              ? "border-emerald-300 text-emerald-700 bg-emerald-50/70"
+                              : "border-amber-300 text-amber-700 bg-amber-50/70"
+                          }`}
+                        >
+                          {d.verification_status === "VERIFIED" ? "✓ Verified" : "⏳ Pending DNS"}
                         </Badge>
-                      )}
+                        {d.ssl_status === "ACTIVE" && (
+                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-blue-300 text-blue-700 bg-blue-50/70">
+                            🔒 SSL Active
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {d.verification_status !== "VERIFIED" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={props.verifyingDomain === d.domain_name}
+                            onClick={() => props.handleVerifyDomain(d.domain_name)}
+                            className="h-6 px-2 text-[10px] font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 cursor-pointer"
+                          >
+                            {props.verifyingDomain === d.domain_name ? "Checking..." : "Verify DNS"}
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => props.handleDeleteDomain(d.id)}
+                          className="h-6 w-6 text-neutral-400 hover:text-red-600"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => props.handleDeleteDomain(d.id)}
-                        className="h-6 w-6 text-neutral-400 hover:text-red-600"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    {d.verification_status !== "VERIFIED" && d.verification_token && (
+                      <div className="text-[10px] bg-slate-50 dark:bg-slate-950/40 p-1.5 rounded border border-slate-200/80 font-mono text-slate-500">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">TXT Record Value:</span>{" "}
+                        <span className="select-all text-indigo-600 font-bold">{d.verification_token}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

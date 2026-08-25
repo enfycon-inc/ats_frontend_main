@@ -6,7 +6,7 @@
  */
 
 export function getBaseDomain(host?: string): string {
-  const activeHost = host || (typeof window !== 'undefined' ? window.location.host : 'enfycon.com');
+  const activeHost = host || (typeof window !== 'undefined' ? window.location.host : 'enfyjobs.com');
   // strip port
   const hostname = activeHost.split(':')[0];
   

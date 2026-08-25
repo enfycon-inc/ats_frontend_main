@@ -440,6 +440,84 @@ const auth = {
   async getTenantDetails(tenantId: string): Promise<any> {
     return apiFetch<any>(`/api/auth/tenants/${tenantId}/details`);
   },
+
+  async ssoLogin(
+    provider: 'google' | 'microsoft',
+    email: string,
+    name?: string,
+    microsoftTenantId?: string,
+    picture?: string
+  ) {
+    const subdomain = getTenantIdentifier();
+    const data = await apiFetch<{
+      accessToken: string;
+      refreshToken?: string;
+      expiresIn: number;
+      tokenType: string;
+      user: any;
+    }>('/api/auth/sso-login', {
+      method: 'POST',
+      body: JSON.stringify({
+        provider,
+        email,
+        name,
+        subdomain,
+        microsoftTenantId,
+        picture,
+      }),
+    });
+
+    setToken(data.accessToken);
+    if (data.refreshToken) setRefreshToken(data.refreshToken);
+    setCurrentUser(data.user);
+    return data;
+  },
+
+  async inviteUser(data: {
+    email: string;
+    fullName: string;
+    roleId?: string;
+    systemRole?: string;
+    branchId?: string;
+    podId?: string;
+    sendEmailInvite?: boolean;
+  }): Promise<any> {
+    return apiFetch<any>('/api/auth/invite', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getInvitationDetails(token: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/invitation/${encodeURIComponent(token)}`);
+  },
+
+  async acceptInvite(token: string, password: string): Promise<any> {
+    return apiFetch<any>('/api/auth/accept-invite', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
+  },
+
+  async getTenantAuthPolicy(subdomain?: string): Promise<any> {
+    const sub = subdomain || getTenantIdentifier();
+    const query = sub ? `?subdomain=${encodeURIComponent(sub)}` : '';
+    return apiFetch<any>(`/api/auth/tenant-auth-policy${query}`);
+  },
+
+  async updateTenantAuthPolicy(policy: any): Promise<any> {
+    return apiFetch<any>('/api/auth/tenant-auth-policy', {
+      method: 'PATCH',
+      body: JSON.stringify(policy),
+    });
+  },
+
+  async verifyMyDomain(domainName: string): Promise<any> {
+    return apiFetch<any>('/api/auth/tenants/my-domains/verify', {
+      method: 'POST',
+      body: JSON.stringify({ domainName }),
+    });
+  },
 };
 
 // ─── Email API ───────────────────────────────────────────────────────
