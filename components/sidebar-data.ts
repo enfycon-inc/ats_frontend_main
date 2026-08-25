@@ -3,6 +3,8 @@ import {
   CalendarDays,
   ChartPie,
   Component,
+  Database,
+  Globe,
   House,
   Mail,
   MessageCircleMore,
@@ -115,6 +117,16 @@ export const data = {
     },
     {
       label: "Application",
+    },
+    {
+      title: "Integrations Hub",
+      url: "/integrations",
+      icon: Globe,
+    },
+    {
+      title: "Dice Sourcing",
+      url: "/integrations/dice",
+      icon: Database,
     },
     {
       title: "Mass Mail",
@@ -365,6 +377,11 @@ export const data = {
           title: "Recruitment Pods",
           url: "/utility/pods",
           circleColor: "bg-violet-500",
+        },
+        {
+          title: "Audit Logs",
+          url: "/utility/audit-logs",
+          circleColor: "bg-red-500",
         },
         {
           title: "Notification",

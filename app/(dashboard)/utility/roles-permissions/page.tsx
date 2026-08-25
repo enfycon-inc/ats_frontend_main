@@ -208,17 +208,40 @@ export default function RolesPermissionsPage() {
     }
   };
 
-  const handleDeleteRole = async (role: CustomRole) => {
+  // Role Delete Modal State
+  const [roleToDelete, setRoleToDelete] = useState<{ role: CustomRole; staffCount: number } | null>(null);
+  const [targetRoleId, setTargetRoleId] = useState<string>("");
+
+  const handleInitiateDeleteRole = (role: CustomRole) => {
     if (role.isSystem) return;
-    const baseRole = role.systemRole || "ACCOUNT_MANAGER";
-    const confirmMsg = `Are you sure you want to delete custom role "${role.name}"?\n\nStaff currently assigned to this role will automatically revert to base System Role "${baseRole}".\nDefault System Role "${baseRole}" will reappear in your active role pool.`;
-    if (!confirm(confirmMsg)) return;
+    const staffCount = users.filter((u) => {
+      if (u.roleId === role.id) return true;
+      const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map(r => r.toUpperCase());
+      const roleNameUpper = role.name.toUpperCase();
+      const sysRoleUpper = (role.replacesSystemRole || role.systemRole || '').toUpperCase();
+      return userRolesUpper.includes(roleNameUpper) || (sysRoleUpper !== '' && userRolesUpper.includes(sysRoleUpper));
+    }).length;
+
+    const availableTargets = roles.filter(r => r.id !== role.id);
+    const defaultTarget = availableTargets.find(r => r.name === "RECRUITER")?.id || availableTargets[0]?.id || "";
+
+    setRoleToDelete({ role, staffCount });
+    setTargetRoleId(defaultTarget);
+  };
+
+  const handleConfirmDeleteRole = async () => {
+    if (!roleToDelete) return;
+    const { role, staffCount } = roleToDelete;
+
+    if (staffCount > 0 && !targetRoleId) {
+      return toast.error("Please select a target replacement role for assigned staff.");
+    }
 
     try {
       setSubmitting(true);
-      const res = await atsApi.auth.deleteCustomRole(role.id);
-      toast.success(res?.message || `Custom role "${role.name}" deleted. Staff reverted to ${baseRole}.`);
-      
+      const res = await atsApi.auth.deleteCustomRole(role.id, staffCount > 0 ? targetRoleId : undefined);
+      toast.success(res?.message || `Custom role "${role.name}" deleted successfully.`);
+      setRoleToDelete(null);
       await loadData();
     } catch (err: any) {
       toast.error("Failed to delete role: " + err.message);
@@ -226,6 +249,7 @@ export default function RolesPermissionsPage() {
       setSubmitting(false);
     }
   };
+
 
   const handleCreateMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -533,7 +557,7 @@ export default function RolesPermissionsPage() {
                             <button
                               onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDeleteRole(role);
+                                  handleInitiateDeleteRole(role);
                               }}
                               className="text-red-500 hover:text-red-700 text-xs p-1 mt-1 transition cursor-pointer"
                               title="Delete custom role"
@@ -679,6 +703,87 @@ export default function RolesPermissionsPage() {
           )}
         </div>
       </div>
+
+      {/* ── Role Delete & Re-assignment Modal ───────────────────────── */}
+      {roleToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
+              <Icon icon="heroicons:exclamation-triangle" className="h-6 w-6 shrink-0" />
+              <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                Delete Custom Role & Reassign Staff
+              </h3>
+            </div>
+
+            <p className="text-xs text-neutral-600 dark:text-slate-300">
+              Are you sure you want to delete custom role <strong>"{roleToDelete.role.name}"</strong>?
+            </p>
+
+            {roleToDelete.staffCount > 0 ? (
+              <div className="space-y-3 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 p-3.5 rounded-lg">
+                <div className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                  <Icon icon="heroicons:users" className="h-4 w-4" />
+                  {roleToDelete.staffCount} staff member(s) are currently assigned to this role.
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-700 dark:text-slate-300">
+                    Select Replacement Target Role:
+                  </label>
+                  <select
+                    value={targetRoleId}
+                    onChange={(e) => setTargetRoleId(e.target.value)}
+                    className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-md p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {roles
+                      .filter((r) => r.id !== roleToDelete.role.id)
+                      .map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name} {r.isSystem ? '(System Role)' : '(Custom Role)'}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <p className="text-[10px] text-neutral-500 dark:text-slate-400">
+                  Staff assigned to "{roleToDelete.role.name}" will be transferred to the selected target role cleanly.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-500 dark:text-slate-400">
+                No staff members are currently assigned to this custom role.
+              </p>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setRoleToDelete(null)}
+                disabled={submitting}
+                className="text-xs font-semibold"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmDeleteRole}
+                disabled={submitting || (roleToDelete.staffCount > 0 && !targetRoleId)}
+                className="bg-red-600 hover:bg-red-700 text-white font-semibold text-xs flex items-center gap-1.5"
+              >
+                {submitting ? (
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent animate-spin rounded-full"></div>
+                ) : (
+                  <>
+                    <Icon icon="heroicons:trash" className="h-4 w-4" />
+                    Reassign & Delete Role
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

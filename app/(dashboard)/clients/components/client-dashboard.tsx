@@ -6,6 +6,8 @@ import DataTable from "@/components/shared/data-table";
 import FilterDrawer, { SelectedFilters } from "@/components/shared/filter-drawer";
 import ColumnDrawer from "@/components/shared/column-drawer";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import {
@@ -19,6 +21,14 @@ import {
   Loader2,
   Plus,
   ChevronDown,
+  ShieldCheck,
+  Building,
+  UserCheck,
+  Globe,
+  MessageSquare,
+  Save,
+  X,
+  Edit,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -27,11 +37,16 @@ interface ClientData {
   id: string;
   clientId: string;
   clientName: string;
+  endClientName: string;
+  isSameAsPrimary: boolean;
+  contactPerson: string;
+  contactDesignation: string;
   contactNumber: string;
   website: string;
   industry: string;
   state: string;
   city: string;
+  country: string;
   status: string;
   category: string;
   primaryOwner: string;
@@ -39,6 +54,20 @@ interface ClientData {
   createdOn: string;
   modifiedOn: string;
   emailId: string;
+  market: string;
+  tierRating: string;
+  creditCheckStatus: string;
+  fillabilityScore: string;
+  vettingNotes: string;
+  paymentTerms: string;
+  federalId: string;
+  gstin: string;
+  panNumber: string;
+  currency: string;
+  msaSigned: boolean;
+  sowExecuted: boolean;
+  coiReceived: boolean;
+  vendorPortalCreated: boolean;
   [key: string]: any;
 }
 
@@ -47,14 +76,15 @@ import { getUserColumnPreferences, saveUserColumnPreferences } from "@/utils/use
 const DEFAULT_CLIENT_COLUMNS = [
   "clientId",
   "clientName",
+  "activeJobsCount",
+  "contactPerson",
   "status",
+  "market",
+  "tierRating",
   "contactNumber",
   "website",
   "industry",
-  "state",
-  "city",
   "primaryOwner",
-  "businessUnit",
   "createdOn",
 ];
 
@@ -89,48 +119,205 @@ export default function ClientDashboard() {
   const [allClients, setAllClients] = useState<ClientData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Delete Warning Modal State
+  const [clientToDelete, setClientToDelete] = useState<ClientData | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
+
+  // FULL EDIT FORM MODAL STATE
+  const [editingClient, setEditingClient] = useState<ClientData | null>(null);
+  const [isSavingClient, setIsSavingClient] = useState(false);
+  const [endClientSelectionMode, setEndClientSelectionMode] = useState<string>("__SAME__");
+
+  const [editFormData, setEditFormData] = useState<any>({
+    client_name: "",
+    end_client_name: "",
+    is_same_as_primary: true,
+    market: "US",
+    status: "Active",
+    contact_person: "",
+    contact_designation: "",
+    email_id: "",
+    contact_number: "",
+    website: "",
+    industry: "",
+    payment_terms: "Net 30",
+    federal_id: "",
+    gstin: "",
+    pan_number: "",
+    currency: "USD",
+    tier_rating: "TIER_1",
+    credit_check_status: "APPROVED",
+    fillability_score: "HIGH",
+    vetting_notes: "",
+    msa_signed: false,
+    sow_executed: false,
+    coi_received: false,
+    vendor_portal_created: false,
+  });
+
   const fetchClients = useCallback(async () => {
     setIsLoading(true);
     try {
-      // No auto-login fallback (prevent tenant hijacking)
-      const data = await atsApi.clients.list();
-      const mappedData = (data || []).map((client: any) => ({
-        id: client.id,
-        clientId: client.client_code,
-        clientName: client.client_name,
-        contactNumber: client.contact_number,
-        website: client.website,
-        industry: client.industry,
-        state: client.state,
-        city: client.city,
-        status: client.status,
-        category: client.category,
-        primaryOwner: client.primary_owner,
-        businessUnit: client.business_unit,
-        createdOn: client.created_at ? new Date(client.created_at).toLocaleDateString() : "N/A",
-        modifiedOn: client.updated_at ? new Date(client.updated_at).toLocaleDateString() : "N/A",
-        emailId: client.email_id,
-        ...client
-      }));
+      const data = await atsApi.clients.list(showDeleted ? "true" : "false");
+      const mappedData = (data || []).map((client: any) => {
+        const bu = (client.business_unit || "").toLowerCase();
+        const detectedMarket = client.market 
+          ? client.market 
+          : (bu.includes("domestic") || bu.includes("bbsr") || bu.includes("india") ? "INDIA" : "US");
+
+        return {
+          id: client.id,
+          clientId: client.client_code,
+          clientName: client.client_name,
+          endClientName: client.end_client_name || client.client_name,
+          isSameAsPrimary: client.is_same_as_primary !== false,
+          contactPerson: client.contact_person || client.client_lead || "N/A",
+          contactDesignation: client.contact_designation || "",
+          market: detectedMarket,
+          tierRating: client.tier_rating || "TIER_1",
+          onboardingStatus: client.onboarding_status || "ACTIVE",
+          activeJobsCount: parseInt(client.active_jobs_count || "0", 10),
+          contactNumber: client.contact_number || "",
+          website: client.website || "",
+          industry: client.industry || "",
+          state: client.state || "",
+          city: client.city || "",
+          country: client.country || "",
+          status: client.status || "Active",
+          category: client.category || "",
+          primaryOwner: client.primary_owner || "N/A",
+          businessUnit: client.business_unit || "Default",
+          createdOn: client.created_at ? new Date(client.created_at).toLocaleDateString() : "N/A",
+          modifiedOn: client.updated_at ? new Date(client.updated_at).toLocaleDateString() : "N/A",
+          emailId: client.email_id || "",
+          creditCheckStatus: client.credit_check_status || "APPROVED",
+          fillabilityScore: client.fillability_score || "HIGH",
+          vettingNotes: client.vetting_notes || client.comments || "",
+          paymentTerms: client.payment_terms || "Net 30",
+          federalId: client.federal_id || "",
+          gstin: client.gstin || "",
+          panNumber: client.pan_number || "",
+          currency: client.currency || "USD",
+          msaSigned: !!client.msa_signed,
+          sowExecuted: !!client.sow_executed,
+          coiReceived: !!client.coi_received,
+          vendorPortalCreated: !!client.vendor_portal_created,
+          deletedAt: client.deleted_at,
+          ...client
+        };
+      });
+
       setAllClients(mappedData);
       setClientsData(mappedData);
     } catch (err) {
       console.warn("[Clients] API fetch failed:", err);
-      // Fallback empty data
       setAllClients([]);
       setClientsData([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showDeleted]);
 
   useEffect(() => {
     fetchClients();
   }, [fetchClients]);
 
+  const handleOpenEditModal = (client: ClientData) => {
+    setEditingClient(client);
+    const isSame = client.isSameAsPrimary !== false;
+    setEndClientSelectionMode(isSame ? "__SAME__" : (client.endClientName || "__CUSTOM__"));
+
+    setEditFormData({
+      client_name: client.clientName || "",
+      end_client_name: client.endClientName || client.clientName || "",
+      is_same_as_primary: isSame,
+      market: client.market || "US",
+      status: client.status || "Active",
+      contact_person: client.contactPerson === "N/A" ? "" : client.contactPerson,
+      contact_designation: client.contactDesignation || "",
+      email_id: client.emailId || "",
+      contact_number: client.contactNumber || "",
+      website: client.website || "",
+      industry: client.industry || "",
+      payment_terms: client.paymentTerms || "Net 30",
+      federal_id: client.federalId || "",
+      gstin: client.gstin || "",
+      pan_number: client.panNumber || "",
+      currency: client.currency || "USD",
+      tier_rating: client.tierRating || "TIER_1",
+      credit_check_status: client.creditCheckStatus || "APPROVED",
+      fillability_score: client.fillabilityScore || "HIGH",
+      vetting_notes: client.vettingNotes || "",
+      msa_signed: !!client.msaSigned,
+      sow_executed: !!client.sowExecuted,
+      coi_received: !!client.coiReceived,
+      vendor_portal_created: !!client.vendorPortalCreated,
+    });
+  };
+
+  const handleSaveEditForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClient) return;
+    if (!editFormData.client_name.trim()) {
+      toast.error("Primary Client Name is required.");
+      return;
+    }
+
+    setIsSavingClient(true);
+    try {
+      let finalEndClientName = editFormData.client_name.trim();
+      if (endClientSelectionMode === "__SAME__") {
+        finalEndClientName = editFormData.client_name.trim();
+      } else if (endClientSelectionMode === "__CUSTOM__") {
+        finalEndClientName = editFormData.end_client_name.trim() || editFormData.client_name.trim();
+      } else {
+        finalEndClientName = endClientSelectionMode;
+      }
+
+      await atsApi.clients.update(editingClient.id, {
+        ...editFormData,
+        client_name: editFormData.client_name.trim(),
+        end_client_name: finalEndClientName,
+        is_same_as_primary: endClientSelectionMode === "__SAME__",
+      });
+
+      toast.success(`Client "${editFormData.client_name}" updated successfully!`);
+      setEditingClient(null);
+      fetchClients();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to update client.");
+    } finally {
+      setIsSavingClient(false);
+    }
+  };
+
+  const handleConfirmSoftDelete = async () => {
+    if (!clientToDelete) return;
+    setIsDeleting(true);
+    try {
+      await atsApi.clients.delete(clientToDelete.id);
+      toast.success(`Client "${clientToDelete.clientName}" soft-deleted and moved to trash.`);
+      setClientToDelete(null);
+      fetchClients();
+    } catch (err) {
+      toast.error("Failed to soft-delete client.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const allColumns = useMemo(() => [
     { id: "clientId", label: "Client ID" },
     { id: "clientName", label: "Client Name" },
+    { id: "endClientName", label: "End Client" },
+    { id: "activeJobsCount", label: "Active Jobs" },
+    { id: "contactPerson", label: "POC Contact Name" },
+    { id: "contactDesignation", label: "POC Title" },
+    { id: "market", label: "Market" },
+    { id: "tierRating", label: "Tier Rating" },
+    { id: "onboardingStatus", label: "Onboarding" },
     { id: "contactNumber", label: "Contact Number" },
     { id: "website", label: "Website" },
     { id: "industry", label: "Industry" },
@@ -185,20 +372,6 @@ export default function ClientDashboard() {
     }
   };
 
-  const handleUpdateRecord = useCallback(async (clientId: string, updatedFields: Partial<ClientData>) => {
-    try {
-      // Optimistic update
-      setAllClients((prev) => prev.map((c) => (c.id === clientId ? { ...c, ...updatedFields } : c)));
-      setClientsData((prev) => prev.map((c) => (c.id === clientId ? { ...c, ...updatedFields } : c)));
-      
-      await atsApi.clients.update(clientId, updatedFields);
-      toast.success("Client updated successfully.");
-    } catch (error) {
-      toast.error("Failed to update client.");
-      fetchClients(); // Revert on failure
-    }
-  }, [fetchClients]);
-
   const handleBulkDelete = useCallback(async (selectedIds: string[]) => {
     const loadingToast = toast.loading(`Deleting ${selectedIds.length} client(s)...`);
     try {
@@ -218,13 +391,6 @@ export default function ClientDashboard() {
     toast.success("Clients list reloaded.");
   };
 
-  const stats = useMemo(() => {
-    const total = clientsData.length;
-    const active = clientsData.filter((c) => c.status === "Active").length;
-    const inactive = clientsData.filter((c) => c.status === "Inactive").length;
-    return { total, active, inactive };
-  }, [clientsData]);
-
   const customCellRenderer = (
     row: ClientData,
     colId: string,
@@ -234,7 +400,57 @@ export default function ClientDashboard() {
     saveEdit: () => void,
     cancelEdit: () => void
   ) => {
-    if (isEditing) return null; // Fallback to default edit input
+    if (isEditing) return null;
+
+    if (colId === "activeJobsCount") {
+      return (
+        <Badge variant="secondary" className="text-[10px] font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+          {row.activeJobsCount || 0} Jobs
+        </Badge>
+      );
+    }
+
+    if (colId === "endClientName") {
+      const isSame = row.isSameAsPrimary || !row.endClientName || row.endClientName === row.clientName;
+      return (
+        <span className="text-xs text-neutral-800 dark:text-neutral-200">
+          {row.endClientName}{" "}
+          {isSame ? (
+            <span className="text-[10px] text-neutral-400 font-normal italic">(Same as Primary)</span>
+          ) : null}
+        </span>
+      );
+    }
+
+    if (colId === "contactPerson") {
+      return (
+        <div className="flex flex-col text-xs">
+          <span className="font-bold text-neutral-900 dark:text-white">{row.contactPerson || "N/A"}</span>
+          {row.contactDesignation && (
+            <span className="text-[10px] text-neutral-400">{row.contactDesignation}</span>
+          )}
+        </div>
+      );
+    }
+
+    if (colId === "market") {
+      const isIndia = row.market === "INDIA" || 
+                      (row.businessUnit || "").toLowerCase().includes("domestic") || 
+                      (row.businessUnit || "").toLowerCase().includes("bbsr");
+      return (
+        <Badge className={cn("text-[9px] font-bold py-0.2 px-1.5 border shadow-none flex items-center gap-1", isIndia ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-blue-50 text-blue-700 border-blue-200")}>
+          <span>{isIndia ? "🇮🇳 India (₹)" : "🇺🇸 USA ($)"}</span>
+        </Badge>
+      );
+    }
+
+    if (colId === "tierRating") {
+      return (
+        <Badge variant="outline" className="text-[9px] font-bold border-indigo-300 text-indigo-700 bg-indigo-50/50">
+          {row.tierRating ? row.tierRating.replace('_', ' ') : 'TIER 1'}
+        </Badge>
+      );
+    }
 
     if (colId === "status") {
       return (
@@ -250,13 +466,19 @@ export default function ClientDashboard() {
         </Badge>
       );
     }
-    if (colId === "clientId") {
+
+    if (colId === "clientId" || colId === "clientName") {
       return (
-        <span className="text-blue-600 hover:underline cursor-pointer">
-          {row.clientId}
+        <span
+          onClick={() => router.push(`/clients/${row.id}`)}
+          className="text-indigo-600 font-bold hover:underline cursor-pointer"
+        >
+          {row[colId]}
         </span>
       );
     }
+
+
     if (colId === "website") {
       return (
         <a href={row.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
@@ -264,7 +486,7 @@ export default function ClientDashboard() {
         </a>
       );
     }
-    return null; // Fallback to default
+    return null;
   };
 
   const topRightActions = (
@@ -285,7 +507,6 @@ export default function ClientDashboard() {
         </div>
       ) : (
         <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none overflow-hidden relative font-sans">
-          {/* Top Custom Ribbon like Ceipal */}
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             <div className="flex items-center gap-4">
               <button className="flex items-center gap-1 text-sm font-semibold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-slate-800 px-2 py-1 rounded cursor-pointer transition-colors">
@@ -308,7 +529,6 @@ export default function ClientDashboard() {
             savedViews={savedViews}
             activeView={activeView}
             onSelectView={handleSelectView}
-            onUpdateRecord={handleUpdateRecord}
             onBulkDelete={handleBulkDelete}
             searchFilterOptions={[
               { label: "Search Any", value: "All" },
@@ -317,11 +537,332 @@ export default function ClientDashboard() {
             ]}
             customCellRenderer={customCellRenderer}
             topRightActions={topRightActions}
-            editableColumns={["clientName", "contactNumber", "website", "city", "state"]}
           />
         </div>
       )}
 
+      {/* FULL CLIENT CRM EDIT FORM MODAL */}
+      {editingClient && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between bg-neutral-50/50 dark:bg-slate-950/40">
+              <div className="flex items-center gap-2">
+                <Building className="h-5 w-5 text-indigo-600" />
+                <div>
+                  <h3 className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                    Edit Client Account: <span className="font-mono text-indigo-600">{editingClient.clientId}</span>
+                  </h3>
+                  <p className="text-xs text-neutral-500">Update master client account, POC, market alignment, and internal CRM comments.</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setEditingClient(null)} className="h-8 w-8 rounded-full">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Modal Body Form */}
+            <form onSubmit={handleSaveEditForm} className="p-6 space-y-6 overflow-y-auto flex-1">
+              {/* SECTION 1: IDENTITY & END CLIENT */}
+              <div className="space-y-4 border-b border-neutral-150 dark:border-slate-800 pb-5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 flex items-center gap-1.5">
+                  <Building className="h-4 w-4" /> 1. Client Identity &amp; End Client
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                      Client Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      required
+                      value={editFormData.client_name}
+                      onChange={(e) => setEditFormData({ ...editFormData, client_name: e.target.value })}
+                      placeholder="e.g. Wipro, TCS, Google, HDFC Bank"
+                      className="w-full px-3 py-2 text-xs font-semibold bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                      End Client <span className="text-[10px] text-neutral-400 font-normal">(Optional)</span>
+                    </label>
+                    <select
+                      value={endClientSelectionMode}
+                      onChange={(e) => setEndClientSelectionMode(e.target.value)}
+                      className="w-full px-3 py-2 text-xs font-semibold bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                    >
+                      <option value="__SAME__">Same as Client Name (Direct Mandate)</option>
+                      {allClients.length > 0 && (
+                        <optgroup label="Select Existing Client">
+                          {allClients
+                            .filter((c) => c.clientName && c.clientName !== editFormData.client_name)
+                            .map((c) => (
+                              <option key={c.id} value={c.clientName}>
+                                {c.clientName}
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                      <option value="__CUSTOM__">+ Enter Custom End Client...</option>
+                    </select>
+
+                    {endClientSelectionMode === "__CUSTOM__" && (
+                      <input
+                        value={editFormData.end_client_name}
+                        onChange={(e) => setEditFormData({ ...editFormData, end_client_name: e.target.value })}
+                        placeholder="Enter custom End Client name"
+                        className="w-full mt-2 px-3 py-2 text-xs font-semibold bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 rounded-md outline-none"
+                      />
+                    )}
+                  </div>
+                </div>
+
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Status</label>
+                    <select
+                      value={editFormData.status}
+                      onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Industry</label>
+                    <input
+                      value={editFormData.industry}
+                      onChange={(e) => setEditFormData({ ...editFormData, industry: e.target.value })}
+                      placeholder="Information Technology, Banking"
+                      className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Website</label>
+                    <input
+                      value={editFormData.website}
+                      onChange={(e) => setEditFormData({ ...editFormData, website: e.target.value })}
+                      placeholder="https://company.com"
+                      className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: POINT OF CONTACT (POC) */}
+              <div className="space-y-4 border-b border-neutral-150 dark:border-slate-800 pb-5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 flex items-center gap-1.5">
+                  <UserCheck className="h-4 w-4" /> 2. Point of Contact (POC) &amp; Communication Details
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">POC Contact Name</label>
+                    <input
+                      value={editFormData.contact_person}
+                      onChange={(e) => setEditFormData({ ...editFormData, contact_person: e.target.value })}
+                      placeholder="e.g. John Smith, Ramesh Kumar"
+                      className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">POC Title / Designation</label>
+                    <input
+                      value={editFormData.contact_designation}
+                      onChange={(e) => setEditFormData({ ...editFormData, contact_designation: e.target.value })}
+                      placeholder="e.g. VMS Lead, HR Director"
+                      className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">POC Work Email</label>
+                    <input
+                      type="email"
+                      value={editFormData.email_id}
+                      onChange={(e) => setEditFormData({ ...editFormData, email_id: e.target.value })}
+                      placeholder="john.smith@client.com"
+                      className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">POC Phone / Contact Number</label>
+                    <input
+                      value={editFormData.contact_number}
+                      onChange={(e) => setEditFormData({ ...editFormData, contact_number: e.target.value })}
+                      placeholder="+1 (555) 019-8234"
+                      className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: MARKET & TAX IDENTIFIERS */}
+              <div className="space-y-4 border-b border-neutral-150 dark:border-slate-800 pb-5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 flex items-center gap-1.5">
+                    <Globe className="h-4 w-4" /> 3. Market Alignment &amp; Tax Identifiers
+                  </h4>
+
+                  <select
+                    value={editFormData.market}
+                    onChange={(e) => setEditFormData({ ...editFormData, market: e.target.value, currency: e.target.value === "INDIA" ? "INR" : "USD" })}
+                    className="text-xs font-bold px-2.5 py-1 bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 rounded-md text-indigo-700 dark:text-indigo-300"
+                  >
+                    <option value="US">US IT Staffing Market ($)</option>
+                    <option value="INDIA">India Domestic Market (₹)</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {editFormData.market === "INDIA" ? (
+                    <>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">GSTIN Number</label>
+                        <input
+                          value={editFormData.gstin}
+                          onChange={(e) => setEditFormData({ ...editFormData, gstin: e.target.value })}
+                          placeholder="22AAAAA0000A1Z5"
+                          className="w-full px-3 py-2 text-xs uppercase font-mono bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">PAN Number</label>
+                        <input
+                          value={editFormData.pan_number}
+                          onChange={(e) => setEditFormData({ ...editFormData, pan_number: e.target.value })}
+                          placeholder="ABCDE1234F"
+                          className="w-full px-3 py-2 text-xs uppercase font-mono bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Federal EIN / Tax ID</label>
+                      <input
+                        value={editFormData.federal_id}
+                        onChange={(e) => setEditFormData({ ...editFormData, federal_id: e.target.value })}
+                        placeholder="12-3456789"
+                        className="w-full px-3 py-2 text-xs font-mono bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Payment Terms</label>
+                    <select
+                      value={editFormData.payment_terms}
+                      onChange={(e) => setEditFormData({ ...editFormData, payment_terms: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                    >
+                      <option value="Net 30">Net 30 Days</option>
+                      <option value="Net 45">Net 45 Days</option>
+                      <option value="Net 60">Net 60 Days</option>
+                      <option value="Paid When Paid">Paid When Paid (PWP)</option>
+                      <option value="Immediate">Immediate / Advance</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: QUALIFIER & ONBOARDING */}
+              <div className="space-y-4 border-b border-neutral-150 dark:border-slate-800 pb-5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4" /> 4. Qualification Rating &amp; Onboarding Verification
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Client Tier Rating</label>
+                    <select
+                      value={editFormData.tier_rating}
+                      onChange={(e) => setEditFormData({ ...editFormData, tier_rating: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                    >
+                      <option value="TIER_1">Tier 1 (Direct VMS / Preferred)</option>
+                      <option value="TIER_2">Tier 2 (Implementation Partner)</option>
+                      <option value="TIER_3">Tier 3 (Subcontract Vendor)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Credit Check Vetting</label>
+                    <select
+                      value={editFormData.credit_check_status}
+                      onChange={(e) => setEditFormData({ ...editFormData, credit_check_status: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                    >
+                      <option value="APPROVED">Approved Credit</option>
+                      <option value="PENDING_CHECK">Pending Check</option>
+                      <option value="HIGH_RISK">High Financial Risk</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Fillability Rating</label>
+                    <select
+                      value={editFormData.fillability_score}
+                      onChange={(e) => setEditFormData({ ...editFormData, fillability_score: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none"
+                    >
+                      <option value="HIGH">High (Fast Closure / Hot Account)</option>
+                      <option value="MEDIUM">Medium (Standard Responsiveness)</option>
+                      <option value="LOW">Low (Slow Feedback / Hard to Fill)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-950/20 text-xs font-semibold cursor-pointer">
+                    <span>MSA Signed</span>
+                    <Switch checked={editFormData.msa_signed} onCheckedChange={(val) => setEditFormData((p: any) => ({ ...p, msa_signed: val }))} />
+                  </label>
+
+                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-950/20 text-xs font-semibold cursor-pointer">
+                    <span>VMS Configured</span>
+                    <Switch checked={editFormData.vendor_portal_created} onCheckedChange={(val) => setEditFormData((p: any) => ({ ...p, vendor_portal_created: val }))} />
+                  </label>
+                </div>
+              </div>
+
+
+              {/* SECTION 5: INTERNAL CRM NOTES & COMMENT BOX */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                  <MessageSquare className="h-4 w-4" /> 5. Internal CRM Notes &amp; Account Comments Box
+                </h4>
+                <textarea
+                  rows={4}
+                  value={editFormData.vetting_notes}
+                  onChange={(e) => setEditFormData({ ...editFormData, vetting_notes: e.target.value })}
+                  placeholder="Type internal notes, recruiter guidelines, fee terms, interview preferences, or comments about this client account..."
+                  className="w-full p-3 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 font-sans leading-relaxed"
+                />
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div className="pt-4 border-t border-neutral-200 dark:border-slate-800 flex justify-end gap-3">
+                <Button type="button" variant="ghost" onClick={() => setEditingClient(null)} disabled={isSavingClient} className="text-xs font-semibold">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSavingClient} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5">
+                  {isSavingClient ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save Client CRM Record
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* FILTER DRAWER */}
       <FilterDrawer
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
@@ -332,6 +873,7 @@ export default function ClientDashboard() {
         predefinedFilters={["Active Clients", "Inactive Clients"]}
       />
 
+      {/* COLUMN DRAWER */}
       <ColumnDrawer
         isOpen={isColumnOpen}
         onClose={() => setIsColumnOpen(false)}
@@ -342,6 +884,55 @@ export default function ClientDashboard() {
           saveUserColumnPreferences("clients", newCols);
         }}
       />
+
+      {/* SOFT DELETE CONFIRMATION WARNING MODAL */}
+      {clientToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center text-red-600 shrink-0">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                  Confirm Soft Delete Client?
+                </h3>
+                <p className="text-xs text-neutral-500">
+                  You are about to soft-delete <strong className="text-neutral-900 dark:text-white">{clientToDelete.clientName}</strong> ({clientToDelete.clientId}).
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg p-3 text-xs text-amber-900 dark:text-amber-300 space-y-1">
+              <p className="font-bold flex items-center gap-1">
+                <ShieldCheck className="h-4 w-4 text-amber-600" /> Data Safety Notice (Soft Delete)
+              </p>
+              <p className="text-[11px] leading-relaxed">
+                This client record will be archived. All associated historical job requisitions, candidate submissions, and billing placements remain 100% preserved. You can restore this client at any time.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+              <Button
+                variant="ghost"
+                onClick={() => setClientToDelete(null)}
+                disabled={isDeleting}
+                className="text-xs font-semibold"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmSoftDelete}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-1.5"
+              >
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Confirm Soft Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -998,6 +998,32 @@ function TenantAdminSettingsView(props: any) {
               </p>
             </CardContent>
           </Card>
+
+          {/* Security & Governance Audit Trail Card */}
+          <Card className="border border-indigo-200 dark:border-indigo-900/50 shadow-xs bg-indigo-50/20 dark:bg-slate-900">
+            <CardHeader className="pb-2 border-b border-indigo-100 dark:border-slate-800">
+              <CardTitle className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4 text-indigo-600" />
+                Security &amp; Audit Trail
+              </CardTitle>
+              <CardDescription className="text-[11px] text-neutral-500">
+                View real-time immutable audit logs of recruiter actions, client rate changes, and workspace security events.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-3 flex items-center justify-between">
+              <div className="text-[11px] text-neutral-600 dark:text-slate-400">
+                SOC2-ready event stream.
+              </div>
+              <Button
+                size="sm"
+                onClick={() => { window.location.href = "/utility/audit-logs"; }}
+                className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1 cursor-pointer"
+              >
+                View Audit Logs →
+              </Button>
+            </CardContent>
+          </Card>
+
         </div>
       </div>
     </>

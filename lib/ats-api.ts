@@ -393,11 +393,13 @@ const auth = {
     });
   },
 
-  async deleteCustomRole(roleId: string): Promise<any> {
-    return apiFetch<any>(`/api/auth/rbac/roles/${roleId}`, {
+  async deleteCustomRole(roleId: string, targetRoleId?: string): Promise<any> {
+    const query = targetRoleId ? `?targetRoleId=${encodeURIComponent(targetRoleId)}` : '';
+    return apiFetch<any>(`/api/auth/rbac/roles/${roleId}${query}`, {
       method: 'DELETE',
     });
   },
+
 
   async assignUserRoles(userId: string, roleIds: string[]): Promise<any> {
     return apiFetch<any>(`/api/auth/rbac/users/${userId}/roles`, {
@@ -670,6 +672,18 @@ const jobs = {
     });
   },
 
+  async delete(id: string): Promise<void> {
+    return apiFetch<void>(`/api/jobs/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async restore(id: string): Promise<JobPayload> {
+    return apiFetch<JobPayload>(`/api/jobs/${id}/restore`, {
+      method: 'PATCH',
+    });
+  },
+
   async parseJd(text: string): Promise<{
     success: boolean;
     primarySkills: string[];
@@ -723,6 +737,12 @@ const candidates = {
   async delete(id: string | number): Promise<any> {
     return apiFetch<any>(`/api/candidates/${id}`, {
       method: 'DELETE',
+    });
+  },
+
+  async restore(id: string | number): Promise<any> {
+    return apiFetch<any>(`/api/candidates/${id}/restore`, {
+      method: 'PATCH',
     });
   },
 
@@ -870,9 +890,11 @@ const candidates = {
 };
 
 const clients = {
-  async list(): Promise<any[]> {
-    return apiFetch<any[]>('/api/clients');
+  async list(includeDeleted?: string): Promise<any[]> {
+    const query = includeDeleted === 'true' ? '?includeDeleted=true' : '';
+    return apiFetch<any[]>(`/api/clients${query}`);
   },
+
 
   async get(id: string): Promise<any> {
     return apiFetch<any>(`/api/clients/${id}`);
@@ -895,6 +917,12 @@ const clients = {
   async delete(id: string): Promise<any> {
     return apiFetch<any>(`/api/clients/${id}`, {
       method: 'DELETE',
+    });
+  },
+
+  async restore(id: string): Promise<any> {
+    return apiFetch<any>(`/api/clients/${id}/restore`, {
+      method: 'PATCH',
     });
   },
 };
@@ -1083,6 +1111,31 @@ const auditLogs = {
   },
 };
 
+const integrations = {
+  dice: {
+    async getSettings(): Promise<{ clientId: string; clientSecret: string; accountId: string; isActive: boolean; dailyViewLimit: number; viewsUsedToday: number; mode: 'LIVE' | 'SANDBOX' }> {
+      return apiFetch('/api/integrations/dice/settings');
+    },
+    async saveSettings(data: { clientId?: string; clientSecret?: string; accountId?: string; isActive?: boolean; dailyViewLimit?: number }): Promise<any> {
+      return apiFetch('/api/integrations/dice/settings', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    async search(query: { q?: string; location?: string; skills?: string[]; workAuth?: string; limit?: number }): Promise<{ results: any[]; mode: 'LIVE' | 'SANDBOX'; totalFound: number }> {
+      return apiFetch('/api/integrations/dice/search', {
+        method: 'POST',
+        body: JSON.stringify(query),
+      });
+    },
+    async importCandidate(diceId: string): Promise<any> {
+      return apiFetch(`/api/integrations/dice/import/${diceId}`, {
+        method: 'POST',
+      });
+    },
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────
 export const atsApi = {
   auth,
@@ -1094,7 +1147,9 @@ export const atsApi = {
   businessUnits,
   submissions,
   auditLogs,
+  integrations,
   email,
   fetch: apiFetch,
 };
+
 
