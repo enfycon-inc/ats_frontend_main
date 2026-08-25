@@ -17,13 +17,21 @@
 import { getTenantIdentifier } from '@/utils/subdomain-helper';
 
 function getApiBase(): string {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    // On production *.enfyjobs.com or custom domain, route API calls to api.enfyjobs.com
+    if (hostname === 'enfyjobs.com' || hostname.endsWith('.enfyjobs.com')) {
+      return 'https://api.enfyjobs.com';
+    }
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      return process.env.NEXT_PUBLIC_API_URL;
+    }
+    return `http://${hostname || '127.0.0.1'}:5000`;
+  }
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  if (typeof window !== 'undefined') {
-    return `http://127.0.0.1:5000`;
-  }
-  return 'http://127.0.0.1:5000';
+  return 'http://backend:5000';
 }
 
 // ─── Token Management ──────────────────────────────────────────────
