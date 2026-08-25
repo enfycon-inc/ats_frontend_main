@@ -12,22 +12,29 @@
  *   import { atsApi } from '@/lib/ats-api';
  *   const jobs = await atsApi.jobs.list();
  *   await atsApi.auth.login(userEmail, userPassword);
- */
-
-import { getTenantIdentifier } from '@/utils/subdomain-helper';
+import { getTenantIdentifier, getBaseDomain } from '@/utils/subdomain-helper';
 
 function getApiBase(): string {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    // On production *.enfyjobs.com or custom domain, route API calls to api.enfyjobs.com
-    if (hostname === 'enfyjobs.com' || hostname.endsWith('.enfyjobs.com')) {
-      return 'https://api.enfyjobs.com';
+
+    // 1. Local development environment
+    if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '127.0.0.1') {
+      return process.env.NEXT_PUBLIC_API_URL || `http://127.0.0.1:5000`;
     }
+
+    // 2. Explicit environment variable if provided
     if (process.env.NEXT_PUBLIC_API_URL) {
       return process.env.NEXT_PUBLIC_API_URL;
     }
-    return `http://${hostname || '127.0.0.1'}:5000`;
+
+    // 3. Dynamic production domain resolution (e.g., deb.enfyjobs.com -> https://api.enfyjobs.com)
+    const baseDomain = getBaseDomain(hostname);
+    const protocol = window.location.protocol;
+    return `${protocol}//api.${baseDomain}`;
   }
+
+  // Server-side execution inside container
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
