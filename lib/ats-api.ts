@@ -12,6 +12,8 @@
  *   import { atsApi } from '@/lib/ats-api';
  *   const jobs = await atsApi.jobs.list();
  *   await atsApi.auth.login(userEmail, userPassword);
+ */
+
 import { getTenantIdentifier, getBaseDomain } from '@/utils/subdomain-helper';
 
 function getApiBase(): string {
