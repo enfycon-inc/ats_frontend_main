@@ -10,22 +10,12 @@ import { getUserFromDb } from "./utils/db"
 const DEFAULT_TENANT_ID = "d3b07384-d113-49c3-a555-9ee75c13ca33";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  secret: process.env.AUTH_SECRET,
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "1kc7Cf4Z2V2XX0WfGLrET9iZzWyDkar9RlqjIK3Vkxo",
+  trustHost: true,
   session: {
     strategy: "jwt",
   },
-  cookies: {
-    sessionToken: {
-      name: `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        domain: process.env.NODE_ENV === "production" ? ".enfyjobs.com" : undefined,
-      },
-    },
-  },
+
   providers: [
     Credentials({
       credentials: {
