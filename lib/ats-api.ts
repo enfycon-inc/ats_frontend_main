@@ -91,6 +91,41 @@ function getCurrentUser(): any | null {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+async function getOrFetchToken(): Promise<string | null> {
+  let token = getToken();
+  if (token) return token;
+
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/auth/session', { cache: 'no-store' });
+      if (res.ok) {
+        const session = await res.json();
+        if (session?.user?.accessToken) {
+          token = session.user.accessToken;
+          setToken(token!);
+          if (session.user) {
+            setCurrentUser({
+              id: session.user.id,
+              email: session.user.email,
+              fullName: session.user.name,
+              roles: session.user.roles,
+              tenantId: session.user.tenantId,
+              defaultMarket: session.user.defaultMarket,
+              permissions: session.user.permissions || [],
+              systemRole: session.user.systemRole || 'RECRUITER',
+              podId: session.user.podId || null,
+            });
+          }
+          return token;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not retrieve token from NextAuth session', e);
+    }
+  }
+  return null;
+}
+
 let isRefreshing = false;
 let refreshSubscribers: Array<(token: string) => void> = [];
 
@@ -133,7 +168,10 @@ async function apiFetch<T = any>(
   options: RequestInit = {},
   isRetry = false,
 ): Promise<T> {
-  const token = getToken();
+  let token = getToken();
+  if (!token && typeof window !== 'undefined' && !path.includes('/api/auth/login') && !path.includes('/api/auth/register')) {
+    token = await getOrFetchToken();
+  }
   const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
