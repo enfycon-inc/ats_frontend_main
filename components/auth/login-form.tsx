@@ -30,6 +30,8 @@ const LoginForm = () => {
   const [passwordType, setPasswordType] = useState("password");
   const formRef = useRef<HTMLFormElement>(null);
 
+  const [isAuthorizingSso, setIsAuthorizingSso] = useState(false);
+
   React.useEffect(() => {
     const errorParam = searchParams.get("error");
     if (errorParam === "AccessDenied" || errorParam === "Callback") {
@@ -41,7 +43,7 @@ const LoginForm = () => {
 
     const ssoToken = searchParams.get("sso_token") || searchParams.get("token");
     if (ssoToken) {
-      toast.loading("Authenticating workspace session...", { id: "sso-login" });
+      setIsAuthorizingSso(true);
       signIn("token-handoff", {
         token: ssoToken,
         redirect: false,
@@ -50,13 +52,14 @@ const LoginForm = () => {
           if (typeof window !== "undefined") {
             localStorage.setItem("ats_access_token", ssoToken);
           }
-          toast.success("Workspace authorized!", { id: "sso-login" });
           window.location.href = "/dashboard";
         } else {
-          toast.error("Session verification expired. Please sign in.", { id: "sso-login" });
+          setIsAuthorizingSso(false);
+          toast.error("Session verification expired. Please sign in.");
         }
       }).catch(() => {
-        toast.error("SSO handoff failed.", { id: "sso-login" });
+        setIsAuthorizingSso(false);
+        toast.error("SSO handoff failed.");
       });
     }
   }, [searchParams]);
@@ -123,13 +126,13 @@ const LoginForm = () => {
           if (isSuperAdmin) {
             // Super Admin always stays on root domain (enfyjobs.com/dashboard)
             if (currentSubdomain) {
-              window.location.href = `${protocol}//${base}/auth/login?sso_token=${encodeURIComponent(syncRes?.accessToken)}&redirect=/dashboard`;
+              window.location.href = `${protocol}//${base}/dashboard`;
             } else {
               window.location.href = "/dashboard";
             }
           } else if (userTenantDomain && userTenantDomain !== "enfy" && userTenantDomain !== "www" && currentSubdomain !== userTenantDomain) {
-            // Tenant user logging in on root/different domain -> redirect to tenant subdomain with SSO handoff
-            window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login?sso_token=${encodeURIComponent(syncRes?.accessToken)}&redirect=/dashboard`;
+            // Tenant user logging in on root domain -> redirect directly to tenant dashboard
+            window.location.href = `${protocol}//${userTenantDomain}.${base}/dashboard`;
           } else if (currentSubdomain === "enfy") {
             // Master tenant user on enfy.localhost -> redirect to root /dashboard
             window.location.href = `${protocol}//${base}/dashboard`;
@@ -142,6 +145,20 @@ const LoginForm = () => {
       }
     });
   };
+
+  if (isAuthorizingSso) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 space-y-4 text-center">
+        <div className="relative flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full border-2 border-indigo-600/20 border-t-indigo-600 animate-spin" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-slate-800">Signing into workspace...</p>
+          <p className="text-xs text-slate-400">Taking you directly to your dashboard</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
