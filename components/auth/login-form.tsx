@@ -106,38 +106,37 @@ const LoginForm = () => {
           return;
         }
 
-          toast.success("Successfully logged in");
+        toast.success("Successfully logged in");
 
-          // Redirection logic
-          const isSuperAdmin = syncRes?.user?.roles?.includes("SUPER_ADMIN") || (syncRes?.user as any)?.systemRole === "SUPER_ADMIN";
-          const userTenantDomain = syncRes?.user?.tenantDomain;
-          const currentSubdomain = getCurrentSubdomain();
-          const base = getBaseDomain();
-          const protocol = window.location.protocol;
+        // Redirection logic
+        const isSuperAdmin = syncRes?.user?.roles?.includes("SUPER_ADMIN") || (syncRes?.user as any)?.systemRole === "SUPER_ADMIN";
+        const userTenantDomain = syncRes?.user?.tenantDomain;
+        const currentSubdomain = getCurrentSubdomain();
+        const base = getBaseDomain();
+        const protocol = window.location.protocol;
 
-          if (isSuperAdmin) {
-            // Super Admin always stays on root domain (enfyjobs.com/dashboard)
-            if (currentSubdomain) {
-              window.location.href = `${protocol}//${base}/dashboard`;
-            } else {
-              window.location.href = "/dashboard";
-            }
-          } else if (userTenantDomain && userTenantDomain !== "enfy" && userTenantDomain !== "www" && currentSubdomain !== userTenantDomain) {
-            // Only redirect to tenant subdomain if currently logging in from the root domain (enfyjobs.com / localhost)
-            const isRootHost = window.location.hostname === "enfyjobs.com" || window.location.hostname === "www.enfyjobs.com" || window.location.hostname === "localhost";
-            if (isRootHost) {
-              const tokenParam = syncRes?.accessToken ? `?sso_token=${encodeURIComponent(syncRes.accessToken)}` : "";
-              window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login${tokenParam}`;
-            } else {
-              // Already on custom domain (e.g. ats.golgrab.com) -> proceed straight to /dashboard
-              window.location.href = "/dashboard";
-            }
-          } else if (currentSubdomain === "enfy") {
-            // Master tenant user on enfy.localhost -> redirect to root /dashboard
+        if (isSuperAdmin) {
+          // Super Admin always stays on root domain (enfyjobs.com/dashboard)
+          if (currentSubdomain) {
             window.location.href = `${protocol}//${base}/dashboard`;
           } else {
             window.location.href = "/dashboard";
           }
+        } else if (userTenantDomain && userTenantDomain !== "enfy" && userTenantDomain !== "www" && currentSubdomain !== userTenantDomain) {
+          // Only redirect to tenant subdomain if currently logging in from the root domain (enfyjobs.com / localhost)
+          const isRootHost = window.location.hostname === "enfyjobs.com" || window.location.hostname === "www.enfyjobs.com" || window.location.hostname === "localhost";
+          if (isRootHost) {
+            const tokenParam = syncRes?.accessToken ? `?sso_token=${encodeURIComponent(syncRes.accessToken)}` : "";
+            window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login${tokenParam}`;
+          } else {
+            // Already on custom domain (e.g. ats.golgrab.com) -> proceed straight to /dashboard
+            window.location.href = "/dashboard";
+          }
+        } else if (currentSubdomain === "enfy") {
+          // Master tenant user on enfy.localhost -> redirect to root /dashboard
+          window.location.href = `${protocol}//${base}/dashboard`;
+        } else {
+          window.location.href = "/dashboard";
         }
       } catch (err: any) {
         toast.error(err.message || "Failed to sign in.");
