@@ -37,6 +37,7 @@ import toast from "react-hot-toast";
 import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { getBaseDomain } from "@/utils/subdomain-helper";
 import { isRoleAdmin, resolveActiveSystemRole, CustomRoleDefinition } from "@/lib/role-permissions";
+import { EmailDispatchCard } from "@/components/company/email-dispatch-card";
 
 interface DomainMapping {
   id: string | number;
@@ -763,7 +764,15 @@ function TenantAdminSettingsView(props: any) {
             </CardContent>
           </Card>
 
-          {/* 4. Candidate Pool Mode Card */}
+          {/* 4. Workspace Email & Custom Domain Strategy Card */}
+          <EmailDispatchCard
+            tenantId={props.profile?.tenantId}
+            subdomain={props.subdomain || props.originalSubdomain}
+            companyName={props.companyName}
+            userEmail={props.profile?.email}
+          />
+
+          {/* 5. Candidate Pool Mode Card */}
           <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
             <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60">
               <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">

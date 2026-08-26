@@ -610,6 +610,40 @@ const email = {
       body: JSON.stringify(data),
     });
   },
+  async getTenantEmailSettings(): Promise<{
+    dispatchMode: 'DEFAULT_SUBDOMAIN' | 'DIRECT_ACCOUNT' | 'CUSTOM_DOMAIN';
+    defaultSubdomainSender: string;
+    customDomain: string;
+    customDomainVerified: boolean;
+    dnsRecords: Array<{ type: string; host: string; value: string; purpose: string; status: string }>;
+    connectedAccounts: Array<{ id: string; provider: string; email: string; profileName?: string; isDefault: boolean; isActive: boolean }>;
+    defaultAccount: any;
+  }> {
+    return apiFetch('/email/tenant-settings');
+  },
+  async setTenantEmailMode(mode: string): Promise<any> {
+    return apiFetch('/email/tenant-settings/mode', {
+      method: 'POST',
+      body: JSON.stringify({ mode }),
+    });
+  },
+  async setTenantCustomDomain(customDomain: string): Promise<any> {
+    return apiFetch('/email/tenant-settings/custom-domain', {
+      method: 'POST',
+      body: JSON.stringify({ customDomain }),
+    });
+  },
+  async verifyTenantCustomDomain(): Promise<any> {
+    return apiFetch('/email/tenant-settings/verify-domain', {
+      method: 'POST',
+    });
+  },
+  async sendTestTenantEmail(recipientEmail?: string): Promise<any> {
+    return apiFetch('/email/tenant-settings/test-email', {
+      method: 'POST',
+      body: JSON.stringify({ recipientEmail }),
+    });
+  },
 };
 
 
