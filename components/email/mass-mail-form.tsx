@@ -31,7 +31,7 @@ import { Bold, Italic, Link2, List, ListOrdered, Send, Clock, X, Paperclip, Plus
 import { SmtpConfigModal } from "@/components/email/smtp-config-modal";
 import { MassMailSettingsModal } from "./mass-mail-settings-modal";
 import Link from 'next/link';
-import { atsApi } from "@/lib/ats-api";
+import { atsApi, getApiBase } from "@/lib/ats-api";
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
 
@@ -341,9 +341,9 @@ export function MassMailForm() {
     const tenantId = user?.tenantId || '';
     const userId = user?.id || user?.dbId || '';
     if (provider === 'google') {
-      window.location.href = `http://localhost:5000/api/v1/auth/google?tenantId=${tenantId}&userId=${userId}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
+      window.location.href = `${getApiBase()}/api/v1/auth/google?tenantId=${tenantId}&userId=${userId}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
     } else if (provider === 'microsoft') {
-      window.location.href = `http://localhost:5000/api/v1/auth/microsoft?tenantId=${tenantId}&userId=${userId}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
+      window.location.href = `${getApiBase()}/api/v1/auth/microsoft?tenantId=${tenantId}&userId=${userId}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
     } else if (provider === 'smtp') {
       setIsConnecting(null);
       setIsDialogOpen(false);

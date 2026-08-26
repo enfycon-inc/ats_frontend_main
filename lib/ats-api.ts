@@ -16,7 +16,7 @@
 
 import { getTenantIdentifier, getBaseDomain } from '@/utils/subdomain-helper';
 
-function getApiBase(): string {
+export function getApiBase(): string {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
 

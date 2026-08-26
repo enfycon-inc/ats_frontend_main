@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { atsApi } from "@/lib/ats-api";
+import { atsApi, getApiBase } from "@/lib/ats-api";
 import { SmtpConfigModal } from "@/components/email/smtp-config-modal";
 import {
   Mail,
@@ -174,7 +174,7 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
 
   const connectMicrosoft = () => {
     const returnTo = typeof window !== "undefined" ? window.location.href : "";
-    window.location.href = `/api/email/auth/microsoft?returnTo=${encodeURIComponent(returnTo)}&tenantId=${tenantId || ""}`;
+    window.location.href = `${getApiBase()}/api/v1/auth/microsoft?returnTo=${encodeURIComponent(returnTo)}&tenantId=${tenantId || ""}`;
   };
 
   return (

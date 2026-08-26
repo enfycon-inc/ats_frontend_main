@@ -63,9 +63,9 @@ export function EmailIntegrationTab() {
     const user = atsApi.auth.getCurrentUser();
     const tenantId = user?.tenantId || '';
     if (provider === 'google') {
-      window.location.href = `http://localhost:5000/api/v1/auth/google?tenantId=${tenantId}&userId=${user?.id || ''}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname + '?tab=email_integration')}`;
+      window.location.href = `${getApiBase()}/api/v1/auth/google?tenantId=${tenantId}&userId=${user?.id || ''}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname + '?tab=email_integration')}`;
     } else if (provider === 'microsoft') {
-      window.location.href = `http://localhost:5000/api/v1/auth/microsoft?tenantId=${tenantId}&userId=${user?.id || ''}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname + '?tab=email_integration')}`;
+      window.location.href = `${getApiBase()}/api/v1/auth/microsoft?tenantId=${tenantId}&userId=${user?.id || ''}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname + '?tab=email_integration')}`;
     } else if (provider === 'smtp') {
       setIsConnecting(null);
       setIsSmtpModalOpen(true);
