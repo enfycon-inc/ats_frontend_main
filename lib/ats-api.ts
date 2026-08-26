@@ -205,29 +205,40 @@ async function apiFetch<T = any>(
     const body = await res.json().catch(() => ({ message: res.statusText }));
     const isExpired = res.status === 401 || (body.message && body.message.toLowerCase().includes('expired'));
 
-    // Attempt automatic token refresh if token expired and retry once
-    if (isExpired && !isRetry && getRefreshToken()) {
-      if (!isRefreshing) {
-        isRefreshing = true;
-        const newToken = await tryAutoRefresh();
-        isRefreshing = false;
-        if (newToken) {
-          onRefreshed(newToken);
+    // Attempt automatic token refresh / session recovery if token expired and retry once
+    if (isExpired && !isRetry) {
+      if (getRefreshToken()) {
+        if (!isRefreshing) {
+          isRefreshing = true;
+          const newToken = await tryAutoRefresh();
+          isRefreshing = false;
+          if (newToken) {
+            onRefreshed(newToken);
+            return apiFetch<T>(path, options, true);
+          }
+        } else {
+          // Wait for active refresh to finish
+          const retryObj = new Promise<T>((resolve, reject) => {
+            refreshSubscribers.push((newToken: string) => {
+              apiFetch<T>(path, options, true).then(resolve).catch(reject);
+            });
+          });
+          return retryObj;
+        }
+      }
+
+      // If no refresh token or refresh failed, clear stale local token and fetch active session token
+      if (typeof window !== 'undefined') {
+        clearToken();
+        const freshToken = await getOrFetchToken();
+        if (freshToken && freshToken !== token) {
           return apiFetch<T>(path, options, true);
         }
-      } else {
-        // Wait for active refresh to finish
-        const retryObj = new Promise<T>((resolve, reject) => {
-          refreshSubscribers.push((newToken: string) => {
-            apiFetch<T>(path, options, true).then(resolve).catch(reject);
-          });
-        });
-        return retryObj;
       }
     }
 
     const errMsg = body.message || `API Error: ${res.status}`;
-    if (typeof window !== 'undefined' && (res.status === 403 || res.status === 401)) {
+    if (typeof window !== 'undefined' && (res.status === 403 || (res.status === 401 && !path.includes('/api/auth/session')))) {
       const event = new CustomEvent("app_show_error_modal", {
         detail: { message: errMsg, title: res.status === 403 ? "Permission Access Required" : "Authentication Required" },
       });
