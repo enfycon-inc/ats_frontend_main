@@ -43,14 +43,14 @@ export default async function DashboardLayout({
       }
     } else {
       const userSub = (user as any).tenantDomain;
-      const isMasterTenant = !userSub || userSub === "enfycon" || userSub === "www" || userSub === "localhost";
+      const isMasterTenant = !userSub || userSub === "enfy" || userSub === "www" || userSub === "localhost";
 
       if (userSub && !isMasterTenant) {
         // Redirect if current subdomain doesn't match user's tenant subdomain
         if (currentSub !== userSub) {
           redirect(`${protocol}://${userSub}.${baseDomain}/dashboard`);
         }
-      } else if (isMasterTenant && currentSub === "enfycon") {
+      } else if (isMasterTenant && currentSub === "enfy") {
         redirect(`${protocol}://${baseDomain}/dashboard`);
       }
     }

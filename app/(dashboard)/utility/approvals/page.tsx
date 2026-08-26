@@ -13,6 +13,7 @@ import toast from "react-hot-toast";
 
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import { getBaseDomain } from "@/utils/subdomain-helper";
 
 interface PendingUser {
   id: string;
@@ -38,6 +39,13 @@ interface Tenant {
 }
 
 export default function ApprovalsPage() {
+  const [baseDomain, setBaseDomain] = useState("enfyjobs.com");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setBaseDomain(getBaseDomain(window.location.hostname));
+    }
+  }, []);
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab");
@@ -195,7 +203,7 @@ export default function ApprovalsPage() {
     try {
       setSubmittingId(userId);
       await atsApi.auth.approveUser(userId, selectedMarket, selectedSubdomain, selectedUserLimit, selectedMaxBranches);
-      toast.success(`Approved! Workspace: ${selectedSubdomain}.enfycon.com (${selectedUserLimit} seats, ${selectedMaxBranches} max branches)`);
+      toast.success(`Approved! Workspace: ${selectedSubdomain}.${baseDomain} (${selectedUserLimit} seats, ${selectedMaxBranches} max branches)`);
       await loadData();
     } catch (err: any) {
       toast.error("Approval failed: " + err.message);
@@ -224,7 +232,7 @@ export default function ApprovalsPage() {
         defaultMarket: manualMarket,
       });
 
-      toast.success(`Tenant "${manualCompanyName}" created and activated! Workspace: ${manualSubdomain}.enfycon.com`);
+      toast.success(`Tenant "${manualCompanyName}" created and activated! Workspace: ${manualSubdomain}.${baseDomain}`);
       
       // Reset form & close modal
       setManualCompanyName("");
@@ -463,7 +471,7 @@ export default function ApprovalsPage() {
                                   className="bg-transparent border-0 px-2.5 py-1.5 text-xs font-medium text-default-900 focus:outline-none w-full"
                                 />
                                 <span className="text-[10px] font-semibold text-default-500 bg-amber-500/10 px-1.5 py-1.5 whitespace-nowrap border-l border-amber-500/20">
-                                  .enfycon.com
+                                  .{baseDomain}
                                 </span>
                               </div>
                             </td>
@@ -807,7 +815,7 @@ export default function ApprovalsPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-default-900">{selectedTenant.name}</h3>
-                  <p className="text-xs text-slate-500 font-medium">Workspace: {selectedTenant.domain}.enfycon.com</p>
+                  <p className="text-xs text-slate-500 font-medium">Workspace: {selectedTenant.domain}.{baseDomain}</p>
                 </div>
               </div>
               <button
@@ -1010,7 +1018,7 @@ export default function ApprovalsPage() {
                     required
                   />
                   <span className="text-[11px] font-bold text-default-500 bg-default-100 dark:bg-slate-700 px-3 py-2 border-l border-default-250">
-                    .enfycon.com
+                    .{baseDomain}
                   </span>
                 </div>
               </div>

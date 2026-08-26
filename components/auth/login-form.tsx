@@ -106,11 +106,11 @@ const LoginForm = () => {
             } else {
               window.location.href = "/dashboard";
             }
-          } else if (userTenantDomain && userTenantDomain !== "enfycon" && userTenantDomain !== "www" && currentSubdomain !== userTenantDomain) {
+          } else if (userTenantDomain && userTenantDomain !== "enfy" && userTenantDomain !== "www" && currentSubdomain !== userTenantDomain) {
             // Tenant user logging in -> redirect to tenant subdomain
             window.location.href = `${protocol}//${userTenantDomain}.${base}/dashboard`;
-          } else if (currentSubdomain === "enfycon") {
-            // Master tenant user on enfycon.localhost -> redirect to root localhost:3000/dashboard
+          } else if (currentSubdomain === "enfy") {
+            // Master tenant user on enfy.localhost -> redirect to root localhost:3000/dashboard
             window.location.href = `${protocol}//${base}/dashboard`;
           } else {
             window.location.href = "/dashboard";
