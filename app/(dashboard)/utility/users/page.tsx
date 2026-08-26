@@ -214,6 +214,7 @@ export default function UserManagementPage() {
         role: addForm.roles[0] || "RECRUITER",
         tenantId: tenantId,
         isApproved: true,
+        sendEmailInvite: true,
       });
 
       // Update full roles and branch location after creation

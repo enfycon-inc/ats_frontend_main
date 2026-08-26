@@ -337,6 +337,7 @@ const auth = {
     role: string;
     tenantId: string;
     isApproved: boolean;
+    sendEmailInvite?: boolean;
   }): Promise<any> {
     return apiFetch<any>('/api/auth/register', {
       method: 'POST',
