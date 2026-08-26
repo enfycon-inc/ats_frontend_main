@@ -131,8 +131,9 @@ const LoginForm = () => {
               window.location.href = "/dashboard";
             }
           } else if (userTenantDomain && userTenantDomain !== "enfy" && userTenantDomain !== "www" && currentSubdomain !== userTenantDomain) {
-            // Tenant user logging in on root domain -> redirect directly to tenant dashboard
-            window.location.href = `${protocol}//${userTenantDomain}.${base}/dashboard`;
+            // Tenant user logging in on root domain -> redirect to tenant with token handoff to populate tenant domain localStorage & session
+            const tokenParam = syncRes?.accessToken ? `?sso_token=${encodeURIComponent(syncRes.accessToken)}` : "";
+            window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login${tokenParam}`;
           } else if (currentSubdomain === "enfy") {
             // Master tenant user on enfy.localhost -> redirect to root /dashboard
             window.location.href = `${protocol}//${base}/dashboard`;
