@@ -38,6 +38,27 @@ const LoginForm = () => {
         { duration: 6000 }
       );
     }
+
+    const ssoToken = searchParams.get("sso_token") || searchParams.get("token");
+    if (ssoToken) {
+      toast.loading("Authenticating workspace session...", { id: "sso-login" });
+      signIn("token-handoff", {
+        token: ssoToken,
+        redirect: false,
+      }).then((res) => {
+        if (res?.ok) {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("ats_access_token", ssoToken);
+          }
+          toast.success("Workspace authorized!", { id: "sso-login" });
+          window.location.href = "/dashboard";
+        } else {
+          toast.error("Session verification expired. Please sign in.", { id: "sso-login" });
+        }
+      }).catch(() => {
+        toast.error("SSO handoff failed.", { id: "sso-login" });
+      });
+    }
   }, [searchParams]);
 
   const togglePasswordType = () => {
@@ -100,17 +121,17 @@ const LoginForm = () => {
           const protocol = window.location.protocol;
 
           if (isSuperAdmin) {
-            // Super Admin always stays on root domain (localhost:3000/dashboard)
+            // Super Admin always stays on root domain (enfyjobs.com/dashboard)
             if (currentSubdomain) {
-              window.location.href = `${protocol}//${base}/dashboard`;
+              window.location.href = `${protocol}//${base}/auth/login?sso_token=${encodeURIComponent(syncRes?.accessToken)}&redirect=/dashboard`;
             } else {
               window.location.href = "/dashboard";
             }
           } else if (userTenantDomain && userTenantDomain !== "enfy" && userTenantDomain !== "www" && currentSubdomain !== userTenantDomain) {
-            // Tenant user logging in -> redirect to tenant subdomain
-            window.location.href = `${protocol}//${userTenantDomain}.${base}/dashboard`;
+            // Tenant user logging in on root/different domain -> redirect to tenant subdomain with SSO handoff
+            window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login?sso_token=${encodeURIComponent(syncRes?.accessToken)}&redirect=/dashboard`;
           } else if (currentSubdomain === "enfy") {
-            // Master tenant user on enfy.localhost -> redirect to root localhost:3000/dashboard
+            // Master tenant user on enfy.localhost -> redirect to root /dashboard
             window.location.href = `${protocol}//${base}/dashboard`;
           } else {
             window.location.href = "/dashboard";

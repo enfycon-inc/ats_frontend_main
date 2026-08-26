@@ -8,6 +8,9 @@ import { loginSchema } from "./lib/zod"
 import { getUserFromDb } from "./utils/db"
 
 const DEFAULT_TENANT_ID = "d3b07384-d113-49c3-a555-9ee75c13ca33";
+const isProd = process.env.NODE_ENV === "production";
+const baseDomain = process.env.BASE_DOMAIN || "enfyjobs.com";
+const cookieDomain = isProd ? `.${baseDomain.includes('localhost') ? 'localhost' : baseDomain}` : undefined;
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "1kc7Cf4Z2V2XX0WfGLrET9iZzWyDkar9RlqjIK3Vkxo",
@@ -15,8 +18,65 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "jwt",
   },
+  cookies: {
+    sessionToken: {
+      name: isProd ? `__Secure-authjs.session-token` : `authjs.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: isProd,
+        domain: cookieDomain,
+      },
+    },
+  },
 
   providers: [
+    Credentials({
+      id: "token-handoff",
+      name: "Token Handoff",
+      credentials: {
+        token: {},
+      },
+      authorize: async (credentials) => {
+        if (!credentials?.token) return null;
+        try {
+          let apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000";
+          if (process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_API_URL) {
+            apiBase = "http://backend:5000";
+          }
+          const res = await fetch(`${apiBase}/api/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${credentials.token}`,
+            },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.user) {
+              return {
+                id: data.user.id,
+                name: data.user.fullName,
+                email: data.user.email,
+                image: "/images/users/user-1.jpg",
+                permissions: data.user.permissions || [],
+                roles: data.user.roles || [],
+                accessToken: credentials.token as string,
+                tenantDomain: data.user.tenantDomain || "",
+                systemRole: data.user.systemRole || "RECRUITER",
+                podId: data.user.podId || null,
+                branchId: data.user.branchId || null,
+                branchName: data.user.branchName || null,
+                tenantId: data.user.tenantId || DEFAULT_TENANT_ID,
+                defaultMarket: data.user.defaultMarket || "US",
+              };
+            }
+          }
+        } catch (e) {
+          console.error("Token handoff authentication error:", e);
+        }
+        return null;
+      },
+    }),
     Credentials({
       credentials: {
         email: {},
