@@ -131,9 +131,15 @@ const LoginForm = () => {
               window.location.href = "/dashboard";
             }
           } else if (userTenantDomain && userTenantDomain !== "enfy" && userTenantDomain !== "www" && currentSubdomain !== userTenantDomain) {
-            // Tenant user logging in on root domain -> redirect to tenant with token handoff to populate tenant domain localStorage & session
-            const tokenParam = syncRes?.accessToken ? `?sso_token=${encodeURIComponent(syncRes.accessToken)}` : "";
-            window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login${tokenParam}`;
+            // Only redirect to tenant subdomain if currently logging in from the root domain (enfyjobs.com / localhost)
+            const isRootHost = window.location.hostname === "enfyjobs.com" || window.location.hostname === "www.enfyjobs.com" || window.location.hostname === "localhost";
+            if (isRootHost) {
+              const tokenParam = syncRes?.accessToken ? `?sso_token=${encodeURIComponent(syncRes.accessToken)}` : "";
+              window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login${tokenParam}`;
+            } else {
+              // Already on custom domain (e.g. ats.golgrab.com) -> proceed straight to /dashboard
+              window.location.href = "/dashboard";
+            }
           } else if (currentSubdomain === "enfy") {
             // Master tenant user on enfy.localhost -> redirect to root /dashboard
             window.location.href = `${protocol}//${base}/dashboard`;
