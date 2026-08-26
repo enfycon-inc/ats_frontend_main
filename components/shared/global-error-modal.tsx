@@ -68,14 +68,31 @@ export function GlobalErrorModal() {
             </p>
           </div>
 
-          <div className="flex justify-end pt-1">
-            <Button
-              type="button"
-              onClick={() => setErrorData(null)}
-              className="bg-[#1a4fa0] hover:bg-[#154185] text-white text-xs px-5 py-2 h-9 rounded-md font-medium shadow-xs transition-colors cursor-pointer"
-            >
-              Understood
-            </Button>
+          <div className="flex justify-end gap-2 pt-1">
+            {errorData.message.toLowerCase().includes("expired") || errorData.title === "Authentication Required" ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    localStorage.removeItem("ats_access_token");
+                    localStorage.removeItem("ats_current_user");
+                    window.location.href = "/auth/login";
+                  }
+                  setErrorData(null);
+                }}
+                className="bg-[#1a4fa0] hover:bg-[#154185] text-white text-xs px-5 py-2 h-9 rounded-md font-medium shadow-xs transition-colors cursor-pointer"
+              >
+                Log In Again
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={() => setErrorData(null)}
+                className="bg-[#1a4fa0] hover:bg-[#154185] text-white text-xs px-5 py-2 h-9 rounded-md font-medium shadow-xs transition-colors cursor-pointer"
+              >
+                Understood
+              </Button>
+            )}
           </div>
         </div>
 
