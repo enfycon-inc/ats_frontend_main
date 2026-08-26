@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Mail, Globe, Trash2, ShieldAlert } from "lucide-react";
 import { SmtpConfigModal } from "@/components/email/smtp-config-modal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { atsApi } from "@/lib/ats-api";
+import { atsApi, getApiBase } from "@/lib/ats-api";
 
 interface EmailAccount {
   id: string;
