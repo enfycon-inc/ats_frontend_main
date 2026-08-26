@@ -1,45 +1,40 @@
-
 "use client";
 
 import { Loader2, LogOutIcon } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { startTransition, useState } from "react";
-import toast from "react-hot-toast";
+import { useState } from "react";
 import { Button } from "../ui/button";
-import { doLogout, LogoutResponse } from "./actions/logout";
+import { signOut } from "next-auth/react";
 import { atsApi } from "@/lib/ats-api";
 
 const Logout = () => {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  const handleLogout = () => {
-    setLoading(true);
-
-    startTransition(async () => {
+  const handleLogout = async () => {
+    try {
+      setLoading(true);
       try {
-        const result = (await doLogout()) as LogoutResponse;
-
-        if ("error" in result) {
-          toast.error(result.error);
-        } else {
-          try {
-            atsApi.auth.logout();
-          } catch (logoutErr) {
-            console.error("Local token clear failed:", logoutErr);
-          }
-          toast.success("You logged out successfully.");
-          router.push("/auth/login");
-        }
-      } catch (error) {
-        console.error("Logout error:", error);
-        toast.error("Something went wrong. Please try again.");
-      } finally {
-        setLoading(false);
+        atsApi.auth.logout();
+      } catch (logoutErr) {
+        console.error("Local token clear failed:", logoutErr);
       }
-    });
-  };
 
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("ats_access_token");
+        localStorage.removeItem("ats_current_user");
+        localStorage.removeItem("active_branch_id");
+        localStorage.removeItem("override_role");
+      }
+
+      await signOut({ callbackUrl: "/auth/login", redirect: true });
+    } catch (error) {
+      console.error("Logout error:", error);
+      if (typeof window !== "undefined") {
+        window.location.href = "/auth/login";
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Button

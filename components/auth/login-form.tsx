@@ -14,7 +14,6 @@ import { Loader2, Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
-import { handleLoginAction } from "./actions/login";
 import { getCurrentSubdomain, getBaseDomain, getTenantIdentifier } from "@/utils/subdomain-helper";
 import Social from "./social";
 import { useSearchParams } from "next/navigation";
@@ -84,35 +83,28 @@ const LoginForm = () => {
   const onSubmit = (data: z.infer<typeof schema>) => {
     startTransition(async () => {
       try {
-        if (!formRef.current) return;
+        // 1. Authenticate with NestJS Backend API to retrieve & store 7-day JWT token
+        let syncRes;
+        try {
+          syncRes = await atsApi.auth.login(data.email, data.password);
+        } catch (apiErr: any) {
+          toast.error(apiErr.message || "Backend authentication failed.");
+          return;
+        }
 
-        const formData = new FormData(formRef.current);
-        const res = await handleLoginAction(formData);
+        // 2. Establish NextAuth session
+        const signInRes = await signIn("credentials", {
+          redirect: false,
+          email: data.email,
+          password: data.password,
+          subdomain: getTenantIdentifier(),
+          callbackUrl: "/dashboard",
+        });
 
-        if (res?.error) {
-          toast.error(res.error);
-        } else {
-          // Sync with NestJS Backend API to retrieve/store JWT token
-          let syncRes;
-          try {
-            syncRes = await atsApi.auth.login(data.email, data.password);
-          } catch (apiErr: any) {
-            toast.error(apiErr.message || "Backend authentication failed.");
-            return;
-          }
-
-          const signInRes = await signIn("credentials", {
-            redirect: false,
-            email: data.email,
-            password: data.password,
-            subdomain: getTenantIdentifier(),
-            callbackUrl: "/dashboard",
-          });
-
-          if (signInRes?.error) {
-            toast.error("Sign in failed. Please check credentials.");
-            return;
-          }
+        if (signInRes?.error) {
+          toast.error("Sign in failed. Please check credentials.");
+          return;
+        }
 
           toast.success("Successfully logged in");
 
