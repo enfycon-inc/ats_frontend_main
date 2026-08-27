@@ -141,6 +141,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   permissions: data.user.permissions || [],
                   roles: data.user.roles || [],
                   accessToken: data.accessToken,
+                  refreshToken: data.refreshToken || null,
+                  expiresIn: data.expiresIn || (60 * 60 * 24 * 7),
                   tenantDomain: data.user.tenantDomain || '',
                   systemRole: data.user.systemRole || 'RECRUITER',
                   podId: data.user.podId || null,
@@ -291,11 +293,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return true;
     },
     async jwt({ token, user }) {
+      // ── First login: populate token from user object returned by authorize() ──
       if (user) {
         token.id = user.id
         token.permissions = (user as any).permissions || []
         token.roles = (user as any).roles || []
         token.accessToken = (user as any).accessToken
+        token.refreshToken = (user as any).refreshToken || null
+        token.accessTokenExpiry = Date.now() + (((user as any).expiresIn || 604800) * 1000)
         token.tenantDomain = (user as any).tenantDomain
         token.systemRole = (user as any).systemRole
         token.podId = (user as any).podId
@@ -303,7 +308,50 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.branchName = (user as any).branchName
         token.tenantId = (user as any).tenantId
         token.defaultMarket = (user as any).defaultMarket
+        delete token.error
+        return token
       }
+
+      // ── Subsequent session checks: silently refresh access token if expired ──
+      const now = Date.now()
+      const expiry = token.accessTokenExpiry as number | undefined
+
+      // Token still valid (more than 5 min remaining) — return as-is
+      if (expiry && now < expiry - 5 * 60 * 1000) {
+        return token
+      }
+
+      // Token expired or about to expire — try silent refresh via backend
+      if (token.refreshToken) {
+        try {
+          // Docker-internal URL (production), env var fallback (dev)
+          const apiBase =
+            process.env.NODE_ENV === 'production'
+              ? 'http://backend:5000'
+              : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000')
+
+          const res = await fetch(`${apiBase}/api/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken: token.refreshToken }),
+          }).catch(() => null)
+
+          if (res && res.ok) {
+            const data = await res.json()
+            token.accessToken = data.accessToken
+            if (data.refreshToken) token.refreshToken = data.refreshToken
+            token.accessTokenExpiry = Date.now() + ((data.expiresIn || 604800) * 1000)
+            delete token.error
+            console.log('[auth.ts jwt] Access token silently refreshed.')
+            return token
+          }
+        } catch (e) {
+          console.error('[auth.ts jwt] Silent token refresh failed:', e)
+        }
+      }
+
+      // Refresh failed — mark error so client can redirect to login
+      token.error = 'RefreshAccessTokenError'
       return token
     },
     async session({ session, token }) {
@@ -319,6 +367,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as any).branchName = token.branchName;
         (session.user as any).tenantId = token.tenantId;
         (session.user as any).defaultMarket = token.defaultMarket;
+        // Forward refresh error so client can detect and redirect to login
+        (session as any).error = token.error || null;
       }
       return session
     }

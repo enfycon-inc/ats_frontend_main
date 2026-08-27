@@ -75,6 +75,7 @@ export function GlobalErrorModal() {
                 onClick={() => {
                   if (typeof window !== "undefined") {
                     localStorage.removeItem("ats_access_token");
+                    localStorage.removeItem("ats_refresh_token");
                     localStorage.removeItem("ats_current_user");
                     window.location.href = "/auth/login";
                   }
