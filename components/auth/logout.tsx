@@ -25,7 +25,11 @@ const Logout = () => {
         localStorage.removeItem("override_role");
       }
 
-      await signOut({ callbackUrl: "/auth/login", redirect: true });
+      await signOut({ redirect: false });
+
+      if (typeof window !== "undefined") {
+        window.location.href = "/auth/login";
+      }
     } catch (error) {
       console.error("Logout error:", error);
       if (typeof window !== "undefined") {
