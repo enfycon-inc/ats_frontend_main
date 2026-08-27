@@ -41,9 +41,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       authorize: async (credentials) => {
         if (!credentials?.token) return null;
         try {
-          let apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000";
-          if (process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_API_URL) {
-            apiBase = "http://backend:5000";
+          let apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.enfyjobs.com";
+          if (process.env.NODE_ENV === "production" && apiBase.includes("localhost")) {
+            apiBase = "https://api.enfyjobs.com";
           }
           const res = await fetch(`${apiBase}/api/auth/me`, {
             headers: {
@@ -52,22 +52,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
           if (res.ok) {
             const data = await res.json();
-            if (data?.user) {
+            const u = data?.user || data;
+            if (u && u.id) {
               return {
-                id: data.user.id,
-                name: data.user.fullName,
-                email: data.user.email,
+                id: u.id,
+                name: u.fullName || u.full_name || u.name,
+                email: u.email,
                 image: "/images/users/user-1.jpg",
-                permissions: data.user.permissions || [],
-                roles: data.user.roles || [],
+                permissions: u.permissions || [],
+                roles: u.roles || [],
                 accessToken: credentials.token as string,
-                tenantDomain: data.user.tenantDomain || "",
-                systemRole: data.user.systemRole || "RECRUITER",
-                podId: data.user.podId || null,
-                branchId: data.user.branchId || null,
-                branchName: data.user.branchName || null,
-                tenantId: data.user.tenantId || DEFAULT_TENANT_ID,
-                defaultMarket: data.user.defaultMarket || "US",
+                tenantDomain: u.tenantDomain || u.tenant_domain || "",
+                systemRole: u.systemRole || "RECRUITER",
+                podId: u.podId || u.pod_id || null,
+                branchId: u.branchId || u.branch_id || null,
+                branchName: u.branchName || u.branch_name || null,
+                tenantId: u.tenantId || u.tenant_id || DEFAULT_TENANT_ID,
+                defaultMarket: u.defaultMarket || u.default_market || "US",
               };
             }
           }
@@ -85,57 +86,50 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       authorize: async (credentials) => {
         try {
-          const parsed = await loginSchema.parseAsync(credentials)
-          const { email, password } = parsed
-          const subdomain = credentials?.subdomain || ""
+          const parsed = await loginSchema.parseAsync(credentials);
+          const { email, password } = parsed;
+          const subdomain = credentials?.subdomain || "";
 
-          // Authenticate against the NestJS Backend via Keycloak direct grant
-          let apiBase = 'http://backend:5000'
-          let res
-
-          try {
-            const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), 10000)
-            res = await fetch(`${apiBase}/api/auth/login`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, password, subdomain }),
-              signal: controller.signal,
-            })
-            clearTimeout(timeoutId)
-          } catch (dockerErr: any) {
-            apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('localhost', '127.0.0.1')
-            res = await fetch(`${apiBase}/api/auth/login`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, password, subdomain }),
-            })
+          let apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.enfyjobs.com";
+          if (process.env.NODE_ENV === "production" && apiBase.includes("localhost")) {
+            apiBase = "https://api.enfyjobs.com";
           }
 
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4000);
+          const res = await fetch(`${apiBase}/api/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password, subdomain }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
           if (res && res.ok) {
-            const data = await res.json()
-            if (data && data.user) {
+            const data = await res.json();
+            const u = data?.user || data;
+            if (data && u) {
               return {
-                id: data.user.id,
-                name: data.user.fullName,
-                email: data.user.email,
-                image: '/images/users/user-1.jpg',
-                permissions: data.user.permissions || [],
-                roles: data.user.roles || [],
+                id: u.id,
+                name: u.fullName || u.full_name || u.name,
+                email: u.email,
+                image: "/images/users/user-1.jpg",
+                permissions: u.permissions || [],
+                roles: u.roles || [],
                 accessToken: data.accessToken,
                 refreshToken: data.refreshToken || null,
-                expiresIn: data.expiresIn || 300,
-                tenantDomain: data.user.tenantDomain || '',
-                systemRole: data.user.systemRole || 'RECRUITER',
-                podId: data.user.podId || null,
-                branchId: data.user.branchId || null,
-                branchName: data.user.branchName || null,
-                tenantId: data.user.tenantId || DEFAULT_TENANT_ID,
-                defaultMarket: data.user.defaultMarket || 'US',
-              }
+                expiresIn: data.expiresIn || 36000,
+                tenantDomain: u.tenantDomain || u.tenant_domain || "",
+                systemRole: u.systemRole || "RECRUITER",
+                podId: u.podId || u.pod_id || null,
+                branchId: u.branchId || u.branch_id || null,
+                branchName: u.branchName || u.branch_name || null,
+                tenantId: u.tenantId || u.tenant_id || DEFAULT_TENANT_ID,
+                defaultMarket: u.defaultMarket || u.default_market || "US",
+              };
             }
           } else {
-            const errBody = res ? await res.text().catch(() => '') : '';
+            const errBody = res ? await res.text().catch(() => "") : "";
             console.warn(`[auth.ts] Backend authentication failed with status ${res?.status}: ${errBody}`);
           }
           return null

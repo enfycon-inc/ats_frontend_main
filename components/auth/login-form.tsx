@@ -92,12 +92,10 @@ const LoginForm = () => {
           return;
         }
 
-        // 2. Establish NextAuth session
-        const signInRes = await signIn("credentials", {
+        // 2. Establish NextAuth session via fast token-handoff
+        const signInRes = await signIn("token-handoff", {
           redirect: false,
-          email: data.email,
-          password: data.password,
-          subdomain: getTenantIdentifier(),
+          token: syncRes.accessToken,
           callbackUrl: "/dashboard",
         });
 
