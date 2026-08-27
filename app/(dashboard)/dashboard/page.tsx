@@ -1811,13 +1811,13 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href="/candidates">
+          <Link href="/applicants">
             <Button size="sm" variant="outline" className="text-xs font-bold border-default-200 h-8 gap-1">
               <Icon icon="heroicons:magnifying-glass" className="h-3.5 w-3.5 text-indigo-600" />
               Talent Bench Search
             </Button>
           </Link>
-          <Link href="/mass-mail">
+          <Link href="/email">
             <Button size="sm" variant="outline" className="text-xs font-bold border-default-200 h-8 gap-1 text-purple-700 bg-purple-50/50 hover:bg-purple-100">
               <Icon icon="heroicons:paper-airplane" className="h-3.5 w-3.5 text-purple-600" />
               Mass Mail Outreach

@@ -93,7 +93,30 @@ function getCurrentUser(): any | null {
 
 async function getOrFetchToken(): Promise<string | null> {
   let token = getToken();
-  if (token) return token;
+  if (token) {
+    // Check if token in localStorage is expired
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (payload.exp && nowSec > payload.exp) {
+          console.warn('[getOrFetchToken] Stored token expired, attempting auto-refresh...');
+          const refreshed = await tryAutoRefresh();
+          if (refreshed) return refreshed;
+          clearToken();
+          token = null;
+        }
+      }
+    } catch {}
+    if (token) return token;
+  }
+
+  // If no valid token in localStorage, attempt auto-refresh from refresh token
+  if (getRefreshToken()) {
+    const refreshed = await tryAutoRefresh();
+    if (refreshed) return refreshed;
+  }
 
   if (typeof window !== 'undefined') {
     try {
@@ -101,28 +124,7 @@ async function getOrFetchToken(): Promise<string | null> {
       if (res.ok) {
         const session = await res.json();
 
-        // If the NextAuth jwt callback could not refresh the token, don't use the stale one
-        if ((session as any)?.error === 'RefreshAccessTokenError') {
-          console.warn('[getOrFetchToken] NextAuth reported RefreshAccessTokenError — session must be renewed.');
-          return null;
-        }
-
-        if (session?.user?.accessToken) {
-          // Decode the JWT payload to check its exp claim before trusting it
-          try {
-            const parts = (session.user.accessToken as string).split('.');
-            if (parts.length === 3) {
-              const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-              const nowSec = Math.floor(Date.now() / 1000);
-              if (payload.exp && nowSec > payload.exp) {
-                console.warn('[getOrFetchToken] Token from NextAuth session is already expired — skipping.');
-                return null;
-              }
-            }
-          } catch {
-            // Parsing failed (e.g., opaque Keycloak token) — trust the session value
-          }
-
+        if (session?.user?.accessToken && (session as any)?.error !== 'RefreshAccessTokenError') {
           token = session.user.accessToken;
           setToken(token!);
           if (session.user) {

@@ -5,7 +5,6 @@ import Google from "next-auth/providers/google"
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id"
 import { ZodError } from "zod"
 import { loginSchema } from "./lib/zod"
-import { getUserFromDb } from "./utils/db"
 
 const DEFAULT_TENANT_ID = "d3b07384-d113-49c3-a555-9ee75c13ca33";
 const isProd = process.env.NODE_ENV === "production";
@@ -85,128 +84,63 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         subdomain: {},
       },
       authorize: async (credentials) => {
-        const fs = require('fs');
-        const path = require('path');
-        const logPath = path.join(process.cwd(), 'nextauth_debug.log');
-        const log = (msg: any) => {
-          console.log(msg);
-          try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`); } catch(e) {}
-        };
-        
         try {
-          log(`Authorize started for email: ${credentials?.email}`);
           const parsed = await loginSchema.parseAsync(credentials)
           const { email, password } = parsed
           const subdomain = credentials?.subdomain || ""
-          log(`Parsed credentials: email=${email}, subdomain=${subdomain}`);
 
-          // 1. Try to authenticate against the NestJS Backend first
+          // Authenticate against the NestJS Backend via Keycloak direct grant
+          let apiBase = 'http://backend:5000'
+          let res
+
           try {
-            let apiBase = 'http://backend:5000'
-            let res
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 10000)
+            res = await fetch(`${apiBase}/api/auth/login`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password, subdomain }),
+              signal: controller.signal,
+            })
+            clearTimeout(timeoutId)
+          } catch (dockerErr: any) {
+            apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('localhost', '127.0.0.1')
+            res = await fetch(`${apiBase}/api/auth/login`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password, subdomain }),
+            })
+          }
 
-            try {
-              log(`Attempting fetch to Docker backend: ${apiBase}/api/auth/login`);
-              const controller = new AbortController()
-              const timeoutId = setTimeout(() => controller.abort(), 10000)
-              res = await fetch(`${apiBase}/api/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, subdomain }),
-                signal: controller.signal,
-              })
-              clearTimeout(timeoutId)
-              log(`Docker backend response status: ${res?.status}`);
-            } catch (dockerErr: any) {
-              log(`Docker backend failed: ${dockerErr.message}. Trying localhost fallback.`);
-              apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('localhost', '127.0.0.1')
-              log(`Attempting fetch to localhost backend: ${apiBase}/api/auth/login`);
-              res = await fetch(`${apiBase}/api/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, subdomain }),
-              })
-              log(`Localhost backend response status: ${res?.status}`);
-            }
-
-            if (res && res.ok) {
-              const data = await res.json()
-              log(`Backend login successful. User data: ${JSON.stringify(data.user)}`);
-              if (data && data.user) {
-                return {
-                  id: data.user.id,
-                  name: data.user.fullName,
-                  email: data.user.email,
-                  image: '/images/users/user-1.jpg',
-                  permissions: data.user.permissions || [],
-                  roles: data.user.roles || [],
-                  accessToken: data.accessToken,
-                  refreshToken: data.refreshToken || null,
-                  expiresIn: data.expiresIn || (60 * 60 * 24 * 7),
-                  tenantDomain: data.user.tenantDomain || '',
-                  systemRole: data.user.systemRole || 'RECRUITER',
-                  podId: data.user.podId || null,
-                  branchId: data.user.branchId || null,
-                  branchName: data.user.branchName || null,
-                  tenantId: data.user.tenantId || DEFAULT_TENANT_ID,
-                  defaultMarket: data.user.defaultMarket || 'US',
-                }
+          if (res && res.ok) {
+            const data = await res.json()
+            if (data && data.user) {
+              return {
+                id: data.user.id,
+                name: data.user.fullName,
+                email: data.user.email,
+                image: '/images/users/user-1.jpg',
+                permissions: data.user.permissions || [],
+                roles: data.user.roles || [],
+                accessToken: data.accessToken,
+                refreshToken: data.refreshToken || null,
+                expiresIn: data.expiresIn || 300,
+                tenantDomain: data.user.tenantDomain || '',
+                systemRole: data.user.systemRole || 'RECRUITER',
+                podId: data.user.podId || null,
+                branchId: data.user.branchId || null,
+                branchName: data.user.branchName || null,
+                tenantId: data.user.tenantId || DEFAULT_TENANT_ID,
+                defaultMarket: data.user.defaultMarket || 'US',
               }
-            } else {
-              const errBody = res ? await res.text().catch(() => '') : '';
-              log(`Backend login failed with status ${res?.status}. Body: ${errBody}`);
             }
-          } catch (apiErr: any) {
-            log(`Backend auth encountered exception: ${apiErr.message}\n${apiErr.stack}`);
-            console.warn("Backend auth attempt encountered an error. Falling back to local mock data.", apiErr)
+          } else {
+            const errBody = res ? await res.text().catch(() => '') : '';
+            console.warn(`[auth.ts] Backend authentication failed with status ${res?.status}: ${errBody}`);
           }
-
-          // 2. Fallback: Authenticate using hardcoded local mock data with signed JWT
-          log(`Falling back to local mock database for ${email}`);
-          const user = await getUserFromDb(email, password)
-          if (user) {
-            const resolvedRole = email === 'admin@enfycon.com' ? 'SUPER_ADMIN' : (user.name.toUpperCase().includes('ADMIN') ? 'ADMIN' : 'RECRUITER');
-            log(`Found mock user: ${user.name}, resolvedRole: ${resolvedRole}`);
-            
-            // Sign a valid HS256 JWT with 7-day TTL
-            const crypto = require('crypto');
-            const secret = process.env.MOCK_JWT_SECRET || 'enfy-ats-dev-jwt-secret-change-me-in-prod';
-            const header = { alg: 'HS256', typ: 'JWT' };
-            const now = Math.floor(Date.now() / 1000);
-            const claims = {
-              sub: user.email,
-              email: user.email,
-              fullName: user.name,
-              roles: resolvedRole === 'SUPER_ADMIN' ? ['ADMIN', 'SUPER_ADMIN'] : [resolvedRole],
-              tenantId: DEFAULT_TENANT_ID,
-              iat: now,
-              exp: now + (60 * 60 * 24 * 7),
-            };
-            const b64H = Buffer.from(JSON.stringify(header)).toString('base64url');
-            const b64P = Buffer.from(JSON.stringify(claims)).toString('base64url');
-            const sig = crypto.createHmac('sha256', secret).update(`${b64H}.${b64P}`).digest('base64url');
-            const generatedToken = `${b64H}.${b64P}.${sig}`;
-
-            return {
-              id: user.email,
-              name: user.name,
-              email: user.email,
-              image: user.image,
-              permissions: ['job:create', 'job:edit', 'job:view', 'candidate:create', 'candidate:view', 'submission:create', 'submission:edit', 'tenant:settings', 'user:manage'],
-              roles: resolvedRole === 'SUPER_ADMIN' ? ['ADMIN', 'SUPER_ADMIN'] : [resolvedRole],
-              accessToken: generatedToken,
-              tenantDomain: '',
-              systemRole: resolvedRole,
-              podId: null,
-              tenantId: DEFAULT_TENANT_ID,
-              defaultMarket: resolvedRole === 'SUPER_ADMIN' ? 'US' : 'IN',
-            }
-          }
-
-          log(`No mock user found for ${email}`);
           return null
         } catch (error: any) {
-          log(`Authorize caught global exception: ${error.message}\n${error.stack}`);
+          console.error(`[auth.ts] Authorize error: ${error.message}`);
           return null
         }
       }
@@ -316,8 +250,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       const now = Date.now()
       const expiry = token.accessTokenExpiry as number | undefined
 
-      // Token still valid (more than 5 min remaining) — return as-is
-      if (expiry && now < expiry - 5 * 60 * 1000) {
+      // Token still valid (more than 1 min remaining) — return as-is
+      if (expiry && now < expiry - 60 * 1000) {
+        delete token.error
         return token
       }
 
@@ -340,7 +275,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             const data = await res.json()
             token.accessToken = data.accessToken
             if (data.refreshToken) token.refreshToken = data.refreshToken
-            token.accessTokenExpiry = Date.now() + ((data.expiresIn || 604800) * 1000)
+            token.accessTokenExpiry = Date.now() + ((data.expiresIn || 300) * 1000)
             delete token.error
             console.log('[auth.ts jwt] Access token silently refreshed.')
             return token
@@ -350,7 +285,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
 
-      // Refresh failed — mark error so client can redirect to login
+      // If token still has an accessToken and hasn't definitely expired, keep using it
+      if (!expiry || now < expiry) {
+        delete token.error
+        return token
+      }
+
+      // Definitively expired and refresh failed — mark error so client redirects to login
       token.error = 'RefreshAccessTokenError'
       return token
     },
