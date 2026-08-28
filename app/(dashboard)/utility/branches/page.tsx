@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import { 
   Building2, MapPin, Plus, Edit2, Users, CheckCircle2, XCircle, 
   Search, ShieldAlert, Sparkles, X, Globe, UserPlus, Briefcase, Crown, Shield,
-  GitFork, ChevronRight, ChevronDown, Layers, Rocket, ArrowRight, MessageSquare, ListChecks, Trash2
+  GitFork, ChevronRight, ChevronDown, Layers, Rocket, ArrowRight, MessageSquare, ListChecks, Trash2,
+  Clock, Calendar, Sun, Moon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +55,12 @@ export default function BranchManagementPage() {
     state: "",
     country: "India",
     market: "INDIA",
+    timezone: "Asia/Kolkata",
+    workStartTime: "09:00",
+    workEndTime: "18:00",
+    workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+    shiftTiming: "Day Shift (09:00 - 18:00)",
+    breakDurationMinutes: 60,
     allowNone: false,
     allowPods: true,
     allowAll: true,
@@ -105,6 +112,12 @@ export default function BranchManagementPage() {
         state: formData.state,
         country: formData.country,
         market: formData.market,
+        timezone: formData.timezone,
+        workStartTime: formData.workStartTime,
+        workEndTime: formData.workEndTime,
+        workingDays: formData.workingDays,
+        shiftTiming: formData.shiftTiming || `Shift (${formData.workStartTime} - ${formData.workEndTime})`,
+        breakDurationMinutes: formData.breakDurationMinutes,
       });
       if (created && typeof window !== "undefined") {
         localStorage.setItem("active_branch_id", created.id);
@@ -133,6 +146,12 @@ export default function BranchManagementPage() {
         state: formData.state,
         country: formData.country,
         market: formData.market,
+        timezone: formData.timezone,
+        workStartTime: formData.workStartTime,
+        workEndTime: formData.workEndTime,
+        workingDays: formData.workingDays,
+        shiftTiming: formData.shiftTiming || `Shift (${formData.workStartTime} - ${formData.workEndTime})`,
+        breakDurationMinutes: formData.breakDurationMinutes,
         allowNone: formData.allowNone,
         allowPods: formData.allowNone ? false : formData.allowPods,
         allowAll: formData.allowNone ? false : formData.allowAll,
@@ -145,7 +164,7 @@ export default function BranchManagementPage() {
         allowedJobApproverRoles: formData.allowedJobApproverRoles,
         approvalRoutingMode: formData.approvalRoutingMode,
       });
-      toast.success("Branch details & routing policy updated successfully!");
+      toast.success("Branch details, operating hours & routing policy updated successfully!");
       setIsEditOpen(false);
       resetForm();
       await loadBranchesAndHierarchy();
@@ -189,6 +208,14 @@ export default function BranchManagementPage() {
       state: b.state || "",
       country: b.country || "India",
       market: b.market || "INDIA",
+      timezone: b.timezone || (b.market === "US" || b.country === "United States" ? "America/New_York" : "Asia/Kolkata"),
+      workStartTime: b.workStartTime || "09:00",
+      workEndTime: b.workEndTime || "18:00",
+      workingDays: Array.isArray(b.workingDays) && b.workingDays.length > 0
+        ? b.workingDays
+        : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      shiftTiming: b.shiftTiming || "Day Shift (09:00 - 18:00)",
+      breakDurationMinutes: b.breakDurationMinutes ?? 60,
       allowNone: allowNone,
       allowPods: allowNone ? false : b.allowPods !== false,
       allowAll: allowNone ? false : b.allowAll !== false,
@@ -254,6 +281,8 @@ export default function BranchManagementPage() {
       ...prev,
       country: presetMarket === "US" ? "United States" : "India",
       market: presetMarket,
+      timezone: presetMarket === "US" ? "America/New_York" : "Asia/Kolkata",
+      shiftTiming: presetMarket === "US" ? "US Day Shift (09:00 - 18:00 EST)" : "General Day Shift (09:00 - 18:00 IST)",
     }));
     setIsCreateOpen(true);
   };
@@ -266,6 +295,12 @@ export default function BranchManagementPage() {
       state: "",
       country: "India",
       market: "INDIA",
+      timezone: "Asia/Kolkata",
+      workStartTime: "09:00",
+      workEndTime: "18:00",
+      workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      shiftTiming: "Day Shift (09:00 - 18:00)",
+      breakDurationMinutes: 60,
       allowNone: false,
       allowPods: true,
       allowAll: true,
@@ -549,6 +584,27 @@ export default function BranchManagementPage() {
                           </div>
                         </div>
 
+                        {/* OPERATING HOURS & SHIFT BADGE */}
+                        <div className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 p-2.5 rounded-lg flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                            <div>
+                              <div className="flex items-center gap-1.5 font-bold text-amber-950 dark:text-amber-200">
+                                <span>{b.workStartTime || "09:00"} - {b.workEndTime || "18:00"}</span>
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 font-mono font-bold">
+                                  {b.timezone ? b.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}
+                                </span>
+                              </div>
+                              <p className="text-[10.5px] text-amber-800/80 dark:text-amber-400/80 font-medium">
+                                {b.shiftTiming || "General Shift"} • {Array.isArray(b.workingDays) && b.workingDays.length > 0 ? (b.workingDays.length === 5 ? "Mon - Fri" : b.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon - Fri"}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-white/70 dark:bg-slate-900/70 px-2 py-0.5 rounded border border-amber-200/60 dark:border-amber-800/60">
+                            Timing Snapshot Enabled
+                          </span>
+                        </div>
+
                         {/* BRANCH MANAGER STRIP */}
                         <div className="bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-neutral-200 dark:border-slate-800 flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -649,6 +705,24 @@ export default function BranchManagementPage() {
                   >
                     {b.managerName ? "Change" : "Assign"}
                   </button>
+                </div>
+
+                {/* OPERATING HOURS & SHIFT BADGE */}
+                <div className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 p-2.5 rounded-lg flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <div>
+                      <div className="flex items-center gap-1.5 font-bold text-amber-950 dark:text-amber-200">
+                        <span>{b.workStartTime || "09:00"} - {b.workEndTime || "18:00"}</span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 font-mono font-bold">
+                          {b.timezone ? b.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-amber-800/80 dark:text-amber-400/80 font-medium">
+                        {b.shiftTiming || "General Shift"} • {Array.isArray(b.workingDays) && b.workingDays.length > 0 ? (b.workingDays.length === 5 ? "Mon - Fri" : b.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon - Fri"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* STATS STRIP */}
@@ -755,12 +829,116 @@ export default function BranchManagementPage() {
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Market Segment *</label>
                 <select
                   value={formData.market}
-                  onChange={(e) => setFormData({ ...formData, market: e.target.value })}
+                  onChange={(e) => {
+                    const m = e.target.value;
+                    setFormData({
+                      ...formData,
+                      market: m,
+                      country: m === "US" ? "United States" : "India",
+                      timezone: m === "US" ? "America/New_York" : "Asia/Kolkata",
+                      shiftTiming: m === "US" ? `US Shift (${formData.workStartTime} - ${formData.workEndTime} EST)` : `Day Shift (${formData.workStartTime} - ${formData.workEndTime} IST)`,
+                    });
+                  }}
                   className="w-full h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 font-semibold"
                 >
                   <option value="INDIA">Domestic India Segment</option>
                   <option value="US">US IT Segment</option>
                 </select>
+              </div>
+
+              {/* Operating Hours & Shift Timing Section */}
+              <div className="p-3.5 bg-neutral-50 dark:bg-slate-850 rounded-xl border border-neutral-200 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between border-b border-neutral-200/60 dark:border-slate-800 pb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                    <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">
+                      Working Hours &amp; Shift Schedule
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400">Snapshot on Job Post</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Timezone</label>
+                    <select
+                      value={formData.timezone}
+                      onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
+                      className="w-full h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 font-semibold"
+                    >
+                      <option value="Asia/Kolkata">Asia/Kolkata (IST +5:30)</option>
+                      <option value="America/New_York">America/New_York (EST -5:00)</option>
+                      <option value="America/Chicago">America/Chicago (CST -6:00)</option>
+                      <option value="America/Denver">America/Denver (MST -7:00)</option>
+                      <option value="America/Los_Angeles">America/Los_Angeles (PST -8:00)</option>
+                      <option value="Europe/London">Europe/London (GMT +0:00)</option>
+                      <option value="Asia/Dubai">Asia/Dubai (GST +4:00)</option>
+                      <option value="Asia/Singapore">Asia/Singapore (SGT +8:00)</option>
+                      <option value="Australia/Sydney">Australia/Sydney (AEST +10:00)</option>
+                      <option value="UTC">UTC</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Shift Name</label>
+                    <Input
+                      value={formData.shiftTiming}
+                      onChange={(e) => setFormData({ ...formData, shiftTiming: e.target.value })}
+                      placeholder="e.g. Day Shift (09:00 - 18:00)"
+                      className="h-8 text-xs rounded border-neutral-300 bg-white dark:bg-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Start Time</label>
+                    <Input
+                      type="time"
+                      value={formData.workStartTime}
+                      onChange={(e) => setFormData({ ...formData, workStartTime: e.target.value })}
+                      className="h-8 text-xs font-mono rounded border-neutral-300 bg-white dark:bg-slate-900"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">End Time</label>
+                    <Input
+                      type="time"
+                      value={formData.workEndTime}
+                      onChange={(e) => setFormData({ ...formData, workEndTime: e.target.value })}
+                      className="h-8 text-xs font-mono rounded border-neutral-300 bg-white dark:bg-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Working Days</label>
+                  <div className="flex flex-wrap gap-1">
+                    {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => {
+                      const isSel = formData.workingDays.includes(day);
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => {
+                            const updated = isSel
+                              ? formData.workingDays.filter((d) => d !== day)
+                              : [...formData.workingDays, day];
+                            setFormData({ ...formData, workingDays: updated });
+                          }}
+                          className={`px-2 py-0.5 rounded text-[10.5px] font-semibold border ${
+                            isSel
+                              ? "bg-indigo-600 text-white border-indigo-600"
+                              : "bg-white dark:bg-slate-900 text-neutral-600 dark:text-neutral-300 border-neutral-200 dark:border-slate-700"
+                          }`}
+                        >
+                          {day.slice(0, 3)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
@@ -872,7 +1050,139 @@ export default function BranchManagementPage() {
                   </div>
                 </div>
 
-                {/* 2. Job Assignment & Routing Policy */}
+                {/* 2. Branch Working Hours & Shift Timing */}
+                <div className="bg-neutral-50/70 dark:bg-slate-800/40 p-4 rounded-xl border border-neutral-200/80 dark:border-slate-700/80 space-y-4">
+                  <div className="flex items-center justify-between border-b border-neutral-200/60 dark:border-slate-700/60 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
+                        Branch Operating Hours &amp; Shift Schedule
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                      Captured on Job Postings
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    {/* Timezone */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                        <Globe className="h-3 w-3 text-neutral-400" /> Office Timezone
+                      </label>
+                      <select
+                        value={formData.timezone}
+                        onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
+                        className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 font-semibold text-neutral-800 dark:text-neutral-200 outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="Asia/Kolkata">India Standard Time (IST) • UTC+05:30</option>
+                        <option value="America/New_York">US Eastern Time (EST/EDT) • UTC-05:00</option>
+                        <option value="America/Chicago">US Central Time (CST/CDT) • UTC-06:00</option>
+                        <option value="America/Denver">US Mountain Time (MST/MDT) • UTC-07:00</option>
+                        <option value="America/Los_Angeles">US Pacific Time (PST/PDT) • UTC-08:00</option>
+                        <option value="Europe/London">UK / London (GMT/BST) • UTC+00:00</option>
+                        <option value="Asia/Dubai">Gulf Standard Time (GST) • UTC+04:00</option>
+                        <option value="Asia/Singapore">Singapore / SGT • UTC+08:00</option>
+                        <option value="Australia/Sydney">Australia Sydney (AEST) • UTC+10:00</option>
+                        <option value="UTC">UTC (Universal)</option>
+                      </select>
+                    </div>
+
+                    {/* Work Start Time */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                        <Sun className="h-3 w-3 text-amber-500" /> Work Start Time
+                      </label>
+                      <Input
+                        type="time"
+                        value={formData.workStartTime}
+                        onChange={(e) => setFormData({ ...formData, workStartTime: e.target.value })}
+                        className="h-8.5 text-xs font-mono rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                      />
+                    </div>
+
+                    {/* Work End Time */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                        <Moon className="h-3 w-3 text-indigo-500" /> Work End Time
+                      </label>
+                      <Input
+                        type="time"
+                        value={formData.workEndTime}
+                        onChange={(e) => setFormData({ ...formData, workEndTime: e.target.value })}
+                        className="h-8.5 text-xs font-mono rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                      />
+                    </div>
+
+                    {/* Shift Name / Timing */}
+                    <div className="space-y-1 sm:col-span-2">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                        Shift Schedule Label / Name
+                      </label>
+                      <Input
+                        value={formData.shiftTiming}
+                        onChange={(e) => setFormData({ ...formData, shiftTiming: e.target.value })}
+                        placeholder="e.g. Day Shift (09:00 - 18:00 IST) or Night US Shift"
+                        className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-medium"
+                      />
+                    </div>
+
+                    {/* Break Duration */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                        Break Duration (Minutes)
+                      </label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={180}
+                        value={formData.breakDurationMinutes}
+                        onChange={(e) => setFormData({ ...formData, breakDurationMinutes: Number(e.target.value) || 0 })}
+                        className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Working Days Selector */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                      <Calendar className="h-3.5 w-3.5 text-neutral-400" /> Working Days
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => {
+                        const isSelected = formData.workingDays.includes(day);
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={() => {
+                              const updated = isSelected
+                                ? formData.workingDays.filter((d) => d !== day)
+                                : [...formData.workingDays, day];
+                              setFormData({ ...formData, workingDays: updated });
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border ${
+                              isSelected
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                                : "bg-white dark:bg-slate-900 text-neutral-600 dark:text-neutral-300 border-neutral-200 dark:border-slate-700 hover:bg-neutral-100"
+                            }`}
+                          >
+                            {day.slice(0, 3)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-amber-50/70 dark:bg-amber-950/30 rounded-lg border border-amber-200/70 dark:border-amber-900/40 flex items-start gap-2 text-[11px] text-amber-900 dark:text-amber-300">
+                    <span className="font-bold">🛡️ Timing Policy:</span>
+                    <span>
+                      Modifying this branch schedule will immediately take effect for all future job postings created in this branch. Previously created jobs will securely retain their original timing snapshot.
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Job Assignment & Routing Policy */}
                 <div className="p-5 bg-white dark:bg-slate-900 rounded-xl border border-neutral-200 dark:border-slate-700/80 shadow-xs space-y-4">
                   <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-3">
                     <div className="flex items-center gap-2.5">

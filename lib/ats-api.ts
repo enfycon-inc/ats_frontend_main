@@ -778,6 +778,12 @@ export interface JobPayload {
   assignedApproverRole?: string | null;
   approvedBy?: string | null;
   approvedAt?: string | null;
+  jobTimezone?: string;
+  workStartTime?: string;
+  workEndTime?: string;
+  workingDays?: string[];
+  shiftTiming?: string;
+  timingSnapshotAt?: string;
   rejectionReason?: string | null;
 }
 
@@ -1226,7 +1232,20 @@ const branches = {
   async get(id: string): Promise<any> {
     return apiFetch<any>(`/api/branches/${id}`);
   },
-  async create(data: { name: string; code?: string; city?: string; state?: string; country?: string; market?: string }): Promise<any> {
+  async create(data: {
+    name: string;
+    code?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    market?: string;
+    timezone?: string;
+    workStartTime?: string;
+    workEndTime?: string;
+    workingDays?: string[];
+    shiftTiming?: string;
+    breakDurationMinutes?: number;
+  }): Promise<any> {
     return apiFetch<any>('/api/branches', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -1251,6 +1270,12 @@ const branches = {
     defaultJobApproverRole?: string;
     allowedJobApproverRoles?: string[];
     approvalRoutingMode?: 'FLEXIBLE' | 'ENFORCE_DEFAULT';
+    timezone?: string;
+    workStartTime?: string;
+    workEndTime?: string;
+    workingDays?: string[];
+    shiftTiming?: string;
+    breakDurationMinutes?: number;
   }): Promise<any> {
     return apiFetch<any>(`/api/branches/${id}`, {
       method: 'PUT',
