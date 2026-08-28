@@ -26,6 +26,7 @@ import userImg from "@/public/assets/images/user.png";
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { atsApi } from "@/lib/ats-api";
 import { isRoleAdmin } from "@/lib/role-permissions";
+import { OfficeClock } from "./office-clock";
 
 // ─── Shared icon button base ─────────────────────────────────────────────────
 function NavIconBtn({
@@ -971,6 +972,10 @@ function BranchSwitcher() {
             localStorage.setItem("active_branch_id", match.id);
             localStorage.setItem("active_branch_name", match.name);
             localStorage.setItem("active_branch_market", match.market || "INDIA");
+            localStorage.setItem("active_branch_timezone", match.timezone || (match.market === "US" ? "America/New_York" : "Asia/Kolkata"));
+            localStorage.setItem("active_branch_start_time", match.workStartTime || match.work_start_time || (match.market === "US" ? "09:00 AM" : "09:30 AM"));
+            localStorage.setItem("active_branch_end_time", match.workEndTime || match.work_end_time || (match.market === "US" ? "06:00 PM" : "06:30 PM"));
+            window.dispatchEvent(new Event("branchChanged"));
           }
         }
       } else {
@@ -1002,6 +1007,10 @@ function BranchSwitcher() {
       localStorage.setItem("active_branch_id", b.id);
       localStorage.setItem("active_branch_name", b.name);
       localStorage.setItem("active_branch_market", b.market || "INDIA");
+      localStorage.setItem("active_branch_timezone", b.timezone || (b.market === "US" ? "America/New_York" : "Asia/Kolkata"));
+      localStorage.setItem("active_branch_start_time", b.workStartTime || b.work_start_time || (b.market === "US" ? "09:00 AM" : "09:30 AM"));
+      localStorage.setItem("active_branch_end_time", b.workEndTime || b.work_end_time || (b.market === "US" ? "06:00 PM" : "06:30 PM"));
+      window.dispatchEvent(new Event("branchChanged"));
       setActiveBranch(b.name);
       window.location.reload();
     }
@@ -1092,6 +1101,8 @@ function BranchSwitcher() {
 export function NavbarRight() {
   return (
     <div className="flex items-center gap-1.5">
+      <OfficeClock />
+
       <BranchSwitcher />
 
       {/* Divider */}
