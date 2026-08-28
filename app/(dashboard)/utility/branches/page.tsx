@@ -5,13 +5,28 @@ import {
   Building2, MapPin, Plus, Edit2, Users, CheckCircle2, XCircle, 
   Search, ShieldAlert, Sparkles, X, Globe, UserPlus, Briefcase, Crown, Shield,
   GitFork, ChevronRight, ChevronDown, Layers, Rocket, ArrowRight, MessageSquare, ListChecks, Trash2,
-  Clock, Calendar, Sun, Moon
+  Clock, Calendar, Sun, Moon, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
+
+const SYSTEM_INTERNAL_ROLES = new Set([
+  "default_roles_enfycon_ats",
+  "offline_access",
+  "uma_authorization",
+  "manage_account",
+  "manage_account_links",
+  "view_profile",
+  "default_roles",
+]);
+
+function getDisplayRoles(roles: any): string[] {
+  const arr = Array.isArray(roles) ? roles : typeof roles === "string" ? [roles] : [];
+  return arr.filter((r) => !SYSTEM_INTERNAL_ROLES.has(String(r).toLowerCase().replace(/-/g, "_").trim()));
+}
 
 function formatTime12(timeStr?: string) {
   if (!timeStr) return "09:00 AM";
@@ -38,6 +53,9 @@ export default function BranchManagementPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [isAssignUserOpen, setIsAssignUserOpen] = useState(false);
+  const [isChangeManagerOpen, setIsChangeManagerOpen] = useState(false);
+  const [managerSearchQuery, setManagerSearchQuery] = useState("");
+  const [savingManager, setSavingManager] = useState(false);
 
   // Branch Stage Remarks Modal State
   const [isRemarksOpen, setIsRemarksOpen] = useState(false);
@@ -187,14 +205,37 @@ export default function BranchManagementPage() {
     }
   };
 
-  const handleAssignManager = async (managerId: string) => {
+  const handleAssignManager = async (managerId: string | null) => {
     if (!selectedBranch) return;
     try {
+      setSavingManager(true);
       await atsApi.branches.updateManager(selectedBranch.id, managerId);
+      toast.success(managerId ? "Branch Head assigned successfully!" : "Branch Head unassigned.");
+      setIsChangeManagerOpen(false);
       await loadBranchesAndHierarchy();
-      if (selectedBranch) openMembersModal(selectedBranch);
+      if (isMembersOpen && selectedBranch) openMembersModal(selectedBranch);
     } catch (err: any) {
-      alert(err.message || "Failed to set Branch Manager");
+      toast.error(err.message || "Failed to set Branch Manager");
+    } finally {
+      setSavingManager(false);
+    }
+  };
+
+  const handleSelectManager = handleAssignManager;
+
+  const openChangeManagerModal = async (b: any) => {
+    setSelectedBranch(b);
+    setManagerSearchQuery("");
+    setIsChangeManagerOpen(true);
+    try {
+      setMembersLoading(true);
+      const users = await atsApi.auth.listUsers().catch(() => []);
+      setAllTenantUsers(users || []);
+    } catch (err) {
+      console.error("Failed to load users for manager selection:", err);
+      setAllTenantUsers([]);
+    } finally {
+      setMembersLoading(false);
     }
   };
 
@@ -624,8 +665,8 @@ export default function BranchManagementPage() {
                             </span>
                           </div>
                           <button
-                            onClick={() => openMembersModal(b)}
-                            className="text-[11px] font-bold text-indigo-650 hover:underline"
+                            onClick={() => openChangeManagerModal(b)}
+                            className="text-[11px] font-bold text-indigo-650 hover:underline cursor-pointer"
                           >
                             {b.managerName ? "Change Manager" : "Assign Manager"}
                           </button>
@@ -707,10 +748,7 @@ export default function BranchManagementPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => {
-                      setSelectedBranch(b);
-                      openMembersModal(b);
-                    }}
+                    onClick={() => openChangeManagerModal(b)}
                     className="text-[10px] font-bold text-indigo-650 hover:underline cursor-pointer"
                   >
                     {b.managerName ? "Change" : "Assign"}
@@ -1455,13 +1493,13 @@ export default function BranchManagementPage() {
               ) : (
                 branchMembers.map((user) => {
                   const isManager = selectedBranch.managerId === user.id;
-                  const rolesArray: string[] = Array.isArray(user.roles) ? user.roles : [user.roles];
+                  const rolesArray: string[] = getDisplayRoles(user.roles);
 
                   return (
                     <div key={user.id} className="flex items-center justify-between p-3.5 rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <p className="text-xs font-bold text-neutral-800 dark:text-white">{user.fullName}</p>
+                          <p className="text-xs font-bold text-neutral-800 dark:text-white">{user.fullName || user.email}</p>
                           {isManager && (
                             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
                               <Crown className="h-3 w-3" /> Branch Head
@@ -1470,13 +1508,19 @@ export default function BranchManagementPage() {
                         </div>
                         <p className="text-[11px] text-neutral-500">{user.email}</p>
                         
-                        {/* ROLES BADGES */}
+                        {/* ROLES BADGES - CLEAN BUSINESS ROLES ONLY */}
                         <div className="flex flex-wrap gap-1 pt-1">
-                          {rolesArray.map((r) => (
-                            <span key={r} className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200">
-                              {r === "BRANCH_ADMIN" ? "Branch Admin" : r.replace("_", " ")}
+                          {rolesArray.length === 0 ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-medium bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-neutral-300 border border-neutral-200 dark:border-slate-700">
+                              Staff Member
                             </span>
-                          ))}
+                          ) : (
+                            rolesArray.map((r) => (
+                              <span key={r} className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200">
+                                {r === "BRANCH_ADMIN" ? "Branch Admin" : r.replace(/_/g, " ")}
+                              </span>
+                            ))
+                          )}
                         </div>
                       </div>
 
@@ -1508,6 +1552,163 @@ export default function BranchManagementPage() {
 
             <div className="p-4 bg-neutral-50 dark:bg-slate-850 border-t border-neutral-100 dark:border-slate-800 text-right">
               <Button size="sm" variant="outline" onClick={() => setIsMembersOpen(false)} className="h-8 text-xs font-bold">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DEDICATED CHANGE / ASSIGN BRANCH HEAD MODAL (CLEAN USER LIST ONLY) */}
+      {isChangeManagerOpen && selectedBranch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                  <Crown className="h-4 w-4 text-amber-500" />
+                  Assign Branch Head: {selectedBranch.name}
+                </h3>
+                <p className="text-[11px] text-neutral-400">
+                  Select a user to assign as the Branch Head
+                </p>
+              </div>
+              <button
+                onClick={() => setIsChangeManagerOpen(false)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Search filter */}
+            <div className="p-3.5 border-b border-neutral-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-neutral-400" />
+                <Input
+                  value={managerSearchQuery}
+                  onChange={(e) => setManagerSearchQuery(e.target.value)}
+                  placeholder="Search user by name or email..."
+                  className="pl-9 h-8 text-xs bg-neutral-50 dark:bg-slate-800 border-neutral-300 dark:border-slate-700"
+                />
+              </div>
+            </div>
+
+            {/* User List */}
+            <div className="p-3.5 space-y-2 max-h-[360px] overflow-y-auto">
+              {/* Option to clear / unassign manager */}
+              {selectedBranch.managerId && (
+                <div
+                  onClick={() => handleSelectManager(null)}
+                  className="flex items-center justify-between p-2.5 rounded-lg border border-dashed border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-full bg-neutral-100 dark:bg-slate-800 flex items-center justify-center text-neutral-400 text-xs font-bold">
+                      ∅
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Unassign Branch Head</p>
+                      <p className="text-[10px] text-neutral-400">Leave branch without assigned manager</p>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost" className="h-6 text-[10.5px] text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 font-semibold px-2">
+                    Unassign
+                  </Button>
+                </div>
+              )}
+
+              {membersLoading ? (
+                <div className="text-center py-8 text-xs text-neutral-400">Loading user list...</div>
+              ) : allTenantUsers.filter((u) => {
+                  if (!managerSearchQuery.trim()) return true;
+                  const q = managerSearchQuery.toLowerCase();
+                  return (u.fullName || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q);
+                }).length === 0 ? (
+                <div className="text-center py-8 text-xs text-neutral-400 italic">No users found.</div>
+              ) : (
+                allTenantUsers
+                  .filter((u) => {
+                    if (!managerSearchQuery.trim()) return true;
+                    const q = managerSearchQuery.toLowerCase();
+                    return (u.fullName || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q);
+                  })
+                  .map((user) => {
+                    const isCurrentManager = selectedBranch.managerId === user.id;
+                    const initials = (user.fullName || user.email || "U")
+                      .split(" ")
+                      .map((n: string) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase();
+
+                    return (
+                      <div
+                        key={user.id}
+                        onClick={() => !isCurrentManager && handleSelectManager(user.id)}
+                        className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${
+                          isCurrentManager
+                            ? "bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 cursor-default"
+                            : "bg-white dark:bg-slate-850 border-neutral-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 cursor-pointer"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                            isCurrentManager
+                              ? "bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200"
+                              : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                          }`}>
+                            {initials}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs font-bold text-neutral-900 dark:text-white truncate">
+                                {user.fullName || user.email}
+                              </p>
+                              {isCurrentManager && (
+                                <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700 shrink-0 flex items-center gap-0.5">
+                                  <Crown className="h-2.5 w-2.5" /> Current Head
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 truncate">{user.email}</p>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 ml-2">
+                          {isCurrentManager ? (
+                            <span className="text-[10.5px] font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                              <Check className="h-3.5 w-3.5" /> Selected
+                            </span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={savingManager}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectManager(user.id);
+                              }}
+                              className="h-6 text-[10.5px] font-semibold border-neutral-300 hover:border-indigo-500 hover:text-indigo-650 px-2"
+                            >
+                              Set as Head
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 bg-neutral-50 dark:bg-slate-850 border-t border-neutral-100 dark:border-slate-800 flex justify-end">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsChangeManagerOpen(false)}
+                className="h-7 text-xs font-bold px-4"
+              >
                 Close
               </Button>
             </div>
