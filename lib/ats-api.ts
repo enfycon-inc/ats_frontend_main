@@ -251,13 +251,17 @@ async function apiFetch<T = any>(
         }
       }
 
-      // If no refresh token or refresh failed, clear stale local token and fetch active session token
+      // If no refresh token or refresh failed, try fetching a fresh session token.
+      // IMPORTANT: Do NOT call clearToken() before this — parallel in-flight requests
+      // still need the current token in localStorage. Clear only after we know there
+      // is genuinely nothing better to use.
       if (typeof window !== 'undefined') {
-        clearToken();
         const freshToken = await getOrFetchToken();
         if (freshToken && freshToken !== token) {
           return apiFetch<T>(path, options, true);
         }
+        // Only clear if we truly have no valid token to fall back to
+        clearToken();
       }
     }
 
@@ -314,9 +318,9 @@ const auth = {
   },
 
   async getProfile(userId?: string): Promise<any> {
-    const uid = userId || getCurrentUser()?.id;
-    if (!uid) return null;
-    return apiFetch<any>(`/api/auth/profile/${uid}`);
+    // /api/auth/me returns the authenticated user's profile.
+    // The old /api/auth/profile/:id route does not exist — use /me instead.
+    return apiFetch<any>('/api/auth/me').catch(() => null);
   },
 
   setCurrentUser(user: any) {
