@@ -20,7 +20,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   cookies: {
     sessionToken: {
-      name: isProd ? `__Secure-authjs.session-token` : `authjs.session-token`,
+      name: `authjs.session-token`,
       options: {
         httpOnly: true,
         sameSite: "lax",
@@ -37,10 +37,37 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       name: "Token Handoff",
       credentials: {
         token: {},
+        userJson: {},
       },
       authorize: async (credentials) => {
         if (!credentials?.token) return null;
         try {
+          // 1. Direct handoff: if userJson payload is provided from client login, hydrate session immediately
+          if (credentials.userJson) {
+            try {
+              const u = JSON.parse(credentials.userJson as string);
+              if (u && (u.id || u.email)) {
+                return {
+                  id: u.id,
+                  name: u.fullName || u.full_name || u.name,
+                  email: u.email,
+                  image: "/images/users/user-1.jpg",
+                  permissions: u.permissions || [],
+                  roles: u.roles || [],
+                  accessToken: credentials.token as string,
+                  tenantDomain: u.tenantDomain || u.tenant_domain || "",
+                  systemRole: u.systemRole || "RECRUITER",
+                  podId: u.podId || u.pod_id || null,
+                  branchId: u.branchId || u.branch_id || null,
+                  branchName: u.branchName || u.branch_name || null,
+                  tenantId: u.tenantId || u.tenant_id || DEFAULT_TENANT_ID,
+                  defaultMarket: u.defaultMarket || u.default_market || "US",
+                };
+              }
+            } catch {}
+          }
+
+          // 2. Network verification fallback against backend API
           let apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.enfyjobs.com";
           if (process.env.NODE_ENV === "production" && apiBase.includes("localhost")) {
             apiBase = "https://api.enfyjobs.com";

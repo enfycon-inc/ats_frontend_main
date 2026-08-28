@@ -96,6 +96,7 @@ const LoginForm = () => {
         const signInRes = await signIn("token-handoff", {
           redirect: false,
           token: syncRes.accessToken,
+          userJson: JSON.stringify(syncRes.user),
           callbackUrl: "/dashboard",
         });
 

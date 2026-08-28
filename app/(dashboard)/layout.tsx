@@ -5,12 +5,12 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getBaseDomain, getCurrentSubdomain } from "@/utils/subdomain-helper";
 
-// Fetch session with a timeout so a slow auth provider never hangs the route
+// Fetch session with a safe timeout so a slow auth provider never hangs the route
 async function getSessionSafe() {
   try {
     const session = await Promise.race([
       auth(),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
     ]);
     return session;
   } catch {
