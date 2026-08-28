@@ -1198,23 +1198,20 @@ export default function EditJobPostingPage() {
                 <SectionHeader title="Business Information" sectionKey="businessInfo" />
                 {!collapsedSections.businessInfo && (
                   <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                    {/* Preserved Job Timing Snapshot Banner */}
+                    {/* Preserved Job Schedule Banner */}
                     {jobTiming && (
                       <div className="md:col-span-4 p-2.5 bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 rounded-lg flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
                           <div>
                             <span className="font-bold text-amber-950 dark:text-amber-200">
-                              Preserved Branch Timing: {jobTiming.workStartTime || "09:00"} - {jobTiming.workEndTime || "18:00"} ({jobTiming.jobTimezone ? jobTiming.jobTimezone.split("/").pop()?.replace(/_/g, " ") : "IST"})
+                              Branch Timing: {jobTiming.workStartTime || "09:00"} - {jobTiming.workEndTime || "18:00"} ({jobTiming.jobTimezone ? jobTiming.jobTimezone.split("/").pop()?.replace(/_/g, " ") : "IST"})
                             </span>
                             <p className="text-[11px] text-amber-800/90 dark:text-amber-400/90 font-medium">
-                              {jobTiming.shiftTiming || "Day Shift"} • {Array.isArray(jobTiming.workingDays) && jobTiming.workingDays.length > 0 ? (jobTiming.workingDays.length === 5 ? "Mon - Fri" : jobTiming.workingDays.join(", ")) : "Mon - Fri"} (Preserved historical schedule captured at creation)
+                              {jobTiming.shiftTiming || (market === "US" ? "US Shift" : "General Shift")} • {Array.isArray(jobTiming.workingDays) && jobTiming.workingDays.length > 0 ? (jobTiming.workingDays.length === 5 ? "Mon - Fri" : jobTiming.workingDays.join(", ")) : "Mon - Fri"}
                             </p>
                           </div>
                         </div>
-                        <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-200/60 dark:bg-amber-900/60 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-800 shrink-0">
-                          Preserved Timing
-                        </span>
                       </div>
                     )}
 

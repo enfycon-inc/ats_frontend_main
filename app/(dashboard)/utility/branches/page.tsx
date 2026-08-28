@@ -13,6 +13,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
 
+function formatTime12(timeStr?: string) {
+  if (!timeStr) return "09:00 AM";
+  const trimmed = timeStr.trim();
+  if (/AM|PM/i.test(trimmed)) return trimmed;
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return trimmed;
+  let h = parseInt(match[1], 10);
+  const m = match[2];
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${String(h).padStart(2, "0")}:${m} ${ampm}`;
+}
+
 export default function BranchManagementPage() {
   const [branches, setBranches] = useState<any[]>([]);
   const [hierarchyData, setHierarchyData] = useState<any>(null);
@@ -59,7 +72,7 @@ export default function BranchManagementPage() {
     workStartTime: "09:00",
     workEndTime: "18:00",
     workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-    shiftTiming: "Day Shift (09:00 - 18:00)",
+    shiftTiming: "General Shift",
     breakDurationMinutes: 60,
     allowNone: false,
     allowPods: true,
@@ -116,7 +129,7 @@ export default function BranchManagementPage() {
         workStartTime: formData.workStartTime,
         workEndTime: formData.workEndTime,
         workingDays: formData.workingDays,
-        shiftTiming: formData.shiftTiming || `Shift (${formData.workStartTime} - ${formData.workEndTime})`,
+        shiftTiming: formData.shiftTiming?.trim() || (formData.market === "US" ? "US Shift" : "General Shift"),
         breakDurationMinutes: formData.breakDurationMinutes,
       });
       if (created && typeof window !== "undefined") {
@@ -150,7 +163,7 @@ export default function BranchManagementPage() {
         workStartTime: formData.workStartTime,
         workEndTime: formData.workEndTime,
         workingDays: formData.workingDays,
-        shiftTiming: formData.shiftTiming || `Shift (${formData.workStartTime} - ${formData.workEndTime})`,
+        shiftTiming: formData.shiftTiming?.trim() || (formData.market === "US" ? "US Shift" : "General Shift"),
         breakDurationMinutes: formData.breakDurationMinutes,
         allowNone: formData.allowNone,
         allowPods: formData.allowNone ? false : formData.allowPods,
@@ -214,7 +227,7 @@ export default function BranchManagementPage() {
       workingDays: Array.isArray(b.workingDays) && b.workingDays.length > 0
         ? b.workingDays
         : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-      shiftTiming: b.shiftTiming || "Day Shift (09:00 - 18:00)",
+      shiftTiming: b.shiftTiming || (b.market === "US" ? "US Shift" : "General Shift"),
       breakDurationMinutes: b.breakDurationMinutes ?? 60,
       allowNone: allowNone,
       allowPods: allowNone ? false : b.allowPods !== false,
@@ -282,7 +295,7 @@ export default function BranchManagementPage() {
       country: presetMarket === "US" ? "United States" : "India",
       market: presetMarket,
       timezone: presetMarket === "US" ? "America/New_York" : "Asia/Kolkata",
-      shiftTiming: presetMarket === "US" ? "US Day Shift (09:00 - 18:00 EST)" : "General Day Shift (09:00 - 18:00 IST)",
+      shiftTiming: presetMarket === "US" ? "US Shift" : "General Shift",
     }));
     setIsCreateOpen(true);
   };
@@ -299,7 +312,7 @@ export default function BranchManagementPage() {
       workStartTime: "09:00",
       workEndTime: "18:00",
       workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-      shiftTiming: "Day Shift (09:00 - 18:00)",
+      shiftTiming: "General Shift",
       breakDurationMinutes: 60,
       allowNone: false,
       allowPods: true,
@@ -590,19 +603,16 @@ export default function BranchManagementPage() {
                             <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
                             <div>
                               <div className="flex items-center gap-1.5 font-bold text-amber-950 dark:text-amber-200">
-                                <span>{b.workStartTime || "09:00"} - {b.workEndTime || "18:00"}</span>
+                                <span>{formatTime12(b.workStartTime)} - {formatTime12(b.workEndTime)}</span>
                                 <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 font-mono font-bold">
                                   {b.timezone ? b.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}
                                 </span>
                               </div>
                               <p className="text-[10.5px] text-amber-800/80 dark:text-amber-400/80 font-medium">
-                                {b.shiftTiming || "General Shift"} • {Array.isArray(b.workingDays) && b.workingDays.length > 0 ? (b.workingDays.length === 5 ? "Mon - Fri" : b.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon - Fri"}
+                                {b.shiftTiming || (b.market === "US" ? "US Shift" : "General Shift")} • {Array.isArray(b.workingDays) && b.workingDays.length > 0 ? (b.workingDays.length === 5 ? "Mon - Fri" : b.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon - Fri"}
                               </p>
                             </div>
                           </div>
-                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-white/70 dark:bg-slate-900/70 px-2 py-0.5 rounded border border-amber-200/60 dark:border-amber-800/60">
-                            Timing Snapshot Enabled
-                          </span>
                         </div>
 
                         {/* BRANCH MANAGER STRIP */}
@@ -713,13 +723,13 @@ export default function BranchManagementPage() {
                     <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
                     <div>
                       <div className="flex items-center gap-1.5 font-bold text-amber-950 dark:text-amber-200">
-                        <span>{b.workStartTime || "09:00"} - {b.workEndTime || "18:00"}</span>
+                        <span>{formatTime12(b.workStartTime)} - {formatTime12(b.workEndTime)}</span>
                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 font-mono font-bold">
                           {b.timezone ? b.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}
                         </span>
                       </div>
                       <p className="text-[10.5px] text-amber-800/80 dark:text-amber-400/80 font-medium">
-                        {b.shiftTiming || "General Shift"} • {Array.isArray(b.workingDays) && b.workingDays.length > 0 ? (b.workingDays.length === 5 ? "Mon - Fri" : b.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon - Fri"}
+                        {b.shiftTiming || (b.market === "US" ? "US Shift" : "General Shift")} • {Array.isArray(b.workingDays) && b.workingDays.length > 0 ? (b.workingDays.length === 5 ? "Mon - Fri" : b.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon - Fri"}
                       </p>
                     </div>
                   </div>
@@ -836,7 +846,7 @@ export default function BranchManagementPage() {
                       market: m,
                       country: m === "US" ? "United States" : "India",
                       timezone: m === "US" ? "America/New_York" : "Asia/Kolkata",
-                      shiftTiming: m === "US" ? `US Shift (${formData.workStartTime} - ${formData.workEndTime} EST)` : `Day Shift (${formData.workStartTime} - ${formData.workEndTime} IST)`,
+                      shiftTiming: m === "US" ? "US Shift" : "General Shift",
                     });
                   }}
                   className="w-full h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 font-semibold"

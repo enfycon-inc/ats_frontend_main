@@ -1439,7 +1439,7 @@ export default function NewJobPostingPage() {
                 <SectionHeader title="Business Information" sectionKey="businessInfo" />
                 {!collapsedSections.businessInfo && (
                   <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                    {/* Active Branch Timing Snapshot Preview Banner */}
+                    {/* Active Branch Schedule Banner */}
                     {activeBranch && (
                       <div className="md:col-span-4 p-2.5 bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 rounded-lg flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
@@ -1449,13 +1449,10 @@ export default function NewJobPostingPage() {
                               Branch Timing: {activeBranch.workStartTime || "09:00"} - {activeBranch.workEndTime || "18:00"} ({activeBranch.timezone ? activeBranch.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"})
                             </span>
                             <p className="text-[11px] text-amber-800/90 dark:text-amber-400/90 font-medium">
-                              {activeBranch.shiftTiming || "Day Shift"} • {Array.isArray(activeBranch.workingDays) && activeBranch.workingDays.length > 0 ? (activeBranch.workingDays.length === 5 ? "Mon - Fri" : activeBranch.workingDays.join(", ")) : "Mon - Fri"} (Captured as immutable timing snapshot for this job)
+                              {activeBranch.shiftTiming || (activeBranch.market === "US" ? "US Shift" : "General Shift")} • {Array.isArray(activeBranch.workingDays) && activeBranch.workingDays.length > 0 ? (activeBranch.workingDays.length === 5 ? "Mon - Fri" : activeBranch.workingDays.join(", ")) : "Mon - Fri"}
                             </p>
                           </div>
                         </div>
-                        <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-200/60 dark:bg-amber-900/60 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-800 shrink-0">
-                          Timing Snapshot
-                        </span>
                       </div>
                     )}
 
