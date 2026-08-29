@@ -45,6 +45,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { JobDescriptionView } from "@/components/ui/job-description-view";
 import {
   Table,
   TableHeader,
@@ -1066,14 +1067,10 @@ export default function JobDetailPage() {
                     <h2 className="text-sm font-bold text-neutral-800 dark:text-white flex items-center gap-2 border-b border-neutral-100 dark:border-slate-800 pb-2">
                       <FileText className="h-4 w-4 text-indigo-500" /> Job Description
                     </h2>
-                    {job.jobDescription ? (
-                      <div
-                        className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed max-w-none prose dark:prose-invert prose-xs"
-                        dangerouslySetInnerHTML={{ __html: job.jobDescription }}
-                      />
-                    ) : (
-                      <p className="text-xs text-neutral-450 italic">No job description provided.</p>
-                    )}
+                    <JobDescriptionView 
+                      content={job.jobDescription} 
+                      jobTitle={job.jobTitle} 
+                    />
                   </CardContent>
                 </Card>
 
