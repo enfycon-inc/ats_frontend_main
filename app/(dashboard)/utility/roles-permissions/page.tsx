@@ -47,7 +47,6 @@ interface TenantUser {
   createdAt: string;
 }
 
-const SYSTEM_ROLE_NAMES = ["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "RECRUITER", "ACCOUNT_MANAGER", "DELIVERY_HEAD", "POD_LEAD"];
 
 const SYSTEM_ARCHETYPES = [
   {
@@ -189,9 +188,7 @@ export default function RolesPermissionsPage() {
       ]);
 
       // Filter out system roles: show ONLY custom roles in the configuration page
-      const customOnly = (rolesData || []).filter(
-        (r: any) => !r.isSystem && !SYSTEM_ROLE_NAMES.includes(r.name.toUpperCase())
-      );
+      const customOnly = (rolesData || []).filter((r: any) => !r.isSystem);
 
       setRoles(rolesData || []);
       setPermissions(permsData || []);
@@ -302,7 +299,7 @@ export default function RolesPermissionsPage() {
       return userRolesUpper.includes(roleNameUpper) || (sysRoleUpper !== '' && userRolesUpper.includes(sysRoleUpper));
     }).length;
 
-    const availableTargets = roles.filter(r => r.id !== role.id && !SYSTEM_ROLE_NAMES.includes(r.name.toUpperCase()));
+    const availableTargets = roles.filter(r => r.id !== role.id && !r.isSystem);
     const defaultTarget = availableTargets[0]?.id || "";
 
     setRoleToDelete({ role, staffCount });
@@ -339,9 +336,7 @@ export default function RolesPermissionsPage() {
   }, {});
 
   // Custom roles filtered for the view (strictly excluding system roles)
-  const customRolesList = roles.filter(
-    (r) => !r.isSystem && !SYSTEM_ROLE_NAMES.includes(r.name.toUpperCase())
-  );
+  const customRolesList = roles.filter((r) => !r.isSystem);
 
   const filteredRoles = selectedBranchFilter === "all"
     ? customRolesList
@@ -845,7 +840,7 @@ export default function RolesPermissionsPage() {
                     className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-md p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     {roles
-                      .filter((r) => r.id !== roleToDelete.role.id && !SYSTEM_ROLE_NAMES.includes(r.name.toUpperCase()))
+                      .filter((r) => r.id !== roleToDelete.role.id && !r.isSystem)
                       .map((r) => (
                         <option key={r.id} value={r.id}>
                           {r.name} (Custom Role)
