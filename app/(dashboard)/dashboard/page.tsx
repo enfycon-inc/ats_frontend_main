@@ -740,7 +740,7 @@ function GlobalAdminDashboardView({ profile }: { profile: any }) {
                   className="h-8 text-xs w-full sm:w-44"
                 />
                 <Link href="/utility/approvals?tab=tenants">
-                  <Button variant="outline" size="sm" className="text-xs h-8 whitespace-nowrap font-bold text-indigo-650 border-indigo-200 hover:bg-indigo-50">
+                  <Button variant="outline" size="sm" className="text-xs h-8 whitespace-nowrap font-bold">
                     Full Tenant Page →
                   </Button>
                 </Link>

@@ -626,7 +626,7 @@ export default function BranchManagementPage() {
                               onClick={() => openBranchRemarksModal(b)}
                               size="sm"
                               variant="outline"
-                              className="h-7 text-[11px] font-semibold border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300 rounded flex items-center gap-1"
+                              className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1"
                             >
                               <MessageSquare className="h-3 w-3 mr-1" /> Stage Remarks
                             </Button>
@@ -635,7 +635,7 @@ export default function BranchManagementPage() {
                               onClick={() => openEditModal(b)}
                               size="sm"
                               variant="outline"
-                              className="h-7 text-[11px] font-semibold border-neutral-300 text-indigo-650 hover:bg-indigo-50"
+                              className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1"
                             >
                               <Edit2 className="h-3 w-3 mr-1" /> Edit Branch
                             </Button>
@@ -644,7 +644,7 @@ export default function BranchManagementPage() {
                               onClick={() => openMembersModal(b)}
                               size="sm"
                               variant="outline"
-                              className="h-7 text-[11px] font-semibold border-neutral-300"
+                              className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1"
                             >
                               Manage Users ({b.usersCount || 0})
                             </Button>
@@ -825,25 +825,25 @@ export default function BranchManagementPage() {
                     onClick={() => openMembersModal(b)}
                     variant="outline"
                     size="sm"
-                    className="h-7 text-[11px] font-semibold border-neutral-300 rounded flex items-center gap-1"
+                    className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1"
                   >
-                    <Users className="h-3.5 w-3.5 text-indigo-650" /> Users ({b.usersCount || 0})
+                    <Users className="h-3.5 w-3.5" /> Users ({b.usersCount || 0})
                   </Button>
 
                   <Button
                     onClick={() => openBranchRemarksModal(b)}
                     variant="outline"
                     size="sm"
-                    className="h-7 text-[11px] font-semibold border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300 rounded flex items-center gap-1"
+                    className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1"
                   >
-                    <MessageSquare className="h-3 w-3" /> Remarks
+                    <MessageSquare className="h-3 w-3 mr-1" /> Remarks
                   </Button>
 
                   <Button
                     onClick={() => openEditModal(b)}
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="h-7 text-[11px] font-semibold text-neutral-600 hover:text-indigo-650"
+                    className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1"
                   >
                     <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
                   </Button>

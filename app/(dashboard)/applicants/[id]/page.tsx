@@ -772,7 +772,7 @@ export default function CandidateDetailPage() {
                     size="sm"
                     variant="outline"
                     onClick={() => resumeInputRef.current?.click()}
-                    className="mt-3 text-xs gap-1.5 border border-indigo-200 hover:bg-indigo-50/30 text-indigo-650 font-bold mx-auto cursor-pointer"
+                    className="mt-3 text-xs gap-1.5 font-bold mx-auto cursor-pointer"
                   >
                     <UploadCloud className="h-4 w-4" /> Upload Resume PDF
                   </Button>

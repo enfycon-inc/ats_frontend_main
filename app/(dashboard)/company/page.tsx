@@ -1001,7 +1001,7 @@ function TenantAdminSettingsView(props: any) {
                             size="sm"
                             disabled={props.verifyingDomain === d.domain_name}
                             onClick={() => props.handleVerifyDomain(d.domain_name)}
-                            className="h-6 px-2 text-[10px] font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 cursor-pointer"
+                            className="h-6 px-2 text-[10px] font-bold cursor-pointer"
                           >
                             {props.verifyingDomain === d.domain_name ? "Checking..." : "Verify DNS"}
                           </Button>
