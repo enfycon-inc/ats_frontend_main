@@ -5,7 +5,7 @@ import {
   Building2, MapPin, Plus, Edit2, Users, CheckCircle2, XCircle, 
   Search, ShieldAlert, Sparkles, X, Globe, UserPlus, Briefcase, Crown, Shield,
   GitFork, ChevronRight, ChevronDown, Layers, Rocket, ArrowRight, MessageSquare, ListChecks, Trash2,
-  Clock, Calendar, Sun, Moon, Check
+  Clock, Calendar, Sun, Moon, Check, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,7 @@ export default function BranchManagementPage() {
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isSubmittingBranch, setIsSubmittingBranch] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [isAssignUserOpen, setIsAssignUserOpen] = useState(false);
   const [isChangeManagerOpen, setIsChangeManagerOpen] = useState(false);
@@ -169,14 +170,15 @@ export default function BranchManagementPage() {
     e.preventDefault();
     if (!selectedBranch) return;
     try {
+      setIsSubmittingBranch(true);
       setFormError("");
-      await atsApi.branches.update(selectedBranch.id, {
-        name: formData.name,
-        code: formData.code,
-        city: formData.city,
-        state: formData.state,
-        country: formData.country,
-        market: formData.market,
+      const updated = await atsApi.branches.update(selectedBranch.id, {
+        name: formData.name.trim(),
+        code: formData.code ? formData.code.trim() : "",
+        city: formData.city ? formData.city.trim() : "",
+        state: formData.state ? formData.state.trim() : "",
+        country: formData.country || "India",
+        market: formData.market || "INDIA",
         timezone: formData.timezone,
         workStartTime: formData.workStartTime,
         workEndTime: formData.workEndTime,
@@ -195,13 +197,24 @@ export default function BranchManagementPage() {
         allowedJobApproverRoles: formData.allowedJobApproverRoles,
         approvalRoutingMode: formData.approvalRoutingMode,
       });
-      toast.success("Branch details, operating hours & routing policy updated successfully!");
+
+      if (typeof window !== "undefined") {
+        const activeBranchId = localStorage.getItem("active_branch_id");
+        if (activeBranchId === selectedBranch.id && updated?.name) {
+          localStorage.setItem("active_branch_name", updated.name);
+          window.dispatchEvent(new Event("branch_updated"));
+        }
+      }
+
+      toast.success("Branch details updated successfully!");
       setIsEditOpen(false);
       resetForm();
       await loadBranchesAndHierarchy();
     } catch (err: any) {
       setFormError(err.message || "Failed to update branch");
       toast.error(err.message || "Failed to update branch");
+    } finally {
+      setIsSubmittingBranch(false);
     }
   };
 
@@ -924,7 +937,6 @@ export default function BranchManagementPage() {
                       Working Hours &amp; Shift Schedule
                     </span>
                   </div>
-                  <span className="text-[10px] text-neutral-400">Snapshot on Job Post</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
@@ -1128,9 +1140,6 @@ export default function BranchManagementPage() {
                         Branch Operating Hours &amp; Shift Schedule
                       </span>
                     </div>
-                    <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
-                      Captured on Job Postings
-                    </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -1241,13 +1250,6 @@ export default function BranchManagementPage() {
                         );
                       })}
                     </div>
-                  </div>
-
-                  <div className="p-2.5 bg-amber-50/70 dark:bg-amber-950/30 rounded-lg border border-amber-200/70 dark:border-amber-900/40 flex items-start gap-2 text-[11px] text-amber-900 dark:text-amber-300">
-                    <span className="font-bold">🛡️ Timing Policy:</span>
-                    <span>
-                      Modifying this branch schedule will immediately take effect for all future job postings created in this branch. Previously created jobs will securely retain their original timing snapshot.
-                    </span>
                   </div>
                 </div>
 
@@ -1436,9 +1438,17 @@ export default function BranchManagementPage() {
                 <Button
                   type="submit"
                   size="sm"
-                  className="h-9 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 rounded-lg shadow-sm"
+                  disabled={isSubmittingBranch}
+                  className="h-9 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 rounded-lg shadow-sm disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                 >
-                  Update Branch
+                  {isSubmittingBranch ? (
+                    <>
+                      <Loader2 className="animate-spin h-3.5 w-3.5" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Update Branch"
+                  )}
                 </Button>
               </div>
             </form>
