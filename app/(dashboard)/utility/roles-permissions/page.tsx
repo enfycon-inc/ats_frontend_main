@@ -564,24 +564,6 @@ export default function RolesPermissionsPage() {
     }
   };
 
-  const getArchetypeBadgeColor = (systemRole?: string) => {
-    switch ((systemRole || "").toUpperCase()) {
-      case "ADMIN":
-        return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800";
-      case "BRANCH_ADMIN":
-        return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800";
-      case "DELIVERY_HEAD":
-        return "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800";
-      case "ACCOUNT_MANAGER":
-        return "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800";
-      case "POD_LEAD":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800";
-      case "RECRUITER":
-      default:
-        return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800";
-    }
-  };
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -620,13 +602,10 @@ export default function RolesPermissionsPage() {
       {/* ─── PAGE HEADER & TOOLBAR ─────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-default-150 pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-default-900 flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
-              <Icon icon="heroicons:shield-check" className="h-6 w-6" />
-            </div>
+          <h1 className="text-xl font-bold text-neutral-900 dark:text-white">
             Custom Staffing Roles
           </h1>
-          <p className="text-xs text-default-500 mt-1">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
             Build and manage branch operational staffing roles, permission policies, and user assignments.
           </p>
         </div>
@@ -634,12 +613,12 @@ export default function RolesPermissionsPage() {
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Branch Filter Dropdown */}
           {branches.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-default-250 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
-              <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
+            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
+              <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-neutral-400 shrink-0" />
               <select
                 value={selectedBranchFilter}
                 onChange={(e) => handleBranchFilterChange(e.target.value)}
-                className="bg-transparent text-xs font-bold text-default-800 dark:text-white outline-none cursor-pointer"
+                className="bg-transparent text-xs font-semibold text-neutral-800 dark:text-white outline-none cursor-pointer"
               >
                 <option value="all">All Branches ({customRolesList.length} Roles)</option>
                 {branches.map((b) => (
@@ -656,7 +635,7 @@ export default function RolesPermissionsPage() {
             variant="outline"
             size="sm"
             onClick={() => loadData()}
-            className="h-9 px-3 text-xs border-default-250 text-default-700 hover:bg-default-100 dark:hover:bg-slate-800"
+            className="h-9 px-3 text-xs border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-slate-800 cursor-pointer"
             title="Refresh Role Registry"
           >
             <Icon icon="heroicons:arrow-path" className="h-4 w-4" />
@@ -665,7 +644,7 @@ export default function RolesPermissionsPage() {
           {/* Primary Create Button */}
           <Button
             onClick={openAddRoleModal}
-            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 shadow-sm cursor-pointer"
+            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-lg shadow-xs cursor-pointer"
           >
             <Icon icon="heroicons:plus" className="h-4 w-4" />
             Create Custom Role
@@ -674,51 +653,51 @@ export default function RolesPermissionsPage() {
       </div>
 
       {/* ─── TABLE FILTER / SEARCH BAR ─────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-4 flex-wrap bg-white dark:bg-slate-900 p-3 rounded-xl border border-default-150 shadow-2xs">
+      <div className="flex items-center justify-between gap-4 flex-wrap bg-white dark:bg-slate-900 p-3 rounded-xl border border-neutral-200 dark:border-slate-800 shadow-2xs">
         <div className="relative flex-1 min-w-[240px] max-w-md">
-          <Icon icon="heroicons:magnifying-glass" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-default-400" />
+          <Icon icon="heroicons:magnifying-glass" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
           <Input
             placeholder="Search roles by name, archetype, branch, author..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 text-xs h-9 bg-default-50 dark:bg-slate-800 border-default-200"
+            className="pl-9 text-xs h-9 bg-neutral-50 dark:bg-slate-800 border-neutral-200 dark:border-slate-700"
           />
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-semibold text-default-500">
+        <div className="flex items-center gap-2 text-xs font-medium text-neutral-500">
           <span>Showing <strong>{filteredRoles.length}</strong> of <strong>{customRolesList.length}</strong> custom roles</span>
         </div>
       </div>
 
       {/* ─── UNIVERSAL ROLES TABLE ─────────────────────────────────────── */}
-      <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl">
+      <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-default-50/70 dark:bg-slate-800/40 border-b border-default-150">
-                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Role Name</th>
-                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Base Role</th>
-                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Branch Office</th>
-                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-center">Permissions</th>
-                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-center">Users Assigned</th>
-                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Created By</th>
-                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Created At</th>
-                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Last Modified</th>
-                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-right">Actions</th>
+              <tr className="bg-neutral-50/80 dark:bg-slate-800/40 border-b border-neutral-200 dark:border-slate-800">
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Role Name</th>
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Base Role</th>
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Branch Office</th>
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-center">Permissions</th>
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-center">Users Assigned</th>
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Created By</th>
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Created At</th>
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Last Modified</th>
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-default-100 text-xs">
+            <tbody className="divide-y divide-neutral-100 dark:divide-slate-800 text-xs">
               {filteredRoles.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-16 text-center text-default-500 font-semibold italic">
+                  <td colSpan={9} className="py-16 text-center text-neutral-500 font-semibold italic">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="h-12 w-12 rounded-full bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 flex items-center justify-center">
-                        <Icon icon="heroicons:shield-check" className="h-6 w-6" />
+                      <div className="h-10 w-10 rounded-full bg-neutral-100 dark:bg-slate-800 text-neutral-500 flex items-center justify-center">
+                        <Icon icon="heroicons:shield-check" className="h-5 w-5" />
                       </div>
-                      <span className="text-sm font-bold text-default-800 dark:text-white">
+                      <span className="text-sm font-bold text-neutral-800 dark:text-white">
                         {searchQuery ? "No matching custom roles found" : "No custom roles defined for this branch"}
                       </span>
-                      <p className="text-xs text-default-450 max-w-sm">
+                      <p className="text-xs text-neutral-400 max-w-sm">
                         Custom roles inherit from abstract system archetypes (Recruiter, BDM, Pod Lead) and apply branch-isolated security policies.
                       </p>
                       <Button
@@ -742,44 +721,41 @@ export default function RolesPermissionsPage() {
                   return (
                     <tr
                       key={role.id}
-                      className="hover:bg-indigo-50/20 dark:hover:bg-slate-800/20 transition-colors group"
+                      className="hover:bg-neutral-50/60 dark:hover:bg-slate-800/30 transition-colors group"
                     >
                       {/* 1. ROLE NAME */}
-                      <td className="py-4 px-4 font-bold text-default-900 whitespace-nowrap">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 flex items-center justify-center shrink-0">
-                            <Icon icon="heroicons:user-group" className="h-4 w-4" />
+                      <td className="py-3.5 px-4 font-semibold text-neutral-900 dark:text-neutral-100 whitespace-nowrap">
+                        <div>
+                          <div
+                            className="font-bold text-xs text-neutral-900 dark:text-white hover:text-indigo-600 cursor-pointer"
+                            onClick={() => openEditRoleModal(role)}
+                          >
+                            {role.name}
                           </div>
-                          <div>
-                            <div className="font-bold text-xs text-default-900 hover:text-indigo-600 cursor-pointer" onClick={() => openEditRoleModal(role)}>
-                              {role.name}
+                          {role.description && (
+                            <div className="text-[11px] text-neutral-400 dark:text-neutral-500 font-normal mt-0.5 max-w-[220px] truncate">
+                              {role.description}
                             </div>
-                            <div className="text-[10px] text-default-450 font-normal mt-0.5 max-w-[200px] truncate">
-                              {role.description || "Operational staffing role"}
-                            </div>
-                          </div>
+                          )}
                         </div>
                       </td>
 
                       {/* 2. BASE ROLE / ARCHETYPE */}
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        <Badge
-                          className={`text-[9.5px] font-bold border px-2 py-0.5 rounded-md ${getArchetypeBadgeColor(role.systemRole)}`}
-                        >
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="text-[10.5px] font-medium font-mono px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-slate-700">
                           {role.systemRole || "RECRUITER"}
-                        </Badge>
+                        </span>
                       </td>
 
                       {/* 3. BRANCH OFFICE */}
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-default-800 dark:text-default-200">
-                          <Icon icon="heroicons:building-office" className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                           {role.branchName || "Default Office"}
                         </span>
                       </td>
 
-                      {/* 4. PERMISSIONS (WITH HOVER TOOLTIP & CLICK TO EDIT MATRIX) */}
-                      <td className="py-4 px-4 text-center whitespace-nowrap relative">
+                      {/* 4. PERMISSIONS (INTERACTIVE BUTTON WITH HOVER PREVIEW) */}
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap relative">
                         <div
                           className="inline-block relative"
                           onMouseEnter={() => setHoveredPermRoleId(role.id)}
@@ -787,32 +763,32 @@ export default function RolesPermissionsPage() {
                         >
                           <button
                             onClick={() => openPermissionsModal(role)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 font-bold text-[11px] hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition cursor-pointer"
-                            title="Click to edit permissions matrix"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-neutral-100 hover:bg-neutral-200/70 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-slate-700 font-medium text-[11px] transition cursor-pointer"
+                            title="Click to configure permissions matrix"
                           >
-                            <Icon icon="heroicons:key" className="h-3 w-3 text-indigo-600" />
+                            <Icon icon="heroicons:key" className="h-3 w-3 text-neutral-500" />
                             {rolePerms.length} Permissions
                           </button>
 
                           {/* Hover Popover showing categorized permission preview */}
                           {isHoveredPerm && (
                             <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-40 w-72 p-3 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 rounded-xl shadow-xl text-left pointer-events-none animate-fadeIn">
-                              <div className="flex items-center justify-between border-b border-default-100 pb-1.5 mb-2">
-                                <span className="text-[11px] font-bold text-default-900 flex items-center gap-1">
-                                  <Icon icon="heroicons:shield-check" className="h-3.5 w-3.5 text-indigo-600" />
+                              <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-1.5 mb-2">
+                                <span className="text-[11px] font-bold text-neutral-900 dark:text-white flex items-center gap-1">
+                                  <Icon icon="heroicons:shield-check" className="h-3.5 w-3.5 text-neutral-500" />
                                   Permissions ({rolePerms.length})
                                 </span>
-                                <span className="text-[9px] text-indigo-600 font-semibold">Click to configure</span>
+                                <span className="text-[9.5px] text-indigo-600 font-semibold">Click to configure</span>
                               </div>
                               <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
                                 {rolePerms.length === 0 ? (
-                                  <p className="text-[10px] text-default-400 italic">No permissions assigned.</p>
+                                  <p className="text-[10px] text-neutral-400 italic">No permissions assigned.</p>
                                 ) : (
                                   <div className="flex flex-wrap gap-1">
                                     {rolePerms.map((perm) => (
                                       <span
                                         key={perm}
-                                        className="inline-block bg-default-100 dark:bg-slate-800 text-default-700 dark:text-default-300 text-[9px] px-1.5 py-0.5 rounded font-mono"
+                                        className="inline-block bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 text-[9px] px-1.5 py-0.5 rounded font-mono"
                                       >
                                         {perm}
                                       </span>
@@ -825,59 +801,44 @@ export default function RolesPermissionsPage() {
                         </div>
                       </td>
 
-                      {/* 5. USERS ASSIGNED (WITH HOVER TOOLTIP & CLICK TO VIEW TABLE MODAL) */}
-                      <td className="py-4 px-4 text-center whitespace-nowrap relative">
+                      {/* 5. USERS ASSIGNED (INTERACTIVE BUTTON WITH HOVER PREVIEW) */}
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap relative">
                         <div
                           className="inline-block relative"
                           onMouseEnter={() => setHoveredUsersRoleId(role.id)}
                           onMouseLeave={() => setHoveredUsersRoleId(null)}
                         >
-                          <div className="inline-flex items-center gap-1">
-                            <button
-                              onClick={() => setViewUsersRole(role)}
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold text-[11px] transition cursor-pointer border ${
-                                assignedUsers.length > 0
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 hover:bg-emerald-100"
-                                  : "bg-default-100 text-default-600 border-default-200 dark:bg-slate-800 dark:text-default-400 hover:bg-default-200"
-                              }`}
-                              title="Click to view all assigned staff"
-                            >
-                              <Icon icon="heroicons:users" className="h-3 w-3" />
-                              {assignedUsers.length} Staff
-                            </button>
-
-                            {/* Quick Add User button */}
-                            <button
-                              onClick={() => openAssignUserModal(role)}
-                              className="p-1 rounded-full text-indigo-600 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 transition cursor-pointer"
-                              title="Assign a staff member to this role"
-                            >
-                              <Icon icon="heroicons:user-plus" className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => setViewUsersRole(role)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-neutral-100 hover:bg-neutral-200/70 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-slate-700 font-medium text-[11px] transition cursor-pointer"
+                            title="Click to view assigned staff"
+                          >
+                            <Icon icon="heroicons:users" className="h-3 w-3 text-neutral-500" />
+                            {assignedUsers.length} Staff
+                          </button>
 
                           {/* Hover Popover showing user previews */}
                           {isHoveredUsers && (
                             <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-40 w-64 p-3 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 rounded-xl shadow-xl text-left pointer-events-none animate-fadeIn">
-                              <div className="flex items-center justify-between border-b border-default-100 pb-1.5 mb-2">
-                                <span className="text-[11px] font-bold text-default-900 flex items-center gap-1">
-                                  <Icon icon="heroicons:users" className="h-3.5 w-3.5 text-indigo-600" />
+                              <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-1.5 mb-2">
+                                <span className="text-[11px] font-bold text-neutral-900 dark:text-white flex items-center gap-1">
+                                  <Icon icon="heroicons:users" className="h-3.5 w-3.5 text-neutral-500" />
                                   Assigned Staff ({assignedUsers.length})
                                 </span>
-                                <span className="text-[9px] text-indigo-600 font-semibold">Click for table</span>
+                                <span className="text-[9.5px] text-indigo-600 font-semibold">Click for table</span>
                               </div>
                               <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
                                 {assignedUsers.length === 0 ? (
-                                  <p className="text-[10px] text-default-400 italic">No staff assigned to this role yet.</p>
+                                  <p className="text-[10px] text-neutral-400 italic">No staff assigned to this role yet.</p>
                                 ) : (
                                   assignedUsers.slice(0, 5).map((u) => (
                                     <div key={u.id} className="flex items-center gap-2 text-xs">
-                                      <div className="h-5 w-5 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[9px] flex items-center justify-center shrink-0">
+                                      <div className="h-5 w-5 rounded-full bg-neutral-200 dark:bg-slate-700 text-neutral-700 dark:text-neutral-200 font-bold text-[9px] flex items-center justify-center shrink-0">
                                         {u.fullName.charAt(0).toUpperCase()}
                                       </div>
                                       <div className="min-w-0 flex-1">
-                                        <div className="font-semibold text-default-900 text-[10.5px] truncate">{u.fullName}</div>
-                                        <div className="text-[9px] text-default-400 truncate">{u.email}</div>
+                                        <div className="font-semibold text-neutral-900 dark:text-white text-[10.5px] truncate">{u.fullName}</div>
+                                        <div className="text-[9px] text-neutral-400 truncate">{u.email}</div>
                                       </div>
                                     </div>
                                   ))
@@ -894,59 +855,38 @@ export default function RolesPermissionsPage() {
                       </td>
 
                       {/* 6. CREATED BY */}
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <Icon icon="heroicons:user-circle" className="h-4 w-4 text-default-400 shrink-0" />
-                          <span className="text-xs text-default-700 font-medium truncate max-w-[130px]">
-                            {role.createdByName || "System Admin"}
-                          </span>
-                        </div>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="text-xs text-neutral-600 dark:text-neutral-300 font-medium truncate max-w-[130px] block">
+                          {role.createdByName || "System Admin"}
+                        </span>
                       </td>
 
                       {/* 7. CREATED AT (WITH TIME AND SECONDS) */}
-                      <td className="py-4 px-4 whitespace-nowrap text-default-600 font-medium text-[11px]">
+                      <td className="py-3.5 px-4 whitespace-nowrap text-neutral-500 dark:text-neutral-400 font-medium text-[11px]">
                         {formatDateTimeWithSeconds(role.createdAt)}
                       </td>
 
                       {/* 8. LAST MODIFIED (WITH TIME AND SECONDS) */}
-                      <td className="py-4 px-4 whitespace-nowrap text-default-600 font-medium text-[11px]">
+                      <td className="py-3.5 px-4 whitespace-nowrap text-neutral-500 dark:text-neutral-400 font-medium text-[11px]">
                         {formatDateTimeWithSeconds(role.updatedAt || role.createdAt)}
                       </td>
 
-                      {/* 9. ACTIONS */}
-                      <td className="py-4 px-4 whitespace-nowrap text-right">
+                      {/* 9. ACTIONS (CLEAN, ESSENTIAL ACTIONS ONLY) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Assign User Button */}
-                          <button
-                            onClick={() => openAssignUserModal(role)}
-                            className="p-1.5 rounded-lg border border-default-200 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-default-600 hover:text-emerald-600 transition cursor-pointer"
-                            title="Assign Staff to this Role"
-                          >
-                            <Icon icon="heroicons:user-plus" className="h-3.5 w-3.5" />
-                          </button>
-
                           {/* Edit Role Button */}
                           <button
                             onClick={() => openEditRoleModal(role)}
-                            className="p-1.5 rounded-lg border border-default-200 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-default-600 hover:text-indigo-600 transition cursor-pointer"
-                            title="Edit Role Details & Permissions"
+                            className="p-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-300 transition cursor-pointer"
+                            title="Edit Role Details & Configuration"
                           >
                             <Icon icon="heroicons:pencil-square" className="h-3.5 w-3.5" />
-                          </button>
-
-                          {/* Quick Edit Permissions Matrix Button */}
-                          <button
-                            onClick={() => openPermissionsModal(role)}
-                            className="p-1.5 rounded-lg border border-default-200 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-default-600 hover:text-indigo-600 transition cursor-pointer"
-                            title="Configure Permissions Matrix"
-                          >
-                            <Icon icon="heroicons:lock-closed" className="h-3.5 w-3.5" />
                           </button>
 
                           {/* Delete Role Button */}
                           <button
                             onClick={() => handleInitiateDeleteRole(role)}
-                            className="p-1.5 rounded-lg border border-default-200 hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 text-default-400 hover:text-red-600 transition cursor-pointer"
+                            className="p-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-950/40 text-neutral-400 hover:text-red-600 transition cursor-pointer"
                             title="Delete Custom Role"
                           >
                             <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
@@ -968,7 +908,7 @@ export default function RolesPermissionsPage() {
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-lg bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-300 flex items-center justify-center">
                   <Icon icon="heroicons:plus" className="h-4.5 w-4.5" />
                 </div>
                 <div>
@@ -1040,12 +980,12 @@ export default function RolesPermissionsPage() {
               {/* Inherit from System Archetype Dropdown */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                  Inherit Permissions from Base System Role ⚙️
+                  Inherit Permissions from Base System Role
                 </label>
                 <select
                   value={newRoleSystemRole}
                   onChange={(e) => handleCreateArchetypeChange(e.target.value)}
-                  className="w-full text-xs font-bold border border-indigo-300 dark:border-indigo-800 rounded-lg p-2.5 bg-indigo-50/40 dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                  className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
                   {SYSTEM_ARCHETYPES.map((arch) => (
                     <option key={arch.key} value={arch.key}>
@@ -1056,11 +996,11 @@ export default function RolesPermissionsPage() {
               </div>
 
               {/* Permissions Matrix Selector */}
-              <div className="border border-default-200 dark:border-slate-800 rounded-xl p-4 space-y-4 bg-default-50/40 dark:bg-slate-800/10">
-                <div className="flex items-center justify-between border-b border-default-200 dark:border-slate-800 pb-3">
+              <div className="border border-neutral-200 dark:border-slate-800 rounded-xl p-4 space-y-4 bg-neutral-50/40 dark:bg-slate-800/10">
+                <div className="flex items-center justify-between border-b border-neutral-200 dark:border-slate-800 pb-3">
                   <div>
-                    <h4 className="text-xs font-bold text-default-900">Custom Permissions Matrix</h4>
-                    <p className="text-[10.5px] text-default-450">Toggle specific security tokens enabled for this role ({newRolePermissions.length} enabled)</p>
+                    <h4 className="text-xs font-bold text-neutral-900 dark:text-white">Custom Permissions Matrix</h4>
+                    <p className="text-[10.5px] text-neutral-400">Toggle specific security tokens enabled for this role ({newRolePermissions.length} enabled)</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -1070,11 +1010,11 @@ export default function RolesPermissionsPage() {
                     >
                       Select All
                     </button>
-                    <span className="text-default-300">|</span>
+                    <span className="text-neutral-300">|</span>
                     <button
                       type="button"
                       onClick={() => setNewRolePermissions([])}
-                      className="text-[10px] font-bold text-default-500 hover:underline cursor-pointer"
+                      className="text-[10px] font-bold text-neutral-500 hover:underline cursor-pointer"
                     >
                       Clear All
                     </button>
@@ -1085,7 +1025,7 @@ export default function RolesPermissionsPage() {
                   {Object.entries(permissionGroups).map(([groupName, groupPerms]) => (
                     <div key={groupName} className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-default-800 uppercase tracking-wider">{groupName}</span>
+                        <span className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">{groupName}</span>
                         <button
                           type="button"
                           onClick={() => {
@@ -1110,8 +1050,8 @@ export default function RolesPermissionsPage() {
                               key={perm.id}
                               className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
                                 isChecked
-                                  ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-default-900"
-                                  : "border-default-150 text-default-500 hover:border-default-300"
+                                  ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white"
+                                  : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300"
                               }`}
                             >
                               <input
@@ -1122,11 +1062,13 @@ export default function RolesPermissionsPage() {
                                     prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
                                   );
                                 }}
-                                className="mt-0.5 h-3.5 w-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
                               />
                               <div className="min-w-0 flex-1">
-                                <span className="font-semibold block text-[11px]">{perm.name}</span>
-                                <span className="text-[9.5px] font-mono text-default-400">{perm.id}</span>
+                                <span className="font-semibold text-neutral-800 dark:text-neutral-200 block text-[11px]">{perm.name}</span>
+                                {perm.description && (
+                                  <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
+                                )}
                               </div>
                             </label>
                           );
@@ -1137,13 +1079,13 @@ export default function RolesPermissionsPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-2 border-t border-neutral-100 dark:border-slate-800">
+              <div className="flex justify-end gap-2.5 pt-2">
                 <Button
-                  type="button"
                   variant="outline"
                   size="sm"
+                  type="button"
                   onClick={() => setShowAddRole(false)}
-                  className="text-xs h-9 px-4"
+                  className="text-xs h-9 px-4 cursor-pointer"
                 >
                   Cancel
                 </Button>
@@ -1152,7 +1094,7 @@ export default function RolesPermissionsPage() {
                   disabled={submitting}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 shadow-xs cursor-pointer"
                 >
-                  {submitting ? "Creating..." : "Save Custom Role"}
+                  {submitting ? "Creating Role..." : "Create Custom Role"}
                 </Button>
               </div>
             </form>
@@ -1166,7 +1108,7 @@ export default function RolesPermissionsPage() {
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-lg bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-300 flex items-center justify-center">
                   <Icon icon="heroicons:pencil-square" className="h-4.5 w-4.5" />
                 </div>
                 <div>
@@ -1241,7 +1183,7 @@ export default function RolesPermissionsPage() {
                 <select
                   value={editRoleSystemRole}
                   onChange={(e) => setEditRoleSystemRole(e.target.value)}
-                  className="w-full text-xs font-bold border border-indigo-300 dark:border-indigo-800 rounded-lg p-2.5 bg-indigo-50/40 dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                  className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
                   {SYSTEM_ARCHETYPES.map((arch) => (
                     <option key={arch.key} value={arch.key}>
@@ -1252,11 +1194,11 @@ export default function RolesPermissionsPage() {
               </div>
 
               {/* Permissions Matrix */}
-              <div className="border border-default-200 dark:border-slate-800 rounded-xl p-4 space-y-4 bg-default-50/40 dark:bg-slate-800/10">
-                <div className="flex items-center justify-between border-b border-default-200 dark:border-slate-800 pb-3">
+              <div className="border border-neutral-200 dark:border-slate-800 rounded-xl p-4 space-y-4 bg-neutral-50/40 dark:bg-slate-800/10">
+                <div className="flex items-center justify-between border-b border-neutral-200 dark:border-slate-800 pb-3">
                   <div>
-                    <h4 className="text-xs font-bold text-default-900">Custom Permissions Matrix</h4>
-                    <p className="text-[10.5px] text-default-450">Configure access tokens for this role ({editRolePermissions.length} enabled)</p>
+                    <h4 className="text-xs font-bold text-neutral-900 dark:text-white">Custom Permissions Matrix</h4>
+                    <p className="text-[10.5px] text-neutral-400">Configure access tokens for this role ({editRolePermissions.length} enabled)</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -1266,11 +1208,11 @@ export default function RolesPermissionsPage() {
                     >
                       Select All
                     </button>
-                    <span className="text-default-300">|</span>
+                    <span className="text-neutral-300">|</span>
                     <button
                       type="button"
                       onClick={() => setEditRolePermissions([])}
-                      className="text-[10px] font-bold text-default-500 hover:underline cursor-pointer"
+                      className="text-[10px] font-bold text-neutral-500 hover:underline cursor-pointer"
                     >
                       Clear All
                     </button>
@@ -1281,7 +1223,7 @@ export default function RolesPermissionsPage() {
                   {Object.entries(permissionGroups).map(([groupName, groupPerms]) => (
                     <div key={groupName} className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-default-800 uppercase tracking-wider">{groupName}</span>
+                        <span className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">{groupName}</span>
                         <button
                           type="button"
                           onClick={() => {
@@ -1306,8 +1248,8 @@ export default function RolesPermissionsPage() {
                               key={perm.id}
                               className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
                                 isChecked
-                                  ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-default-900"
-                                  : "border-default-150 text-default-500 hover:border-default-300"
+                                  ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white"
+                                  : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300"
                               }`}
                             >
                               <input
@@ -1318,11 +1260,13 @@ export default function RolesPermissionsPage() {
                                     prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
                                   );
                                 }}
-                                className="mt-0.5 h-3.5 w-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
                               />
                               <div className="min-w-0 flex-1">
-                                <span className="font-semibold block text-[11px]">{perm.name}</span>
-                                <span className="text-[9.5px] font-mono text-default-400">{perm.id}</span>
+                                <span className="font-semibold text-neutral-800 dark:text-neutral-200 block text-[11px]">{perm.name}</span>
+                                {perm.description && (
+                                  <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
+                                )}
                               </div>
                             </label>
                           );
@@ -1333,13 +1277,13 @@ export default function RolesPermissionsPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-2 border-t border-neutral-100 dark:border-slate-800">
+              <div className="flex justify-end gap-2.5 pt-2">
                 <Button
-                  type="button"
                   variant="outline"
                   size="sm"
+                  type="button"
                   onClick={() => setEditingRole(null)}
-                  className="text-xs h-9 px-4"
+                  className="text-xs h-9 px-4 cursor-pointer"
                 >
                   Cancel
                 </Button>
@@ -1362,7 +1306,7 @@ export default function RolesPermissionsPage() {
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[85vh] flex flex-col">
             <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-lg bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-300 flex items-center justify-center">
                   <Icon icon="heroicons:users" className="h-4.5 w-4.5" />
                 </div>
                 <div>
@@ -1395,10 +1339,10 @@ export default function RolesPermissionsPage() {
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">
-              <div className="border border-default-150 rounded-xl overflow-hidden shadow-2xs">
+              <div className="border border-neutral-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-default-50/80 dark:bg-slate-800/40 border-b border-default-150 text-[10px] font-bold uppercase tracking-wider text-default-600">
+                    <tr className="bg-neutral-50/80 dark:bg-slate-800/40 border-b border-neutral-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
                       <th className="py-3 px-4">Staff Member</th>
                       <th className="py-3 px-4">Email</th>
                       <th className="py-3 px-4">Assigned Roles</th>
@@ -1407,12 +1351,12 @@ export default function RolesPermissionsPage() {
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-default-100 text-xs">
+                  <tbody className="divide-y divide-neutral-100 dark:divide-slate-800 text-xs">
                     {getAssignedUsers(viewUsersRole).length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-12 text-center text-default-400 italic">
+                        <td colSpan={6} className="py-12 text-center text-neutral-400 italic">
                           <div className="flex flex-col items-center gap-2">
-                            <Icon icon="heroicons:user-group" className="h-8 w-8 text-default-300" />
+                            <Icon icon="heroicons:user-group" className="h-8 w-8 text-neutral-300 dark:text-neutral-600" />
                             <span>No staff members are currently assigned to this role.</span>
                             <Button
                               size="sm"
@@ -1427,26 +1371,26 @@ export default function RolesPermissionsPage() {
                       </tr>
                     ) : (
                       getAssignedUsers(viewUsersRole).map((u) => (
-                        <tr key={u.id} className="hover:bg-default-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                          <td className="py-3 px-4 font-semibold text-default-900">
+                        <tr key={u.id} className="hover:bg-neutral-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                          <td className="py-3 px-4 font-semibold text-neutral-900 dark:text-white">
                             <div className="flex items-center gap-2.5">
-                              <div className="h-7 w-7 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
+                              <div className="h-7 w-7 rounded-full bg-neutral-200 dark:bg-slate-700 text-neutral-700 dark:text-neutral-200 font-bold text-xs flex items-center justify-center shrink-0">
                                 {u.fullName.charAt(0).toUpperCase()}
                               </div>
                               <span>{u.fullName}</span>
                             </div>
                           </td>
-                          <td className="py-3 px-4 text-default-600 font-mono text-[11px]">{u.email}</td>
+                          <td className="py-3 px-4 text-neutral-500 font-mono text-[11px]">{u.email}</td>
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {(u.roles && u.roles.length > 0 ? u.roles : [u.roleName || "Recruiter"]).map(
                                 (roleItem, rIdx) => (
                                   <span
                                     key={rIdx}
-                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                    className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${
                                       roleItem.toUpperCase() === viewUsersRole.name.toUpperCase()
-                                        ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-300/50"
-                                        : "bg-default-100 text-default-700 dark:bg-slate-800 dark:text-slate-300"
+                                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                                        : "bg-neutral-100 text-neutral-700 dark:bg-slate-800 dark:text-slate-300 border border-neutral-200/80 dark:border-slate-700"
                                     }`}
                                   >
                                     {roleItem}
@@ -1456,11 +1400,11 @@ export default function RolesPermissionsPage() {
                             </div>
                           </td>
                           <td className="py-3 px-4">
-                            <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] font-bold border-0">
+                            <span className="bg-neutral-100 text-neutral-700 dark:bg-slate-800 dark:text-slate-300 border border-neutral-200/80 dark:border-slate-700 text-[10px] font-medium px-2 py-0.5 rounded">
                               Active
-                            </Badge>
+                            </span>
                           </td>
-                          <td className="py-3 px-4 text-default-450 text-[11px]">
+                          <td className="py-3 px-4 text-neutral-500 text-[11px]">
                             {formatDateTimeWithSeconds(u.createdAt)}
                           </td>
                           <td className="py-3 px-4 text-right">
@@ -1472,10 +1416,10 @@ export default function RolesPermissionsPage() {
                               >
                                 Remove
                               </button>
-                              <span className="text-default-300">|</span>
+                              <span className="text-neutral-300">|</span>
                               <Link
                                 href={`/utility/users?search=${encodeURIComponent(u.email)}`}
-                                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-1"
+                                className="text-xs font-medium text-neutral-700 hover:text-indigo-600 hover:underline inline-flex items-center gap-1"
                               >
                                 Manage User
                                 <Icon icon="heroicons:arrow-top-right-on-square" className="h-3 w-3" />
@@ -1491,7 +1435,7 @@ export default function RolesPermissionsPage() {
             </div>
 
             <div className="px-6 py-3.5 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 flex justify-between items-center shrink-0">
-              <span className="text-[11px] text-default-450">
+              <span className="text-[11px] text-neutral-400">
                 To manage comprehensive workspace permissions, visit <strong>Users & Teams</strong>.
               </span>
               <Button
@@ -1513,7 +1457,7 @@ export default function RolesPermissionsPage() {
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden my-auto flex flex-col max-h-[85vh]">
             <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-lg bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-300 flex items-center justify-center">
                   <Icon icon="heroicons:user-plus" className="h-4.5 w-4.5" />
                 </div>
                 <div>
@@ -1564,7 +1508,7 @@ export default function RolesPermissionsPage() {
                     Available Staff ({filteredAvailableUsers.length})
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-medium bg-neutral-100 text-neutral-700 dark:bg-slate-800 dark:text-neutral-300 border border-neutral-200 dark:border-slate-700 px-2 py-0.5 rounded-md">
                       {selectedUserIdsToAssign.length} selected
                     </span>
                     <button
@@ -1607,7 +1551,7 @@ export default function RolesPermissionsPage() {
                             onChange={() => toggleUserToAssign(u.id)}
                             className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer shrink-0"
                           />
-                          <div className="h-7 w-7 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0">
+                          <div className="h-7 w-7 rounded-full bg-neutral-200 dark:bg-slate-700 text-neutral-700 dark:text-neutral-200 font-bold text-xs flex items-center justify-center shrink-0">
                             {u.fullName.charAt(0).toUpperCase()}
                           </div>
                           <div className="truncate flex-1">
@@ -1615,7 +1559,7 @@ export default function RolesPermissionsPage() {
                               <span className="text-xs font-semibold text-neutral-900 dark:text-white">
                                 {u.fullName}
                               </span>
-                              <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400">
+                              <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
                                 ({(u.roles && u.roles.length > 0 ? u.roles : [u.roleName || "Recruiter"]).join(", ")})
                               </span>
                             </div>
@@ -1659,13 +1603,13 @@ export default function RolesPermissionsPage() {
         </div>
       )}
 
-      {/* ─── MODAL 4: DIRECT PERMISSIONS MATRIX MODAL ─────────────────── */}
+      {/* ─── MODAL 5: DIRECT PERMISSIONS MATRIX MODAL ─────────────────── */}
       {matrixEditingRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-lg bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-300 flex items-center justify-center">
                   <Icon icon="heroicons:lock-open" className="h-4.5 w-4.5" />
                 </div>
                 <div>
@@ -1686,8 +1630,8 @@ export default function RolesPermissionsPage() {
             </div>
 
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
-              <div className="flex items-center justify-between bg-indigo-50/50 dark:bg-indigo-950/30 p-3 rounded-xl border border-indigo-200 dark:border-indigo-800/50">
-                <div className="text-xs text-indigo-950 dark:text-indigo-200">
+              <div className="flex items-center justify-between bg-neutral-50 dark:bg-slate-800/50 p-3 rounded-xl border border-neutral-200 dark:border-slate-700">
+                <div className="text-xs text-neutral-700 dark:text-neutral-300">
                   Select and configure granular operation access tokens for staff holding this role.
                 </div>
                 <div className="flex items-center gap-2">
@@ -1698,11 +1642,11 @@ export default function RolesPermissionsPage() {
                   >
                     Select All
                   </button>
-                  <span className="text-default-300">|</span>
+                  <span className="text-neutral-300">|</span>
                   <button
                     type="button"
                     onClick={() => setMatrixPermissions([])}
-                    className="text-xs font-bold text-default-500 hover:underline cursor-pointer"
+                    className="text-xs font-bold text-neutral-500 hover:underline cursor-pointer"
                   >
                     Clear All
                   </button>
@@ -1711,10 +1655,10 @@ export default function RolesPermissionsPage() {
 
               <div className="space-y-6">
                 {Object.entries(permissionGroups).map(([groupName, groupPerms]) => (
-                  <div key={groupName} className="space-y-2 border-b border-default-150 pb-5 last:border-b-0 last:pb-0">
+                  <div key={groupName} className="space-y-2 border-b border-neutral-200 dark:border-slate-800 pb-5 last:border-b-0 last:pb-0">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-default-850 uppercase tracking-wider flex items-center gap-1.5">
-                        <Icon icon="heroicons:folder" className="h-3.5 w-3.5 text-indigo-600" />
+                      <h4 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Icon icon="heroicons:folder" className="h-3.5 w-3.5 text-neutral-400" />
                         {groupName}
                       </h4>
                       <button
@@ -1733,21 +1677,21 @@ export default function RolesPermissionsPage() {
                             key={perm.id}
                             className={`flex items-start gap-2.5 p-3 rounded-lg border transition cursor-pointer select-none ${
                               isChecked
-                                ? "border-indigo-300 dark:border-indigo-800 bg-indigo-50/20 dark:bg-indigo-950/20 text-default-900"
-                                : "border-default-150 bg-default-50/20 dark:bg-slate-800/10 text-default-500 hover:border-default-300"
+                                ? "border-indigo-300 dark:border-indigo-800 bg-indigo-50/20 dark:bg-indigo-950/20 text-neutral-900 dark:text-white"
+                                : "border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300"
                             }`}
                           >
                             <input
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => handleToggleMatrixPermission(perm.id)}
-                              className="mt-0.5 h-4 w-4 rounded border-default-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                              className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                             />
                             <div className="min-w-0 flex-1">
-                              <div className="text-xs font-bold text-default-900">{perm.name}</div>
-                              <div className="text-[10px] text-default-400 font-mono mt-0.5">Token: &apos;{perm.id}&apos;</div>
+                              <div className="text-xs font-bold text-neutral-900 dark:text-white">{perm.name}</div>
+                              <div className="text-[10px] text-neutral-400 font-mono mt-0.5">Token: &apos;{perm.id}&apos;</div>
                               {perm.description && (
-                                <p className="text-[10.5px] text-default-500 mt-1 leading-snug">{perm.description}</p>
+                                <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-1 leading-snug">{perm.description}</p>
                               )}
                             </div>
                           </label>
@@ -1780,7 +1724,7 @@ export default function RolesPermissionsPage() {
         </div>
       )}
 
-      {/* ─── MODAL 5: DELETE ROLE CONFIRMATION ──────────────────────────── */}
+      {/* ─── MODAL 6: DELETE ROLE CONFIRMATION ──────────────────────────── */}
       {roleToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
