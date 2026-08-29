@@ -20,6 +20,8 @@ interface PodMember {
 interface Pod {
   id: string;
   name: string;
+  branchId?: string | null;
+  branchName?: string | null;
   podHeadId: string | null;
   podHeadName: string | null;
   description: string | null;
@@ -39,6 +41,8 @@ export default function PodsPage() {
   const [pods, setPods] = useState<Pod[]>([]);
   const [availableRecruiters, setAvailableRecruiters] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
 
   const [activeView, setActiveView] = useState<"all" | "cycle">("all");
 
@@ -48,6 +52,7 @@ export default function PodsPage() {
 
   // Form fields
   const [podName, setPodName] = useState("");
+  const [podBranchId, setPodBranchId] = useState("");
   const [podHeadId, setPodHeadId] = useState("");
   const [podDescription, setPodDescription] = useState("");
   const [selectedRecruiterIds, setSelectedRecruiterIds] = useState<string[]>([]);
@@ -57,25 +62,34 @@ export default function PodsPage() {
     const canAccess =
       user?.roles?.includes("ADMIN") ||
       user?.roles?.includes("SUPER_ADMIN") ||
+      user?.roles?.includes("BRANCH_ADMIN") ||
       user?.permissions?.includes("pod:view") ||
       user?.permissions?.includes("user:manage");
 
     setHasAccess(!!canAccess);
-    if (canAccess) loadData();
-    else setLoading(false);
+    if (canAccess) {
+      const storedBranch = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+      if (storedBranch) setSelectedBranchFilter(storedBranch);
+      loadData(storedBranch || "all");
+    } else {
+      setLoading(false);
+    }
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (branchFilter = selectedBranchFilter) => {
     try {
       setLoading(true);
-      const [podsData, availRecruitersData, usersData] = await Promise.all([
-        atsApi.pods.list(),
-        atsApi.pods.getAvailableRecruiters(),
+      const bid = branchFilter !== "all" ? branchFilter : undefined;
+      const [podsData, availRecruitersData, usersData, branchesData] = await Promise.all([
+        atsApi.pods.list(bid),
+        atsApi.pods.getAvailableRecruiters(bid),
         atsApi.auth.listUsers(),
+        atsApi.branches.list().catch(() => []),
       ]);
-      setPods(podsData);
-      setAvailableRecruiters(availRecruitersData);
-      setAllUsers(usersData.filter((u: any) => u.isActive));
+      setPods(podsData || []);
+      setAvailableRecruiters(availRecruitersData || []);
+      setAllUsers((usersData || []).filter((u: any) => u.isActive));
+      setBranches(branchesData || []);
     } catch (err: any) {
       toast.error("Failed to load recruitment pods: " + err.message);
     } finally {
@@ -83,8 +97,14 @@ export default function PodsPage() {
     }
   };
 
+  const handleBranchFilterChange = async (branchId: string) => {
+    setSelectedBranchFilter(branchId);
+    await loadData(branchId);
+  };
+
   const openCreatePanel = () => {
     setPodName("");
+    setPodBranchId(selectedBranchFilter !== "all" ? selectedBranchFilter : branches[0]?.id || "");
     setPodHeadId("");
     setPodDescription("");
     setSelectedRecruiterIds([]);
@@ -95,6 +115,7 @@ export default function PodsPage() {
   const openEditPanel = (pod: Pod) => {
     setSelectedPod(pod);
     setPodName(pod.name);
+    setPodBranchId(pod.branchId || branches[0]?.id || "");
     setPodHeadId(pod.podHeadId || "");
     setPodDescription(pod.description || "");
     setSelectedRecruiterIds(pod.members.map((m) => m.id));
@@ -113,6 +134,7 @@ export default function PodsPage() {
       setSubmitting(true);
       await atsApi.pods.create({
         name: podName.trim(),
+        branchId: podBranchId || undefined,
         podHeadId: podHeadId || undefined,
         description: podDescription.trim() || undefined,
         recruiterIds: selectedRecruiterIds,
@@ -135,6 +157,7 @@ export default function PodsPage() {
       setSubmitting(true);
       await atsApi.pods.update(selectedPod.id, {
         name: podName.trim(),
+        branchId: podBranchId || null,
         podHeadId: podHeadId || null,
         description: podDescription.trim() || null,
         recruiterIds: selectedRecruiterIds,
@@ -168,7 +191,8 @@ export default function PodsPage() {
     if (!confirm("Reset the round-robin cycle? All pods will become available for assignment again.")) return;
     try {
       setSubmitting(true);
-      await atsApi.pods.resetCycle();
+      const bid = selectedBranchFilter !== "all" ? selectedBranchFilter : undefined;
+      await atsApi.pods.resetCycle(bid);
       toast.success("Round-robin cycle reset successfully!");
       await loadData();
     } catch (err: any) {
@@ -216,19 +240,40 @@ export default function PodsPage() {
 
   // ── Derived data ────────────────────────────────────────────────────
   // Combine potential pod heads (active users who are not admins, or the current pod head of the selected pod)
-  const recruiterUsersForHead = allUsers.filter(
-    (u) =>
-      (!u.roles?.includes("ADMIN") && !u.roles?.includes("SUPER_ADMIN") && u.roleName !== "ADMIN" && u.roleName !== "SUPER_ADMIN") ||
-      (selectedPod && selectedPod.podHeadId === u.id)
-  );
+  const recruiterUsersForHead = allUsers.filter((u) => {
+    const matchBranch =
+      !podBranchId ||
+      u.branchId === podBranchId ||
+      u.branch_id === podBranchId ||
+      (Array.isArray(u.assignedBranchIds) && u.assignedBranchIds.includes(podBranchId)) ||
+      (Array.isArray(u.assigned_branch_ids) && u.assigned_branch_ids.includes(podBranchId));
+    return (
+      ((!u.roles?.includes("ADMIN") && !u.roles?.includes("SUPER_ADMIN") && u.roleName !== "ADMIN" && u.roleName !== "SUPER_ADMIN") ||
+        (selectedPod && selectedPod.podHeadId === u.id)) &&
+      matchBranch
+    );
+  });
 
-  // Potential recruiters to assign (active users with role RECRUITER or POD_LEAD, excluding admins)
-  const recruitersForPanel = allUsers.filter(
-    (u) =>
-      (u.roleName === "RECRUITER" || u.roleName === "POD_LEAD" || u.roles?.includes("RECRUITER") || u.roles?.includes("POD_LEAD")) &&
+  // Potential recruiters to assign (active users with role RECRUITER or POD_LEAD, or custom roles with those archetypes, excluding tenant admins)
+  const recruitersForPanel = allUsers.filter((u) => {
+    const matchBranch =
+      !podBranchId ||
+      u.branchId === podBranchId ||
+      u.branch_id === podBranchId ||
+      (Array.isArray(u.assignedBranchIds) && u.assignedBranchIds.includes(podBranchId)) ||
+      (Array.isArray(u.assigned_branch_ids) && u.assigned_branch_ids.includes(podBranchId));
+    return (
+      (u.roleName === "RECRUITER" ||
+        u.roleName === "POD_LEAD" ||
+        u.systemRole === "RECRUITER" ||
+        u.systemRole === "POD_LEAD" ||
+        u.roles?.includes("RECRUITER") ||
+        u.roles?.includes("POD_LEAD")) &&
       !u.roles?.includes("ADMIN") &&
-      !u.roles?.includes("SUPER_ADMIN")
-  );
+      !u.roles?.includes("SUPER_ADMIN") &&
+      matchBranch
+    );
+  });
 
   const totalPodsCount = pods.length;
   const availablePodsCount = pods.filter((p) => p.isAvailableForAssignment).length;
@@ -251,15 +296,34 @@ export default function PodsPage() {
               Recruitment Pods Management
             </h1>
             <p className="text-sm text-default-600 mt-1">
-              Create recruitment teams, assign heads, and review round-robin job assignment routing.
+              Create recruitment teams, assign heads, and review round-robin job assignment routing isolated to branch offices.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Branch Scope Dropdown */}
+            {branches.length > 0 && (
+              <div className="flex items-center gap-1.5 bg-default-50 dark:bg-slate-800 border border-default-250 dark:border-slate-700 rounded-lg px-2.5 py-1.5 shadow-2xs">
+                <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
+                <select
+                  value={selectedBranchFilter}
+                  onChange={(e) => handleBranchFilterChange(e.target.value)}
+                  className="bg-transparent text-xs font-bold text-default-800 dark:text-white outline-none cursor-pointer"
+                >
+                  <option value="all">All Branches ({pods.length})</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <Button
               onClick={handleResetRR}
               disabled={submitting}
               variant="outline"
-              className="flex items-center gap-1.5 border-default-300 font-semibold text-sm"
+              className="flex items-center gap-1.5 border-default-300 font-semibold text-sm h-9"
             >
               <Icon icon="heroicons:arrow-path" className="h-4 w-4" />
               Reset Cycle
@@ -267,7 +331,7 @@ export default function PodsPage() {
             <Button
               onClick={openCreatePanel}
               disabled={submitting}
-              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm text-sm"
+              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm text-sm h-9 cursor-pointer"
             >
               <Icon icon="heroicons:plus" className="h-4 w-4" />
               Create Pod
@@ -305,7 +369,7 @@ export default function PodsPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-default-50/50 dark:bg-slate-800/20 border-b border-default-150">
-                    {["Pod Name", "Pod Lead", "Recruiters", "Jobs Assigned", "Status", "Actions"].map((h) => (
+                    {["Pod Name", "Branch Office", "Pod Lead", "Recruiters", "Jobs Assigned", "Status", "Actions"].map((h) => (
                       <th key={h} className={`py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 ${h === "Actions" ? "text-right" : ""}`}>
                         {h}
                       </th>
@@ -315,10 +379,10 @@ export default function PodsPage() {
                 <tbody className="divide-y divide-default-100 text-xs">
                   {pods.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-16 text-center text-default-500 font-semibold italic">
+                      <td colSpan={7} className="py-16 text-center text-default-500 font-semibold italic">
                         <div className="flex flex-col items-center gap-3">
                           <Icon icon="heroicons:users" className="h-10 w-10 text-default-300" />
-                          <span>No recruitment pods configured yet. Click <strong>Create Pod</strong> to get started.</span>
+                          <span>No recruitment pods found for this branch. Click <strong>Create Pod</strong> to get started.</span>
                         </div>
                       </td>
                     </tr>
@@ -341,6 +405,13 @@ export default function PodsPage() {
                               )}
                             </div>
                           </div>
+                        </td>
+
+                        {/* Branch Office */}
+                        <td className="py-4 px-4 whitespace-nowrap">
+                          <Badge className="bg-indigo-50/80 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 text-[10px] px-2 py-0.5 border border-indigo-200 dark:border-indigo-800/50 font-bold">
+                            {pod.branchName || "Default Office"}
+                          </Badge>
                         </td>
 
                         {/* Pod Lead */}
@@ -560,6 +631,30 @@ export default function PodsPage() {
                 className="text-sm"
               />
             </div>
+
+            {/* Branch Location */}
+            {branches.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-default-800 block">
+                  Branch Office <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={podBranchId}
+                  onChange={(e) => setPodBranchId(e.target.value)}
+                  className="w-full text-sm font-semibold border border-default-250 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 cursor-pointer"
+                  required
+                >
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.market || "General"})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-default-450">
+                  This recruitment pod and member assignments will be isolated to this branch office.
+                </p>
+              </div>
+            )}
 
             {/* Pod Lead */}
             <div className="space-y-1.5">

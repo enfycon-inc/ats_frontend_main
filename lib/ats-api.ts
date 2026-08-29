@@ -1141,14 +1141,14 @@ const clients = {
 };
 
 const pods = {
-  async list(): Promise<any[]> {
-    return apiFetch<any[]>('/api/pods');
+  async list(branchId?: string): Promise<any[]> {
+    return apiFetch<any[]>(`/api/pods${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''}`);
   },
   async get(id: string): Promise<any> {
     return apiFetch<any>(`/api/pods/${id}`);
   },
-  async getAvailableRecruiters(): Promise<any[]> {
-    return apiFetch<any[]>('/api/pods/available-recruiters');
+  async getAvailableRecruiters(branchId?: string): Promise<any[]> {
+    return apiFetch<any[]>(`/api/pods/available-recruiters${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''}`);
   },
   async getMyTeam(): Promise<any> {
     return apiFetch<any>('/api/pods/my-team');
@@ -1170,8 +1170,8 @@ const pods = {
       method: 'DELETE',
     });
   },
-  async resetCycle(): Promise<any> {
-    return apiFetch<any>('/api/pods/reset-cycle', {
+  async resetCycle(branchId?: string): Promise<any> {
+    return apiFetch<any>(`/api/pods/reset-cycle${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''}`, {
       method: 'POST',
     });
   },

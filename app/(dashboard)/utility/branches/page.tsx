@@ -1751,63 +1751,168 @@ export default function BranchManagementPage() {
         </div>
       )}
 
-      {/* MULTI-ROLE ASSIGNMENT MODAL */}
+      {/* MULTI-ROLE ASSIGNMENT MODAL (CUSTOM ROLES & BRANCH ADMIN ONLY) */}
       {isAssignUserOpen && selectedMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in-0 zoom-in-95">
-            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in-0 zoom-in-95 my-auto max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
               <div>
                 <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-indigo-650" /> Configure Roles: {selectedMember.fullName}
+                  <Shield className="h-4 w-4 text-indigo-650" /> Configure Roles: {selectedMember.fullName || selectedMember.email}
                 </h3>
-                <p className="text-[11px] text-neutral-400">Assign single or multiple operational roles to this staff member</p>
+                <p className="text-[11px] text-neutral-400">Assign custom staffing profiles and branch administrative roles</p>
               </div>
-              <button onClick={() => setIsAssignUserOpen(false)} className="text-neutral-400 hover:text-neutral-600">
+              <button onClick={() => setIsAssignUserOpen(false)} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveMemberRoles} className="p-5 space-y-4">
+            <form onSubmit={handleSaveMemberRoles} className="p-5 space-y-4 overflow-y-auto flex-1">
+              
+              {/* 1. Branch Administrative Governance */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider block">
-                  Select Assigned System Roles
+                <label className="text-[10.5px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider block">
+                  Branch Administration Governance
                 </label>
-                <div className="space-y-2 border border-neutral-200 dark:border-slate-800 p-3 rounded-lg bg-neutral-50/50">
-                  {availableRolesList.map((r) => {
-                    const isChecked = selectedRoles.includes(r.key);
-                    return (
-                      <div 
-                        key={r.key} 
-                        onClick={() => {
-                          if (isChecked) setSelectedRoles(selectedRoles.filter(role => role !== r.key));
-                          else setSelectedRoles([...selectedRoles, r.key]);
-                        }}
-                        className={`flex items-start gap-2.5 p-2 rounded cursor-pointer transition-colors border ${
-                          isChecked ? "bg-indigo-50/80 border-indigo-300 dark:bg-indigo-950/40" : "bg-white border-neutral-200"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {}} // handled by parent div
-                          className="h-4 w-4 accent-indigo-600 cursor-pointer mt-0.5"
-                        />
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-neutral-800 dark:text-white leading-none">{r.label}</p>
-                          <p className="text-[10px] text-neutral-450 mt-0.5">{r.desc}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div 
+                  onClick={() => {
+                    const isChecked = selectedRoles.includes("BRANCH_ADMIN");
+                    if (isChecked) setSelectedRoles(selectedRoles.filter(r => r !== "BRANCH_ADMIN"));
+                    else setSelectedRoles([...selectedRoles, "BRANCH_ADMIN"]);
+                  }}
+                  className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all border ${
+                    selectedRoles.includes("BRANCH_ADMIN")
+                      ? "bg-amber-50/80 border-amber-300 dark:bg-amber-950/40 dark:border-amber-700 shadow-xs"
+                      : "bg-white dark:bg-slate-850 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedRoles.includes("BRANCH_ADMIN")}
+                    onChange={() => {}} // handled by parent div
+                    className="h-4 w-4 accent-amber-600 cursor-pointer mt-0.5"
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold text-neutral-900 dark:text-white flex items-center gap-1">
+                        <Crown className="h-3.5 w-3.5 text-amber-500" /> Branch Admin (Branch Manager)
+                      </p>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+                        Governance
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                      Grants full administrative control, recruiter assignment, and delivery management for this branch.
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
-                <Button type="button" variant="outline" size="sm" onClick={() => setIsAssignUserOpen(false)} className="h-8 text-xs font-bold">
+              {/* 2. Workspace Custom Staffing Roles */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10.5px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider block">
+                    Custom Staffing Profiles
+                  </label>
+                  <a 
+                    href="/utility/roles-permissions" 
+                    target="_blank" 
+                    className="text-[10.5px] font-bold text-indigo-650 hover:underline flex items-center gap-0.5"
+                  >
+                    + Manage Roles <ArrowRight className="h-3 w-3" />
+                  </a>
+                </div>
+
+                {(() => {
+                  const customRolesList = tenantRoles.filter(
+                    (r: any) => !r.isSystem && !["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.name)
+                  );
+
+                  if (customRolesList.length === 0) {
+                    return (
+                      <div className="p-4 border border-dashed border-neutral-300 dark:border-slate-750 rounded-xl text-center space-y-2 bg-neutral-50/50 dark:bg-slate-850/50">
+                        <ShieldAlert className="h-6 w-6 text-amber-500 mx-auto" />
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">No Custom Roles Configured</p>
+                          <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                            System roles are abstract templates. Create custom roles in <strong>Role Management</strong> before assigning staff.
+                          </p>
+                        </div>
+                        <Button 
+                          type="button" 
+                          size="sm" 
+                          onClick={() => window.open("/utility/roles-permissions", "_blank")}
+                          className="h-7 text-xs bg-indigo-650 hover:bg-indigo-700 text-white font-bold"
+                        >
+                          Configure Roles in Settings
+                        </Button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-2 border border-neutral-200 dark:border-slate-800 p-2.5 rounded-xl bg-neutral-50/40 dark:bg-slate-850/40 max-h-[220px] overflow-y-auto">
+                      {customRolesList.map((r: any) => {
+                        const isChecked = selectedRoles.includes(r.name) || selectedRoles.includes(r.id);
+                        return (
+                          <div 
+                            key={r.id || r.name} 
+                            onClick={() => {
+                              if (isChecked) {
+                                setSelectedRoles(selectedRoles.filter((role) => role !== r.name && role !== r.id));
+                              } else {
+                                setSelectedRoles([...selectedRoles, r.name]);
+                              }
+                            }}
+                            className={`flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all border ${
+                              isChecked 
+                                ? "bg-indigo-50/80 border-indigo-300 dark:bg-indigo-950/40 dark:border-indigo-700 shadow-2xs" 
+                                : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}} // handled by parent div
+                              className="h-4 w-4 accent-indigo-600 cursor-pointer mt-0.5 shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-xs font-bold text-neutral-900 dark:text-white capitalize">{r.name}</p>
+                                {r.systemRole && (
+                                  <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-neutral-300 border border-neutral-200 dark:border-slate-700">
+                                    Base: {r.systemRole.replace(/_/g, " ")}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10.5px] text-neutral-450 mt-0.5 truncate">
+                                {r.description || "Custom operational staffing role"}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100 dark:border-slate-800 shrink-0">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setIsAssignUserOpen(false)} 
+                  className="h-8 text-xs font-bold"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-4">
-                  Save Roles & Permissions
+                <Button 
+                  type="submit" 
+                  size="sm" 
+                  className="h-8 text-xs bg-indigo-650 hover:bg-indigo-700 text-white font-bold px-4 shadow-xs cursor-pointer"
+                >
+                  Save Roles &amp; Permissions
                 </Button>
               </div>
             </form>
