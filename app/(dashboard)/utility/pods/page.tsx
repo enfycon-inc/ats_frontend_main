@@ -41,6 +41,7 @@ export default function PodsPage() {
   const [pods, setPods] = useState<Pod[]>([]);
   const [availableRecruiters, setAvailableRecruiters] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
 
@@ -91,16 +92,18 @@ export default function PodsPage() {
     try {
       setLoading(true);
       const bid = branchFilter !== "all" ? branchFilter : undefined;
-      const [podsData, availRecruitersData, usersData, branchesData] = await Promise.all([
+      const [podsData, availRecruitersData, usersData, branchesData, rolesData] = await Promise.all([
         atsApi.pods.list(bid),
         atsApi.pods.getAvailableRecruiters(bid),
         atsApi.auth.listUsers(),
         atsApi.branches.list().catch(() => []),
+        atsApi.auth.listRoles(bid, true).catch(() => []),
       ]);
       setPods(podsData || []);
       setAvailableRecruiters(availRecruitersData || []);
       setAllUsers((usersData || []).filter((u: any) => u.isActive));
       setBranches(branchesData || []);
+      setRoles(rolesData || []);
     } catch (err: any) {
       toast.error("Failed to load recruitment pods: " + err.message);
     } finally {
@@ -254,6 +257,8 @@ export default function PodsPage() {
   }
 
   // ── Derived data ────────────────────────────────────────────────────
+  // Pod Lead Candidates: ONLY users assigned roles created from the POD_LEAD template
+  // (or currently assigned as head of the selected pod)
   const recruiterUsersForHead = allUsers.filter((u) => {
     const matchBranch =
       !podBranchId ||
@@ -261,11 +266,26 @@ export default function PodsPage() {
       u.branch_id === podBranchId ||
       (Array.isArray(u.assignedBranchIds) && u.assignedBranchIds.includes(podBranchId)) ||
       (Array.isArray(u.assigned_branch_ids) && u.assigned_branch_ids.includes(podBranchId));
-    return (
-      ((!u.roles?.includes("ADMIN") && !u.roles?.includes("SUPER_ADMIN") && u.roleName !== "ADMIN" && u.roleName !== "SUPER_ADMIN") ||
-        (selectedPod && selectedPod.podHeadId === u.id)) &&
-      matchBranch
-    );
+
+    if (!matchBranch) return false;
+
+    // Check if the user's role was created from the POD_LEAD template
+    const userRoleObj = roles.find((r) => r.id === u.roleId);
+    const baseArchetype = (
+      userRoleObj?.systemRole ||
+      userRoleObj?.replacesSystemRole ||
+      u.systemRole ||
+      (u.roles && u.roles[0]) ||
+      u.roleName ||
+      ""
+    ).toUpperCase();
+
+    const isPodLeadTemplate =
+      baseArchetype === "POD_LEAD" ||
+      u.roles?.includes("POD_LEAD") ||
+      (selectedPod && selectedPod.podHeadId === u.id);
+
+    return isPodLeadTemplate && !u.roles?.includes("ADMIN") && !u.roles?.includes("SUPER_ADMIN");
   });
 
   const formatDisplayRoleName = (roleName?: string) => {
@@ -288,6 +308,7 @@ export default function PodsPage() {
     }
   };
 
+  // Recruiters for the pod checklist: Recruiters in the same branch
   const recruitersForModal = allUsers.filter((u) => {
     const matchBranch =
       !podBranchId ||
@@ -295,17 +316,28 @@ export default function PodsPage() {
       u.branch_id === podBranchId ||
       (Array.isArray(u.assignedBranchIds) && u.assignedBranchIds.includes(podBranchId)) ||
       (Array.isArray(u.assigned_branch_ids) && u.assigned_branch_ids.includes(podBranchId));
-    
-    const roleMatches = (u.roleName === "RECRUITER" ||
-      u.roleName === "POD_LEAD" ||
-      u.systemRole === "RECRUITER" ||
-      u.systemRole === "POD_LEAD" ||
-      u.roles?.includes("RECRUITER") ||
-      u.roles?.includes("POD_LEAD")) &&
-      !u.roles?.includes("ADMIN") &&
-      !u.roles?.includes("SUPER_ADMIN");
 
-    if (!roleMatches || !matchBranch) return false;
+    if (!matchBranch) return false;
+
+    const userRoleObj = roles.find((r) => r.id === u.roleId);
+    const baseArchetype = (
+      userRoleObj?.systemRole ||
+      userRoleObj?.replacesSystemRole ||
+      u.systemRole ||
+      (u.roles && u.roles[0]) ||
+      u.roleName ||
+      ""
+    ).toUpperCase();
+
+    const isRecruiterTemplate =
+      baseArchetype === "RECRUITER" ||
+      baseArchetype === "POD_LEAD" ||
+      u.roles?.includes("RECRUITER") ||
+      u.roles?.includes("POD_LEAD");
+
+    if (!isRecruiterTemplate || u.roles?.includes("ADMIN") || u.roles?.includes("SUPER_ADMIN")) {
+      return false;
+    }
 
     if (recruiterSearch.trim()) {
       const q = recruiterSearch.toLowerCase().trim();
@@ -714,14 +746,18 @@ export default function PodsPage() {
                     className="w-full text-xs font-semibold border border-indigo-200 dark:border-indigo-900/60 rounded-lg p-2.5 bg-indigo-50/30 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                   >
                     <option value="">— None (Unassigned) —</option>
-                    {recruiterUsersForHead.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.fullName} ({formatDisplayRoleName(u.roleName)}) — {u.email}
-                      </option>
-                    ))}
+                    {recruiterUsersForHead.length === 0 ? (
+                      <option disabled value="">(No staff with Pod Lead role in this branch)</option>
+                    ) : (
+                      recruiterUsersForHead.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.fullName} ({formatDisplayRoleName(u.roleName)}) — {u.email}
+                        </option>
+                      ))
+                    )}
                   </select>
                   <p className="text-[10.5px] text-default-450 leading-relaxed">
-                    💡 Selecting a Pod Lead automatically promotes their access role to <strong>POD_LEAD</strong>.
+                    💡 Only staff assigned to roles created from the <strong>POD_LEAD</strong> template in this branch are eligible as Pod Lead.
                   </p>
                 </div>
 
