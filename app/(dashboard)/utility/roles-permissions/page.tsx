@@ -17,6 +17,7 @@ interface Permission {
   id: string;
   name: string;
   group: string;
+  description?: string;
 }
 
 interface CustomRole {
@@ -426,23 +427,14 @@ export default function RolesPermissionsPage() {
            ========================================== */}
         <div className="lg:col-span-2 space-y-4">
           <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl">
-            <CardHeader className="border-b border-default-150 p-4 bg-default-50/50 dark:bg-slate-800/20 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-bold text-default-900 flex items-center gap-2">
-                  <Icon icon="heroicons:user-group" className="h-4 w-4 text-indigo-600" />
-                  Custom Roles
-                </CardTitle>
-                <CardDescription className="text-[11px] text-default-500">
-                  {filteredRoles.length} custom operational role{filteredRoles.length !== 1 ? "s" : ""}
-                </CardDescription>
-              </div>
-              <Button 
-                size="sm" 
-                onClick={openAddRoleModal} 
-                className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2.5 rounded-lg shadow-2xs"
-              >
-                <Icon icon="heroicons:plus" className="h-3.5 w-3.5 mr-1" /> Add Role
-              </Button>
+            <CardHeader className="border-b border-default-150 p-4 bg-default-50/50 dark:bg-slate-800/20">
+              <CardTitle className="text-sm font-bold text-default-900 flex items-center gap-2">
+                <Icon icon="heroicons:user-group" className="h-4 w-4 text-indigo-600" />
+                Custom Roles
+              </CardTitle>
+              <CardDescription className="text-[11px] text-default-500">
+                {filteredRoles.length} custom operational role{filteredRoles.length !== 1 ? "s" : ""} in current office
+              </CardDescription>
             </CardHeader>
 
             <CardContent className="p-3 space-y-2">
@@ -453,15 +445,8 @@ export default function RolesPermissionsPage() {
                   </div>
                   <p className="text-xs font-bold text-default-800 dark:text-white">No Custom Roles Found</p>
                   <p className="text-[11px] text-default-450 leading-relaxed max-w-xs mx-auto">
-                    System roles are abstract templates. Click <strong>Create Custom Role</strong> to define a branch staffing profile.
+                    Click <strong>Create Custom Role</strong> above to define a staffing role for this office.
                   </p>
-                  <Button 
-                    size="sm" 
-                    onClick={openAddRoleModal} 
-                    className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold mt-2"
-                  >
-                    + Create First Role
-                  </Button>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
@@ -492,11 +477,6 @@ export default function RolesPermissionsPage() {
                               <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[8.5px] font-bold border border-indigo-200 dark:border-indigo-800 px-1.5 py-0.2">
                                 Base: {role.systemRole || "RECRUITER"}
                               </Badge>
-                              {role.branchName && (
-                                <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[8.5px] font-bold border-0 px-1.5 py-0.2">
-                                  {role.branchName}
-                                </Badge>
-                              )}
                             </div>
                             <p className="text-[10.5px] text-default-500 mt-1 line-clamp-2">
                               {role.description || "Custom operational staffing role"}
@@ -544,11 +524,6 @@ export default function RolesPermissionsPage() {
                     <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[9px] font-bold border border-indigo-200">
                       Base Archetype: {selectedRole.systemRole || "RECRUITER"}
                     </Badge>
-                    {selectedRole.branchName && (
-                      <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-bold border-0">
-                        {selectedRole.branchName}
-                      </Badge>
-                    )}
                   </div>
                   <p className="text-[11px] text-default-500 mt-0.5">{selectedRole.description || "Custom branch role"}</p>
                 </div>
@@ -600,28 +575,34 @@ export default function RolesPermissionsPage() {
                             {groupPerms.map((perm) => {
                               const isChecked = selectedPermissions.includes(perm.id);
                               return (
-                                <div
+                                <label
                                   key={perm.id}
-                                  onClick={() => handlePermissionToggle(perm.id)}
-                                  className={`flex items-start gap-3 p-2.5 rounded-lg border transition cursor-pointer ${
-                                    isChecked 
-                                      ? "bg-indigo-50/50 border-indigo-200 dark:bg-indigo-950/20 dark:border-indigo-800" 
-                                      : "border-default-150 hover:bg-default-50/50"
+                                  className={`flex items-start gap-2.5 p-3 rounded-lg border transition-all cursor-pointer select-none ${
+                                    isChecked
+                                      ? "border-indigo-300 dark:border-indigo-800 bg-indigo-50/20 dark:bg-indigo-950/20 text-default-900"
+                                      : "border-default-150 bg-default-50/20 dark:bg-slate-800/10 text-default-500 hover:border-default-300"
                                   }`}
                                 >
-                                  <Checkbox
-                                    id={perm.id}
+                                  <input
+                                    type="checkbox"
                                     checked={isChecked}
-                                    onCheckedChange={() => handlePermissionToggle(perm.id)}
-                                    className="mt-0.5"
+                                    onChange={() => handlePermissionToggle(perm.id)}
+                                    className="mt-0.5 h-4 w-4 rounded border-default-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                                   />
-                                  <div>
-                                    <label htmlFor={perm.id} className="text-xs font-semibold text-default-900 cursor-pointer block leading-none">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-xs font-bold tracking-tight text-default-900">
                                       {perm.name}
-                                    </label>
-                                    <span className="text-[10px] text-default-400 mt-1 block">Token: `{perm.id}`</span>
+                                    </div>
+                                    <div className="text-[10px] text-default-400 font-mono mt-0.5">
+                                      Token: &apos;{perm.id}&apos;
+                                    </div>
+                                    {perm.description && (
+                                      <p className="text-[10.5px] text-default-500 mt-1 leading-snug">
+                                        {perm.description}
+                                      </p>
+                                    )}
                                   </div>
-                                </div>
+                                </label>
                               );
                             })}
                           </div>
@@ -657,16 +638,9 @@ export default function RolesPermissionsPage() {
               <div>
                 <p className="text-sm font-bold text-default-800 dark:text-white">No Role Selected</p>
                 <p className="text-xs text-default-450 mt-1 max-w-sm">
-                  Select a custom role from the left panel to configure its granular security permissions matrix, or create a new custom role.
+                  Select a custom role from the left panel to configure its granular security permissions matrix.
                 </p>
               </div>
-              <Button 
-                size="sm" 
-                onClick={openAddRoleModal} 
-                className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
-              >
-                + Create Custom Role
-              </Button>
             </div>
           )}
         </div>

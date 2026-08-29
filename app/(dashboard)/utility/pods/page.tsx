@@ -380,20 +380,24 @@ export default function PodsPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-default-50/50 dark:bg-slate-800/20 border-b border-default-150">
-                    {["Pod Name", "Branch Office", "Pod Lead", "Recruiters", "Jobs Assigned", "Status", "Actions"].map((h) => (
-                      <th key={h} className={`py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 ${h === "Actions" ? "text-right" : ""}`}>
-                        {h}
-                      </th>
-                    ))}
+                    <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Pod Name</th>
+                    {selectedBranchFilter === "all" && (
+                      <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Branch Office</th>
+                    )}
+                    <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Pod Lead</th>
+                    <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Recruiters</th>
+                    <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Jobs Assigned</th>
+                    <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Status</th>
+                    <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-default-100 text-xs">
                   {pods.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-16 text-center text-default-500 font-semibold italic">
+                      <td colSpan={selectedBranchFilter === "all" ? 7 : 6} className="py-16 text-center text-default-500 font-semibold italic">
                         <div className="flex flex-col items-center gap-3">
                           <Icon icon="heroicons:users" className="h-10 w-10 text-default-300" />
-                          <span>No recruitment pods found for this branch. Click <strong>Create Pod</strong> to get started.</span>
+                          <span>No recruitment pods found for this branch. Click <strong>Create Pod</strong> above to get started.</span>
                         </div>
                       </td>
                     </tr>
@@ -418,12 +422,14 @@ export default function PodsPage() {
                           </div>
                         </td>
 
-                        {/* Branch Office */}
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <Badge className="bg-indigo-50/80 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 text-[10px] px-2 py-0.5 border border-indigo-200 dark:border-indigo-800/50 font-bold">
-                            {pod.branchName || "Default Office"}
-                          </Badge>
-                        </td>
+                        {/* Branch Office (Only if All Branches selected) */}
+                        {selectedBranchFilter === "all" && (
+                          <td className="py-4 px-4 whitespace-nowrap">
+                            <Badge className="bg-indigo-50/80 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 text-[10px] px-2 py-0.5 border border-indigo-200 dark:border-indigo-800/50 font-bold">
+                              {pod.branchName || "Default Office"}
+                            </Badge>
+                          </td>
+                        )}
 
                         {/* Pod Lead */}
                         <td className="py-4 px-4 whitespace-nowrap">
