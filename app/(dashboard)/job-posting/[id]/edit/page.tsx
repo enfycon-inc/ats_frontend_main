@@ -44,6 +44,7 @@ import toast from "react-hot-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { AddClientModal } from "../../components/add-client-modal";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 
 
 
@@ -2581,70 +2582,11 @@ export default function EditJobPostingPage() {
                 <SectionHeader title="Job Description & Editor" sectionKey="jobDescription" />
                 {!collapsedSections.jobDescription && (
                   <div className="p-4 space-y-3">
-                    <div className="flex items-center justify-between bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-t-lg p-2 transition-colors">
-                      {/* Editor formatting toolbar mock */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => toast("Bold style template", { icon: "📝" })}
-                          className="px-2 py-1 hover:bg-neutral-200 dark:hover:bg-slate-750 rounded font-bold text-xs cursor-pointer text-neutral-700 dark:text-neutral-300"
-                        >
-                          B
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toast("Italic style template", { icon: "📝" })}
-                          className="px-2 py-1 hover:bg-neutral-200 dark:hover:bg-slate-750 rounded italic text-xs cursor-pointer text-neutral-700 dark:text-neutral-300"
-                        >
-                          I
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toast("Underline style template", { icon: "📝" })}
-                          className="px-2 py-1 hover:bg-neutral-200 dark:hover:bg-slate-750 rounded underline text-xs cursor-pointer text-neutral-700 dark:text-neutral-300"
-                        >
-                          U
-                        </button>
-                        <span className="w-px h-4 bg-neutral-300 dark:bg-slate-700 mx-1" />
-                        <button
-                          type="button"
-                          onClick={() => toast("List template inserted", { icon: "📝" })}
-                          className="px-2 py-1 hover:bg-neutral-200 dark:hover:bg-slate-750 rounded text-xs cursor-pointer text-neutral-700 dark:text-neutral-300"
-                        >
-                          • Bullet List
-                        </button>
-                      </div>
-
-                      {/* Source Mode Toggle */}
-                      <button
-                        type="button"
-                        onClick={() => setIsHtmlMode(!isHtmlMode)}
-                        className={cn(
-                          "px-3 py-1 rounded text-xs font-bold border transition-colors cursor-pointer",
-                          isHtmlMode
-                            ? "bg-primary text-white border-primary"
-                            : "hover:bg-neutral-200 dark:hover:bg-slate-700 text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
-                        )}
-                      >
-                        {isHtmlMode ? "View Rich Text" : "HTML Source"}
-                      </button>
-                    </div>
-
-                    <div className="relative">
-                      {isHtmlMode ? (
-                        <textarea
-                          {...register("jobDescription")}
-                          className="w-full h-64 bg-neutral-50 dark:bg-slate-950 border border-t-0 border-neutral-200 dark:border-slate-800 rounded-b-lg p-3 outline-hidden text-xs font-mono resize-none leading-relaxed text-neutral-800 dark:text-neutral-200"
-                          placeholder="HTML Raw Content..."
-                        />
-                      ) : (
-                        <textarea
-                          {...register("jobDescription")}
-                          className="w-full h-64 bg-white dark:bg-slate-950 border border-t-0 border-neutral-200 dark:border-slate-800 rounded-b-lg p-3 outline-hidden text-xs resize-none leading-relaxed text-neutral-800 dark:text-neutral-200"
-                          placeholder="Type or paste rich job descriptions here..."
-                        />
-                      )}
-                    </div>
+                    <RichTextEditor
+                      value={watch("jobDescription") || ""}
+                      onChange={(val) => setValue("jobDescription", val, { shouldValidate: true, shouldDirty: true })}
+                      placeholder="Type or paste rich job description from ChatGPT, Word, PDF, or Docs..."
+                    />
                     {errors.jobDescription && (
                       <p className="text-[10px] text-red-655 font-bold">{errors.jobDescription.message}</p>
                     )}

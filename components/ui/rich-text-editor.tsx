@@ -24,64 +24,68 @@ interface RichTextEditorProps {
 }
 
 /**
- * Helper to convert pasted raw Markdown string (e.g. **bold**, ## Header, * List) to HTML
+ * Helper to convert raw or HTML-wrapped Markdown string (e.g. **bold**, ## Header, * List) to HTML
  */
 function convertMarkdownToHtml(text: string): string {
-  if (!text) return "";
+  if (!text || !text.trim()) return "";
   
-  // If it already looks like HTML (has tags), preserve as HTML
-  if (/<[a-z][\s\S]*>/i.test(text)) {
-    return text;
-  }
+  let html = text.trim();
 
-  let html = text;
-
-  // Escape basic HTML chars before converting markdown
+  // If already wrapped in HTML tags (e.g. pasted into Quill), clean inner markdown syntax
   html = html
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/<p>\s*###\s*([^<]+)<\/p>/gi, "<h3>$1</h3>")
+    .replace(/<p>\s*##\s*([^<]+)<\/p>/gi, "<h2>$1</h2>")
+    .replace(/<p>\s*#\s*([^<]+)<\/p>/gi, "<h1>$1</h1>")
+    .replace(/<p>\s*(?:[\*\-\•]|&bull;|&middot;)\s*([^<]+)<\/p>/gi, "<li>$1</li>")
+    .replace(/\*\*([^*<]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/__([^_<]+)__/g, "<strong>$1</strong>")
+    .replace(/(<li>[\s\S]*?<\/li>)/gi, "<ul>$1</ul>")
+    .replace(/<\/ul>\s*<ul>/g, "");
 
-  // Headers (### Header 3, ## Header 2, # Header 1)
-  html = html.replace(/^### (.*$)/gim, "<h3>$1</h3>");
-  html = html.replace(/^## (.*$)/gim, "<h2>$1</h2>");
-  html = html.replace(/^# (.*$)/gim, "<h1>$1</h1>");
+  // If raw markdown without HTML tags:
+  if (!/<[a-z][\s\S]*>/i.test(html)) {
+    // Escape basic HTML chars before converting markdown
+    html = html
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
 
-  // Bold (**text** or __text__)
-  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-  html = html.replace(/__(.*?)__/g, "<strong>$1</strong>");
+    // Headers
+    html = html.replace(/^### (.*$)/gim, "<h3>$1</h3>");
+    html = html.replace(/^## (.*$)/gim, "<h2>$1</h2>");
+    html = html.replace(/^# (.*$)/gim, "<h1>$1</h1>");
 
-  // Italic (*text* or _text_)
-  html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
-  html = html.replace(/_(.*?)_/g, "<em>$1</em>");
+    // Bold & Italic
+    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/__(.*?)__/g, "<strong>$1</strong>");
+    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
+    html = html.replace(/_(.*?)_/g, "<em>$1</em>");
 
-  // Bullet Lists (* item or - item)
-  html = html.replace(/^\s*[\*\-] (.*$)/gim, "<li>$1</li>");
-  html = html.replace(/(<li>.*<\/li>)/gis, "<ul>$1</ul>");
-  // Clean nested duplicate <ul> tags
-  html = html.replace(/<\/ul>\s*<ul>/g, "");
+    // Bullet & numbered Lists
+    html = html.replace(/^\s*[\*\-\•] (.*$)/gim, "<li>$1</li>");
+    html = html.replace(/(<li>.*<\/li>)/gis, "<ul>$1</ul>");
+    html = html.replace(/<\/ul>\s*<ul>/g, "");
+    html = html.replace(/^\s*\d+\. (.*$)/gim, "<li>$1</li>");
 
-  // Numbered Lists (1. item)
-  html = html.replace(/^\s*\d+\. (.*$)/gim, "<li>$1</li>");
-
-  // Paragraphs (line breaks)
-  const lines = html.split(/\n\s*\n/);
-  html = lines
-    .map((p) => {
-      const trimmed = p.trim();
-      if (!trimmed) return "";
-      if (
-        trimmed.startsWith("<h") ||
-        trimmed.startsWith("<ul") ||
-        trimmed.startsWith("<ol") ||
-        trimmed.startsWith("<li")
-      ) {
-        return trimmed;
-      }
-      return `<p>${trimmed.replace(/\n/g, "<br/>")}</p>`;
-    })
-    .filter(Boolean)
-    .join("");
+    // Paragraphs
+    const lines = html.split(/\n\s*\n/);
+    html = lines
+      .map((p) => {
+        const trimmed = p.trim();
+        if (!trimmed) return "";
+        if (
+          trimmed.startsWith("<h") ||
+          trimmed.startsWith("<ul") ||
+          trimmed.startsWith("<ol") ||
+          trimmed.startsWith("<li")
+        ) {
+          return trimmed;
+        }
+        return `<p>${trimmed.replace(/\n/g, "<br/>")}</p>`;
+      })
+      .filter(Boolean)
+      .join("");
+  }
 
   return html;
 }
