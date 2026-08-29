@@ -1468,35 +1468,29 @@ export default function RolesPermissionsPage() {
                               : "hover:bg-default-50 dark:hover:bg-slate-800/40"
                           }`}
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
                             <input
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleUserToAssign(u.id)}
-                              className="rounded border-default-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
+                              className="rounded border-default-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer shrink-0"
                             />
                             <div className="h-6 w-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center shrink-0">
                               {u.fullName.charAt(0).toUpperCase()}
                             </div>
-                            <div className="truncate">
-                              <span className="text-xs font-semibold text-default-900 dark:text-white block truncate">
-                                {u.fullName}
-                              </span>
+                            <div className="truncate flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap truncate">
+                                <span className="text-xs font-semibold text-default-900 dark:text-white">
+                                  {u.fullName}
+                                </span>
+                                <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400">
+                                  ({(u.roles && u.roles.length > 0 ? u.roles : [u.roleName || "Recruiter"]).join(", ")})
+                                </span>
+                              </div>
                               <span className="text-[10px] text-default-400 font-mono block truncate">
                                 {u.email}
                               </span>
                             </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0 pl-2 flex-wrap justify-end">
-                            {(u.roles && u.roles.length > 0 ? u.roles : [u.roleName || "Recruiter"]).map((r, i) => (
-                              <span
-                                key={i}
-                                className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-default-100 text-default-600 dark:bg-slate-800 dark:text-slate-300"
-                              >
-                                {r}
-                              </span>
-                            ))}
                           </div>
                         </label>
                       );
