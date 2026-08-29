@@ -46,9 +46,9 @@ export default async function DashboardLayout({
       const isMasterTenant = !userSub || userSub === "enfy" || userSub === "www" || userSub === "localhost";
 
       if (userSub && !isMasterTenant) {
-        // Redirect if current subdomain doesn't match user's tenant subdomain
-        if (currentSub !== userSub) {
-          redirect(`${protocol}://${userSub}.${baseDomain}/dashboard`);
+        // If current subdomain doesn't match user's tenant subdomain, direct to login on current host
+        if (currentSub && currentSub !== userSub) {
+          redirect("/");
         }
       } else if (isMasterTenant && currentSub === "enfy") {
         redirect(`${protocol}://${baseDomain}/dashboard`);

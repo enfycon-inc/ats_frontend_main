@@ -8,8 +8,6 @@ import { loginSchema } from "./lib/zod"
 
 const DEFAULT_TENANT_ID = "d3b07384-d113-49c3-a555-9ee75c13ca33";
 const isProd = process.env.NODE_ENV === "production";
-const baseDomain = process.env.BASE_DOMAIN || "enfyjobs.com";
-const cookieDomain = isProd ? `.${baseDomain.includes('localhost') ? 'localhost' : baseDomain}` : undefined;
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "1kc7Cf4Z2V2XX0WfGLrET9iZzWyDkar9RlqjIK3Vkxo",
@@ -26,7 +24,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         sameSite: "lax",
         path: "/",
         secure: isProd,
-        domain: cookieDomain,
+        // Host-only cookie: isolates each tenant subdomain session (csm.enfyjobs.com vs enfycon.enfyjobs.com)
+        domain: undefined,
       },
     },
   },
