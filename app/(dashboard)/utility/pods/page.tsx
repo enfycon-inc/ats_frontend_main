@@ -268,6 +268,26 @@ export default function PodsPage() {
     );
   });
 
+  const formatDisplayRoleName = (roleName?: string) => {
+    if (!roleName) return "Recruiter";
+    switch (roleName.toUpperCase()) {
+      case "ACCOUNT_MANAGER":
+        return "Account Manager (System Role)";
+      case "POD_LEAD":
+        return "Pod Lead (System Role)";
+      case "RECRUITER":
+        return "Recruiter (System Role)";
+      case "DELIVERY_HEAD":
+        return "Delivery Head (System Role)";
+      case "BRANCH_ADMIN":
+        return "Branch Admin (System Role)";
+      case "ADMIN":
+        return "Admin (System Role)";
+      default:
+        return roleName;
+    }
+  };
+
   const recruitersForModal = allUsers.filter((u) => {
     const matchBranch =
       !podBranchId ||
@@ -696,7 +716,7 @@ export default function PodsPage() {
                     <option value="">— None (Unassigned) —</option>
                     {recruiterUsersForHead.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.fullName} ({u.roleName}) — {u.email}
+                        {u.fullName} ({formatDisplayRoleName(u.roleName)}) — {u.email}
                       </option>
                     ))}
                   </select>
@@ -762,7 +782,7 @@ export default function PodsPage() {
                               <div className="text-[10px] text-default-400 truncate">{r.email}</div>
                             </div>
                             <Badge className="text-[9px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 border-0 font-semibold shrink-0">
-                              {r.roleName}
+                              {formatDisplayRoleName(r.roleName)}
                             </Badge>
                           </div>
                         );
