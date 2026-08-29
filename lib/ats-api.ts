@@ -487,6 +487,22 @@ const auth = {
     });
   },
 
+  async updateCustomRole(
+    roleId: string,
+    data: {
+      name?: string;
+      description?: string;
+      permissions?: string[];
+      systemRole?: string;
+      branchId?: string;
+    }
+  ): Promise<any> {
+    return apiFetch<any>(`/api/auth/rbac/roles/${roleId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
   async updateRolePermissions(roleId: string, permissions: string[]): Promise<any> {
     return apiFetch<any>(`/api/auth/rbac/roles/${roleId}/permissions`, {
       method: 'PATCH',

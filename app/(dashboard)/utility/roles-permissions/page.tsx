@@ -1,17 +1,16 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import toast from "react-hot-toast";
+import { toast } from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
-import { getTenantIdentifier } from "@/utils/subdomain-helper";
 import { isRoleAdmin } from "@/lib/role-permissions";
+import Link from "next/link";
 
 interface Permission {
   id: string;
@@ -31,6 +30,11 @@ interface CustomRole {
   isExactSubstitution?: boolean;
   replacesSystemRole?: string | null;
   permissions: string[];
+  createdAt?: string;
+  updatedAt?: string;
+  createdById?: string | null;
+  createdByName?: string | null;
+  createdByEmail?: string | null;
 }
 
 interface TenantUser {
@@ -47,7 +51,6 @@ interface TenantUser {
   isActive: boolean;
   createdAt: string;
 }
-
 
 const SYSTEM_ARCHETYPES = [
   {
@@ -114,6 +117,22 @@ const SYSTEM_ARCHETYPES = [
       "branch_admin:manage", "user:manage", "pod:view", "pod:edit",
       "client:view", "placement:view", "report:view"
     ]
+  },
+  {
+    key: "ADMIN",
+    label: "Admin / Workspace Director Template",
+    badge: "Full Admin",
+    desc: "Full company administration privileges across jobs, clients, candidates, pods, users, and branch offices.",
+    perms: [
+      "job:create", "job:edit", "job:view", "job:publish_direct", "job:approve", "job:reject",
+      "job:assign", "job:assign_recruiter", "job:assign_pod",
+      "candidate:create", "candidate:view",
+      "submission:view", "submission:create", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+      "tenant:settings", "user:manage",
+      "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
+      "branch_admin:manage", "candidate:search_all_branches", "job:view_all_branches", "candidate:search_all_markets",
+      "client:view", "placement:view", "report:view"
+    ]
   }
 ];
 
@@ -121,7 +140,6 @@ export default function RolesPermissionsPage() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [profile, setProfile] = useState<any>(null);
 
   // Core Dynamic RBAC state
   const [roles, setRoles] = useState<CustomRole[]>([]);
@@ -129,12 +147,13 @@ export default function RolesPermissionsPage() {
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [users, setUsers] = useState<TenantUser[]>([]);
-  
-  // Selection states
-  const [selectedRole, setSelectedRole] = useState<CustomRole | null>(null);
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // New Custom Role Form State
+  // Hover Popover States
+  const [hoveredPermRoleId, setHoveredPermRoleId] = useState<string | null>(null);
+  const [hoveredUsersRoleId, setHoveredUsersRoleId] = useState<string | null>(null);
+
+  // Create Modal State
   const [showAddRole, setShowAddRole] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleDesc, setNewRoleDesc] = useState("");
@@ -142,19 +161,33 @@ export default function RolesPermissionsPage() {
   const [newRoleSystemRole, setNewRoleSystemRole] = useState("RECRUITER");
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>(SYSTEM_ARCHETYPES[0].perms);
 
-  // Role Delete Modal State
+  // Edit Modal State
+  const [editingRole, setEditingRole] = useState<CustomRole | null>(null);
+  const [editRoleName, setEditRoleName] = useState("");
+  const [editRoleDesc, setEditRoleDesc] = useState("");
+  const [editRoleBranchId, setEditRoleBranchId] = useState("");
+  const [editRoleSystemRole, setEditRoleSystemRole] = useState("RECRUITER");
+  const [editRolePermissions, setEditRolePermissions] = useState<string[]>([]);
+
+  // Users Modal State (Table View)
+  const [viewUsersRole, setViewUsersRole] = useState<CustomRole | null>(null);
+
+  // Direct Permissions Matrix Editor Modal State
+  const [matrixEditingRole, setMatrixEditingRole] = useState<CustomRole | null>(null);
+  const [matrixPermissions, setMatrixPermissions] = useState<string[]>([]);
+
+  // Delete Modal State
   const [roleToDelete, setRoleToDelete] = useState<{ role: CustomRole; staffCount: number } | null>(null);
   const [targetRoleId, setTargetRoleId] = useState<string>("");
 
   useEffect(() => {
     const user = atsApi.auth.getCurrentUser();
     const override = typeof window !== "undefined" ? localStorage.getItem("override_role") : null;
-    
-    // Check if active role perspective has admin access
+
     const hasAccess = override
       ? isRoleAdmin(override, roles, user)
       : (user?.roles?.includes("ADMIN") || user?.roles?.includes("SUPER_ADMIN") || user?.roles?.includes("BRANCH_ADMIN") || user?.permissions?.includes("user:manage"));
-    
+
     setIsAdmin(hasAccess);
 
     if (hasAccess) {
@@ -180,31 +213,17 @@ export default function RolesPermissionsPage() {
     try {
       setLoading(true);
       const bid = branchFilter !== "all" ? branchFilter : undefined;
-      const [rolesData, permsData, usersData, branchesData, profileData] = await Promise.all([
+      const [rolesData, permsData, usersData, branchesData] = await Promise.all([
         atsApi.auth.listRoles(bid, true),
         atsApi.auth.listAllPermissions(),
         atsApi.auth.listUsers(),
         atsApi.branches.list().catch(() => []),
-        atsApi.auth.me().catch(() => null)
       ]);
-
-      // Filter out system roles: show ONLY custom roles in the configuration page
-      const customOnly = (rolesData || []).filter((r: any) => !r.isSystem);
 
       setRoles(rolesData || []);
       setPermissions(permsData || []);
       setUsers(usersData || []);
       setBranches(branchesData || []);
-      setProfile(profileData);
-
-      // Default select the first custom role if available
-      if (customOnly.length > 0) {
-        setSelectedRole(customOnly[0]);
-        setSelectedPermissions(customOnly[0].permissions || []);
-      } else {
-        setSelectedRole(null);
-        setSelectedPermissions([]);
-      }
     } catch (err: any) {
       toast.error("Failed to load roles and permissions: " + err.message);
     } finally {
@@ -217,38 +236,51 @@ export default function RolesPermissionsPage() {
     await loadData(branchId);
   };
 
-  const handleRoleSelect = (role: CustomRole) => {
-    setSelectedRole(role);
-    setSelectedPermissions(role.permissions || []);
+  // Group permissions by category
+  const permissionGroups = useMemo(() => {
+    return permissions.reduce<Record<string, Permission[]>>((acc, perm) => {
+      const group = perm.group || "General Operations";
+      if (!acc[group]) acc[group] = [];
+      acc[group].push(perm);
+      return acc;
+    }, {});
+  }, [permissions]);
+
+  // Helper to get staff assigned to a role
+  const getAssignedUsers = (role: CustomRole): TenantUser[] => {
+    return users.filter((u) => {
+      if (u.roleId === role.id) return true;
+      const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map(r => r.toUpperCase());
+      const roleNameUpper = role.name.toUpperCase();
+      const sysRoleUpper = (role.replacesSystemRole || role.systemRole || '').toUpperCase();
+      return userRolesUpper.includes(roleNameUpper) || (sysRoleUpper !== '' && userRolesUpper.includes(sysRoleUpper));
+    });
   };
 
-  const handlePermissionToggle = (permId: string) => {
-    if (selectedRole?.isSystem) return; // Cannot modify core system roles
+  // Custom roles filtered for the view (strictly excluding system roles)
+  const customRolesList = useMemo(() => {
+    return roles.filter((r) => !r.isSystem);
+  }, [roles]);
 
-    setSelectedPermissions((prev) =>
-      prev.includes(permId) ? prev.filter((p) => p !== permId) : [...prev, permId]
-    );
-  };
+  const filteredRoles = useMemo(() => {
+    let list = selectedBranchFilter === "all"
+      ? customRolesList
+      : customRolesList.filter((r) => r.branchId === selectedBranchFilter);
 
-  const handleSavePermissions = async () => {
-    if (!selectedRole) return;
-    if (selectedRole.isSystem) {
-      toast.error("System roles are abstract templates and cannot be directly modified.");
-      return;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      list = list.filter((r) =>
+        r.name.toLowerCase().includes(query) ||
+        (r.systemRole && r.systemRole.toLowerCase().includes(query)) ||
+        (r.branchName && r.branchName.toLowerCase().includes(query)) ||
+        (r.createdByName && r.createdByName.toLowerCase().includes(query)) ||
+        (r.description && r.description.toLowerCase().includes(query))
+      );
     }
+    return list;
+  }, [customRolesList, selectedBranchFilter, searchQuery]);
 
-    try {
-      setSubmitting(true);
-      await atsApi.auth.updateRolePermissions(selectedRole.id, selectedPermissions);
-      toast.success(`Permissions updated for role "${selectedRole.name}"`);
-      await loadData();
-    } catch (err: any) {
-      toast.error("Failed to update permissions: " + err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
+  // ─── CREATE ROLE HANDLERS ───────────────────────────────────────
   const openAddRoleModal = () => {
     setNewRoleName("");
     setNewRoleDesc("");
@@ -259,7 +291,7 @@ export default function RolesPermissionsPage() {
     setShowAddRole(true);
   };
 
-  const handleArchetypeChange = (archetypeKey: string) => {
+  const handleCreateArchetypeChange = (archetypeKey: string) => {
     setNewRoleSystemRole(archetypeKey);
     const archetype = SYSTEM_ARCHETYPES.find((a) => a.key === archetypeKey);
     if (archetype) {
@@ -280,7 +312,7 @@ export default function RolesPermissionsPage() {
         permissions: newRolePermissions,
       });
 
-      toast.success(`Custom staffing role "${newRole.name}" created successfully!`);
+      toast.success(`Custom role "${newRole.name}" created successfully!`);
       setShowAddRole(false);
       await loadData();
     } catch (err: any) {
@@ -290,20 +322,86 @@ export default function RolesPermissionsPage() {
     }
   };
 
+  // ─── EDIT ROLE HANDLERS ─────────────────────────────────────────
+  const openEditRoleModal = (role: CustomRole) => {
+    setEditingRole(role);
+    setEditRoleName(role.name);
+    setEditRoleDesc(role.description || "");
+    setEditRoleBranchId(role.branchId || branches[0]?.id || "");
+    setEditRoleSystemRole(role.systemRole || "RECRUITER");
+    setEditRolePermissions(role.permissions || []);
+  };
+
+  const handleEditRoleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRole) return;
+    if (!editRoleName.trim()) return toast.error("Role name cannot be empty.");
+
+    try {
+      setSubmitting(true);
+      await atsApi.auth.updateCustomRole(editingRole.id, {
+        name: editRoleName.trim(),
+        description: editRoleDesc.trim(),
+        systemRole: editRoleSystemRole,
+        branchId: editRoleBranchId || undefined,
+        permissions: editRolePermissions,
+      });
+
+      toast.success(`Role "${editRoleName}" updated successfully!`);
+      setEditingRole(null);
+      await loadData();
+    } catch (err: any) {
+      toast.error("Failed to update role: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ─── DIRECT PERMISSIONS MATRIX MODAL HANDLERS ───────────────────
+  const openPermissionsModal = (role: CustomRole) => {
+    setMatrixEditingRole(role);
+    setMatrixPermissions(role.permissions || []);
+  };
+
+  const handleToggleMatrixPermission = (permId: string) => {
+    setMatrixPermissions((prev) =>
+      prev.includes(permId) ? prev.filter((p) => p !== permId) : [...prev, permId]
+    );
+  };
+
+  const handleToggleMatrixGroup = (groupPerms: Permission[]) => {
+    const groupPermIds = groupPerms.map((p) => p.id);
+    const allEnabled = groupPermIds.every((id) => matrixPermissions.includes(id));
+    if (allEnabled) {
+      setMatrixPermissions((prev) => prev.filter((id) => !groupPermIds.includes(id)));
+    } else {
+      setMatrixPermissions((prev) => Array.from(new Set([...prev, ...groupPermIds])));
+    }
+  };
+
+  const handleSaveMatrixPermissions = async () => {
+    if (!matrixEditingRole) return;
+    try {
+      setSubmitting(true);
+      await atsApi.auth.updateRolePermissions(matrixEditingRole.id, matrixPermissions);
+      toast.success(`Permissions updated for role "${matrixEditingRole.name}"`);
+      setMatrixEditingRole(null);
+      await loadData();
+    } catch (err: any) {
+      toast.error("Failed to update permissions: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ─── DELETE ROLE HANDLERS ───────────────────────────────────────
   const handleInitiateDeleteRole = (role: CustomRole) => {
     if (role.isSystem) return;
-    const staffCount = users.filter((u) => {
-      if (u.roleId === role.id) return true;
-      const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map(r => r.toUpperCase());
-      const roleNameUpper = role.name.toUpperCase();
-      const sysRoleUpper = (role.replacesSystemRole || role.systemRole || '').toUpperCase();
-      return userRolesUpper.includes(roleNameUpper) || (sysRoleUpper !== '' && userRolesUpper.includes(sysRoleUpper));
-    }).length;
-
-    const availableTargets = roles.filter(r => r.id !== role.id && !r.isSystem);
+    const assigned = getAssignedUsers(role);
+    const availableTargets = roles.filter((r) => r.id !== role.id && !r.isSystem);
     const defaultTarget = availableTargets[0]?.id || "";
 
-    setRoleToDelete({ role, staffCount });
+    setRoleToDelete({ role, staffCount: assigned.length });
     setTargetRoleId(defaultTarget);
   };
 
@@ -328,30 +426,61 @@ export default function RolesPermissionsPage() {
     }
   };
 
-  // Group permissions by category
-  const permissionGroups = permissions.reduce<Record<string, Permission[]>>((acc, perm) => {
-    const group = perm.group || "General";
-    if (!acc[group]) acc[group] = [];
-    acc[group].push(perm);
-    return acc;
-  }, {});
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "—";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
 
-  // Custom roles filtered for the view (strictly excluding system roles)
-  const customRolesList = roles.filter((r) => !r.isSystem);
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return "—";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
 
-  const filteredRoles = selectedBranchFilter === "all"
-    ? customRolesList
-    : customRolesList.filter((r) => r.branchId === selectedBranchFilter);
-
-  const selectedArchetypeObj = SYSTEM_ARCHETYPES.find((a) => a.key === newRoleSystemRole) || SYSTEM_ARCHETYPES[0];
+  const getArchetypeBadgeColor = (systemRole?: string) => {
+    switch ((systemRole || "").toUpperCase()) {
+      case "ADMIN":
+        return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800";
+      case "BRANCH_ADMIN":
+        return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800";
+      case "DELIVERY_HEAD":
+        return "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800";
+      case "ACCOUNT_MANAGER":
+        return "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800";
+      case "POD_LEAD":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800";
+      case "RECRUITER":
+      default:
+        return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800";
+    }
+  };
 
   if (loading) {
     return (
-      <div>
+      <div className="space-y-6">
         <SiteBreadcrumb />
-        <div className="flex flex-col items-center justify-center min-h-[300px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          <p className="mt-4 text-sm text-default-500">Loading custom role configurations...</p>
+        <div className="flex flex-col items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+          <p className="mt-4 text-xs font-semibold text-default-500">Loading custom role registry...</p>
         </div>
       </div>
     );
@@ -368,7 +497,7 @@ export default function RolesPermissionsPage() {
             </div>
             <h2 className="text-xl font-bold text-red-500 mb-2">Access Denied</h2>
             <p className="text-sm text-default-600">
-              Only workspace **Administrators** or **Branch Managers** can view and configure custom staffing roles.
+              Only workspace <strong>Administrators</strong> or <strong>Branch Managers</strong> can view and configure custom staffing roles.
             </p>
           </CardContent>
         </Card>
@@ -377,25 +506,27 @@ export default function RolesPermissionsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <SiteBreadcrumb />
-      
-      {/* HEADER WITH BRANCH SELECTOR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-default-100 pb-5">
+
+      {/* ─── PAGE HEADER & TOOLBAR ─────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-default-150 pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-default-900 flex items-center gap-2">
-            <Icon icon="heroicons:shield-check" className="text-indigo-600 h-7 w-7" />
-            Custom Staffing Roles &amp; Permissions
+          <h1 className="text-2xl font-bold text-default-900 flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
+              <Icon icon="heroicons:shield-check" className="h-6 w-6" />
+            </div>
+            Custom Staffing Roles
           </h1>
-          <p className="text-sm text-default-600 mt-1">
-            Build custom branch staffing profiles inherited from abstract system archetypes (Recruiter, BDM, Delivery Head, etc.).
+          <p className="text-xs text-default-500 mt-1">
+            Build and manage branch operational staffing roles, permission policies, and user assignments.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap">
           {/* Branch Filter Dropdown */}
           {branches.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-default-50 dark:bg-slate-800 border border-default-250 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
+            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-default-250 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
               <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
               <select
                 value={selectedBranchFilter}
@@ -412,244 +543,301 @@ export default function RolesPermissionsPage() {
             </div>
           )}
 
-          <Button 
-            onClick={openAddRoleModal} 
-            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 shadow-sm cursor-pointer"
+          {/* Refresh Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadData()}
+            className="h-9 px-3 text-xs border-default-250 text-default-700 hover:bg-default-100 dark:hover:bg-slate-800"
+            title="Refresh Role Registry"
           >
-            <Icon icon="heroicons:plus" className="h-4 w-4" /> Create Custom Role
+            <Icon icon="heroicons:arrow-path" className="h-4 w-4" />
+          </Button>
+
+          {/* Primary Create Button */}
+          <Button
+            onClick={openAddRoleModal}
+            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 shadow-sm cursor-pointer"
+          >
+            <Icon icon="heroicons:plus" className="h-4 w-4" />
+            Create Custom Role
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* ==========================================
-           LEFT COLUMN: CUSTOM ROLES LIST ONLY
-           ========================================== */}
-        <div className="lg:col-span-2 space-y-4">
-          <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl">
-            <CardHeader className="border-b border-default-150 p-4 bg-default-50/50 dark:bg-slate-800/20">
-              <CardTitle className="text-sm font-bold text-default-900 flex items-center gap-2">
-                <Icon icon="heroicons:user-group" className="h-4 w-4 text-indigo-600" />
-                Custom Roles
-              </CardTitle>
-              <CardDescription className="text-[11px] text-default-500">
-                {filteredRoles.length} custom operational role{filteredRoles.length !== 1 ? "s" : ""} in current office
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="p-3 space-y-2">
-              {filteredRoles.length === 0 ? (
-                <div className="p-8 border border-dashed border-default-250 dark:border-slate-800 rounded-xl text-center space-y-2 bg-default-50/40 dark:bg-slate-800/10">
-                  <div className="h-10 w-10 rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 flex items-center justify-center mx-auto">
-                    <Icon icon="heroicons:shield-check" className="h-5 w-5" />
-                  </div>
-                  <p className="text-xs font-bold text-default-800 dark:text-white">No Custom Roles Found</p>
-                  <p className="text-[11px] text-default-450 leading-relaxed max-w-xs mx-auto">
-                    Click <strong>Create Custom Role</strong> above to define a staffing role for this office.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
-                  {filteredRoles.map((role) => {
-                    const isSelected = selectedRole?.id === role.id;
-                    const staffCount = users.filter((u) => {
-                      if (u.roleId === role.id) return true;
-                      const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map(r => r.toUpperCase());
-                      return userRolesUpper.includes(role.name.toUpperCase());
-                    }).length;
-
-                    return (
-                      <div
-                        key={role.id}
-                        onClick={() => handleRoleSelect(role)}
-                        className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
-                          isSelected
-                            ? "border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/30 shadow-xs ring-1 ring-indigo-500"
-                            : "border-default-150 bg-white dark:bg-slate-850 hover:bg-default-50/60 dark:hover:bg-slate-800/40"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-bold text-xs text-default-900 capitalize truncate">
-                                {role.name}
-                              </span>
-                              <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[8.5px] font-bold border border-indigo-200 dark:border-indigo-800 px-1.5 py-0.2">
-                                Base: {role.systemRole || "RECRUITER"}
-                              </Badge>
-                            </div>
-                            <p className="text-[10.5px] text-default-500 mt-1 line-clamp-2">
-                              {role.description || "Custom operational staffing role"}
-                            </p>
-                          </div>
-                          
-                          <div className="text-right flex flex-col items-end gap-1.5 shrink-0">
-                            <span className="text-[9.5px] font-bold text-indigo-600 bg-indigo-50 dark:bg-slate-800 dark:text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-150 dark:border-slate-700">
-                              {staffCount} Staff
-                            </span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleInitiateDeleteRole(role);
-                              }}
-                              className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer"
-                              title="Delete custom role"
-                            >
-                              <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      {/* ─── TABLE FILTER / SEARCH BAR ─────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-4 flex-wrap bg-white dark:bg-slate-900 p-3 rounded-xl border border-default-150 shadow-2xs">
+        <div className="relative flex-1 min-w-[240px] max-w-md">
+          <Icon icon="heroicons:magnifying-glass" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-default-400" />
+          <Input
+            placeholder="Search roles by name, archetype, branch, author..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 text-xs h-9 bg-default-50 dark:bg-slate-800 border-default-200"
+          />
         </div>
 
-        {/* ==========================================
-           RIGHT COLUMN: CONFIGURATION PANEL (PERMISSION MATRIX)
-           ========================================== */}
-        <div className="lg:col-span-3">
-          {selectedRole ? (
-            <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl">
-              <CardHeader className="border-b border-default-150 bg-default-50/50 dark:bg-slate-800/20 flex flex-col md:flex-row md:items-center justify-between gap-4 p-4">
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <CardTitle className="text-sm font-bold flex items-center gap-1.5 text-default-900">
-                      <Icon icon="heroicons:lock-open" className="text-indigo-600 h-4.5 w-4.5" />
-                      Configure Role: {selectedRole.name}
-                    </CardTitle>
-                    <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[9px] font-bold border border-indigo-200">
-                      Base Archetype: {selectedRole.systemRole || "RECRUITER"}
-                    </Badge>
-                  </div>
-                  <p className="text-[11px] text-default-500 mt-0.5">{selectedRole.description || "Custom branch role"}</p>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge className="bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 text-xs font-semibold py-1 px-3 flex items-center gap-1.5">
-                    <Icon icon="heroicons:users" className="h-3.5 w-3.5 text-indigo-600" />
-                    {users.filter(u => u.roleId === selectedRole.id || (u.roles && u.roles.includes(selectedRole.name))).length} Staff Assigned
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => window.location.href = "/utility/users"}
-                    className="h-8 text-xs font-semibold border-neutral-300 hover:border-indigo-500 hover:text-indigo-600 flex items-center gap-1 cursor-pointer"
-                  >
-                    Manage Users
-                    <Icon icon="heroicons:arrow-top-right-on-square" className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="p-0">
-                {/* PERMISSION MATRIX GRID */}
-                <div className="p-5 space-y-6">
-                  <div className="space-y-6 max-h-[520px] overflow-y-auto pr-1">
-                    {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
-                      const getGroupIcon = (name: string) => {
-                        if (name.includes("Jobs")) return "heroicons:briefcase";
-                        if (name.includes("Candidates")) return "heroicons:users";
-                        if (name.includes("Sourcing") || name.includes("Submissions")) return "heroicons:arrow-up-tray";
-                        if (name.includes("Screening") || name.includes("Review Gate")) return "heroicons:shield-check";
-                        if (name.includes("Interview") || name.includes("Audits")) return "heroicons:chat-bubble-left-right";
-                        if (name.includes("Clients") || name.includes("Placements")) return "heroicons:building-office-2";
-                        if (name.includes("Pods")) return "heroicons:user-group";
-                        if (name.includes("Branch")) return "heroicons:map-pin";
-                        return "heroicons:cog-6-tooth";
-                      };
-
-                      return (
-                        <div key={groupName} className="space-y-2 border-b border-default-150 pb-5 last:border-b-0 last:pb-0">
-                          <div className="flex items-center gap-2">
-                            <Icon icon={getGroupIcon(groupName)} className="h-4 w-4 text-indigo-600" />
-                            <h3 className="text-xs font-bold text-default-850 uppercase tracking-wider">{groupName}</h3>
-                            <span className="text-[10px] text-default-400 font-medium ml-auto">
-                              {groupPerms.filter(p => selectedPermissions.includes(p.id)).length} / {groupPerms.length} enabled
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2">
-                            {groupPerms.map((perm) => {
-                              const isChecked = selectedPermissions.includes(perm.id);
-                              return (
-                                <label
-                                  key={perm.id}
-                                  className={`flex items-start gap-2.5 p-3 rounded-lg border transition-all cursor-pointer select-none ${
-                                    isChecked
-                                      ? "border-indigo-300 dark:border-indigo-800 bg-indigo-50/20 dark:bg-indigo-950/20 text-default-900"
-                                      : "border-default-150 bg-default-50/20 dark:bg-slate-800/10 text-default-500 hover:border-default-300"
-                                  }`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => handlePermissionToggle(perm.id)}
-                                    className="mt-0.5 h-4 w-4 rounded border-default-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                                  />
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-xs font-bold tracking-tight text-default-900">
-                                      {perm.name}
-                                    </div>
-                                    <div className="text-[10px] text-default-400 font-mono mt-0.5">
-                                      Token: &apos;{perm.id}&apos;
-                                    </div>
-                                    {perm.description && (
-                                      <p className="text-[10.5px] text-default-500 mt-1 leading-snug">
-                                        {perm.description}
-                                      </p>
-                                    )}
-                                  </div>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="border-t border-default-150 pt-4 flex justify-end">
-                    <Button
-                      disabled={submitting}
-                      onClick={handleSavePermissions}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 flex items-center gap-1.5 shadow-xs cursor-pointer"
-                    >
-                      {submitting ? (
-                        <div className="h-4 w-4 border-2 border-white border-t-transparent animate-spin rounded-full"></div>
-                      ) : (
-                        <>
-                          <Icon icon="heroicons:check-circle" className="h-4.5 w-4.5" />
-                          Save Permissions Matrix
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="h-[400px] border border-dashed border-default-250 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center text-center p-6 space-y-3 bg-white dark:bg-slate-900">
-              <div className="h-12 w-12 rounded-full bg-indigo-50 dark:bg-slate-800 text-indigo-600 flex items-center justify-center">
-                <Icon icon="heroicons:shield-check" className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-default-800 dark:text-white">No Role Selected</p>
-                <p className="text-xs text-default-450 mt-1 max-w-sm">
-                  Select a custom role from the left panel to configure its granular security permissions matrix.
-                </p>
-              </div>
-            </div>
-          )}
+        <div className="flex items-center gap-2 text-xs font-semibold text-default-500">
+          <span>Showing <strong>{filteredRoles.length}</strong> of <strong>{customRolesList.length}</strong> custom roles</span>
         </div>
       </div>
 
-      {/* ── CREATE CUSTOM ROLE MODAL (INHERITS FROM SYSTEM ROLE ARCHETYPE) ── */}
+      {/* ─── UNIVERSAL ROLES TABLE ─────────────────────────────────────── */}
+      <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-default-50/70 dark:bg-slate-800/40 border-b border-default-150">
+                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Role Name</th>
+                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Base Role</th>
+                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Branch Office</th>
+                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-center">Permissions</th>
+                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-center">Users Assigned</th>
+                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Created By</th>
+                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Created At</th>
+                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Last Edited</th>
+                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-default-100 text-xs">
+              {filteredRoles.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-16 text-center text-default-500 font-semibold italic">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-12 w-12 rounded-full bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 flex items-center justify-center">
+                        <Icon icon="heroicons:shield-check" className="h-6 w-6" />
+                      </div>
+                      <span className="text-sm font-bold text-default-800 dark:text-white">
+                        {searchQuery ? "No matching custom roles found" : "No custom roles defined for this branch"}
+                      </span>
+                      <p className="text-xs text-default-450 max-w-sm">
+                        Custom roles inherit from abstract system archetypes (Recruiter, BDM, Pod Lead) and apply branch-isolated security policies.
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={openAddRoleModal}
+                        className="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-4"
+                      >
+                        <Icon icon="heroicons:plus" className="h-3.5 w-3.5 mr-1" />
+                        Create First Custom Role
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredRoles.map((role) => {
+                  const assignedUsers = getAssignedUsers(role);
+                  const rolePerms = role.permissions || [];
+                  const isHoveredPerm = hoveredPermRoleId === role.id;
+                  const isHoveredUsers = hoveredUsersRoleId === role.id;
+
+                  return (
+                    <tr
+                      key={role.id}
+                      className="hover:bg-indigo-50/20 dark:hover:bg-slate-800/20 transition-colors group"
+                    >
+                      {/* 1. ROLE NAME */}
+                      <td className="py-4 px-4 font-bold text-default-900 whitespace-nowrap">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 flex items-center justify-center shrink-0">
+                            <Icon icon="heroicons:user-group" className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-xs text-default-900 hover:text-indigo-600 cursor-pointer" onClick={() => openEditRoleModal(role)}>
+                              {role.name}
+                            </div>
+                            <div className="text-[10px] text-default-450 font-normal mt-0.5 max-w-[200px] truncate">
+                              {role.description || "Operational staffing role"}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 2. BASE ROLE / ARCHETYPE */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <Badge
+                          className={`text-[9.5px] font-bold border px-2 py-0.5 rounded-md ${getArchetypeBadgeColor(role.systemRole)}`}
+                        >
+                          {role.systemRole || "RECRUITER"}
+                        </Badge>
+                      </td>
+
+                      {/* 3. BRANCH OFFICE */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-default-800 dark:text-default-200">
+                          <Icon icon="heroicons:building-office" className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                          {role.branchName || "Default Office"}
+                        </span>
+                      </td>
+
+                      {/* 4. PERMISSIONS (WITH HOVER TOOLTIP & CLICK TO EDIT MATRIX) */}
+                      <td className="py-4 px-4 text-center whitespace-nowrap relative">
+                        <div
+                          className="inline-block relative"
+                          onMouseEnter={() => setHoveredPermRoleId(role.id)}
+                          onMouseLeave={() => setHoveredPermRoleId(null)}
+                        >
+                          <button
+                            onClick={() => openPermissionsModal(role)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 font-bold text-[11px] hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition cursor-pointer"
+                            title="Click to edit permissions matrix"
+                          >
+                            <Icon icon="heroicons:key" className="h-3 w-3 text-indigo-600" />
+                            {rolePerms.length} Permissions
+                          </button>
+
+                          {/* Hover Popover showing categorized permission preview */}
+                          {isHoveredPerm && (
+                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-40 w-72 p-3 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 rounded-xl shadow-xl text-left pointer-events-none animate-fadeIn">
+                              <div className="flex items-center justify-between border-b border-default-100 pb-1.5 mb-2">
+                                <span className="text-[11px] font-bold text-default-900 flex items-center gap-1">
+                                  <Icon icon="heroicons:shield-check" className="h-3.5 w-3.5 text-indigo-600" />
+                                  Permissions ({rolePerms.length})
+                                </span>
+                                <span className="text-[9px] text-indigo-600 font-semibold">Click to configure</span>
+                              </div>
+                              <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                                {rolePerms.length === 0 ? (
+                                  <p className="text-[10px] text-default-400 italic">No permissions assigned.</p>
+                                ) : (
+                                  <div className="flex flex-wrap gap-1">
+                                    {rolePerms.map((perm) => (
+                                      <span
+                                        key={perm}
+                                        className="inline-block bg-default-100 dark:bg-slate-800 text-default-700 dark:text-default-300 text-[9px] px-1.5 py-0.5 rounded font-mono"
+                                      >
+                                        {perm}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 5. USERS ASSIGNED (WITH HOVER TOOLTIP & CLICK TO VIEW TABLE MODAL) */}
+                      <td className="py-4 px-4 text-center whitespace-nowrap relative">
+                        <div
+                          className="inline-block relative"
+                          onMouseEnter={() => setHoveredUsersRoleId(role.id)}
+                          onMouseLeave={() => setHoveredUsersRoleId(null)}
+                        >
+                          <button
+                            onClick={() => setViewUsersRole(role)}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold text-[11px] transition cursor-pointer border ${
+                              assignedUsers.length > 0
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 hover:bg-emerald-100"
+                                : "bg-default-100 text-default-600 border-default-200 dark:bg-slate-800 dark:text-default-400 hover:bg-default-200"
+                            }`}
+                            title="Click to view all assigned staff"
+                          >
+                            <Icon icon="heroicons:users" className="h-3 w-3" />
+                            {assignedUsers.length} Staff
+                          </button>
+
+                          {/* Hover Popover showing user previews */}
+                          {isHoveredUsers && (
+                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-40 w-64 p-3 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 rounded-xl shadow-xl text-left pointer-events-none animate-fadeIn">
+                              <div className="flex items-center justify-between border-b border-default-100 pb-1.5 mb-2">
+                                <span className="text-[11px] font-bold text-default-900 flex items-center gap-1">
+                                  <Icon icon="heroicons:users" className="h-3.5 w-3.5 text-indigo-600" />
+                                  Assigned Staff ({assignedUsers.length})
+                                </span>
+                                <span className="text-[9px] text-indigo-600 font-semibold">Click for table</span>
+                              </div>
+                              <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                                {assignedUsers.length === 0 ? (
+                                  <p className="text-[10px] text-default-400 italic">No staff assigned to this role yet.</p>
+                                ) : (
+                                  assignedUsers.slice(0, 5).map((u) => (
+                                    <div key={u.id} className="flex items-center gap-2 text-xs">
+                                      <div className="h-5 w-5 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[9px] flex items-center justify-center shrink-0">
+                                        {u.fullName.charAt(0).toUpperCase()}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="font-semibold text-default-900 text-[10.5px] truncate">{u.fullName}</div>
+                                        <div className="text-[9px] text-default-400 truncate">{u.email}</div>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                                {assignedUsers.length > 5 && (
+                                  <p className="text-[9.5px] text-indigo-600 font-semibold text-center pt-1">
+                                    + {assignedUsers.length - 5} more staff...
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 6. CREATED BY */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <Icon icon="heroicons:user-circle" className="h-4 w-4 text-default-400 shrink-0" />
+                          <span className="text-xs text-default-700 font-medium truncate max-w-[130px]">
+                            {role.createdByName || "System Admin"}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 7. CREATED AT */}
+                      <td className="py-4 px-4 whitespace-nowrap text-default-500 font-medium text-[11px]">
+                        {formatDate(role.createdAt)}
+                      </td>
+
+                      {/* 8. LAST EDITED */}
+                      <td className="py-4 px-4 whitespace-nowrap text-default-500 font-medium text-[11px]">
+                        {formatDateTime(role.updatedAt || role.createdAt)}
+                      </td>
+
+                      {/* 9. ACTIONS */}
+                      <td className="py-4 px-4 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Edit Role Button */}
+                          <button
+                            onClick={() => openEditRoleModal(role)}
+                            className="p-1.5 rounded-lg border border-default-200 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-default-600 hover:text-indigo-600 transition cursor-pointer"
+                            title="Edit Role Details & Permissions"
+                          >
+                            <Icon icon="heroicons:pencil-square" className="h-3.5 w-3.5" />
+                          </button>
+
+                          {/* Quick Edit Permissions Matrix Button */}
+                          <button
+                            onClick={() => openPermissionsModal(role)}
+                            className="p-1.5 rounded-lg border border-default-200 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-default-600 hover:text-indigo-600 transition cursor-pointer"
+                            title="Configure Permissions Matrix"
+                          >
+                            <Icon icon="heroicons:lock-closed" className="h-3.5 w-3.5" />
+                          </button>
+
+                          {/* Delete Role Button */}
+                          <button
+                            onClick={() => handleInitiateDeleteRole(role)}
+                            className="p-1.5 rounded-lg border border-default-200 hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 text-default-400 hover:text-red-600 transition cursor-pointer"
+                            title="Delete Custom Role"
+                          >
+                            <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* ─── MODAL 1: CREATE CUSTOM ROLE ───────────────────────────────── */}
       {showAddRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden my-auto max-h-[90vh] flex flex-col">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
@@ -659,54 +847,65 @@ export default function RolesPermissionsPage() {
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
                     Create Custom Staffing Role
                   </h3>
-                  <p className="text-[11px] text-neutral-400">Inherits base permissions and workflow archetype from a system role</p>
+                  <p className="text-[11px] text-neutral-400">Define operational staffing profile and custom permission matrix</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setShowAddRole(false)} 
-                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg"
+              <button
+                onClick={() => setShowAddRole(false)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg cursor-pointer"
               >
                 <Icon icon="heroicons:x-mark" className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateRole} className="p-6 space-y-4 overflow-y-auto flex-1">
-              
-              {/* Branch Selection */}
-              {branches.length > 0 && (
+            <form onSubmit={handleCreateRole} className="p-6 space-y-5 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Branch Selection */}
+                {branches.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                      Target Branch Office <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={newRoleBranchId}
+                      onChange={(e) => setNewRoleBranchId(e.target.value)}
+                      className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                      required
+                    >
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name} ({b.market || "General"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Role Name */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                    Branch Office <span className="text-red-500">*</span>
+                    Custom Role Name <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    value={newRoleBranchId}
-                    onChange={(e) => setNewRoleBranchId(e.target.value)}
-                    className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                  <Input
+                    placeholder="e.g. Senior Recruiter, Lead BDM, Operations Head..."
+                    value={newRoleName}
+                    onChange={(e) => setNewRoleName(e.target.value)}
+                    className="text-xs h-10 font-medium"
                     required
-                  >
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name} ({b.market || "General"})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[10.5px] text-neutral-450">
-                    This custom staffing role will be isolated and available to staff in this branch office.
-                  </p>
+                  />
                 </div>
-              )}
+              </div>
 
-              {/* Role Name */}
+              {/* Description */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                  Custom Role Name <span className="text-red-500">*</span>
+                  Description
                 </label>
                 <Input
-                  placeholder="e.g. Senior Technical Recruiter, BDM - Enterprise..."
-                  value={newRoleName}
-                  onChange={(e) => setNewRoleName(e.target.value)}
-                  className="text-xs h-9 font-medium"
-                  required
+                  placeholder="Role responsibilities and operational scope..."
+                  value={newRoleDesc}
+                  onChange={(e) => setNewRoleDesc(e.target.value)}
+                  className="text-xs h-9 font-normal"
                 />
               </div>
 
@@ -717,7 +916,7 @@ export default function RolesPermissionsPage() {
                 </label>
                 <select
                   value={newRoleSystemRole}
-                  onChange={(e) => handleArchetypeChange(e.target.value)}
+                  onChange={(e) => handleCreateArchetypeChange(e.target.value)}
                   className="w-full text-xs font-bold border border-indigo-300 dark:border-indigo-800 rounded-lg p-2.5 bg-indigo-50/40 dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
                   {SYSTEM_ARCHETYPES.map((arch) => (
@@ -728,53 +927,104 @@ export default function RolesPermissionsPage() {
                 </select>
               </div>
 
-              {/* Archetype Preview Box */}
-              <div className="p-3.5 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/60 rounded-xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
-                    <Icon icon="heroicons:sparkles" className="h-4 w-4 text-indigo-600" />
-                    {selectedArchetypeObj.label}
-                  </span>
-                  <Badge className="bg-indigo-600 text-white text-[9px] font-bold border-0 px-2 py-0.2">
-                    {newRolePermissions.length} Permissions Inherited
-                  </Badge>
+              {/* Permissions Matrix Selector */}
+              <div className="border border-default-200 dark:border-slate-800 rounded-xl p-4 space-y-4 bg-default-50/40 dark:bg-slate-800/10">
+                <div className="flex items-center justify-between border-b border-default-200 dark:border-slate-800 pb-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-default-900">Custom Permissions Matrix</h4>
+                    <p className="text-[10.5px] text-default-450">Toggle specific security tokens enabled for this role ({newRolePermissions.length} enabled)</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewRolePermissions(permissions.map(p => p.id))}
+                      className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-default-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setNewRolePermissions([])}
+                      className="text-[10px] font-bold text-default-500 hover:underline cursor-pointer"
+                    >
+                      Clear All
+                    </button>
+                  </div>
                 </div>
-                <p className="text-[11px] text-neutral-600 dark:text-slate-300 leading-relaxed">
-                  {selectedArchetypeObj.desc}
-                </p>
+
+                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                  {Object.entries(permissionGroups).map(([groupName, groupPerms]) => (
+                    <div key={groupName} className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-default-800 uppercase tracking-wider">{groupName}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const ids = groupPerms.map(p => p.id);
+                            const all = ids.every(id => newRolePermissions.includes(id));
+                            if (all) {
+                              setNewRolePermissions(prev => prev.filter(id => !ids.includes(id)));
+                            } else {
+                              setNewRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
+                            }
+                          }}
+                          className="text-[10px] font-semibold text-indigo-600 hover:underline cursor-pointer"
+                        >
+                          Toggle Group
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {groupPerms.map((perm) => {
+                          const isChecked = newRolePermissions.includes(perm.id);
+                          return (
+                            <label
+                              key={perm.id}
+                              className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
+                                isChecked
+                                  ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-default-900"
+                                  : "border-default-150 text-default-500 hover:border-default-300"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  setNewRolePermissions(prev =>
+                                    prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
+                                  );
+                                }}
+                                className="mt-0.5 h-3.5 w-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <span className="font-semibold block text-[11px]">{perm.name}</span>
+                                <span className="text-[9.5px] font-mono text-default-400">{perm.id}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              {/* Description */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                  Description / Operational Functions
-                </label>
-                <textarea
-                  placeholder="Describe this role's scope, responsibilities, or specializations..."
-                  value={newRoleDesc}
-                  onChange={(e) => setNewRoleDesc(e.target.value)}
-                  className="w-full text-xs border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100 dark:border-slate-800 shrink-0">
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  type="button" 
+              <div className="flex justify-end gap-2.5 pt-2 border-t border-neutral-100 dark:border-slate-800">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setShowAddRole(false)}
-                  className="h-8 text-xs font-bold"
+                  className="text-xs h-9 px-4"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  size="sm" 
-                  type="submit" 
-                  disabled={submitting || !newRoleName.trim()} 
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 px-5 shadow-xs cursor-pointer"
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 shadow-xs cursor-pointer"
                 >
-                  {submitting ? "Creating..." : "Create Custom Role"}
+                  {submitting ? "Creating..." : "Save Custom Role"}
                 </Button>
               </div>
             </form>
@@ -782,80 +1032,477 @@ export default function RolesPermissionsPage() {
         </div>
       )}
 
-      {/* ── Role Delete & Re-assignment Modal ───────────────────────── */}
-      {roleToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
-              <Icon icon="heroicons:exclamation-triangle" className="h-6 w-6 shrink-0" />
-              <h3 className="text-base font-bold text-neutral-900 dark:text-white">
-                Delete Custom Role &amp; Reassign Staff
-              </h3>
+      {/* ─── MODAL 2: EDIT CUSTOM ROLE ─────────────────────────────────── */}
+      {editingRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
+                  <Icon icon="heroicons:pencil-square" className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Edit Role: {editingRole.name}
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">Modify role name, archetype template, branch assignment, and permissions</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingRole(null)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg cursor-pointer"
+              >
+                <Icon icon="heroicons:x-mark" className="h-5 w-5" />
+              </button>
             </div>
 
-            <p className="text-xs text-neutral-600 dark:text-slate-300">
-              Are you sure you want to delete custom role <strong>"{roleToDelete.role.name}"</strong>?
-            </p>
-
-            {roleToDelete.staffCount > 0 ? (
-              <div className="space-y-3 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 p-3.5 rounded-lg">
-                <div className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                  <Icon icon="heroicons:users" className="h-4 w-4" />
-                  {roleToDelete.staffCount} staff member(s) are currently assigned to this role.
-                </div>
-                
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-700 dark:text-slate-300">
-                    Select Replacement Target Role:
-                  </label>
-                  <select
-                    value={targetRoleId}
-                    onChange={(e) => setTargetRoleId(e.target.value)}
-                    className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-md p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    {roles
-                      .filter((r) => r.id !== roleToDelete.role.id && !r.isSystem)
-                      .map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name} (Custom Role)
+            <form onSubmit={handleEditRoleSave} className="p-6 space-y-5 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Target Branch */}
+                {branches.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                      Branch Office <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={editRoleBranchId}
+                      onChange={(e) => setEditRoleBranchId(e.target.value)}
+                      className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                      required
+                    >
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name} ({b.market || "General"})
                         </option>
                       ))}
-                  </select>
-                </div>
-                <p className="text-[10px] text-neutral-500 dark:text-slate-400">
-                  Staff assigned to "{roleToDelete.role.name}" will be transferred to the selected target role cleanly.
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-neutral-500 dark:text-slate-400">
-                No staff members are currently assigned to this custom role.
-              </p>
-            )}
+                    </select>
+                  </div>
+                )}
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+                {/* Role Name */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Custom Role Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={editRoleName}
+                    onChange={(e) => setEditRoleName(e.target.value)}
+                    className="text-xs h-10 font-medium"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                  Description
+                </label>
+                <Input
+                  value={editRoleDesc}
+                  onChange={(e) => setEditRoleDesc(e.target.value)}
+                  className="text-xs h-9 font-normal"
+                />
+              </div>
+
+              {/* Base Archetype */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                  Base System Archetype Template
+                </label>
+                <select
+                  value={editRoleSystemRole}
+                  onChange={(e) => setEditRoleSystemRole(e.target.value)}
+                  className="w-full text-xs font-bold border border-indigo-300 dark:border-indigo-800 rounded-lg p-2.5 bg-indigo-50/40 dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                >
+                  {SYSTEM_ARCHETYPES.map((arch) => (
+                    <option key={arch.key} value={arch.key}>
+                      {arch.label} — ({arch.badge})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Permissions Matrix */}
+              <div className="border border-default-200 dark:border-slate-800 rounded-xl p-4 space-y-4 bg-default-50/40 dark:bg-slate-800/10">
+                <div className="flex items-center justify-between border-b border-default-200 dark:border-slate-800 pb-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-default-900">Custom Permissions Matrix</h4>
+                    <p className="text-[10.5px] text-default-450">Configure access tokens for this role ({editRolePermissions.length} enabled)</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditRolePermissions(permissions.map(p => p.id))}
+                      className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-default-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditRolePermissions([])}
+                      className="text-[10px] font-bold text-default-500 hover:underline cursor-pointer"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                  {Object.entries(permissionGroups).map(([groupName, groupPerms]) => (
+                    <div key={groupName} className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-default-800 uppercase tracking-wider">{groupName}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const ids = groupPerms.map(p => p.id);
+                            const all = ids.every(id => editRolePermissions.includes(id));
+                            if (all) {
+                              setEditRolePermissions(prev => prev.filter(id => !ids.includes(id)));
+                            } else {
+                              setEditRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
+                            }
+                          }}
+                          className="text-[10px] font-semibold text-indigo-600 hover:underline cursor-pointer"
+                        >
+                          Toggle Group
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {groupPerms.map((perm) => {
+                          const isChecked = editRolePermissions.includes(perm.id);
+                          return (
+                            <label
+                              key={perm.id}
+                              className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
+                                isChecked
+                                  ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-default-900"
+                                  : "border-default-150 text-default-500 hover:border-default-300"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  setEditRolePermissions(prev =>
+                                    prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
+                                  );
+                                }}
+                                className="mt-0.5 h-3.5 w-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <span className="font-semibold block text-[11px]">{perm.name}</span>
+                                <span className="text-[9.5px] font-mono text-default-400">{perm.id}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2 border-t border-neutral-100 dark:border-slate-800">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingRole(null)}
+                  className="text-xs h-9 px-4"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 shadow-xs cursor-pointer"
+                >
+                  {submitting ? "Saving Changes..." : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL 3: ASSIGNED USERS TABLE VIEW (ON CLICK USERS COUNT) ── */}
+      {viewUsersRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 flex items-center justify-center">
+                  <Icon icon="heroicons:users" className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Staff Members Assigned to: {viewUsersRole.name}
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">
+                    {getAssignedUsers(viewUsersRole).length} active user{getAssignedUsers(viewUsersRole).length !== 1 ? "s" : ""} in {viewUsersRole.branchName || "Default Office"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewUsersRole(null)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg cursor-pointer"
+              >
+                <Icon icon="heroicons:x-mark" className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="border border-default-150 rounded-xl overflow-hidden shadow-2xs">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-default-50/80 dark:bg-slate-800/40 border-b border-default-150 text-[10px] font-bold uppercase tracking-wider text-default-600">
+                      <th className="py-3 px-4">Staff Member</th>
+                      <th className="py-3 px-4">Email</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Assigned On</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-default-100 text-xs">
+                    {getAssignedUsers(viewUsersRole).length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-10 text-center text-default-400 italic">
+                          No users are currently assigned to this role.
+                        </td>
+                      </tr>
+                    ) : (
+                      getAssignedUsers(viewUsersRole).map((u) => (
+                        <tr key={u.id} className="hover:bg-default-50/50 dark:hover:bg-slate-800/20">
+                          <td className="py-3 px-4 font-semibold text-default-900">
+                            <div className="flex items-center gap-2.5">
+                              <div className="h-7 w-7 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
+                                {u.fullName.charAt(0).toUpperCase()}
+                              </div>
+                              <span>{u.fullName}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-default-600 font-mono text-[11px]">{u.email}</td>
+                          <td className="py-3 px-4">
+                            <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] font-bold border-0">
+                              Active
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4 text-default-450 text-[11px]">{formatDate(u.createdAt)}</td>
+                          <td className="py-3 px-4 text-right">
+                            <Link
+                              href={`/utility/users?search=${encodeURIComponent(u.email)}`}
+                              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-1"
+                            >
+                              Manage User
+                              <Icon icon="heroicons:arrow-top-right-on-square" className="h-3 w-3" />
+                            </Link>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="px-6 py-3.5 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 flex justify-between items-center shrink-0">
+              <span className="text-[11px] text-default-450">
+                To assign or transfer staff roles, navigate to <strong>Users & Teams</strong>.
+              </span>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                onClick={() => setRoleToDelete(null)}
-                disabled={submitting}
-                className="text-xs font-semibold"
+                onClick={() => setViewUsersRole(null)}
+                className="text-xs h-8 px-4"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL 4: DIRECT PERMISSIONS MATRIX MODAL ─────────────────── */}
+      {matrixEditingRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
+                  <Icon icon="heroicons:lock-open" className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Permissions Matrix: {matrixEditingRole.name}
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">
+                    Base Archetype: {matrixEditingRole.systemRole || "RECRUITER"} • {matrixPermissions.length} enabled permissions
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setMatrixEditingRole(null)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg cursor-pointer"
+              >
+                <Icon icon="heroicons:x-mark" className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
+              <div className="flex items-center justify-between bg-indigo-50/50 dark:bg-indigo-950/30 p-3 rounded-xl border border-indigo-200 dark:border-indigo-800/50">
+                <div className="text-xs text-indigo-950 dark:text-indigo-200">
+                  Select and configure granular operation access tokens for staff holding this role.
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMatrixPermissions(permissions.map(p => p.id))}
+                    className="text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
+                  >
+                    Select All
+                  </button>
+                  <span className="text-default-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setMatrixPermissions([])}
+                    className="text-xs font-bold text-default-500 hover:underline cursor-pointer"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                {Object.entries(permissionGroups).map(([groupName, groupPerms]) => (
+                  <div key={groupName} className="space-y-2 border-b border-default-150 pb-5 last:border-b-0 last:pb-0">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-default-850 uppercase tracking-wider flex items-center gap-1.5">
+                        <Icon icon="heroicons:folder" className="h-3.5 w-3.5 text-indigo-600" />
+                        {groupName}
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleMatrixGroup(groupPerms)}
+                        className="text-[10px] font-semibold text-indigo-600 hover:underline cursor-pointer"
+                      >
+                        Toggle All in {groupName}
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2">
+                      {groupPerms.map((perm) => {
+                        const isChecked = matrixPermissions.includes(perm.id);
+                        return (
+                          <label
+                            key={perm.id}
+                            className={`flex items-start gap-2.5 p-3 rounded-lg border transition cursor-pointer select-none ${
+                              isChecked
+                                ? "border-indigo-300 dark:border-indigo-800 bg-indigo-50/20 dark:bg-indigo-950/20 text-default-900"
+                                : "border-default-150 bg-default-50/20 dark:bg-slate-800/10 text-default-500 hover:border-default-300"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleToggleMatrixPermission(perm.id)}
+                              className="mt-0.5 h-4 w-4 rounded border-default-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-bold text-default-900">{perm.name}</div>
+                              <div className="text-[10px] text-default-400 font-mono mt-0.5">Token: &apos;{perm.id}&apos;</div>
+                              {perm.description && (
+                                <p className="text-[10.5px] text-default-500 mt-1 leading-snug">{perm.description}</p>
+                              )}
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="px-6 py-3.5 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 flex justify-end gap-2.5 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMatrixEditingRole(null)}
+                className="text-xs h-9 px-4"
               >
                 Cancel
               </Button>
               <Button
-                size="sm"
-                onClick={handleConfirmDeleteRole}
-                disabled={submitting || (roleToDelete.staffCount > 0 && !targetRoleId)}
-                className="bg-red-600 hover:bg-red-700 text-white font-semibold text-xs flex items-center gap-1.5"
+                disabled={submitting}
+                onClick={handleSaveMatrixPermissions}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 shadow-xs cursor-pointer flex items-center gap-1.5"
               >
-                {submitting ? (
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent animate-spin rounded-full"></div>
-                ) : (
-                  <>
-                    <Icon icon="heroicons:trash" className="h-4 w-4" />
-                    Reassign &amp; Delete Role
-                  </>
-                )}
+                {submitting ? "Saving Matrix..." : "Save Permissions Matrix"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL 5: DELETE ROLE CONFIRMATION ──────────────────────────── */}
+      {roleToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
+            <div className="h-12 w-12 rounded-full bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center mx-auto">
+              <Icon icon="heroicons:trash" className="h-6 w-6" />
+            </div>
+
+            <div className="text-center">
+              <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                Delete Custom Role &quot;{roleToDelete.role.name}&quot;?
+              </h3>
+              <p className="text-xs text-neutral-500 mt-1.5">
+                This will permanently delete this operational staffing role definition.
+              </p>
+            </div>
+
+            {roleToDelete.staffCount > 0 && (
+              <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-300">
+                  <Icon icon="heroicons:exclamation-triangle" className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span>{roleToDelete.staffCount} Staff Member(s) Currently Assigned</span>
+                </div>
+                <p className="text-[11px] text-amber-800 dark:text-amber-400 leading-relaxed">
+                  Please select a replacement custom role to automatically re-assign these staff members before deleting:
+                </p>
+                <select
+                  value={targetRoleId}
+                  onChange={(e) => setTargetRoleId(e.target.value)}
+                  className="w-full text-xs font-semibold border border-amber-300 dark:border-amber-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                >
+                  {roles
+                    .filter((r) => r.id !== roleToDelete.role.id && !r.isSystem)
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} ({r.branchName || "Current Office"})
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRoleToDelete(null)}
+                className="text-xs h-9 px-4"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={submitting}
+                onClick={handleConfirmDeleteRole}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs h-9 px-5 shadow-xs cursor-pointer"
+              >
+                {submitting ? "Deleting..." : "Confirm & Delete"}
               </Button>
             </div>
           </div>
@@ -864,5 +1511,3 @@ export default function RolesPermissionsPage() {
     </div>
   );
 }
-
-
