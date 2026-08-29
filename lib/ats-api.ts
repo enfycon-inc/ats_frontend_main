@@ -461,12 +461,17 @@ const auth = {
     return apiFetch<any[]>('/api/auth/rbac/permissions');
   },
 
-  async listRoles(): Promise<any[]> {
-    return apiFetch<any[]>('/api/auth/rbac/roles');
+  async listRoles(branchId?: string, includeSystem?: boolean): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (branchId) params.append('branchId', branchId);
+    if (includeSystem !== undefined) params.append('includeSystem', String(includeSystem));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return apiFetch<any[]>(`/api/auth/rbac/roles${query}`);
   },
 
-  async listAssignableRoles(): Promise<any[]> {
-    return apiFetch<any[]>('/api/auth/rbac/assignable-roles');
+  async listAssignableRoles(branchId?: string): Promise<any[]> {
+    const query = branchId ? `?branchId=${encodeURIComponent(branchId)}` : '';
+    return apiFetch<any[]>(`/api/auth/rbac/assignable-roles${query}`);
   },
 
   async createCustomRole(data: {
@@ -474,6 +479,7 @@ const auth = {
     description: string;
     permissions: string[];
     systemRole?: string;
+    branchId?: string;
   }): Promise<any> {
     return apiFetch<any>('/api/auth/rbac/roles', {
       method: 'POST',

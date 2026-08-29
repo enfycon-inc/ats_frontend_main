@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
@@ -24,6 +23,8 @@ interface CustomRole {
   id: string;
   name: string;
   description: string;
+  branchId?: string | null;
+  branchName?: string | null;
   isSystem: boolean;
   systemRole?: string;
   isExactSubstitution?: boolean;
@@ -38,113 +39,174 @@ interface TenantUser {
   roleId: string | null;
   roleName: string;
   roles?: string[];
+  branchId?: string | null;
+  branch_id?: string | null;
+  assignedBranchIds?: string[];
+  assigned_branch_ids?: string[];
   isActive: boolean;
   createdAt: string;
 }
+
+const SYSTEM_ROLE_NAMES = ["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "RECRUITER", "ACCOUNT_MANAGER", "DELIVERY_HEAD", "POD_LEAD"];
+
+const SYSTEM_ARCHETYPES = [
+  {
+    key: "RECRUITER",
+    label: "Recruiter Template",
+    badge: "Recruitment",
+    desc: "Candidate sourcing, talent pipeline tracking, applicant creation, and pod assignment viewing.",
+    perms: [
+      "candidate:create", "candidate:view",
+      "submission:create", "submission:view", "submission:edit",
+      "job:view", "pod:view"
+    ]
+  },
+  {
+    key: "ACCOUNT_MANAGER",
+    label: "Account Manager (BDM) Template",
+    badge: "Business Development",
+    desc: "Client relations, job requisition authoring, client approvals, interview scheduling, and placements.",
+    perms: [
+      "job:create", "job:edit", "job:view", "job:approve",
+      "candidate:view", "candidate:create",
+      "submission:view", "submission:create", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+      "pod:view", "client:view", "client:create", "client:edit",
+      "placement:view", "placement:create", "report:view"
+    ]
+  },
+  {
+    key: "POD_LEAD",
+    label: "Pod Lead Template",
+    badge: "Team Lead",
+    desc: "Recruitment pod leadership, candidate screening gate, requisition approvals, and team routing.",
+    perms: [
+      "job:view", "job:edit", "job:approve", "job:reject",
+      "candidate:view", "candidate:create",
+      "submission:view", "submission:create", "submission:internal_screening", "submission:schedule_interview", "submission:edit",
+      "pod:view", "pod:edit", "report:view"
+    ]
+  },
+  {
+    key: "DELIVERY_HEAD",
+    label: "Delivery Head Template",
+    badge: "Delivery Governance",
+    desc: "Branch delivery orchestration, recruiter & pod allocation, requisition activation, and audit gates.",
+    perms: [
+      "job:view", "job:edit", "job:approve", "job:reject",
+      "job:assign", "job:assign_recruiter", "job:assign_pod",
+      "candidate:view", "candidate:create",
+      "submission:view", "submission:create", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+      "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
+      "candidate:search_all_branches", "job:view_all_branches", "candidate:search_all_markets",
+      "client:view", "placement:view", "report:view"
+    ]
+  },
+  {
+    key: "BRANCH_ADMIN",
+    label: "Branch Admin Template",
+    badge: "Branch Governance",
+    desc: "Branch administrative authority, staff role configuration, and branch recruitment oversight.",
+    perms: [
+      "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:assign", "job:assign_recruiter", "job:assign_pod",
+      "candidate:create", "candidate:view",
+      "submission:create", "submission:view", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+      "branch_admin:manage", "user:manage", "pod:view", "pod:edit",
+      "client:view", "placement:view", "report:view"
+    ]
+  }
+];
 
 export default function RolesPermissionsPage() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
-
-  const currentUser = typeof window !== 'undefined' ? atsApi.auth.getCurrentUser() : null;
-  const getDomainSuffix = () => {
-    const userEmail = profile?.email || currentUser?.email;
-    if (userEmail?.toLowerCase().endsWith("@csm.com")) {
-      return "csm";
-    }
-    const currentSub = typeof window !== 'undefined' ? getTenantIdentifier() : "";
-    const rawDomain = currentSub || profile?.tenantDomain || currentUser?.tenantDomain || "enfycon";
-    return rawDomain.toLowerCase().endsWith(".com") ? rawDomain.slice(0, -4) : rawDomain;
-  };
-  const tenantDomain = getDomainSuffix();
 
   // Core Dynamic RBAC state
   const [roles, setRoles] = useState<CustomRole[]>([]);
-  const [assignableRoles, setAssignableRoles] = useState<CustomRole[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [users, setUsers] = useState<TenantUser[]>([]);
   
   // Selection states
   const [selectedRole, setSelectedRole] = useState<CustomRole | null>(null);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
-  const [activeSubTab, setActiveSubTab] = useState<"permissions" | "users" | "settings">("permissions");
-  const [podSystemEnabled, setPodSystemEnabled] = useState(true);
-  const [savingSettings, setSavingSettings] = useState(false);
 
   // New Custom Role Form State
   const [showAddRole, setShowAddRole] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleDesc, setNewRoleDesc] = useState("");
+  const [newRoleBranchId, setNewRoleBranchId] = useState("");
   const [newRoleSystemRole, setNewRoleSystemRole] = useState("RECRUITER");
+  const [newRolePermissions, setNewRolePermissions] = useState<string[]>(SYSTEM_ARCHETYPES[0].perms);
 
-  // Add Member Modal State
-  const [showAddMember, setShowAddMember] = useState(false);
-  const [memberName, setMemberName] = useState("");
-  const [memberEmail, setMemberEmail] = useState("");
-  const [memberPassword, setMemberPassword] = useState("");
-  const [memberRole, setMemberRole] = useState("RECRUITER");
-
-  // Assign Roles Modal State
-  const [assigningUser, setAssigningUser] = useState<TenantUser | null>(null);
-  const [modalRoleIds, setModalRoleIds] = useState<string[]>([]);
-  const [userLimit, setUserLimit] = useState<number>(5);
+  // Role Delete Modal State
+  const [roleToDelete, setRoleToDelete] = useState<{ role: CustomRole; staffCount: number } | null>(null);
+  const [targetRoleId, setTargetRoleId] = useState<string>("");
 
   useEffect(() => {
     const user = atsApi.auth.getCurrentUser();
     const override = typeof window !== "undefined" ? localStorage.getItem("override_role") : null;
-    const activeRole = override || user?.systemRole || user?.roles?.[0];
     
     // Check if active role perspective has admin access
     const hasAccess = override
       ? isRoleAdmin(override, roles, user)
-      : (user?.roles?.includes("ADMIN") || user?.roles?.includes("SUPER_ADMIN") || user?.permissions?.includes("user:manage"));
+      : (user?.roles?.includes("ADMIN") || user?.roles?.includes("SUPER_ADMIN") || user?.roles?.includes("BRANCH_ADMIN") || user?.permissions?.includes("user:manage"));
     
     setIsAdmin(hasAccess);
 
     if (hasAccess) {
-      loadData();
+      const storedBranch = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+      if (storedBranch) setSelectedBranchFilter(storedBranch);
+      loadData(storedBranch || "all");
     } else {
       setLoading(false);
     }
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (branchFilter = selectedBranchFilter) => {
     try {
       setLoading(true);
-      const [rolesData, assignableData, permsData, usersData, profileData] = await Promise.all([
-        atsApi.auth.listRoles(),
-        atsApi.auth.listAssignableRoles().catch(() => []),
+      const bid = branchFilter !== "all" ? branchFilter : undefined;
+      const [rolesData, permsData, usersData, branchesData, profileData] = await Promise.all([
+        atsApi.auth.listRoles(bid, true),
         atsApi.auth.listAllPermissions(),
         atsApi.auth.listUsers(),
-        atsApi.auth.me()
+        atsApi.branches.list().catch(() => []),
+        atsApi.auth.me().catch(() => null)
       ]);
 
-      setRoles(rolesData);
-      setAssignableRoles(assignableData.length > 0 ? assignableData : rolesData);
-      setPermissions(permsData);
-      setUsers(usersData);
-      setProfile(profileData);
-      if (profileData) {
-        setPodSystemEnabled(profileData.podSystemEnabled !== false);
-        if (profileData.userLimit) {
-          setUserLimit(profileData.userLimit);
-        }
-      }
+      // Filter out system roles: show ONLY custom roles in the configuration page
+      const customOnly = (rolesData || []).filter(
+        (r: any) => !r.isSystem && !SYSTEM_ROLE_NAMES.includes(r.name.toUpperCase())
+      );
 
-      // Default select the first role
-      if (rolesData.length > 0) {
-        const adminRole = rolesData.find((r: any) => r.name === "ADMIN") || rolesData[0];
-        setSelectedRole(adminRole);
-        setSelectedPermissions(adminRole.permissions || []);
+      setRoles(rolesData || []);
+      setPermissions(permsData || []);
+      setUsers(usersData || []);
+      setBranches(branchesData || []);
+      setProfile(profileData);
+
+      // Default select the first custom role if available
+      if (customOnly.length > 0) {
+        setSelectedRole(customOnly[0]);
+        setSelectedPermissions(customOnly[0].permissions || []);
+      } else {
+        setSelectedRole(null);
+        setSelectedPermissions([]);
       }
     } catch (err: any) {
       toast.error("Failed to load roles and permissions: " + err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBranchFilterChange = async (branchId: string) => {
+    setSelectedBranchFilter(branchId);
+    await loadData(branchId);
   };
 
   const handleRoleSelect = (role: CustomRole) => {
@@ -165,7 +227,7 @@ export default function RolesPermissionsPage() {
     try {
       setSubmitting(true);
       await atsApi.auth.updateRolePermissions(selectedRole.id, selectedPermissions);
-      toast.success(`Successfully updated permissions for role "${selectedRole.name}"!`);
+      toast.success(`Successfully updated permissions for custom role "${selectedRole.name}"!`);
       
       // Update local state
       setRoles((prev) =>
@@ -179,6 +241,23 @@ export default function RolesPermissionsPage() {
     }
   };
 
+  const openAddRoleModal = () => {
+    setNewRoleName("");
+    setNewRoleDesc("");
+    setNewRoleBranchId(selectedBranchFilter !== "all" ? selectedBranchFilter : branches[0]?.id || "");
+    setNewRoleSystemRole("RECRUITER");
+    setNewRolePermissions(SYSTEM_ARCHETYPES[0].perms);
+    setShowAddRole(true);
+  };
+
+  const handleArchetypeChange = (archetypeKey: string) => {
+    setNewRoleSystemRole(archetypeKey);
+    const archetype = SYSTEM_ARCHETYPES.find((a) => a.key === archetypeKey);
+    if (archetype) {
+      setNewRolePermissions(archetype.perms);
+    }
+  };
+
   const handleCreateRole = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRoleName.trim()) return toast.error("Please provide a role name.");
@@ -187,30 +266,20 @@ export default function RolesPermissionsPage() {
       const newRole = await atsApi.auth.createCustomRole({
         name: newRoleName.trim(),
         description: newRoleDesc.trim(),
-        permissions: ["job:view", "candidate:view"], // Default initial permissions
-        systemRole: newRoleSystemRole
+        systemRole: newRoleSystemRole,
+        branchId: newRoleBranchId || undefined,
+        permissions: newRolePermissions,
       });
 
-      toast.success(`Custom role "${newRole.name}" successfully created!`);
-      setRoles((prev) => [...prev, newRole]);
-      setSelectedRole(newRole);
-      setSelectedPermissions(newRole.permissions);
-      
-      // Reset form
-      setNewRoleName("");
-      setNewRoleDesc("");
-      setNewRoleSystemRole("RECRUITER");
+      toast.success(`Custom staffing role "${newRole.name}" created successfully!`);
       setShowAddRole(false);
+      await loadData();
     } catch (err: any) {
-      toast.error("Failed to create role: " + err.message);
+      toast.error("Failed to create custom role: " + err.message);
     } finally {
       setSubmitting(false);
     }
   };
-
-  // Role Delete Modal State
-  const [roleToDelete, setRoleToDelete] = useState<{ role: CustomRole; staffCount: number } | null>(null);
-  const [targetRoleId, setTargetRoleId] = useState<string>("");
 
   const handleInitiateDeleteRole = (role: CustomRole) => {
     if (role.isSystem) return;
@@ -222,8 +291,8 @@ export default function RolesPermissionsPage() {
       return userRolesUpper.includes(roleNameUpper) || (sysRoleUpper !== '' && userRolesUpper.includes(sysRoleUpper));
     }).length;
 
-    const availableTargets = roles.filter(r => r.id !== role.id);
-    const defaultTarget = availableTargets.find(r => r.name === "RECRUITER")?.id || availableTargets[0]?.id || "";
+    const availableTargets = roles.filter(r => r.id !== role.id && !SYSTEM_ROLE_NAMES.includes(r.name.toUpperCase()));
+    const defaultTarget = availableTargets[0]?.id || "";
 
     setRoleToDelete({ role, staffCount });
     setTargetRoleId(defaultTarget);
@@ -250,146 +319,6 @@ export default function RolesPermissionsPage() {
     }
   };
 
-
-  const handleCreateMember = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const trimmedName = memberName.trim();
-    const trimmedEmail = memberEmail.trim().toLowerCase();
-    const password = memberPassword;
-
-    if (!trimmedName || !trimmedEmail || !password) {
-      return toast.error("Please fill in all required fields.");
-    }
-
-    if (trimmedName.length < 2) {
-      return toast.error("Full Name must be at least 2 characters.");
-    }
-
-    if (trimmedEmail.length < 2) {
-      return toast.error("Work Email prefix must be at least 2 characters.");
-    }
-
-    const emailPrefixRegex = /^[a-z0-9._-]+$/;
-    if (!emailPrefixRegex.test(trimmedEmail)) {
-      return toast.error("Work Email prefix can only contain letters, numbers, dots, hyphens, and underscores.");
-    }
-
-    if (password.length < 8) {
-      return toast.error("Password must be at least 8 characters.");
-    }
-
-    const activeCount = users.filter(u => u.isActive).length;
-    if (activeCount >= userLimit) {
-      return toast.error(`Seat limit reached! You have used all ${userLimit} licenses. Deactivate a user first or contact support to purchase more seats.`);
-    }
-    
-    try {
-      setSubmitting(true);
-      const tenantId = profile?.tenantId || currentUser?.tenantId;
-      const fullEmail = `${trimmedEmail}@${tenantDomain}.com`;
-      
-      await atsApi.auth.registerUser({
-        email: fullEmail,
-        fullName: trimmedName,
-        password: password,
-        role: memberRole,
-        tenantId: tenantId || "",
-        isApproved: true, // Auto-approved by tenant admin
-      });
-      
-      toast.success(`Successfully added ${memberName} as ${memberRole}!`);
-      
-      // Clear form & close modal
-      setMemberName("");
-      setMemberEmail("");
-      setMemberPassword("");
-      setMemberRole("RECRUITER");
-      setShowAddMember(false);
-      
-      // Reload data
-      await loadData();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to add member.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleAssignUserRoles = async (userId: string, selectedRoleIds: string[]) => {
-    if (selectedRoleIds.length === 0) {
-      return toast.error("A user must have at least one role assigned.");
-    }
-    try {
-      setSubmittingId(userId);
-      const res = await atsApi.auth.assignUserRoles(userId, selectedRoleIds);
-      toast.success(res.message || "User roles assigned successfully.");
-      
-      // Update local state: find the names of the assigned roles
-      const assignedRoleNames = roles
-        .filter((r) => selectedRoleIds.includes(r.id))
-        .map((r) => r.name);
-      
-      const primaryRoleId = selectedRoleIds[0];
-      const primaryRoleName = assignedRoleNames[0] || "User";
-
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === userId
-            ? {
-                ...u,
-                roleId: primaryRoleId,
-                roleName: primaryRoleName,
-                roles: assignedRoleNames,
-              }
-            : u
-        )
-      );
-    } catch (err: any) {
-      toast.error("Failed to assign roles: " + err.message);
-    } finally {
-      setSubmittingId(null);
-    }
-  };
-
-  const handleUserStatusToggle = async (userId: string, currentActive: boolean) => {
-    // Protect against self-deactivation (Ceipal rule)
-    const currentUserId = profile?.id || currentUser?.id;
-    if (currentUserId === userId && currentActive) {
-      toast.error("You cannot deactivate your own account.");
-      return;
-    }
-
-    try {
-      setSubmittingId(userId);
-      const nextActive = !currentActive;
-      await atsApi.auth.setUserStatus(userId, nextActive);
-      toast.success(`User status updated to ${nextActive ? "Active" : "Inactive"}!`);
-      
-      // Update local state
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, isActive: nextActive } : u))
-      );
-    } catch (err: any) {
-      toast.error("Failed to update user status: " + err.message);
-    } finally {
-      setSubmittingId(null);
-    }
-  };
-
-  const handleTogglePodSystem = async (checked: boolean) => {
-    try {
-      setSavingSettings(true);
-      await atsApi.auth.updateMySettings({ podSystemEnabled: checked });
-      setPodSystemEnabled(checked);
-      toast.success(`Recruitment Pod system ${checked ? "enabled" : "disabled (unassigned mode)"} successfully!`);
-    } catch (err: any) {
-      toast.error("Failed to update pod settings: " + err.message);
-    } finally {
-      setSavingSettings(false);
-    }
-  };
-
   // Group permissions by category
   const permissionGroups = permissions.reduce<Record<string, Permission[]>>((acc, perm) => {
     const group = perm.group || "General";
@@ -398,13 +327,24 @@ export default function RolesPermissionsPage() {
     return acc;
   }, {});
 
+  // Custom roles filtered for the view (strictly excluding system roles)
+  const customRolesList = roles.filter(
+    (r) => !r.isSystem && !SYSTEM_ROLE_NAMES.includes(r.name.toUpperCase())
+  );
+
+  const filteredRoles = selectedBranchFilter === "all"
+    ? customRolesList
+    : customRolesList.filter((r) => !r.branchId || r.branchId === selectedBranchFilter);
+
+  const selectedArchetypeObj = SYSTEM_ARCHETYPES.find((a) => a.key === newRoleSystemRole) || SYSTEM_ARCHETYPES[0];
+
   if (loading) {
     return (
       <div>
         <SiteBreadcrumb />
         <div className="flex flex-col items-center justify-center min-h-[300px]">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          <p className="mt-4 text-sm text-default-500">Loading RBAC configurations...</p>
+          <p className="mt-4 text-sm text-default-500">Loading custom role configurations...</p>
         </div>
       </div>
     );
@@ -421,7 +361,7 @@ export default function RolesPermissionsPage() {
             </div>
             <h2 className="text-xl font-bold text-red-500 mb-2">Access Denied</h2>
             <p className="text-sm text-default-600">
-              Only workspace **Administrators** can view and manage roles, access permissions, and staff security levels.
+              Only workspace **Administrators** or **Branch Managers** can view and configure custom staffing roles.
             </p>
           </CardContent>
         </Card>
@@ -430,147 +370,154 @@ export default function RolesPermissionsPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <SiteBreadcrumb />
       
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-default-900 flex items-center gap-2">
-          <Icon icon="heroicons:shield-check" className="text-indigo-600 h-7 w-7" />
-          Roles & Permissions Workspace Settings
-        </h1>
-        <p className="text-sm text-default-600 mt-1">
-          Decouple access privileges to build custom staffing roles. Define Ceipal-compatible security settings for recruiters and BDMs.
-        </p>
+      {/* HEADER WITH BRANCH SELECTOR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-default-100 pb-5">
+        <div>
+          <h1 className="text-2xl font-bold text-default-900 flex items-center gap-2">
+            <Icon icon="heroicons:shield-check" className="text-indigo-600 h-7 w-7" />
+            Custom Staffing Roles &amp; Permissions
+          </h1>
+          <p className="text-sm text-default-600 mt-1">
+            Build custom branch staffing profiles inherited from abstract system archetypes (Recruiter, BDM, Delivery Head, etc.).
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Branch Filter Dropdown */}
+          {branches.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-default-50 dark:bg-slate-800 border border-default-250 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
+              <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
+              <select
+                value={selectedBranchFilter}
+                onChange={(e) => handleBranchFilterChange(e.target.value)}
+                className="bg-transparent text-xs font-bold text-default-800 dark:text-white outline-none cursor-pointer"
+              >
+                <option value="all">All Branches ({customRolesList.length} Roles)</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <Button 
+            onClick={openAddRoleModal} 
+            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 shadow-sm cursor-pointer"
+          >
+            <Icon icon="heroicons:plus" className="h-4 w-4" /> Create Custom Role
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* ==========================================
-           LEFT COLUMN: ROLES LIST
+           LEFT COLUMN: CUSTOM ROLES LIST ONLY
            ========================================== */}
         <div className="lg:col-span-2 space-y-4">
-          <Card className="border border-default-100 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-            <CardHeader className="border-b border-default-100 flex flex-row items-center justify-between">
+          <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl">
+            <CardHeader className="border-b border-default-150 p-4 bg-default-50/50 dark:bg-slate-800/20 flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-base font-semibold">Custom Staffing Roles</CardTitle>
-                <CardDescription className="text-xs">Define dynamic workspace profiles.</CardDescription>
+                <CardTitle className="text-sm font-bold text-default-900 flex items-center gap-2">
+                  <Icon icon="heroicons:user-group" className="h-4 w-4 text-indigo-600" />
+                  Custom Roles
+                </CardTitle>
+                <CardDescription className="text-[11px] text-default-500">
+                  {filteredRoles.length} custom operational role{filteredRoles.length !== 1 ? "s" : ""}
+                </CardDescription>
               </div>
-              <Button size="sm" onClick={() => setShowAddRole(true)} className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-750 text-white font-semibold">
-                <Icon icon="heroicons:plus" className="h-4 w-4" /> Add Role
+              <Button 
+                size="sm" 
+                onClick={openAddRoleModal} 
+                className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2.5 rounded-lg shadow-2xs"
+              >
+                <Icon icon="heroicons:plus" className="h-3.5 w-3.5 mr-1" /> Add Role
               </Button>
             </CardHeader>
-            <CardContent className="p-4 space-y-3">
-              {/* Form to Add Custom Role */}
-              {showAddRole && (
-                <form onSubmit={handleCreateRole} className="border border-indigo-100 dark:border-slate-800 bg-indigo-50/20 dark:bg-slate-800/10 p-3 rounded-lg space-y-3 mb-2 animate-fadeIn">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-default-700">Role Name</label>
-                    <Input
-                      placeholder="e.g. BDM, Sourcing Lead"
-                      value={newRoleName}
-                      onChange={(e) => setNewRoleName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-default-700">Base Role Template ⚙️</label>
-                    <select
-                      value={newRoleSystemRole}
-                      onChange={(e) => setNewRoleSystemRole(e.target.value)}
-                      className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md p-2 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 font-semibold"
-                    >
-                      <option value="RECRUITER">Recruiter Template</option>
-                      <option value="ACCOUNT_MANAGER">Account Manager Template (BDM)</option>
-                      <option value="BRANCH_ADMIN">Branch Admin Template (Branch Head)</option>
-                      <option value="ADMIN">Admin Template</option>
-                      <option value="DELIVERY_HEAD">Delivery Head Template</option>
-                      <option value="POD_LEAD">Pod Lead Template</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-default-700">Description</label>
-                    <textarea
-                      placeholder="Role functions..."
-                      value={newRoleDesc}
-                      onChange={(e) => setNewRoleDesc(e.target.value)}
-                      className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md p-2 bg-transparent focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                      rows={2}
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="ghost" type="button" onClick={() => setShowAddRole(false)}>Cancel</Button>
-                    <Button size="sm" type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-750 text-white font-semibold">
-                      Create
-                    </Button>
-                  </div>
-                </form>
-              )}
 
-              {/* Roles Cards */}
-              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                {roles.map((role) => {
-                  const isSelected = selectedRole?.id === role.id;
-                  const staffCount = users.filter((u) => {
-                    if (u.roleId === role.id) return true;
-                    const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map(r => r.toUpperCase());
-                    const roleNameUpper = role.name.toUpperCase();
-                    const sysRoleUpper = (role.replacesSystemRole || role.systemRole || '').toUpperCase();
-                    return userRolesUpper.includes(roleNameUpper) || (sysRoleUpper !== '' && userRolesUpper.includes(sysRoleUpper));
-                  }).length;
-                  return (
-                    <div
-                      key={role.id}
-                      onClick={() => handleRoleSelect(role)}
-                      className={`p-3 rounded-lg border cursor-pointer transition flex flex-col justify-between ${
-                        isSelected
-                          ? "border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20"
-                          : "border-default-100 hover:bg-default-50/50"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm text-default-900">{role.name}</span>
-                            {role.isSystem ? (
-                              <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-600 text-[9px] uppercase tracking-wider font-semibold border-0">
-                                System
+            <CardContent className="p-3 space-y-2">
+              {filteredRoles.length === 0 ? (
+                <div className="p-8 border border-dashed border-default-250 dark:border-slate-800 rounded-xl text-center space-y-2 bg-default-50/40 dark:bg-slate-800/10">
+                  <div className="h-10 w-10 rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 flex items-center justify-center mx-auto">
+                    <Icon icon="heroicons:shield-check" className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-bold text-default-800 dark:text-white">No Custom Roles Found</p>
+                  <p className="text-[11px] text-default-450 leading-relaxed max-w-xs mx-auto">
+                    System roles are abstract templates. Click <strong>Create Custom Role</strong> to define a branch staffing profile.
+                  </p>
+                  <Button 
+                    size="sm" 
+                    onClick={openAddRoleModal} 
+                    className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold mt-2"
+                  >
+                    + Create First Role
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
+                  {filteredRoles.map((role) => {
+                    const isSelected = selectedRole?.id === role.id;
+                    const staffCount = users.filter((u) => {
+                      if (u.roleId === role.id) return true;
+                      const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map(r => r.toUpperCase());
+                      return userRolesUpper.includes(role.name.toUpperCase());
+                    }).length;
+
+                    return (
+                      <div
+                        key={role.id}
+                        onClick={() => handleRoleSelect(role)}
+                        className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                          isSelected
+                            ? "border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/30 shadow-xs ring-1 ring-indigo-500"
+                            : "border-default-150 bg-white dark:bg-slate-850 hover:bg-default-50/60 dark:hover:bg-slate-800/40"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-xs text-default-900 capitalize truncate">
+                                {role.name}
+                              </span>
+                              <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[8.5px] font-bold border border-indigo-200 dark:border-indigo-800 px-1.5 py-0.2">
+                                Base: {role.systemRole || "RECRUITER"}
                               </Badge>
-                            ) : role.isExactSubstitution ? (
-                              <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[9px] font-semibold border border-emerald-200">
-                                Substitutes: {role.replacesSystemRole || role.systemRole || "System Role"}
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 text-[9px] font-semibold border border-blue-200">
-                                Custom (Base: {role.systemRole || "RECRUITER"})
-                              </Badge>
-                            )}
+                              {role.branchName && (
+                                <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[8.5px] font-bold border-0 px-1.5 py-0.2">
+                                  {role.branchName}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-[10.5px] text-default-500 mt-1 line-clamp-2">
+                              {role.description || "Custom operational staffing role"}
+                            </p>
                           </div>
-                          <p className="text-xs text-default-500 mt-1 max-w-[280px]">
-                            {role.description || "No description provided."}
-                          </p>
-                        </div>
-                        
-                        <div className="text-right flex flex-col items-end gap-1.5">
-                          <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 dark:bg-slate-800 dark:text-indigo-400 px-2 py-0.5 rounded-full">
-                            {staffCount} Staff
-                          </span>
-                          {!role.isSystem && (
+                          
+                          <div className="text-right flex flex-col items-end gap-1.5 shrink-0">
+                            <span className="text-[9.5px] font-bold text-indigo-600 bg-indigo-50 dark:bg-slate-800 dark:text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-150 dark:border-slate-700">
+                              {staffCount} Staff
+                            </span>
                             <button
                               onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleInitiateDeleteRole(role);
+                                e.stopPropagation();
+                                handleInitiateDeleteRole(role);
                               }}
-                              className="text-red-500 hover:text-red-700 text-xs p-1 mt-1 transition cursor-pointer"
+                              className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer"
                               title="Delete custom role"
                             >
-                              <Icon icon="heroicons:trash" className="h-4 w-4" />
+                              <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
                             </button>
-                          )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -580,20 +527,30 @@ export default function RolesPermissionsPage() {
            ========================================== */}
         <div className="lg:col-span-3">
           {selectedRole ? (
-            <Card className="border border-default-100 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-              <CardHeader className="border-b border-default-100 bg-default-50/50 dark:bg-slate-800/10 flex flex-col md:flex-row md:items-center justify-between gap-4 p-4">
+            <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl">
+              <CardHeader className="border-b border-default-150 bg-default-50/50 dark:bg-slate-800/20 flex flex-col md:flex-row md:items-center justify-between gap-4 p-4">
                 <div>
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <Icon icon="heroicons:lock-open" className="text-indigo-600 h-5 w-5" />
-                    Configure Role: {selectedRole.name}
-                  </CardTitle>
-                  <p className="text-xs text-default-500 mt-0.5">{selectedRole.description}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <CardTitle className="text-sm font-bold flex items-center gap-1.5 text-default-900">
+                      <Icon icon="heroicons:lock-open" className="text-indigo-600 h-4.5 w-4.5" />
+                      Configure Role: {selectedRole.name}
+                    </CardTitle>
+                    <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[9px] font-bold border border-indigo-200">
+                      Base Archetype: {selectedRole.systemRole || "RECRUITER"}
+                    </Badge>
+                    {selectedRole.branchName && (
+                      <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-bold border-0">
+                        {selectedRole.branchName}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-default-500 mt-0.5">{selectedRole.description || "Custom branch role"}</p>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge className="bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 text-xs font-semibold py-1 px-3 flex items-center gap-1.5">
                     <Icon icon="heroicons:users" className="h-3.5 w-3.5 text-indigo-600" />
-                    {users.filter(u => u.roleId === selectedRole.id || (selectedRole.isSystem && u.roleName === selectedRole.name)).length} Staff Assigned
+                    {users.filter(u => u.roleId === selectedRole.id || (u.roles && u.roles.includes(selectedRole.name))).length} Staff Assigned
                   </Badge>
                   <Button
                     size="sm"
@@ -609,17 +566,8 @@ export default function RolesPermissionsPage() {
               
               <CardContent className="p-0">
                 {/* PERMISSION MATRIX GRID */}
-                <div className="p-4 space-y-6">
-                  {selectedRole.isSystem && (
-                    <div className="border border-indigo-100 dark:border-slate-800 bg-indigo-50/20 p-3 rounded-lg text-xs text-indigo-700 flex items-start gap-2">
-                      <Icon icon="heroicons:information-circle" className="h-5 w-5 shrink-0 mt-0.5" />
-                      <p>
-                        <strong>System Role Notice</strong>: This is a default system role. System roles have locked permissions to ensure core SaaS workflows remain stable. To define custom permission layouts, create a new dynamic role using the <strong>Add Role</strong> button.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="space-y-6 max-h-[540px] overflow-y-auto pr-1">
+                <div className="p-5 space-y-6">
+                  <div className="space-y-6 max-h-[520px] overflow-y-auto pr-1">
                     {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
                       const getGroupIcon = (name: string) => {
                         if (name.includes("Jobs")) return "heroicons:briefcase";
@@ -642,21 +590,22 @@ export default function RolesPermissionsPage() {
                               {groupPerms.filter(p => selectedPermissions.includes(p.id)).length} / {groupPerms.length} enabled
                             </span>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2">
                             {groupPerms.map((perm) => {
                               const isChecked = selectedPermissions.includes(perm.id);
                               return (
                                 <div
                                   key={perm.id}
                                   onClick={() => handlePermissionToggle(perm.id)}
-                                  className={`flex items-start gap-3 p-2.5 rounded-lg border transition ${
-                                    selectedRole.isSystem ? "cursor-default" : "cursor-pointer hover:bg-default-50/50"
-                                  } ${isChecked ? "bg-emerald-50/10 border-emerald-500/20" : "border-default-100"}`}
+                                  className={`flex items-start gap-3 p-2.5 rounded-lg border transition cursor-pointer ${
+                                    isChecked 
+                                      ? "bg-indigo-50/50 border-indigo-200 dark:bg-indigo-950/20 dark:border-indigo-800" 
+                                      : "border-default-150 hover:bg-default-50/50"
+                                  }`}
                                 >
                                   <Checkbox
                                     id={perm.id}
                                     checked={isChecked}
-                                    disabled={selectedRole.isSystem}
                                     onCheckedChange={() => handlePermissionToggle(perm.id)}
                                     className="mt-0.5"
                                   />
@@ -664,7 +613,7 @@ export default function RolesPermissionsPage() {
                                     <label htmlFor={perm.id} className="text-xs font-semibold text-default-900 cursor-pointer block leading-none">
                                       {perm.name}
                                     </label>
-                                    <span className="text-[10px] text-default-400 mt-1 block">Permission Token: `{perm.id}`</span>
+                                    <span className="text-[10px] text-default-400 mt-1 block">Token: `{perm.id}`</span>
                                   </div>
                                 </div>
                               );
@@ -675,34 +624,183 @@ export default function RolesPermissionsPage() {
                     })}
                   </div>
 
-                  {!selectedRole.isSystem && (
-                    <div className="border-t border-default-100 pt-4 flex justify-end">
-                      <Button
-                        disabled={submitting}
-                        onClick={handleSavePermissions}
-                        className="bg-indigo-600 hover:bg-indigo-750 text-white font-semibold flex items-center gap-1.5"
-                      >
-                        {submitting ? (
-                          <div className="h-4 w-4 border-2 border-white border-t-transparent animate-spin rounded-full"></div>
-                        ) : (
-                          <>
-                            <Icon icon="heroicons:check-circle" className="h-4.5 w-4.5" />
-                            Save Permissions Matrix
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  )}
+                  <div className="border-t border-default-150 pt-4 flex justify-end">
+                    <Button
+                      disabled={submitting}
+                      onClick={handleSavePermissions}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      {submitting ? (
+                        <div className="h-4 w-4 border-2 border-white border-t-transparent animate-spin rounded-full"></div>
+                      ) : (
+                        <>
+                          <Icon icon="heroicons:check-circle" className="h-4.5 w-4.5" />
+                          Save Permissions Matrix
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           ) : (
-            <div className="h-[400px] border border-dashed border-default-200 rounded-xl flex items-center justify-center text-default-500 text-sm">
-              Select a custom role from the left panel to begin layout configuration.
+            <div className="h-[400px] border border-dashed border-default-250 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center text-center p-6 space-y-3 bg-white dark:bg-slate-900">
+              <div className="h-12 w-12 rounded-full bg-indigo-50 dark:bg-slate-800 text-indigo-600 flex items-center justify-center">
+                <Icon icon="heroicons:shield-check" className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-default-800 dark:text-white">No Role Selected</p>
+                <p className="text-xs text-default-450 mt-1 max-w-sm">
+                  Select a custom role from the left panel to configure its granular security permissions matrix, or create a new custom role.
+                </p>
+              </div>
+              <Button 
+                size="sm" 
+                onClick={openAddRoleModal} 
+                className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
+              >
+                + Create Custom Role
+              </Button>
             </div>
           )}
         </div>
       </div>
+
+      {/* ── CREATE CUSTOM ROLE MODAL (INHERITS FROM SYSTEM ROLE ARCHETYPE) ── */}
+      {showAddRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden my-auto max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
+                  <Icon icon="heroicons:plus" className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Create Custom Staffing Role
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">Inherits base permissions and workflow archetype from a system role</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowAddRole(false)} 
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg"
+              >
+                <Icon icon="heroicons:x-mark" className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateRole} className="p-6 space-y-4 overflow-y-auto flex-1">
+              
+              {/* Branch Selection */}
+              {branches.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Branch Office <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={newRoleBranchId}
+                    onChange={(e) => setNewRoleBranchId(e.target.value)}
+                    className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                    required
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.market || "General"})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10.5px] text-neutral-450">
+                    This custom staffing role will be isolated and available to staff in this branch office.
+                  </p>
+                </div>
+              )}
+
+              {/* Role Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                  Custom Role Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  placeholder="e.g. Senior Technical Recruiter, BDM - Enterprise..."
+                  value={newRoleName}
+                  onChange={(e) => setNewRoleName(e.target.value)}
+                  className="text-xs h-9 font-medium"
+                  required
+                />
+              </div>
+
+              {/* Inherit from System Archetype Dropdown */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                  Inherit Permissions from Base System Role ⚙️
+                </label>
+                <select
+                  value={newRoleSystemRole}
+                  onChange={(e) => handleArchetypeChange(e.target.value)}
+                  className="w-full text-xs font-bold border border-indigo-300 dark:border-indigo-800 rounded-lg p-2.5 bg-indigo-50/40 dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                >
+                  {SYSTEM_ARCHETYPES.map((arch) => (
+                    <option key={arch.key} value={arch.key}>
+                      {arch.label} — ({arch.badge})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Archetype Preview Box */}
+              <div className="p-3.5 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/60 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                    <Icon icon="heroicons:sparkles" className="h-4 w-4 text-indigo-600" />
+                    {selectedArchetypeObj.label}
+                  </span>
+                  <Badge className="bg-indigo-600 text-white text-[9px] font-bold border-0 px-2 py-0.2">
+                    {newRolePermissions.length} Permissions Inherited
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-neutral-600 dark:text-slate-300 leading-relaxed">
+                  {selectedArchetypeObj.desc}
+                </p>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                  Description / Operational Functions
+                </label>
+                <textarea
+                  placeholder="Describe this role's scope, responsibilities, or specializations..."
+                  value={newRoleDesc}
+                  onChange={(e) => setNewRoleDesc(e.target.value)}
+                  className="w-full text-xs border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100 dark:border-slate-800 shrink-0">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  type="button" 
+                  onClick={() => setShowAddRole(false)}
+                  className="h-8 text-xs font-bold"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  size="sm" 
+                  type="submit" 
+                  disabled={submitting || !newRoleName.trim()} 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 px-5 shadow-xs cursor-pointer"
+                >
+                  {submitting ? "Creating..." : "Create Custom Role"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── Role Delete & Re-assignment Modal ───────────────────────── */}
       {roleToDelete && (
@@ -711,7 +809,7 @@ export default function RolesPermissionsPage() {
             <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
               <Icon icon="heroicons:exclamation-triangle" className="h-6 w-6 shrink-0" />
               <h3 className="text-base font-bold text-neutral-900 dark:text-white">
-                Delete Custom Role & Reassign Staff
+                Delete Custom Role &amp; Reassign Staff
               </h3>
             </div>
 
@@ -736,10 +834,10 @@ export default function RolesPermissionsPage() {
                     className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-md p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     {roles
-                      .filter((r) => r.id !== roleToDelete.role.id)
+                      .filter((r) => r.id !== roleToDelete.role.id && !SYSTEM_ROLE_NAMES.includes(r.name.toUpperCase()))
                       .map((r) => (
                         <option key={r.id} value={r.id}>
-                          {r.name} {r.isSystem ? '(System Role)' : '(Custom Role)'}
+                          {r.name} (Custom Role)
                         </option>
                       ))}
                   </select>
@@ -775,7 +873,7 @@ export default function RolesPermissionsPage() {
                 ) : (
                   <>
                     <Icon icon="heroicons:trash" className="h-4 w-4" />
-                    Reassign & Delete Role
+                    Reassign &amp; Delete Role
                   </>
                 )}
               </Button>
@@ -786,4 +884,5 @@ export default function RolesPermissionsPage() {
     </div>
   );
 }
+
 
