@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -39,6 +39,8 @@ import {
   Award,
   MessageSquare,
   UserCheck,
+  FileDown,
+  ExternalLink,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -445,6 +447,7 @@ function renderClutterFreeRemarks(sub: any) {
 export default function JobDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = String(params?.id || "");
 
   // States
@@ -456,6 +459,14 @@ export default function JobDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"details" | "pipeline" | "matches">("details");
   const [pipelineView, setPipelineView] = useState<"list" | "kanban">("list");
+
+  // Sync tab from URL query param if present
+  useEffect(() => {
+    const tabParam = searchParams?.get("tab");
+    if (tabParam === "pipeline" || tabParam === "matches" || tabParam === "details") {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   // User details & permission controls
   const currentUser = useMemo(() => {
@@ -1058,6 +1069,203 @@ export default function JobDetailPage() {
               </div>
             </Card>
 
+            {/* SUBMITTED CANDIDATES & RESUMES STRIP (Ceipal / Enterprise ATS style) */}
+            <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850 gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-650 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/60">
+                    <Users className="h-4.5 w-4.5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold text-neutral-900 dark:text-white">
+                        Candidate Submissions for this Requirement
+                      </h2>
+                      <Badge className={cn(
+                        "text-[10px] font-bold border",
+                        submissions.length > 0
+                          ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800"
+                          : "bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-slate-800 dark:text-neutral-400"
+                      )}>
+                        {submissions.length} / {job.submissionRequired || 5} Submitted
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                      Review submitted candidate profiles, monitor client approval status, and download original resumes.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <Button
+                    size="sm"
+                    onClick={() => setUploadSubmitOpen(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1 text-xs h-8 shadow-xs rounded-lg cursor-pointer"
+                  >
+                    <Upload className="h-3.5 w-3.5" /> Submit New CV
+                  </Button>
+                  {submissions.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setActiveTab("pipeline")}
+                      className="text-xs font-semibold h-8 rounded-lg"
+                    >
+                      Open Pipeline Board →
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {submissions.length === 0 ? (
+                <div className="p-8 text-center bg-white dark:bg-slate-900">
+                  <div className="w-12 h-12 rounded-full bg-neutral-100 dark:bg-slate-800 text-neutral-400 flex items-center justify-center mx-auto mb-3">
+                    <UserPlus className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-xs font-bold text-neutral-800 dark:text-neutral-200">No Candidates Submitted Yet</h3>
+                  <p className="text-[11px] text-neutral-400 max-w-md mx-auto mt-1 mb-4">
+                    This requirement is actively accepting submissions (0 of {job.submissionRequired || 5} required candidates). Upload a resume or select candidates from AI Matches to start client screening.
+                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => setUploadSubmitOpen(true)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 text-xs h-8.5 rounded-lg shadow-sm"
+                    >
+                      <Upload className="h-3.5 w-3.5" /> Upload &amp; Submit Candidate CV
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setActiveTab("matches")}
+                      className="text-xs font-semibold h-8.5 rounded-lg border-neutral-300"
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-amber-500 mr-1" /> View AI Matches ({aiMatches.length})
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-neutral-50/80 dark:bg-slate-850/80 border-b border-neutral-200 dark:border-slate-800 text-[10.5px] font-extrabold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 select-none">
+                        <th className="py-2.5 px-4">Candidate Name &amp; Contact</th>
+                        <th className="py-2.5 px-3">Recruiter</th>
+                        <th className="py-2.5 px-3">Submitted Rate</th>
+                        <th className="py-2.5 px-3">Internal Review</th>
+                        <th className="py-2.5 px-3">Client Status</th>
+                        <th className="py-2.5 px-3">Remarks / Date</th>
+                        <th className="py-2.5 px-4 text-right">Actions &amp; CV Download</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100 dark:divide-slate-800 text-xs">
+                      {submissions.map((sub) => (
+                        <tr
+                          key={sub.id}
+                          className="hover:bg-neutral-50/60 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          {/* Candidate Name & Contact */}
+                          <td className="py-3 px-4 align-middle">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-650 dark:text-indigo-400 font-bold flex items-center justify-center text-xs shrink-0 border border-indigo-100 dark:border-indigo-900/60">
+                                {sub.candidateName ? sub.candidateName.charAt(0).toUpperCase() : "C"}
+                              </div>
+                              <div className="min-w-0">
+                                <Link
+                                  href={`/applicants/${sub.candidateId}`}
+                                  className="font-bold text-neutral-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline flex items-center gap-1"
+                                >
+                                  <span>{sub.candidateName}</span>
+                                  <ExternalLink className="h-3 w-3 text-neutral-400 inline shrink-0" />
+                                </Link>
+                                <div className="text-[11px] text-neutral-500 dark:text-neutral-400 flex items-center gap-2 mt-0.5 truncate">
+                                  <span>{sub.candidateEmail || "—"}</span>
+                                  {sub.candidatePhone && <span>• {sub.candidatePhone}</span>}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Recruiter */}
+                          <td className="py-3 px-3 align-middle font-medium text-neutral-800 dark:text-neutral-200">
+                            {sub.recruiterName || "System"}
+                          </td>
+
+                          {/* Pay Rate */}
+                          <td className="py-3 px-3 align-middle font-semibold text-neutral-850 dark:text-neutral-200">
+                            {sub.submittedRate || job.payRate || "—"}
+                          </td>
+
+                          {/* Internal Review */}
+                          <td className="py-3 px-3 align-middle">
+                            {renderInternalReviewStatus(sub)}
+                          </td>
+
+                          {/* Client / Final Status */}
+                          <td className="py-3 px-3 align-middle">
+                            {sub.finalStatus === "PENDING_APPROVAL" ? (
+                              <Badge className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 text-[10px] font-semibold">
+                                Pending Approval
+                              </Badge>
+                            ) : sub.finalStatus === "SUBMITTED" ? (
+                              <Badge className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 text-[10px] font-bold">
+                                Submitted to Client
+                              </Badge>
+                            ) : sub.finalStatus === "OFFER" ? (
+                              <Badge className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-300 text-[10px] font-bold">
+                                Offer Released
+                              </Badge>
+                            ) : sub.finalStatus === "JOIN" || sub.finalStatus === "PLACED" ? (
+                              <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 text-[10px] font-bold">
+                                Joined / Placed
+                              </Badge>
+                            ) : sub.finalStatus === "REJECTED" ? (
+                              <Badge className="bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 text-[10px] font-bold">
+                                Rejected
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-neutral-100 text-neutral-700 border-neutral-200 text-[10px] font-semibold">
+                                {sub.finalStatus}
+                              </Badge>
+                            )}
+                          </td>
+
+                          {/* Remarks / Date */}
+                          <td className="py-3 px-3 align-middle text-xs max-w-[200px] truncate">
+                            {renderClutterFreeRemarks(sub)}
+                          </td>
+
+                          {/* Actions & CV Download */}
+                          <td className="py-3 px-4 align-middle text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate")}
+                                className="h-7 text-[11px] font-bold border-indigo-200 text-indigo-700 dark:text-indigo-300 bg-indigo-50/40 hover:bg-indigo-600 hover:text-white dark:bg-indigo-950/30 flex items-center gap-1 rounded-md cursor-pointer"
+                                title="Download candidate CV PDF"
+                              >
+                                <FileDown className="h-3 w-3" /> Download CV
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openReviewPanel(sub)}
+                                className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded-md cursor-pointer flex items-center gap-1"
+                              >
+                                <Pencil className="h-3 w-3" /> Review
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
               
               {/* Left Description area */}
@@ -1389,40 +1597,51 @@ export default function JobDetailPage() {
 
                             {/* 8. Action */}
                             <td className="h-[52px] py-1 px-2.5 text-center whitespace-nowrap align-middle" onClick={(e) => e.stopPropagation()}>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <button className="p-1 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-border/70 font-sans p-1">
-                                  <DropdownMenuItem
-                                    onClick={() => openReviewPanel(sub)}
-                                    className="text-xs cursor-pointer gap-2 font-medium py-1.5"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5 text-indigo-500" />
-                                    Edit Status &amp; Rounds
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      setSelectedSubForInterview(sub);
-                                      setInterviewModalOpen(true);
-                                    }}
-                                    className="text-xs cursor-pointer gap-2 font-medium py-1.5"
-                                  >
-                                    <CalendarDays className="h-3.5 w-3.5 text-cyan-500" />
-                                    Schedule Interview
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate")}
-                                    className="text-xs cursor-pointer gap-2 font-medium py-1.5"
-                                  >
-                                    <FileText className="h-3.5 w-3.5 text-emerald-500" />
-                                    Download CV
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate")}
+                                  className="h-7 text-[10.5px] font-bold px-2 flex items-center gap-1 border-indigo-200 text-indigo-700 dark:text-indigo-300 bg-indigo-50/40 hover:bg-indigo-600 hover:text-white dark:bg-indigo-950/30"
+                                  title="Download candidate CV PDF"
+                                >
+                                  <FileDown className="h-3 w-3" /> CV
+                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button className="p-1 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-border/70 font-sans p-1">
+                                    <DropdownMenuItem
+                                      onClick={() => openReviewPanel(sub)}
+                                      className="text-xs cursor-pointer gap-2 font-medium py-1.5"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5 text-indigo-500" />
+                                      Edit Status &amp; Rounds
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setSelectedSubForInterview(sub);
+                                        setInterviewModalOpen(true);
+                                      }}
+                                      className="text-xs cursor-pointer gap-2 font-medium py-1.5"
+                                    >
+                                      <CalendarDays className="h-3.5 w-3.5 text-cyan-500" />
+                                      Schedule Interview
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate")}
+                                      className="text-xs cursor-pointer gap-2 font-medium py-1.5"
+                                    >
+                                      <FileDown className="h-3.5 w-3.5 text-indigo-500" />
+                                      Download Resume PDF
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </td>
                           </tr>
                         ))
