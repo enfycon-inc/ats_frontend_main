@@ -31,7 +31,7 @@ interface Pod {
   createdAt: string;
 }
 
-type PanelMode = "create" | "edit" | null;
+type ModalMode = "create" | "edit" | null;
 
 export default function PodsPage() {
   const [loading, setLoading] = useState(true);
@@ -46,8 +46,8 @@ export default function PodsPage() {
 
   const [activeView, setActiveView] = useState<"all" | "cycle">("all");
 
-  // Right-panel state
-  const [panelMode, setPanelMode] = useState<PanelMode>(null);
+  // Modal Pop-up state (replacing sidebar)
+  const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [selectedPod, setSelectedPod] = useState<Pod | null>(null);
 
   // Form fields
@@ -56,6 +56,7 @@ export default function PodsPage() {
   const [podHeadId, setPodHeadId] = useState("");
   const [podDescription, setPodDescription] = useState("");
   const [selectedRecruiterIds, setSelectedRecruiterIds] = useState<string[]>([]);
+  const [recruiterSearch, setRecruiterSearch] = useState<string>("");
 
   useEffect(() => {
     const user = atsApi.auth.getCurrentUser();
@@ -112,30 +113,33 @@ export default function PodsPage() {
     await loadData(branchId);
   };
 
-  const openCreatePanel = () => {
+  const openCreateModal = () => {
     setPodName("");
     const defaultBranch = (selectedBranchFilter !== "all" ? selectedBranchFilter : null) || (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null) || branches[0]?.id || "";
     setPodBranchId(defaultBranch);
     setPodHeadId("");
     setPodDescription("");
     setSelectedRecruiterIds([]);
+    setRecruiterSearch("");
     setSelectedPod(null);
-    setPanelMode("create");
+    setModalMode("create");
   };
 
-  const openEditPanel = (pod: Pod) => {
+  const openEditModal = (pod: Pod) => {
     setSelectedPod(pod);
     setPodName(pod.name);
     setPodBranchId(pod.branchId || branches[0]?.id || "");
     setPodHeadId(pod.podHeadId || "");
     setPodDescription(pod.description || "");
     setSelectedRecruiterIds(pod.members.map((m) => m.id));
-    setPanelMode("edit");
+    setRecruiterSearch("");
+    setModalMode("edit");
   };
 
-  const closePanel = () => {
-    setPanelMode(null);
+  const closeModal = () => {
+    setModalMode(null);
     setSelectedPod(null);
+    setRecruiterSearch("");
   };
 
   const handleCreatePod = async (e: React.FormEvent) => {
@@ -151,7 +155,7 @@ export default function PodsPage() {
         recruiterIds: selectedRecruiterIds,
       });
       toast.success(`Recruitment pod "${podName}" created successfully!`);
-      closePanel();
+      closeModal();
       await loadData();
     } catch (err: any) {
       toast.error("Failed to create pod: " + err.message);
@@ -174,7 +178,7 @@ export default function PodsPage() {
         recruiterIds: selectedRecruiterIds,
       });
       toast.success(`Recruitment pod "${podName}" updated successfully!`);
-      closePanel();
+      closeModal();
       await loadData();
     } catch (err: any) {
       toast.error("Failed to update pod: " + err.message);
@@ -189,7 +193,7 @@ export default function PodsPage() {
       setSubmitting(true);
       await atsApi.pods.delete(id);
       toast.success(`Pod "${name}" deleted successfully.`);
-      if (selectedPod?.id === id) closePanel();
+      if (selectedPod?.id === id) closeModal();
       await loadData();
     } catch (err: any) {
       toast.error("Failed to delete pod: " + err.message);
@@ -250,7 +254,6 @@ export default function PodsPage() {
   }
 
   // ── Derived data ────────────────────────────────────────────────────
-  // Combine potential pod heads (active users who are not admins, or the current pod head of the selected pod)
   const recruiterUsersForHead = allUsers.filter((u) => {
     const matchBranch =
       !podBranchId ||
@@ -265,25 +268,30 @@ export default function PodsPage() {
     );
   });
 
-  // Potential recruiters to assign (active users with role RECRUITER or POD_LEAD, or custom roles with those archetypes, excluding tenant admins)
-  const recruitersForPanel = allUsers.filter((u) => {
+  const recruitersForModal = allUsers.filter((u) => {
     const matchBranch =
       !podBranchId ||
       u.branchId === podBranchId ||
       u.branch_id === podBranchId ||
       (Array.isArray(u.assignedBranchIds) && u.assignedBranchIds.includes(podBranchId)) ||
       (Array.isArray(u.assigned_branch_ids) && u.assigned_branch_ids.includes(podBranchId));
-    return (
-      (u.roleName === "RECRUITER" ||
-        u.roleName === "POD_LEAD" ||
-        u.systemRole === "RECRUITER" ||
-        u.systemRole === "POD_LEAD" ||
-        u.roles?.includes("RECRUITER") ||
-        u.roles?.includes("POD_LEAD")) &&
+    
+    const roleMatches = (u.roleName === "RECRUITER" ||
+      u.roleName === "POD_LEAD" ||
+      u.systemRole === "RECRUITER" ||
+      u.systemRole === "POD_LEAD" ||
+      u.roles?.includes("RECRUITER") ||
+      u.roles?.includes("POD_LEAD")) &&
       !u.roles?.includes("ADMIN") &&
-      !u.roles?.includes("SUPER_ADMIN") &&
-      matchBranch
-    );
+      !u.roles?.includes("SUPER_ADMIN");
+
+    if (!roleMatches || !matchBranch) return false;
+
+    if (recruiterSearch.trim()) {
+      const q = recruiterSearch.toLowerCase().trim();
+      return u.fullName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+    }
+    return true;
   });
 
   const totalPodsCount = pods.length;
@@ -291,533 +299,545 @@ export default function PodsPage() {
   const usedPodsCount = pods.filter((p) => !p.isAvailableForAssignment).length;
   const cycleProgressPercent = totalPodsCount > 0 ? Math.round((usedPodsCount / totalPodsCount) * 100) : 0;
 
-  const panelOpen = panelMode !== null;
-
   return (
-    <div className="relative min-h-screen">
-      {/* ── Main content area (shrinks when panel is open) ── */}
-      <div className={`transition-all duration-300 ${panelOpen ? "pr-[440px]" : ""}`}>
-        <SiteBreadcrumb />
+    <div className="space-y-5">
+      <SiteBreadcrumb />
 
-        {/* HEADER */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-default-100 pb-5 mt-2">
-          <div>
-            <h1 className="text-2xl font-bold text-default-900 flex items-center gap-2">
-              <Icon icon="heroicons:users" className="text-indigo-600 h-7 w-7" />
-              Recruitment Pods Management
-            </h1>
-            <p className="text-sm text-default-600 mt-1">
-              Create recruitment teams, assign heads, and review round-robin job assignment routing isolated to branch offices.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Branch Scope Dropdown */}
-            {branches.length > 0 && (
-              <div className="flex items-center gap-1.5 bg-default-50 dark:bg-slate-800 border border-default-250 dark:border-slate-700 rounded-lg px-2.5 py-1.5 shadow-2xs">
-                <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
-                <select
-                  value={selectedBranchFilter}
-                  onChange={(e) => handleBranchFilterChange(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-default-800 dark:text-white outline-none cursor-pointer"
-                >
-                  <option value="all">All Branches ({pods.length})</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <Button
-              onClick={handleResetRR}
-              disabled={submitting}
-              variant="outline"
-              className="flex items-center gap-1.5 border-default-300 font-semibold text-sm h-9"
-            >
-              <Icon icon="heroicons:arrow-path" className="h-4 w-4" />
-              Reset Cycle
-            </Button>
-            <Button
-              onClick={openCreatePanel}
-              disabled={submitting}
-              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm text-sm h-9 cursor-pointer"
-            >
-              <Icon icon="heroicons:plus" className="h-4 w-4" />
-              Create Pod
-            </Button>
-          </div>
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-default-150 pb-5">
+        <div>
+          <h1 className="text-2xl font-bold text-default-900 flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
+              <Icon icon="heroicons:users" className="h-6 w-6" />
+            </div>
+            Recruitment Pods Management
+          </h1>
+          <p className="text-xs text-default-500 mt-1">
+            Create recruitment teams, assign heads, and review round-robin job assignment routing isolated to branch offices.
+          </p>
         </div>
-
-        {/* VIEW TABS */}
-        <div className="flex border-b border-default-200 mt-4">
-          {(["all", "cycle"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveView(tab)}
-              className={`flex items-center gap-1.5 px-5 py-2.5 border-b-2 text-xs uppercase tracking-wider font-bold transition cursor-pointer ${
-                activeView === tab
-                  ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                  : "border-transparent text-default-500 hover:text-default-800"
-              }`}
-            >
-              <Icon
-                icon={tab === "all" ? "heroicons:list-bullet" : "heroicons:arrow-path-20-solid"}
-                className="h-4 w-4"
-              />
-              {tab === "all" ? "All Pods" : "Assignment Cycle Status"}
-            </button>
-          ))}
-        </div>
-
-        {/* ═══════════════════════════════════════
-            TAB 1 — ALL PODS TABLE
-            ═══════════════════════════════════════ */}
-        {activeView === "all" ? (
-          <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl mt-4">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-default-50/50 dark:bg-slate-800/20 border-b border-default-150">
-                    <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Pod Name</th>
-                    {selectedBranchFilter === "all" && (
-                      <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Branch Office</th>
-                    )}
-                    <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Pod Lead</th>
-                    <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Recruiters</th>
-                    <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Jobs Assigned</th>
-                    <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Status</th>
-                    <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-default-100 text-xs">
-                  {pods.length === 0 ? (
-                    <tr>
-                      <td colSpan={selectedBranchFilter === "all" ? 7 : 6} className="py-16 text-center text-default-500 font-semibold italic">
-                        <div className="flex flex-col items-center gap-3">
-                          <Icon icon="heroicons:users" className="h-10 w-10 text-default-300" />
-                          <span>No recruitment pods found for this branch. Click <strong>Create Pod</strong> above to get started.</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    pods.map((pod) => (
-                      <tr
-                        key={pod.id}
-                        className={`hover:bg-indigo-50/30 dark:hover:bg-slate-800/10 transition-colors ${
-                          selectedPod?.id === pod.id ? "bg-indigo-50/50 dark:bg-indigo-950/10" : ""
-                        }`}
-                      >
-                        {/* Pod Name */}
-                        <td className="py-4 px-4 font-bold text-default-900 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${pod.isAvailableForAssignment ? "bg-emerald-500" : "bg-pink-500"}`} />
-                            <div>
-                              <div>{pod.name}</div>
-                              {pod.description && (
-                                <div className="text-[10px] text-default-450 font-normal mt-0.5 max-w-[180px] truncate">{pod.description}</div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Branch Office (Only if All Branches selected) */}
-                        {selectedBranchFilter === "all" && (
-                          <td className="py-4 px-4 whitespace-nowrap">
-                            <Badge className="bg-indigo-50/80 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 text-[10px] px-2 py-0.5 border border-indigo-200 dark:border-indigo-800/50 font-bold">
-                              {pod.branchName || "Default Office"}
-                            </Badge>
-                          </td>
-                        )}
-
-                        {/* Pod Lead */}
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          {pod.podHeadName ? (
-                            <div>
-                              <div className="font-bold text-default-900">{pod.podHeadName}</div>
-                              <div className="text-[10px] text-indigo-500 font-semibold">POD LEAD</div>
-                            </div>
-                          ) : (
-                            <span className="text-default-400 italic text-[11px]">Unassigned</span>
-                          )}
-                        </td>
-
-                        {/* Recruiters */}
-                        <td className="py-4 px-4">
-                          {pod.members.length === 0 ? (
-                            <span className="text-default-400 italic text-[11px]">No members</span>
-                          ) : (
-                            <div className="flex flex-wrap gap-1 max-w-[200px]">
-                              {pod.members.slice(0, 3).map((m) => (
-                                <Badge key={m.id} className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-[9px] px-1.5 py-0.5 border-0 font-semibold">
-                                  {m.fullName.split(" ")[0]}
-                                </Badge>
-                              ))}
-                              {pod.members.length > 3 && (
-                                <Badge className="bg-slate-200 text-slate-600 text-[9px] px-1.5 py-0.5 border-0 font-bold">
-                                  +{pod.members.length - 3}
-                                </Badge>
-                              )}
-                              <div className="w-full text-[9px] text-default-400 mt-0.5">{pod.members.length} member{pod.members.length !== 1 ? "s" : ""}</div>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Jobs */}
-                        <td className="py-4 px-4">
-                          <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300 border-0 font-bold px-2 py-1">
-                            {pod.jobsCount} jobs
-                          </Badge>
-                        </td>
-
-                        {/* Status */}
-                        <td className="py-4 px-4">
-                          <Badge className={`text-[9px] uppercase tracking-wider font-bold border-0 px-2 py-1 ${
-                            pod.isAvailableForAssignment
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400"
-                              : "bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400"
-                          }`}>
-                            {pod.isAvailableForAssignment ? "Available" : "Used"}
-                          </Badge>
-                        </td>
-
-                        {/* Actions */}
-                        <td className="py-4 px-4 text-right">
-                          <div className="inline-flex gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openEditPanel(pod)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50"
-                              title="Edit pod"
-                            >
-                              <Icon icon="heroicons:pencil-square" className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDeletePod(pod.id, pod.name)}
-                              className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
-                              title="Delete pod"
-                            >
-                              <Icon icon="heroicons:trash" className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        ) : (
-          /* ═══════════════════════════════════════
-             TAB 2 — CYCLE STATUS DASHBOARD
-             ═══════════════════════════════════════ */
-          <div className="space-y-6 mt-4">
-            {/* Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { label: "Total Pods", value: totalPodsCount, icon: "heroicons:users", color: "indigo" },
-                { label: "Available", value: availablePodsCount, icon: "heroicons:check-circle", color: "emerald" },
-                { label: "Used This Cycle", value: usedPodsCount, icon: "heroicons:clock", color: "amber" },
-                { label: "Cycle Progress", value: `${cycleProgressPercent}%`, icon: "heroicons:arrow-path-20-solid", color: "pink" },
-              ].map(({ label, value, icon, color }) => (
-                <Card key={label} className={`border border-default-150 bg-white dark:bg-slate-900 p-4 flex items-center gap-3 shadow-xs`}>
-                  <div className={`h-10 w-10 rounded-lg bg-${color}-50 text-${color}-600 dark:bg-${color}-950/20 dark:text-${color}-400 flex items-center justify-center text-lg shrink-0`}>
-                    <Icon icon={icon} />
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-default-450 font-bold uppercase tracking-wider">{label}</div>
-                    <div className={`text-xl font-bold text-${color === "indigo" ? "default-900" : color + "-600"} mt-0.5`}>{value}</div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-
-            {cycleProgressPercent === 100 && (
-              <div className="border border-red-200 bg-red-50/30 p-3 rounded-lg text-xs text-red-700 font-bold flex items-center gap-2">
-                <Icon icon="heroicons:exclamation-triangle" className="h-5 w-5 shrink-0" />
-                Cycle Complete — All pods have been used. Click "Reset Cycle" to start a new round.
-              </div>
-            )}
-
-            <div>
-              <h2 className="text-sm font-bold text-default-800 uppercase tracking-wider mb-3">Pod Slot Status</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {pods.length === 0 ? (
-                  <div className="col-span-full py-12 text-center text-default-500 italic">No pods configured.</div>
-                ) : (
-                  pods.map((pod, idx) => (
-                    <Card key={pod.id} className="border border-default-150 bg-white dark:bg-slate-900 p-4 shadow-xs hover:shadow-sm transition-all">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <div className="text-[10px] text-default-400 font-bold uppercase tracking-wider">Pod {idx + 1}</div>
-                          <div className="text-sm font-bold text-default-900 mt-0.5">{pod.name}</div>
-                        </div>
-                        <Badge className={`text-[9px] uppercase font-bold border-0 px-2 py-0.5 ${
-                          pod.isAvailableForAssignment
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-amber-50 text-amber-700"
-                        }`}>
-                          {pod.isAvailableForAssignment ? "Available" : "Used"}
-                        </Badge>
-                      </div>
-                      <div className="space-y-1.5 text-xs text-default-600">
-                        <div className="flex justify-between py-1 border-b border-default-100">
-                          <span>Pod Lead</span>
-                          <span className="font-bold text-default-900">{pod.podHeadName || "—"}</span>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-default-100">
-                          <span>Recruiters</span>
-                          <span className="font-bold text-default-900">{pod.members.length}</span>
-                        </div>
-                        <div className="flex justify-between py-1">
-                          <span>Jobs Assigned</span>
-                          <span className="font-bold text-indigo-600">{pod.jobsCount}</span>
-                        </div>
-                      </div>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ═══════════════════════════════════════════════════
-          RIGHT SIDE PANEL — Create / Edit Pod
-          ═══════════════════════════════════════════════════ */}
-      {/* Backdrop overlay (subtle) */}
-      {panelOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-slate-900/10"
-          onClick={closePanel}
-        />
-      )}
-
-      {/* Panel */}
-      <div
-        className={`fixed top-0 right-0 h-full w-[430px] bg-white dark:bg-slate-900 border-l border-default-200 shadow-2xl z-40 flex flex-col transition-transform duration-300 ease-in-out ${
-          panelOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        {/* Panel Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-default-150 shrink-0 bg-default-50/60 dark:bg-slate-800/40">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center">
-              <Icon icon={panelMode === "create" ? "heroicons:plus" : "heroicons:pencil"} className="h-4 w-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-default-900">
-                {panelMode === "create" ? "Create New Pod" : `Edit Pod`}
-              </h2>
-              {panelMode === "edit" && selectedPod && (
-                <p className="text-[11px] text-default-500 font-medium">{selectedPod.name}</p>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={closePanel}
-            className="h-8 w-8 rounded-lg flex items-center justify-center text-default-500 hover:text-default-800 hover:bg-default-100 transition cursor-pointer"
-          >
-            <Icon icon="heroicons:x-mark" className="h-5 w-5" />
-          </button>
-        </div>
-
-        {/* Panel Form — scrollable body */}
-        <form
-          onSubmit={panelMode === "create" ? handleCreatePod : handleUpdatePod}
-          className="flex flex-col flex-1 overflow-hidden"
-        >
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-
-            {/* Pod Name */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-default-800 block">
-                Pod Name <span className="text-red-500">*</span>
-              </label>
-              <Input
-                placeholder="e.g. Engineering Pod Alpha"
-                value={podName}
-                onChange={(e) => setPodName(e.target.value)}
-                required
-                className="text-sm"
-              />
-            </div>
-
-            {/* Branch Location */}
-            {branches.length > 0 && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-default-800 block">
-                  Branch Office <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={podBranchId}
-                  onChange={(e) => setPodBranchId(e.target.value)}
-                  className="w-full text-sm font-semibold border border-default-250 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 cursor-pointer"
-                  required
-                >
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name} ({b.market || "General"})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-default-450">
-                  This recruitment pod and member assignments will be isolated to this branch office.
-                </p>
-              </div>
-            )}
-
-            {/* Pod Lead */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-default-800 block">Assign Pod Lead</label>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Branch Scope Dropdown */}
+          {branches.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-default-250 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
+              <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
               <select
-                value={podHeadId}
-                onChange={(e) => setPodHeadId(e.target.value)}
-                className="w-full text-sm border border-default-250 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                value={selectedBranchFilter}
+                onChange={(e) => handleBranchFilterChange(e.target.value)}
+                className="bg-transparent text-xs font-bold text-default-800 dark:text-white outline-none cursor-pointer"
               >
-                <option value="">— None (Unassigned) —</option>
-                {recruiterUsersForHead.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.fullName} ({u.roleName})
+                <option value="all">All Branches ({pods.length})</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
                   </option>
                 ))}
               </select>
-              <p className="text-[10px] text-default-450 leading-relaxed">
-                💡 Selecting a Pod Lead automatically upgrades their role to <strong>POD_LEAD</strong>. Removing them reverts them to a standard Recruiter.
-              </p>
             </div>
+          )}
 
-            {/* Recruiters */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-default-800">Assign Recruiters</label>
-                <span className="text-[10px] text-default-450 font-semibold">{selectedRecruiterIds.length} selected</span>
-              </div>
+          <Button
+            onClick={handleResetRR}
+            disabled={submitting}
+            variant="outline"
+            className="flex items-center gap-1.5 border-default-250 font-semibold text-xs h-9 px-3 text-default-700 hover:bg-default-100 dark:hover:bg-slate-800"
+          >
+            <Icon icon="heroicons:arrow-path" className="h-4 w-4" />
+            Reset Cycle
+          </Button>
 
-              {recruitersForPanel.length === 0 ? (
-                <div className="border border-dashed border-default-200 rounded-lg p-4 text-center text-[11px] text-default-450 italic">
-                  No recruiters available in this workspace.
-                </div>
-              ) : (
-                <div className="border border-default-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                  {recruitersForPanel.map((r, idx) => {
-                    const isChecked = selectedRecruiterIds.includes(r.id);
-                    const assignedPod = pods.find((p) => p.id === r.podId);
-                    const inAnotherPod = assignedPod && (!selectedPod || selectedPod.id !== r.podId);
+          <Button
+            onClick={openCreateModal}
+            disabled={submitting}
+            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-sm text-xs h-9 px-4 cursor-pointer"
+          >
+            <Icon icon="heroicons:plus" className="h-4 w-4" />
+            Create Pod
+          </Button>
+        </div>
+      </div>
 
-                    return (
-                      <div
-                        key={r.id}
-                        onClick={() => toggleRecruiter(r.id)}
-                        className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
-                          idx !== 0 ? "border-t border-default-100 dark:border-slate-700/50" : ""
-                        } ${isChecked ? "bg-indigo-50/60 dark:bg-indigo-950/20" : "hover:bg-default-50/60"}`}
-                      >
-                        <div className={`h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                          isChecked
-                            ? "bg-indigo-600 border-indigo-600"
-                            : "border-default-300 bg-white dark:bg-slate-800"
-                        }`}>
-                          {isChecked && <Icon icon="heroicons:check" className="h-2.5 w-2.5 text-white" />}
+      {/* VIEW TABS */}
+      <div className="flex border-b border-default-200">
+        {(["all", "cycle"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveView(tab)}
+            className={`flex items-center gap-1.5 px-5 py-2.5 border-b-2 text-xs uppercase tracking-wider font-bold transition cursor-pointer ${
+              activeView === tab
+                ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                : "border-transparent text-default-500 hover:text-default-800"
+            }`}
+          >
+            <Icon
+              icon={tab === "all" ? "heroicons:list-bullet" : "heroicons:arrow-path-20-solid"}
+              className="h-4 w-4"
+            />
+            {tab === "all" ? "All Pods" : "Assignment Cycle Status"}
+          </button>
+        ))}
+      </div>
+
+      {/* ═══════════════════════════════════════
+          TAB 1 — ALL PODS TABLE
+          ═══════════════════════════════════════ */}
+      {activeView === "all" ? (
+        <Card className="border border-default-150 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-default-50/70 dark:bg-slate-800/40 border-b border-default-150">
+                  <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Pod Name</th>
+                  {selectedBranchFilter === "all" && (
+                    <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Branch Office</th>
+                  )}
+                  <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Pod Lead</th>
+                  <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Recruiters</th>
+                  <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-center">Jobs Assigned</th>
+                  <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-center">Status</th>
+                  <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-default-100 text-xs">
+                {pods.length === 0 ? (
+                  <tr>
+                    <td colSpan={selectedBranchFilter === "all" ? 7 : 6} className="py-16 text-center text-default-500 font-semibold italic">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="h-12 w-12 rounded-full bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 flex items-center justify-center">
+                          <Icon icon="heroicons:users" className="h-6 w-6" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-bold text-default-900 truncate flex items-center gap-2">
-                            <span>{r.fullName}</span>
-                            {inAnotherPod && (
-                              <Badge className="bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400 border-0 text-[9px] px-1 py-0 font-semibold">
-                                in {assignedPod.name}
-                              </Badge>
+                        <span className="text-sm font-bold text-default-800 dark:text-white">
+                          No recruitment pods found for this branch
+                        </span>
+                        <p className="text-xs text-default-450 max-w-sm">
+                          Group recruiters into pods to automate round-robin job distribution and streamline candidate submissions.
+                        </p>
+                        <Button
+                          size="sm"
+                          onClick={openCreateModal}
+                          className="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-4 cursor-pointer"
+                        >
+                          <Icon icon="heroicons:plus" className="h-3.5 w-3.5 mr-1" />
+                          Create First Pod
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  pods.map((pod) => (
+                    <tr
+                      key={pod.id}
+                      className="hover:bg-indigo-50/20 dark:hover:bg-slate-800/20 transition-colors"
+                    >
+                      {/* Pod Name */}
+                      <td className="py-4 px-4 font-bold text-default-900 whitespace-nowrap">
+                        <div className="flex items-center gap-2.5">
+                          <span className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${pod.isAvailableForAssignment ? "bg-emerald-500 ring-4 ring-emerald-500/20" : "bg-amber-500 ring-4 ring-amber-500/20"}`} />
+                          <div>
+                            <div className="font-bold text-xs text-default-900 hover:text-indigo-600 cursor-pointer" onClick={() => openEditModal(pod)}>
+                              {pod.name}
+                            </div>
+                            {pod.description && (
+                              <div className="text-[10px] text-default-450 font-normal mt-0.5 max-w-[200px] truncate">{pod.description}</div>
                             )}
                           </div>
-                          <div className="text-[10px] text-default-450 truncate">{r.email}</div>
                         </div>
-                        <Badge className="text-[9px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 border-0 font-semibold shrink-0">
-                          {r.roleName}
+                      </td>
+
+                      {/* Branch Office (Only if All Branches selected) */}
+                      {selectedBranchFilter === "all" && (
+                        <td className="py-4 px-4 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-default-800 dark:text-default-200">
+                            <Icon icon="heroicons:building-office" className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                            {pod.branchName || "Default Office"}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Pod Lead */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        {pod.podHeadName ? (
+                          <div className="flex items-center gap-2">
+                            <div className="h-7 w-7 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                              {pod.podHeadName.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-bold text-xs text-default-900">{pod.podHeadName}</div>
+                              <div className="text-[9.5px] text-indigo-600 font-semibold">POD LEAD</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-default-400 italic text-[11px]">Unassigned</span>
+                        )}
+                      </td>
+
+                      {/* Recruiters */}
+                      <td className="py-4 px-4">
+                        {pod.members.length === 0 ? (
+                          <span className="text-default-400 italic text-[11px]">No members</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1 max-w-[240px]">
+                            {pod.members.slice(0, 3).map((m) => (
+                              <Badge key={m.id} className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-[9px] px-1.5 py-0.5 border-0 font-medium">
+                                {m.fullName.split(" ")[0]}
+                              </Badge>
+                            ))}
+                            {pod.members.length > 3 && (
+                              <Badge className="bg-indigo-50 text-indigo-700 text-[9px] px-1.5 py-0.5 border border-indigo-200 font-bold">
+                                +{pod.members.length - 3} more
+                              </Badge>
+                            )}
+                            <div className="w-full text-[9.5px] text-default-400 mt-0.5">{pod.members.length} recruiter{pod.members.length !== 1 ? "s" : ""} assigned</div>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Jobs */}
+                      <td className="py-4 px-4 text-center whitespace-nowrap">
+                        <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-200 font-bold px-2 py-0.5 text-[11px]">
+                          {pod.jobsCount} Jobs
                         </Badge>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-4 px-4 text-center whitespace-nowrap">
+                        <Badge className={`text-[10px] font-bold border px-2.5 py-0.5 rounded-full ${
+                          pod.isAvailableForAssignment
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                            : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                        }`}>
+                          {pod.isAvailableForAssignment ? "Available" : "Assigned"}
+                        </Badge>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-4 px-4 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => openEditModal(pod)}
+                            className="p-1.5 rounded-lg border border-default-200 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-default-600 hover:text-indigo-600 transition cursor-pointer"
+                            title="Edit Pod Details & Members"
+                          >
+                            <Icon icon="heroicons:pencil-square" className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeletePod(pod.id, pod.name)}
+                            className="p-1.5 rounded-lg border border-default-200 hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 text-default-400 hover:text-red-600 transition cursor-pointer"
+                            title="Delete Pod"
+                          >
+                            <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : (
+        /* ═══════════════════════════════════════
+           TAB 2 — CYCLE STATUS DASHBOARD
+           ═══════════════════════════════════════ */
+        <div className="space-y-6">
+          {/* Stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: "Total Pods", value: totalPodsCount, icon: "heroicons:users", color: "indigo" },
+              { label: "Available", value: availablePodsCount, icon: "heroicons:check-circle", color: "emerald" },
+              { label: "Used This Cycle", value: usedPodsCount, icon: "heroicons:clock", color: "amber" },
+              { label: "Cycle Progress", value: `${cycleProgressPercent}%`, icon: "heroicons:arrow-path-20-solid", color: "pink" },
+            ].map(({ label, value, icon, color }) => (
+              <Card key={label} className="border border-default-150 bg-white dark:bg-slate-900 p-4 flex items-center gap-3 shadow-xs rounded-xl">
+                <div className={`h-10 w-10 rounded-lg bg-${color}-50 text-${color}-600 dark:bg-${color}-950/20 dark:text-${color}-400 flex items-center justify-center text-lg shrink-0`}>
+                  <Icon icon={icon} />
+                </div>
+                <div>
+                  <div className="text-[10px] text-default-450 font-bold uppercase tracking-wider">{label}</div>
+                  <div className={`text-xl font-bold text-${color === "indigo" ? "default-900" : color + "-600"} mt-0.5`}>{value}</div>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {cycleProgressPercent === 100 && (
+            <div className="border border-red-200 bg-red-50/30 p-3 rounded-lg text-xs text-red-700 font-bold flex items-center gap-2">
+              <Icon icon="heroicons:exclamation-triangle" className="h-5 w-5 shrink-0" />
+              Cycle Complete — All pods have been used. Click &quot;Reset Cycle&quot; to start a new round.
+            </div>
+          )}
+
+          <div>
+            <h2 className="text-sm font-bold text-default-800 uppercase tracking-wider mb-3">Pod Slot Status</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {pods.length === 0 ? (
+                <div className="col-span-full py-12 text-center text-default-500 italic">No pods configured.</div>
+              ) : (
+                pods.map((pod, idx) => (
+                  <Card key={pod.id} className="border border-default-150 bg-white dark:bg-slate-900 p-4 shadow-xs hover:shadow-sm transition-all rounded-xl">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="text-[10px] text-default-400 font-bold uppercase tracking-wider">Pod {idx + 1}</div>
+                        <div className="text-sm font-bold text-default-900 mt-0.5">{pod.name}</div>
                       </div>
-                    );
-                  })}
-                </div>
+                      <Badge className={`text-[9px] uppercase font-bold border-0 px-2 py-0.5 ${
+                        pod.isAvailableForAssignment
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-amber-50 text-amber-700"
+                      }`}>
+                        {pod.isAvailableForAssignment ? "Available" : "Used"}
+                      </Badge>
+                    </div>
+                    <div className="space-y-1.5 text-xs text-default-600">
+                      <div className="flex justify-between py-1 border-b border-default-100">
+                        <span>Pod Lead</span>
+                        <span className="font-bold text-default-900">{pod.podHeadName || "—"}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-default-100">
+                        <span>Recruiters</span>
+                        <span className="font-bold text-default-900">{pod.members.length}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span>Jobs Assigned</span>
+                        <span className="font-bold text-indigo-600">{pod.jobsCount}</span>
+                      </div>
+                    </div>
+                  </Card>
+                ))
               )}
-              <p className="text-[10px] text-default-400">Select one or more recruiters to join this pod (max 10).</p>
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Description */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-default-800 block">Pod Description</label>
-              <textarea
-                placeholder="Optional — describe this pod's focus, goals, or specialization..."
-                value={podDescription}
-                onChange={(e) => setPodDescription(e.target.value)}
-                className="w-full text-sm border border-default-250 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 resize-none"
-                rows={4}
-              />
-            </div>
-
-            {/* Edit-only: danger zone */}
-            {panelMode === "edit" && selectedPod && (
-              <div className="border border-red-200 dark:border-red-900/30 rounded-lg p-4 bg-red-50/30 dark:bg-red-950/10">
-                <div className="text-xs font-bold text-red-700 dark:text-red-400 mb-2 flex items-center gap-1.5">
-                  <Icon icon="heroicons:exclamation-triangle" className="h-4 w-4" />
-                  Danger Zone
+      {/* ═══════════════════════════════════════════════════
+          CENTERED MODAL POP-UP — Create / Edit Pod
+          ═══════════════════════════════════════════════════ */}
+      {modalMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
+                  <Icon icon={modalMode === "create" ? "heroicons:plus" : "heroicons:pencil-square"} className="h-4.5 w-4.5" />
                 </div>
-                <p className="text-[11px] text-red-600 dark:text-red-400/80 mb-3">
-                  Deleting a pod will unassign all its members and remove all job assignments.
-                </p>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    {modalMode === "create" ? "Create Recruitment Pod" : `Edit Pod: ${selectedPod?.name}`}
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">
+                    Assemble recruitment team, assign Pod Lead, and configure branch round-robin routing
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closeModal}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg cursor-pointer"
+              >
+                <Icon icon="heroicons:x-mark" className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Form Body */}
+            <form
+              onSubmit={modalMode === "create" ? handleCreatePod : handleUpdatePod}
+              className="flex flex-col flex-1 overflow-hidden"
+            >
+              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Pod Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                      Pod Name <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      placeholder="e.g. Engineering Pod Alpha"
+                      value={podName}
+                      onChange={(e) => setPodName(e.target.value)}
+                      required
+                      className="text-xs h-10 font-medium"
+                    />
+                  </div>
+
+                  {/* Branch Location */}
+                  {branches.length > 0 && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                        Branch Office <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={podBranchId}
+                        onChange={(e) => setPodBranchId(e.target.value)}
+                        className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                        required
+                      >
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name} ({b.market || "General"})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Pod Lead */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Assign Pod Lead (Team Lead)
+                  </label>
+                  <select
+                    value={podHeadId}
+                    onChange={(e) => setPodHeadId(e.target.value)}
+                    className="w-full text-xs font-semibold border border-indigo-200 dark:border-indigo-900/60 rounded-lg p-2.5 bg-indigo-50/30 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                  >
+                    <option value="">— None (Unassigned) —</option>
+                    {recruiterUsersForHead.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.fullName} ({u.roleName}) — {u.email}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10.5px] text-default-450 leading-relaxed">
+                    💡 Selecting a Pod Lead automatically promotes their access role to <strong>POD_LEAD</strong>.
+                  </p>
+                </div>
+
+                {/* Recruiters Multi-Select */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                      Assign Recruiters ({selectedRecruiterIds.length} selected)
+                    </label>
+                    {recruitersForModal.length > 5 && (
+                      <div className="relative w-44">
+                        <Input
+                          placeholder="Search recruiters..."
+                          value={recruiterSearch}
+                          onChange={(e) => setRecruiterSearch(e.target.value)}
+                          className="text-[11px] h-7 pl-2"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {recruitersForModal.length === 0 ? (
+                    <div className="border border-dashed border-default-200 dark:border-slate-800 rounded-xl p-4 text-center text-xs text-default-450 italic">
+                      No recruiters available for this branch office.
+                    </div>
+                  ) : (
+                    <div className="border border-default-200 dark:border-slate-800 rounded-xl max-h-48 overflow-y-auto divide-y divide-default-100 dark:divide-slate-800 shadow-2xs">
+                      {recruitersForModal.map((r) => {
+                        const isChecked = selectedRecruiterIds.includes(r.id);
+                        const assignedPod = pods.find((p) => p.id === r.podId);
+                        const inAnotherPod = assignedPod && (!selectedPod || selectedPod.id !== r.podId);
+
+                        return (
+                          <div
+                            key={r.id}
+                            onClick={() => toggleRecruiter(r.id)}
+                            className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${
+                              isChecked
+                                ? "bg-indigo-50/60 dark:bg-indigo-950/30"
+                                : "hover:bg-default-50/60 dark:hover:bg-slate-800/40"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}}
+                              className="h-4 w-4 rounded border-default-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-bold text-default-900 truncate flex items-center gap-1.5">
+                                <span>{r.fullName}</span>
+                                {inAnotherPod && (
+                                  <Badge className="bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-0 text-[9px] px-1 py-0 font-bold">
+                                    in {assignedPod.name}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-default-400 truncate">{r.email}</div>
+                            </div>
+                            <Badge className="text-[9px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 border-0 font-semibold shrink-0">
+                              {r.roleName}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-default-400">Select recruiters to receive round-robin candidate and job dispatches.</p>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Pod Description & Objectives
+                  </label>
+                  <textarea
+                    placeholder="Optional — describe this pod's industry focus, domain specialization, or goals..."
+                    value={podDescription}
+                    onChange={(e) => setPodDescription(e.target.value)}
+                    className="w-full text-xs border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-normal"
+                    rows={3}
+                  />
+                </div>
+
+                {/* Danger Zone (Edit mode only) */}
+                {modalMode === "edit" && selectedPod && (
+                  <div className="border border-red-200 dark:border-red-900/30 rounded-xl p-3.5 bg-red-50/30 dark:bg-red-950/10 flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-red-700 dark:text-red-400 flex items-center gap-1">
+                        <Icon icon="heroicons:exclamation-triangle" className="h-4 w-4" />
+                        Delete Pod
+                      </div>
+                      <p className="text-[10.5px] text-red-600/80">
+                        Unassigns all recruiters and removes active cycle routing.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDeletePod(selectedPod.id, selectedPod.name)}
+                      disabled={submitting}
+                      className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 text-xs font-bold h-8"
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="shrink-0 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 px-6 py-3.5 flex items-center justify-end gap-2.5">
                 <Button
                   type="button"
-                  size="sm"
                   variant="outline"
-                  onClick={() => handleDeletePod(selectedPod.id, selectedPod.name)}
+                  size="sm"
+                  onClick={closeModal}
                   disabled={submitting}
-                  className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 text-xs font-bold"
+                  className="text-xs h-9 px-4"
                 >
-                  <Icon icon="heroicons:trash" className="h-3.5 w-3.5 mr-1" />
-                  Delete This Pod
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submitting || !podName.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 shadow-xs cursor-pointer"
+                >
+                  {submitting
+                    ? (modalMode === "create" ? "Creating Pod..." : "Saving Changes...")
+                    : (modalMode === "create" ? "Create Pod" : "Save Changes")}
                 </Button>
               </div>
-            )}
+            </form>
           </div>
-
-          {/* Panel Footer — always visible at bottom */}
-          <div className="shrink-0 border-t border-default-150 bg-default-50/60 dark:bg-slate-800/40 px-6 py-4 flex items-center justify-between gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={closePanel}
-              disabled={submitting}
-              className="font-semibold text-sm"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={submitting || !podName.trim()}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-6 shadow-sm"
-            >
-              {submitting ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  {panelMode === "create" ? "Creating…" : "Saving…"}
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  <Icon icon={panelMode === "create" ? "heroicons:plus" : "heroicons:check"} className="h-3.5 w-3.5" />
-                  {panelMode === "create" ? "Create Pod" : "Save Changes"}
-                </span>
-              )}
-            </Button>
-          </div>
-        </form>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
