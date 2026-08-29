@@ -586,7 +586,11 @@ export default function BranchManagementPage() {
               ) : (
                 filteredBranches.map((b) => {
                   const branchHier = (hierarchyData?.branches || []).find((h: any) => String(h.id) === String(b.id));
-                  const members = (branchHier?.members && branchHier.members.length > 0) ? branchHier.members : (b.members || []);
+                  const members = (b.members && b.members.length > 0)
+                    ? b.members
+                    : (branchHier?.members && branchHier.members.length > 0)
+                    ? branchHier.members
+                    : [];
 
                   return (
                     <div key={b.id} className="relative pl-6 space-y-3">
