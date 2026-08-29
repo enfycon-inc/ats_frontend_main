@@ -161,6 +161,16 @@ export default function RolesPermissionsPage() {
       const storedBranch = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
       if (storedBranch) setSelectedBranchFilter(storedBranch);
       loadData(storedBranch || "all");
+
+      const handleBranchChanged = () => {
+        const updatedBranch = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+        if (updatedBranch) {
+          setSelectedBranchFilter(updatedBranch);
+          loadData(updatedBranch);
+        }
+      };
+      window.addEventListener("branchChanged", handleBranchChanged);
+      return () => window.removeEventListener("branchChanged", handleBranchChanged);
     } else {
       setLoading(false);
     }
@@ -218,24 +228,24 @@ export default function RolesPermissionsPage() {
     if (selectedRole?.isSystem) return; // Cannot modify core system roles
 
     setSelectedPermissions((prev) =>
-      prev.includes(permId) ? prev.filter((id) => id !== permId) : [...prev, permId]
+      prev.includes(permId) ? prev.filter((p) => p !== permId) : [...prev, permId]
     );
   };
 
   const handleSavePermissions = async () => {
     if (!selectedRole) return;
+    if (selectedRole.isSystem) {
+      toast.error("System roles are abstract templates and cannot be directly modified.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       await atsApi.auth.updateRolePermissions(selectedRole.id, selectedPermissions);
-      toast.success(`Successfully updated permissions for custom role "${selectedRole.name}"!`);
-      
-      // Update local state
-      setRoles((prev) =>
-        prev.map((r) => (r.id === selectedRole.id ? { ...r, permissions: selectedPermissions } : r))
-      );
-      setSelectedRole((prev) => (prev ? { ...prev, permissions: selectedPermissions } : null));
+      toast.success(`Permissions updated for role "${selectedRole.name}"`);
+      await loadData();
     } catch (err: any) {
-      toast.error("Failed to save permissions: " + err.message);
+      toast.error("Failed to update permissions: " + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -244,7 +254,8 @@ export default function RolesPermissionsPage() {
   const openAddRoleModal = () => {
     setNewRoleName("");
     setNewRoleDesc("");
-    setNewRoleBranchId(selectedBranchFilter !== "all" ? selectedBranchFilter : branches[0]?.id || "");
+    const defaultBranch = (selectedBranchFilter !== "all" ? selectedBranchFilter : null) || (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null) || branches[0]?.id || "";
+    setNewRoleBranchId(defaultBranch);
     setNewRoleSystemRole("RECRUITER");
     setNewRolePermissions(SYSTEM_ARCHETYPES[0].perms);
     setShowAddRole(true);
@@ -334,7 +345,7 @@ export default function RolesPermissionsPage() {
 
   const filteredRoles = selectedBranchFilter === "all"
     ? customRolesList
-    : customRolesList.filter((r) => !r.branchId || r.branchId === selectedBranchFilter);
+    : customRolesList.filter((r) => r.branchId === selectedBranchFilter);
 
   const selectedArchetypeObj = SYSTEM_ARCHETYPES.find((a) => a.key === newRoleSystemRole) || SYSTEM_ARCHETYPES[0];
 

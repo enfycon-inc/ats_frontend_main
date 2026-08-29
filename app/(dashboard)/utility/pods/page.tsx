@@ -71,6 +71,16 @@ export default function PodsPage() {
       const storedBranch = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
       if (storedBranch) setSelectedBranchFilter(storedBranch);
       loadData(storedBranch || "all");
+
+      const handleBranchChanged = () => {
+        const updatedBranch = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+        if (updatedBranch) {
+          setSelectedBranchFilter(updatedBranch);
+          loadData(updatedBranch);
+        }
+      };
+      window.addEventListener("branchChanged", handleBranchChanged);
+      return () => window.removeEventListener("branchChanged", handleBranchChanged);
     } else {
       setLoading(false);
     }
@@ -104,7 +114,8 @@ export default function PodsPage() {
 
   const openCreatePanel = () => {
     setPodName("");
-    setPodBranchId(selectedBranchFilter !== "all" ? selectedBranchFilter : branches[0]?.id || "");
+    const defaultBranch = (selectedBranchFilter !== "all" ? selectedBranchFilter : null) || (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null) || branches[0]?.id || "";
+    setPodBranchId(defaultBranch);
     setPodHeadId("");
     setPodDescription("");
     setSelectedRecruiterIds([]);
