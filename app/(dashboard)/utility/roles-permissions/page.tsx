@@ -171,6 +171,9 @@ export default function RolesPermissionsPage() {
 
   // Users Modal State (Table View)
   const [viewUsersRole, setViewUsersRole] = useState<CustomRole | null>(null);
+  const [showInlineAssign, setShowInlineAssign] = useState(false);
+  const [selectedUserToAssign, setSelectedUserToAssign] = useState("");
+  const [isAssigningUser, setIsAssigningUser] = useState(false);
 
   // Direct Permissions Matrix Editor Modal State
   const [matrixEditingRole, setMatrixEditingRole] = useState<CustomRole | null>(null);
@@ -394,6 +397,51 @@ export default function RolesPermissionsPage() {
     }
   };
 
+  // ─── ASSIGN USER TO ROLE HANDLERS ───────────────────────────────
+  const openAssignUserModal = (role: CustomRole) => {
+    setViewUsersRole(role);
+    setShowInlineAssign(true);
+    setSelectedUserToAssign("");
+  };
+
+  const handleAssignUserSubmit = async (targetRole: CustomRole) => {
+    if (!selectedUserToAssign) {
+      toast.error("Please select a staff member to assign.");
+      return;
+    }
+    try {
+      setIsAssigningUser(true);
+      await atsApi.auth.assignUserRoles(selectedUserToAssign, [targetRole.id]);
+      const assignedUserObj = users.find(u => u.id === selectedUserToAssign);
+      toast.success(`Assigned ${assignedUserObj?.fullName || "Staff member"} to role "${targetRole.name}"!`);
+      setSelectedUserToAssign("");
+      setShowInlineAssign(false);
+      await loadData();
+    } catch (err: any) {
+      toast.error("Failed to assign role to user: " + err.message);
+    } finally {
+      setIsAssigningUser(false);
+    }
+  };
+
+  const handleUnassignUser = async (userToUnassign: TenantUser, targetRole: CustomRole) => {
+    const defaultRole = roles.find(r => r.name === "RECRUITER" || r.systemRole === "RECRUITER") || roles[0];
+    if (!defaultRole) {
+      toast.error("No default fallback role available.");
+      return;
+    }
+    try {
+      setSubmitting(true);
+      await atsApi.auth.assignUserRoles(userToUnassign.id, [defaultRole.id]);
+      toast.success(`Removed ${userToUnassign.fullName} from "${targetRole.name}" (reassigned to ${defaultRole.name}).`);
+      await loadData();
+    } catch (err: any) {
+      toast.error("Failed to unassign user: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // ─── DELETE ROLE HANDLERS ───────────────────────────────────────
   const handleInitiateDeleteRole = (role: CustomRole) => {
     if (role.isSystem) return;
@@ -426,7 +474,8 @@ export default function RolesPermissionsPage() {
     }
   };
 
-  const formatDate = (dateStr?: string) => {
+  // Format date + time WITH SECONDS
+  const formatDateTimeWithSeconds = (dateStr?: string) => {
     if (!dateStr) return "—";
     try {
       const d = new Date(dateStr);
@@ -434,22 +483,11 @@ export default function RolesPermissionsPage() {
         month: "short",
         day: "numeric",
         year: "numeric",
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const formatDateTime = (dateStr?: string) => {
-    if (!dateStr) return "—";
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+      }) + ", " + d.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
       });
     } catch {
       return dateStr;
@@ -595,7 +633,7 @@ export default function RolesPermissionsPage() {
                 <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-center">Users Assigned</th>
                 <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Created By</th>
                 <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Created At</th>
-                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Last Edited</th>
+                <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Last Modified</th>
                 <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600 text-right">Actions</th>
               </tr>
             </thead>
@@ -724,18 +762,32 @@ export default function RolesPermissionsPage() {
                           onMouseEnter={() => setHoveredUsersRoleId(role.id)}
                           onMouseLeave={() => setHoveredUsersRoleId(null)}
                         >
-                          <button
-                            onClick={() => setViewUsersRole(role)}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold text-[11px] transition cursor-pointer border ${
-                              assignedUsers.length > 0
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 hover:bg-emerald-100"
-                                : "bg-default-100 text-default-600 border-default-200 dark:bg-slate-800 dark:text-default-400 hover:bg-default-200"
-                            }`}
-                            title="Click to view all assigned staff"
-                          >
-                            <Icon icon="heroicons:users" className="h-3 w-3" />
-                            {assignedUsers.length} Staff
-                          </button>
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                setViewUsersRole(role);
+                                setShowInlineAssign(false);
+                              }}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold text-[11px] transition cursor-pointer border ${
+                                assignedUsers.length > 0
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 hover:bg-emerald-100"
+                                  : "bg-default-100 text-default-600 border-default-200 dark:bg-slate-800 dark:text-default-400 hover:bg-default-200"
+                              }`}
+                              title="Click to view all assigned staff"
+                            >
+                              <Icon icon="heroicons:users" className="h-3 w-3" />
+                              {assignedUsers.length} Staff
+                            </button>
+
+                            {/* Quick Add User button */}
+                            <button
+                              onClick={() => openAssignUserModal(role)}
+                              className="p-1 rounded-full text-indigo-600 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 transition cursor-pointer"
+                              title="Assign a staff member to this role"
+                            >
+                              <Icon icon="heroicons:user-plus" className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
 
                           {/* Hover Popover showing user previews */}
                           {isHoveredUsers && (
@@ -784,19 +836,28 @@ export default function RolesPermissionsPage() {
                         </div>
                       </td>
 
-                      {/* 7. CREATED AT */}
-                      <td className="py-4 px-4 whitespace-nowrap text-default-500 font-medium text-[11px]">
-                        {formatDate(role.createdAt)}
+                      {/* 7. CREATED AT (WITH TIME AND SECONDS) */}
+                      <td className="py-4 px-4 whitespace-nowrap text-default-600 font-medium text-[11px]">
+                        {formatDateTimeWithSeconds(role.createdAt)}
                       </td>
 
-                      {/* 8. LAST EDITED */}
-                      <td className="py-4 px-4 whitespace-nowrap text-default-500 font-medium text-[11px]">
-                        {formatDateTime(role.updatedAt || role.createdAt)}
+                      {/* 8. LAST MODIFIED (WITH TIME AND SECONDS) */}
+                      <td className="py-4 px-4 whitespace-nowrap text-default-600 font-medium text-[11px]">
+                        {formatDateTimeWithSeconds(role.updatedAt || role.createdAt)}
                       </td>
 
                       {/* 9. ACTIONS */}
                       <td className="py-4 px-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Assign User Button */}
+                          <button
+                            onClick={() => openAssignUserModal(role)}
+                            className="p-1.5 rounded-lg border border-default-200 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-default-600 hover:text-emerald-600 transition cursor-pointer"
+                            title="Assign Staff to this Role"
+                          >
+                            <Icon icon="heroicons:user-plus" className="h-3.5 w-3.5" />
+                          </button>
+
                           {/* Edit Role Button */}
                           <button
                             onClick={() => openEditRoleModal(role)}
@@ -1228,7 +1289,7 @@ export default function RolesPermissionsPage() {
         </div>
       )}
 
-      {/* ─── MODAL 3: ASSIGNED USERS TABLE VIEW (ON CLICK USERS COUNT) ── */}
+      {/* ─── MODAL 3: ASSIGNED USERS TABLE VIEW (WITH ADD/ASSIGN USER OPTION) ── */}
       {viewUsersRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[85vh] flex flex-col">
@@ -1238,21 +1299,79 @@ export default function RolesPermissionsPage() {
                   <Icon icon="heroicons:users" className="h-4.5 w-4.5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    Staff Members Assigned to: {viewUsersRole.name}
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                    Staff Assigned to: <span className="text-indigo-600 font-extrabold">{viewUsersRole.name}</span>
                   </h3>
                   <p className="text-[11px] text-neutral-400">
                     {getAssignedUsers(viewUsersRole).length} active user{getAssignedUsers(viewUsersRole).length !== 1 ? "s" : ""} in {viewUsersRole.branchName || "Default Office"}
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setViewUsersRole(null)}
-                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg cursor-pointer"
-              >
-                <Icon icon="heroicons:x-mark" className="h-5 w-5" />
-              </button>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => setShowInlineAssign(!showInlineAssign)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-8 px-3 font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Icon icon={showInlineAssign ? "heroicons:x-mark" : "heroicons:user-plus"} className="h-3.5 w-3.5" />
+                  {showInlineAssign ? "Hide Form" : "+ Assign User"}
+                </Button>
+
+                <button
+                  onClick={() => {
+                    setViewUsersRole(null);
+                    setShowInlineAssign(false);
+                  }}
+                  className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg cursor-pointer"
+                >
+                  <Icon icon="heroicons:x-mark" className="h-5 w-5" />
+                </button>
+              </div>
             </div>
+
+            {/* INLINE ASSIGN USER FORM */}
+            {showInlineAssign && (
+              <div className="p-4 bg-indigo-50/60 dark:bg-indigo-950/40 border-b border-indigo-100 dark:border-indigo-900/60 space-y-2 animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                    <Icon icon="heroicons:user-plus" className="h-4 w-4 text-indigo-600" />
+                    Assign Staff Member to {viewUsersRole.name}
+                  </span>
+                  <span className="text-[10.5px] text-default-500">Select an existing tenant user</span>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select
+                    value={selectedUserToAssign}
+                    onChange={(e) => setSelectedUserToAssign(e.target.value)}
+                    className="flex-1 min-w-[260px] text-xs font-medium border border-indigo-200 dark:border-indigo-800 rounded-lg p-2 bg-white dark:bg-slate-800 text-default-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                  >
+                    <option value="">-- Select staff member to assign --</option>
+                    {users
+                      .filter((u) => {
+                        if (u.roleId === viewUsersRole.id) return false;
+                        const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map(r => r.toUpperCase());
+                        return !userRolesUpper.includes(viewUsersRole.name.toUpperCase());
+                      })
+                      .map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.fullName} ({u.email}) — Current Role: {u.roleName || (u.roles && u.roles[0]) || "Recruiter"}
+                        </option>
+                      ))}
+                  </select>
+
+                  <Button
+                    size="sm"
+                    disabled={!selectedUserToAssign || isAssigningUser}
+                    onClick={() => handleAssignUserSubmit(viewUsersRole)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-4 cursor-pointer shrink-0"
+                  >
+                    {isAssigningUser ? "Assigning..." : "Confirm Assignment"}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className="p-6 overflow-y-auto flex-1">
               <div className="border border-default-150 rounded-xl overflow-hidden shadow-2xs">
@@ -1262,20 +1381,31 @@ export default function RolesPermissionsPage() {
                       <th className="py-3 px-4">Staff Member</th>
                       <th className="py-3 px-4">Email</th>
                       <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4">Assigned On</th>
+                      <th className="py-3 px-4">Joined / Created</th>
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-default-100 text-xs">
                     {getAssignedUsers(viewUsersRole).length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-10 text-center text-default-400 italic">
-                          No users are currently assigned to this role.
+                        <td colSpan={5} className="py-12 text-center text-default-400 italic">
+                          <div className="flex flex-col items-center gap-2">
+                            <Icon icon="heroicons:user-group" className="h-8 w-8 text-default-300" />
+                            <span>No staff members are currently assigned to this role.</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setShowInlineAssign(true)}
+                              className="mt-1 text-xs h-7 text-indigo-600 border-indigo-300 hover:bg-indigo-50"
+                            >
+                              + Assign First User
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ) : (
                       getAssignedUsers(viewUsersRole).map((u) => (
-                        <tr key={u.id} className="hover:bg-default-50/50 dark:hover:bg-slate-800/20">
+                        <tr key={u.id} className="hover:bg-default-50/50 dark:hover:bg-slate-800/20 transition-colors">
                           <td className="py-3 px-4 font-semibold text-default-900">
                             <div className="flex items-center gap-2.5">
                               <div className="h-7 w-7 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
@@ -1290,15 +1420,27 @@ export default function RolesPermissionsPage() {
                               Active
                             </Badge>
                           </td>
-                          <td className="py-3 px-4 text-default-450 text-[11px]">{formatDate(u.createdAt)}</td>
+                          <td className="py-3 px-4 text-default-450 text-[11px]">
+                            {formatDateTimeWithSeconds(u.createdAt)}
+                          </td>
                           <td className="py-3 px-4 text-right">
-                            <Link
-                              href={`/utility/users?search=${encodeURIComponent(u.email)}`}
-                              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-1"
-                            >
-                              Manage User
-                              <Icon icon="heroicons:arrow-top-right-on-square" className="h-3 w-3" />
-                            </Link>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleUnassignUser(u, viewUsersRole)}
+                                className="text-xs text-red-500 hover:text-red-700 hover:underline cursor-pointer"
+                                title="Remove user from this role"
+                              >
+                                Remove
+                              </button>
+                              <span className="text-default-300">|</span>
+                              <Link
+                                href={`/utility/users?search=${encodeURIComponent(u.email)}`}
+                                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-1"
+                              >
+                                Manage User
+                                <Icon icon="heroicons:arrow-top-right-on-square" className="h-3 w-3" />
+                              </Link>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -1310,12 +1452,15 @@ export default function RolesPermissionsPage() {
 
             <div className="px-6 py-3.5 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 flex justify-between items-center shrink-0">
               <span className="text-[11px] text-default-450">
-                To assign or transfer staff roles, navigate to <strong>Users & Teams</strong>.
+                To manage comprehensive workspace permissions, visit <strong>Users & Teams</strong>.
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setViewUsersRole(null)}
+                onClick={() => {
+                  setViewUsersRole(null);
+                  setShowInlineAssign(false);
+                }}
                 className="text-xs h-8 px-4"
               >
                 Close
