@@ -169,10 +169,11 @@ export default function RolesPermissionsPage() {
   const [editRoleSystemRole, setEditRoleSystemRole] = useState("RECRUITER");
   const [editRolePermissions, setEditRolePermissions] = useState<string[]>([]);
 
-  // Users Modal State (Table View)
+  // Users Modal State (Table View & Multi-User Assignment)
   const [viewUsersRole, setViewUsersRole] = useState<CustomRole | null>(null);
   const [showInlineAssign, setShowInlineAssign] = useState(false);
-  const [selectedUserToAssign, setSelectedUserToAssign] = useState("");
+  const [selectedUserIdsToAssign, setSelectedUserIdsToAssign] = useState<string[]>([]);
+  const [assignUserSearchQuery, setAssignUserSearchQuery] = useState("");
   const [isAssigningUser, setIsAssigningUser] = useState(false);
 
   // Direct Permissions Matrix Editor Modal State
@@ -300,6 +301,39 @@ export default function RolesPermissionsPage() {
     return list;
   }, [customRolesList, selectedBranchFilter, searchQuery]);
 
+  // Available staff members to assign to viewUsersRole (supports multiple roles per user)
+  const availableUsersToAssign = useMemo(() => {
+    if (!viewUsersRole) return [];
+    return users.filter((u) => {
+      // 1. Strict branch filter
+      if (viewUsersRole.branchId) {
+        const userBranches = [
+          u.branchId,
+          u.branch_id,
+          ...(Array.isArray(u.assignedBranchIds) ? u.assignedBranchIds : []),
+          ...(Array.isArray(u.assigned_branch_ids) ? u.assigned_branch_ids : [])
+        ].filter(Boolean);
+
+        if (!userBranches.includes(viewUsersRole.branchId)) {
+          return false;
+        }
+      }
+
+      // 2. Exclude users who ALREADY have this role
+      if (u.roleId === viewUsersRole.id) return false;
+      const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map((r) => r.toUpperCase());
+      return !userRolesUpper.includes(viewUsersRole.name.toUpperCase());
+    });
+  }, [users, viewUsersRole]);
+
+  const filteredAvailableUsers = useMemo(() => {
+    if (!assignUserSearchQuery.trim()) return availableUsersToAssign;
+    const q = assignUserSearchQuery.toLowerCase().trim();
+    return availableUsersToAssign.filter(
+      (u) => u.fullName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+    );
+  }, [availableUsersToAssign, assignUserSearchQuery]);
+
   // ─── CREATE ROLE HANDLERS ───────────────────────────────────────
   const openAddRoleModal = () => {
     setNewRoleName("");
@@ -414,43 +448,58 @@ export default function RolesPermissionsPage() {
     }
   };
 
-  // ─── ASSIGN USER TO ROLE HANDLERS ───────────────────────────────
+  // ─── ASSIGN USER TO ROLE HANDLERS (MULTI-USER & MULTI-ROLE) ───
   const openAssignUserModal = (role: CustomRole) => {
     setViewUsersRole(role);
     setShowInlineAssign(true);
-    setSelectedUserToAssign("");
+    setSelectedUserIdsToAssign([]);
+    setAssignUserSearchQuery("");
   };
 
-  const handleAssignUserSubmit = async (targetRole: CustomRole) => {
-    if (!selectedUserToAssign) {
-      toast.error("Please select a staff member to assign.");
+  const toggleUserToAssign = (userId: string) => {
+    setSelectedUserIdsToAssign((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleSelectAllUsersToAssign = (availableUsers: TenantUser[]) => {
+    const allIds = availableUsers.map((u) => u.id);
+    const allSelected = allIds.length > 0 && allIds.every((id) => selectedUserIdsToAssign.includes(id));
+    if (allSelected) {
+      setSelectedUserIdsToAssign([]);
+    } else {
+      setSelectedUserIdsToAssign(allIds);
+    }
+  };
+
+  const handleBatchAssignUsersSubmit = async (targetRole: CustomRole) => {
+    if (selectedUserIdsToAssign.length === 0) {
+      toast.error("Please select at least one staff member to assign.");
       return;
     }
     try {
       setIsAssigningUser(true);
-      await atsApi.auth.assignUserRoles(selectedUserToAssign, [targetRole.id]);
-      const assignedUserObj = users.find(u => u.id === selectedUserToAssign);
-      toast.success(`Assigned ${assignedUserObj?.fullName || "Staff member"} to role "${targetRole.name}"!`);
-      setSelectedUserToAssign("");
+      await atsApi.auth.batchAssignUsersToRole(targetRole.id, selectedUserIdsToAssign);
+      toast.success(
+        `Successfully assigned ${selectedUserIdsToAssign.length} staff member(s) to role "${targetRole.name}"!`
+      );
+      setSelectedUserIdsToAssign([]);
+      setAssignUserSearchQuery("");
       setShowInlineAssign(false);
       await loadData();
     } catch (err: any) {
-      toast.error("Failed to assign role to user: " + err.message);
+      toast.error("Failed to assign role to staff: " + err.message);
     } finally {
       setIsAssigningUser(false);
     }
   };
 
   const handleUnassignUser = async (userToUnassign: TenantUser, targetRole: CustomRole) => {
-    const defaultRole = roles.find(r => r.name === "RECRUITER" || r.systemRole === "RECRUITER") || roles[0];
-    if (!defaultRole) {
-      toast.error("No default fallback role available.");
-      return;
-    }
+    if (!confirm(`Are you sure you want to remove ${userToUnassign.fullName} from the role "${targetRole.name}"?`)) return;
     try {
       setSubmitting(true);
-      await atsApi.auth.assignUserRoles(userToUnassign.id, [defaultRole.id]);
-      toast.success(`Removed ${userToUnassign.fullName} from "${targetRole.name}" (reassigned to ${defaultRole.name}).`);
+      await atsApi.auth.unassignUserFromRole(targetRole.id, userToUnassign.id);
+      toast.success(`Removed ${userToUnassign.fullName} from "${targetRole.name}".`);
       await loadData();
     } catch (err: any) {
       toast.error("Failed to unassign user: " + err.message);
@@ -1347,59 +1396,136 @@ export default function RolesPermissionsPage() {
               </div>
             </div>
 
-            {/* INLINE ASSIGN USER FORM */}
+            {/* INLINE MULTI-USER ASSIGNMENT PANEL */}
             {showInlineAssign && (
-              <div className="p-4 bg-indigo-50/60 dark:bg-indigo-950/40 border-b border-indigo-100 dark:border-indigo-900/60 space-y-2 animate-fadeIn">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
-                    <Icon icon="heroicons:user-plus" className="h-4 w-4 text-indigo-600" />
-                    Assign Staff Member to {viewUsersRole.name}
-                  </span>
-                  <span className="text-[10.5px] text-default-500">Select an existing tenant user</span>
+              <div className="p-4 bg-indigo-50/70 dark:bg-indigo-950/40 border-b border-indigo-100 dark:border-indigo-900/60 space-y-3 animate-fadeIn">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs shrink-0 shadow-xs">
+                      <Icon icon="heroicons:user-plus" className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                        Assign Staff Members to <span className="text-indigo-600 font-extrabold">{viewUsersRole.name}</span>
+                      </span>
+                      <span className="text-[10.5px] text-default-500 block">
+                        Select multiple staff members to assign this custom role. Staff can hold multiple custom roles simultaneously.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                    <span className="text-xs font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300 px-2.5 py-0.5 rounded-full">
+                      {selectedUserIdsToAssign.length} selected
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      type="button"
+                      onClick={() => handleSelectAllUsersToAssign(filteredAvailableUsers)}
+                      className="text-[11px] h-7 px-2.5 text-indigo-600 border-indigo-200 hover:bg-indigo-100/50 cursor-pointer"
+                    >
+                      {filteredAvailableUsers.length > 0 &&
+                      filteredAvailableUsers.every((u) => selectedUserIdsToAssign.includes(u.id))
+                        ? "Deselect All"
+                        : "Select All"}
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap">
-                  <select
-                    value={selectedUserToAssign}
-                    onChange={(e) => setSelectedUserToAssign(e.target.value)}
-                    className="flex-1 min-w-[260px] text-xs font-medium border border-indigo-200 dark:border-indigo-800 rounded-lg p-2 bg-white dark:bg-slate-800 text-default-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                  >
-                    <option value="">-- Select staff member to assign --</option>
-                    {users
-                      .filter((u) => {
-                        if (u.roleId === viewUsersRole.id) return false;
+                {/* Search Bar for selecting staff */}
+                <div className="relative">
+                  <Icon
+                    icon="heroicons:magnifying-glass"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-default-400"
+                  />
+                  <input
+                    type="text"
+                    value={assignUserSearchQuery}
+                    onChange={(e) => setAssignUserSearchQuery(e.target.value)}
+                    placeholder="Search available staff by name or email..."
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-default-900 dark:text-white"
+                  />
+                </div>
 
-                        // Strict branch filter: User must belong to viewUsersRole.branchId (if specified)
-                        if (viewUsersRole.branchId) {
-                          const userBranches = [
-                            u.branchId,
-                            u.branch_id,
-                            ...(Array.isArray(u.assignedBranchIds) ? u.assignedBranchIds : []),
-                            ...(Array.isArray(u.assigned_branch_ids) ? u.assigned_branch_ids : [])
-                          ].filter(Boolean);
+                {/* Checklist of available staff */}
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-indigo-100 dark:border-indigo-900/60 bg-white dark:bg-slate-900 divide-y divide-default-100 dark:divide-slate-800 shadow-2xs">
+                  {filteredAvailableUsers.length === 0 ? (
+                    <div className="py-6 text-center text-default-400 italic text-xs">
+                      {availableUsersToAssign.length === 0
+                        ? "All staff members in this branch are already assigned to this role."
+                        : "No matching staff members found."}
+                    </div>
+                  ) : (
+                    filteredAvailableUsers.map((u) => {
+                      const isSelected = selectedUserIdsToAssign.includes(u.id);
+                      return (
+                        <label
+                          key={u.id}
+                          className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors ${
+                            isSelected
+                              ? "bg-indigo-50/80 dark:bg-indigo-950/60"
+                              : "hover:bg-default-50 dark:hover:bg-slate-800/40"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleUserToAssign(u.id)}
+                              className="rounded border-default-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
+                            />
+                            <div className="h-6 w-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center shrink-0">
+                              {u.fullName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="truncate">
+                              <span className="text-xs font-semibold text-default-900 dark:text-white block truncate">
+                                {u.fullName}
+                              </span>
+                              <span className="text-[10px] text-default-400 font-mono block truncate">
+                                {u.email}
+                              </span>
+                            </div>
+                          </div>
 
-                          if (!userBranches.includes(viewUsersRole.branchId)) {
-                            return false;
-                          }
-                        }
+                          <div className="flex items-center gap-1.5 shrink-0 pl-2 flex-wrap justify-end">
+                            {(u.roles && u.roles.length > 0 ? u.roles : [u.roleName || "Recruiter"]).map((r, i) => (
+                              <span
+                                key={i}
+                                className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-default-100 text-default-600 dark:bg-slate-800 dark:text-slate-300"
+                              >
+                                {r}
+                              </span>
+                            ))}
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
 
-                        const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map(r => r.toUpperCase());
-                        return !userRolesUpper.includes(viewUsersRole.name.toUpperCase());
-                      })
-                      .map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.fullName} ({u.email}) — Current Role: {u.roleName || (u.roles && u.roles[0]) || "Recruiter"}
-                        </option>
-                      ))}
-                  </select>
-
+                <div className="flex justify-end gap-2 pt-1">
                   <Button
                     size="sm"
-                    disabled={!selectedUserToAssign || isAssigningUser}
-                    onClick={() => handleAssignUserSubmit(viewUsersRole)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-4 cursor-pointer shrink-0"
+                    variant="outline"
+                    type="button"
+                    onClick={() => {
+                      setShowInlineAssign(false);
+                      setSelectedUserIdsToAssign([]);
+                    }}
+                    className="text-xs h-8 px-3"
                   >
-                    {isAssigningUser ? "Assigning..." : "Confirm Assignment"}
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={selectedUserIdsToAssign.length === 0 || isAssigningUser}
+                    onClick={() => handleBatchAssignUsersSubmit(viewUsersRole)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 px-4 cursor-pointer shadow-xs"
+                  >
+                    {isAssigningUser
+                      ? "Assigning..."
+                      : `Assign Selected (${selectedUserIdsToAssign.length})`}
                   </Button>
                 </div>
               </div>
@@ -1412,6 +1538,7 @@ export default function RolesPermissionsPage() {
                     <tr className="bg-default-50/80 dark:bg-slate-800/40 border-b border-default-150 text-[10px] font-bold uppercase tracking-wider text-default-600">
                       <th className="py-3 px-4">Staff Member</th>
                       <th className="py-3 px-4">Email</th>
+                      <th className="py-3 px-4">Assigned Roles</th>
                       <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4">Joined / Created</th>
                       <th className="py-3 px-4 text-right">Actions</th>
@@ -1420,7 +1547,7 @@ export default function RolesPermissionsPage() {
                   <tbody className="divide-y divide-default-100 text-xs">
                     {getAssignedUsers(viewUsersRole).length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center text-default-400 italic">
+                        <td colSpan={6} className="py-12 text-center text-default-400 italic">
                           <div className="flex flex-col items-center gap-2">
                             <Icon icon="heroicons:user-group" className="h-8 w-8 text-default-300" />
                             <span>No staff members are currently assigned to this role.</span>
@@ -1428,9 +1555,9 @@ export default function RolesPermissionsPage() {
                               size="sm"
                               variant="outline"
                               onClick={() => setShowInlineAssign(true)}
-                              className="mt-1 text-xs h-7 text-indigo-600 border-indigo-300 hover:bg-indigo-50"
+                              className="mt-1 text-xs h-7 text-indigo-600 border-indigo-300 hover:bg-indigo-50 cursor-pointer"
                             >
-                              + Assign First User
+                              + Assign Staff
                             </Button>
                           </div>
                         </td>
@@ -1448,6 +1575,24 @@ export default function RolesPermissionsPage() {
                           </td>
                           <td className="py-3 px-4 text-default-600 font-mono text-[11px]">{u.email}</td>
                           <td className="py-3 px-4">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {(u.roles && u.roles.length > 0 ? u.roles : [u.roleName || "Recruiter"]).map(
+                                (roleItem, rIdx) => (
+                                  <span
+                                    key={rIdx}
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                      roleItem.toUpperCase() === viewUsersRole.name.toUpperCase()
+                                        ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-300/50"
+                                        : "bg-default-100 text-default-700 dark:bg-slate-800 dark:text-slate-300"
+                                    }`}
+                                  >
+                                    {roleItem}
+                                  </span>
+                                )
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
                             <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] font-bold border-0">
                               Active
                             </Badge>
@@ -1459,7 +1604,7 @@ export default function RolesPermissionsPage() {
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 onClick={() => handleUnassignUser(u, viewUsersRole)}
-                                className="text-xs text-red-500 hover:text-red-700 hover:underline cursor-pointer"
+                                className="text-xs text-red-500 hover:text-red-700 hover:underline cursor-pointer font-medium"
                                 title="Remove user from this role"
                               >
                                 Remove

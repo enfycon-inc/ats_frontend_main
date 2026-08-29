@@ -518,10 +518,24 @@ const auth = {
   },
 
 
-  async assignUserRoles(userId: string, roleIds: string[]): Promise<any> {
+  async assignUserRoles(userId: string, roleIds: string[], append: boolean = false): Promise<any> {
     return apiFetch<any>(`/api/auth/rbac/users/${userId}/roles`, {
       method: 'POST',
-      body: JSON.stringify({ roleIds }),
+      body: JSON.stringify({ roleIds, append }),
+    });
+  },
+
+  async batchAssignUsersToRole(roleId: string, userIds: string[]): Promise<any> {
+    return apiFetch<any>(`/api/auth/rbac/roles/${roleId}/assign-users`, {
+      method: 'POST',
+      body: JSON.stringify({ userIds }),
+    });
+  },
+
+  async unassignUserFromRole(roleId: string, userId: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/rbac/roles/${roleId}/unassign-user`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
     });
   },
 
