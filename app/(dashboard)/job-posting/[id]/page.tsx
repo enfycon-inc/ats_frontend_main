@@ -1824,279 +1824,301 @@ export default function JobDetailPage() {
 
       {/* PIPELINE REVIEW EDIT DIALOG */}
       <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
-        <DialogContent className="sm:max-w-[450px] font-sans">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-bold text-neutral-800 dark:text-white flex items-center gap-1">
-              <ClipboardList className="h-4 w-4 text-indigo-500" />
-              Candidate Pipeline Stage Review
-            </DialogTitle>
-            <DialogDescription className="text-xs text-neutral-500">
-              Update submission stages for candidate <strong>{selectedSub?.candidateName}</strong> on requisition <strong>{job.jobTitle}</strong>.
+        <DialogContent className="sm:max-w-3xl font-sans max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-xl">
+          <DialogHeader className="px-5 py-3.5 border-b border-neutral-200 dark:border-slate-800 bg-neutral-50/60 dark:bg-slate-850 shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-primary" />
+                Candidate Pipeline Stage Review
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+              Update interview progression, audit remarks, and client status for <strong>{selectedSub?.candidateName}</strong> on <strong>{job.jobTitle}</strong>.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleUpdateSubmission} className="space-y-4 text-xs">
-            
-            {/* Candidate details quickcard */}
-            {selectedSub && (
-              <div className="p-3 bg-neutral-50 dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm grid grid-cols-2 gap-2 text-[10.5px]">
-                <div className="col-span-2 border-b border-neutral-100 dark:border-slate-800 pb-1 flex justify-between font-bold">
-                  <span>{selectedSub.candidateName}</span>
-                  <span className="text-[9px] text-neutral-400">ID: {selectedSub.candidateId}</span>
+          <form onSubmit={handleUpdateSubmission} className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3.5 text-xs">
+              
+              {/* Candidate details horizontal compact bar */}
+              {selectedSub && (
+                <div className="p-3 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-lg grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Candidate</span>
+                    <span className="font-bold text-neutral-800 dark:text-neutral-100 block truncate">{selectedSub.candidateName}</span>
+                    <span className="text-[10px] text-neutral-400 block truncate">{selectedSub.candidateEmail || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Designation</span>
+                    <span className="font-semibold text-neutral-700 dark:text-neutral-200 block truncate">{selectedSub.candidateDesignation || "Software Engineer"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Experience</span>
+                    <span className="font-semibold text-neutral-700 dark:text-neutral-200 block">{selectedSub.candidateExperience ? `${selectedSub.candidateExperience} Yrs` : "N/A"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Work Auth</span>
+                    <span className="font-semibold text-neutral-700 dark:text-neutral-200 block truncate">{selectedSub.candidateWorkAuth || "US Citizen / Any"}</span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-neutral-450 block">Designation</span>
-                  <span className="font-semibold text-neutral-700 dark:text-neutral-300 truncate block">{selectedSub.candidateDesignation || "Not Specified"}</span>
-                </div>
-                <div>
-                  <span className="text-neutral-450 block">Experience</span>
-                  <span className="font-semibold text-neutral-700 dark:text-neutral-300 block">{selectedSub.candidateExperience ? `${selectedSub.candidateExperience} Yrs` : "N/A"}</span>
-                </div>
-                <div>
-                  <span className="text-neutral-450 block">Email Address</span>
-                  <span className="font-semibold text-neutral-700 dark:text-neutral-300 truncate block">{selectedSub.candidateEmail}</span>
-                </div>
-                <div>
-                  <span className="text-neutral-450 block">Work Auth</span>
-                  <span className="font-semibold text-neutral-700 dark:text-neutral-300 block truncate">{selectedSub.candidateWorkAuth || "N/A"}</span>
+              )}
+
+              {/* UNIFIED SINGLE-THEME INTERVIEW STAGES (3-Column Grid) */}
+              <div>
+                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1.5">
+                  Interview Progression Stages
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  
+                  {/* Stage 1: Round 1 (L1) */}
+                  <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                          Round 1 (L1)
+                        </span>
+                        {!canAuditL1 && (
+                          <Badge variant="secondary" className="text-[9px] py-0">View Only</Badge>
+                        )}
+                      </div>
+                      <select
+                        value={l1Status}
+                        disabled={!canAuditL1}
+                        onChange={(e) => setL1Status(e.target.value)}
+                        className="w-full border border-neutral-300 dark:border-slate-700 rounded h-7.5 bg-white dark:bg-slate-800 text-xs px-2 outline-hidden cursor-pointer disabled:opacity-60 text-neutral-800 dark:text-neutral-200"
+                      >
+                        <option value="">Pending</option>
+                        <option value="SCHEDULED">Scheduled</option>
+                        <option value="CLEARED">Cleared</option>
+                        <option value="REJECTED">Rejected</option>
+                      </select>
+                      {canAuditL1 && (
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              setL1Remarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                              e.target.value = "";
+                            }
+                          }}
+                          className="w-full border border-neutral-300 dark:border-slate-700 rounded h-7 text-[11px] bg-white dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 px-1.5 font-medium cursor-pointer"
+                        >
+                          <option value="" disabled>+ Quick Remark</option>
+                          {resolvedTemplates.l1.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    {canAuditL1 && (
+                      <textarea
+                        rows={2}
+                        placeholder="L1 screening feedback..."
+                        value={l1Remarks}
+                        onChange={(e) => setL1Remarks(e.target.value)}
+                        className="w-full border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-white dark:bg-slate-900 outline-hidden focus:border-primary resize-none text-neutral-800 dark:text-neutral-200"
+                      />
+                    )}
+                  </div>
+
+                  {/* Stage 2: Round 2 (L2) */}
+                  <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                          Round 2 (L2)
+                        </span>
+                        {!canAuditL2 && (
+                          <Badge variant="secondary" className="text-[9px] py-0">View Only</Badge>
+                        )}
+                      </div>
+                      <select
+                        value={l2Status}
+                        disabled={!canAuditL2}
+                        onChange={(e) => setL2Status(e.target.value)}
+                        className="w-full border border-neutral-300 dark:border-slate-700 rounded h-7.5 bg-white dark:bg-slate-800 text-xs px-2 outline-hidden cursor-pointer disabled:opacity-60 text-neutral-800 dark:text-neutral-200"
+                      >
+                        <option value="">Not Started</option>
+                        <option value="PENDING">Pending</option>
+                        <option value="SCHEDULED">Scheduled</option>
+                        <option value="CLEARED">Cleared</option>
+                        <option value="REJECTED">Rejected</option>
+                      </select>
+                      {canAuditL2 && (
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              setL2Remarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                              e.target.value = "";
+                            }
+                          }}
+                          className="w-full border border-neutral-300 dark:border-slate-700 rounded h-7 text-[11px] bg-white dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 px-1.5 font-medium cursor-pointer"
+                        >
+                          <option value="" disabled>+ Quick Remark</option>
+                          {resolvedTemplates.l2.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    {canAuditL2 && (
+                      <textarea
+                        rows={2}
+                        placeholder="L2 technical feedback..."
+                        value={l2Remarks}
+                        onChange={(e) => setL2Remarks(e.target.value)}
+                        className="w-full border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-white dark:bg-slate-900 outline-hidden focus:border-primary resize-none text-neutral-800 dark:text-neutral-200"
+                      />
+                    )}
+                  </div>
+
+                  {/* Stage 3: Round 3 (L3) */}
+                  <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                          Round 3 (L3)
+                        </span>
+                        {!canAuditL3 && (
+                          <Badge variant="secondary" className="text-[9px] py-0">View Only</Badge>
+                        )}
+                      </div>
+                      <select
+                        value={l3Status}
+                        disabled={!canAuditL3}
+                        onChange={(e) => setL3Status(e.target.value)}
+                        className="w-full border border-neutral-300 dark:border-slate-700 rounded h-7.5 bg-white dark:bg-slate-800 text-xs px-2 outline-hidden cursor-pointer disabled:opacity-60 text-neutral-800 dark:text-neutral-200"
+                      >
+                        <option value="">Not Started</option>
+                        <option value="PENDING">Pending</option>
+                        <option value="SCHEDULED">Scheduled</option>
+                        <option value="CLEARED">Cleared</option>
+                        <option value="REJECTED">Rejected</option>
+                      </select>
+                      {canAuditL3 && (
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              setL3Remarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                              e.target.value = "";
+                            }
+                          }}
+                          className="w-full border border-neutral-300 dark:border-slate-700 rounded h-7 text-[11px] bg-white dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 px-1.5 font-medium cursor-pointer"
+                        >
+                          <option value="" disabled>+ Quick Remark</option>
+                          {resolvedTemplates.l3.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    {canAuditL3 && (
+                      <textarea
+                        rows={2}
+                        placeholder="L3 readiness feedback..."
+                        value={l3Remarks}
+                        onChange={(e) => setL3Remarks(e.target.value)}
+                        className="w-full border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-white dark:bg-slate-900 outline-hidden focus:border-primary resize-none text-neutral-800 dark:text-neutral-200"
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
-            )}
 
-            {/* Status Selectors with Granular Permissions & Pre-configured Quick-Pick Remarks */}
-            <div className="space-y-3 pt-2">
-              {/* L1 Stage */}
-              <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                    Round 1 (L1) — Interview Stage
-                  </label>
-                  {!canAuditL1 && (
-                    <Badge className="bg-slate-100 text-slate-500 text-[9px] border-0">Locked (View Only)</Badge>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={l1Status}
-                    disabled={!canAuditL1}
-                    onChange={(e) => setL1Status(e.target.value)}
-                    className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-transparent text-xs outline-none cursor-pointer disabled:opacity-60"
-                  >
-                    <option value="">Pending</option>
-                    <option value="SCHEDULED">Scheduled</option>
-                    <option value="CLEARED">Cleared</option>
-                    <option value="REJECTED">Rejected</option>
-                  </select>
-                  {canAuditL1 && (
+              {/* Final Milestone, Pay Rate & Client Feedback in a 2-Column Compact Block */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+                
+                {/* Left: Final Milestone & Pay Rate */}
+                <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-neutral-450 uppercase block tracking-wider">
+                      Final Milestone Status
+                    </label>
                     <select
-                      defaultValue=""
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          setL1Remarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
-                          e.target.value = "";
-                        }
-                      }}
-                      className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-white dark:bg-slate-800 text-[11px] text-indigo-600 font-semibold cursor-pointer"
+                      value={finalStatus}
+                      disabled={!canApproveClient}
+                      onChange={(e) => setFinalStatus(e.target.value)}
+                      className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-white dark:bg-slate-800 text-xs px-2 outline-hidden cursor-pointer font-bold disabled:opacity-60 text-neutral-900 dark:text-white"
                     >
-                      <option value="" disabled>+ L1 Quick Remark</option>
-                      {resolvedTemplates.l1.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
+                      <option value="PENDING_APPROVAL">Pending Review</option>
+                      <option value="SUBMITTED">Submitted to Client</option>
+                      <option value="OFFER">Offer Stage</option>
+                      <option value="JOIN">Joined / Placed</option>
+                      <option value="REJECTED">Rejected</option>
                     </select>
-                  )}
-                </div>
-                {canAuditL1 && (
-                  <textarea
-                    rows={1.5}
-                    placeholder="L1 screening feedback notes..."
-                    value={l1Remarks}
-                    onChange={(e) => setL1Remarks(e.target.value)}
-                    className="w-full border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-transparent outline-none focus:border-indigo-500 resize-none"
-                  />
-                )}
-              </div>
+                  </div>
 
-              {/* L2 Stage */}
-              <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                    L2 — Technical Vetting &amp; Screening
-                  </label>
-                  {!canAuditL2 && (
-                    <Badge className="bg-slate-100 text-slate-500 text-[9px] border-0">Locked (View Only)</Badge>
-                  )}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-neutral-450 uppercase block tracking-wider">
+                      Submitted Pay Rate
+                    </label>
+                    <Input
+                      value={submittedRate}
+                      disabled={!canEditRate}
+                      onChange={(e) => setSubmittedRate(e.target.value)}
+                      className="h-8 text-xs font-semibold bg-white dark:bg-slate-800 disabled:opacity-60"
+                      placeholder="e.g. $70/hr or 15 LPA"
+                    />
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={l2Status}
-                    disabled={!canAuditL2}
-                    onChange={(e) => setL2Status(e.target.value)}
-                    className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-transparent text-xs outline-none cursor-pointer disabled:opacity-60"
-                  >
-                    <option value="">Not Started</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="SCHEDULED">Scheduled</option>
-                    <option value="CLEARED">Cleared</option>
-                    <option value="REJECTED">Rejected</option>
-                  </select>
-                  {canAuditL2 && (
-                    <select
-                      defaultValue=""
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          setL2Remarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
-                          e.target.value = "";
-                        }
-                      }}
-                      className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-white dark:bg-slate-800 text-[11px] text-cyan-600 font-semibold cursor-pointer"
-                    >
-                      <option value="" disabled>+ L2 Quick Remark</option>
-                      {resolvedTemplates.l2.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                {canAuditL2 && (
-                  <textarea
-                    rows={1.5}
-                    placeholder="L2 technical feedback notes..."
-                    value={l2Remarks}
-                    onChange={(e) => setL2Remarks(e.target.value)}
-                    className="w-full border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-transparent outline-none focus:border-indigo-500 resize-none"
-                  />
-                )}
-              </div>
 
-              {/* L3 Stage */}
-              <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                    L3 — Commercial &amp; Client Readiness Audit
-                  </label>
-                  {!canAuditL3 && (
-                    <Badge className="bg-slate-100 text-slate-500 text-[9px] border-0">Locked (View Only)</Badge>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={l3Status}
-                    disabled={!canAuditL3}
-                    onChange={(e) => setL3Status(e.target.value)}
-                    className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-transparent text-xs outline-none cursor-pointer disabled:opacity-60"
-                  >
-                    <option value="">Not Started</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="SCHEDULED">Scheduled</option>
-                    <option value="CLEARED">Cleared</option>
-                    <option value="REJECTED">Rejected</option>
-                  </select>
-                  {canAuditL3 && (
-                    <select
-                      defaultValue=""
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          setL3Remarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
-                          e.target.value = "";
-                        }
-                      }}
-                      className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-white dark:bg-slate-800 text-[11px] text-purple-600 font-semibold cursor-pointer"
-                    >
-                      <option value="" disabled>+ L3 Quick Remark</option>
-                      {resolvedTemplates.l3.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                {canAuditL3 && (
+                {/* Right: Client / Final Remarks */}
+                <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-1.5 flex flex-col justify-between">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-bold text-neutral-450 uppercase block tracking-wider">
+                      Client / Final Remarks
+                    </label>
+                    {canApproveClient && (
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            setRemarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                            e.target.value = "";
+                          }
+                        }}
+                        className="text-[10px] border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-0.5 bg-white dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 font-medium cursor-pointer"
+                      >
+                        <option value="" disabled>+ Client Quick Remark</option>
+                        {resolvedTemplates.final.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                   <textarea
-                    rows={1.5}
-                    placeholder="L3 commercial feedback notes..."
-                    value={l3Remarks}
-                    onChange={(e) => setL3Remarks(e.target.value)}
-                    className="w-full border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-transparent outline-none focus:border-indigo-500 resize-none"
-                  />
-                )}
-              </div>
-
-              {/* Final Status & Rate */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-neutral-450 uppercase block">Final Milestone Status</label>
-                  <select
-                    value={finalStatus}
+                    value={remarks}
                     disabled={!canApproveClient}
-                    onChange={(e) => setFinalStatus(e.target.value)}
-                    className="w-full border border-neutral-300 dark:border-slate-700 rounded h-8 bg-transparent text-xs outline-none cursor-pointer font-bold disabled:opacity-60"
-                  >
-                    <option value="PENDING_APPROVAL">Pending Review</option>
-                    <option value="SUBMITTED">Submitted to Client</option>
-                    <option value="OFFER">Offer Stage</option>
-                    <option value="JOIN">Joined / Placed</option>
-                    <option value="REJECTED">Rejected</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-neutral-450 uppercase block">Submitted Pay Rate</label>
-                  <Input
-                    value={submittedRate}
-                    disabled={!canEditRate}
-                    onChange={(e) => setSubmittedRate(e.target.value)}
-                    className="h-8 text-xs font-semibold disabled:opacity-60"
-                    placeholder="e.g. $70/hr or 15 LPA"
+                    onChange={(e) => setRemarks(e.target.value)}
+                    rows={3}
+                    className="w-full flex-1 border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-white dark:bg-slate-900 outline-hidden focus:border-primary disabled:opacity-60 resize-none text-neutral-800 dark:text-neutral-200"
+                    placeholder={canApproveClient ? "Enter manager / client feedback notes..." : "No remarks recorded."}
                   />
                 </div>
               </div>
 
-              {/* Final Client Remarks */}
+              {/* Recruiter Submission Note */}
               <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-bold text-neutral-450 uppercase block">Client / Final Remarks</label>
-                  {canApproveClient && (
-                    <select
-                      defaultValue=""
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          setRemarks((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
-                          e.target.value = "";
-                        }
-                      }}
-                      className="text-[10px] border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-0.5 bg-white dark:bg-slate-800 text-emerald-600 font-semibold cursor-pointer"
-                    >
-                      <option value="" disabled>+ Client Quick Remark</option>
-                      {resolvedTemplates.final.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                <label className="text-[10px] font-bold text-neutral-450 uppercase block tracking-wider">
+                  Recruiter Submission Note
+                </label>
                 <textarea
-                  value={remarks}
-                  disabled={!canApproveClient}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  className="w-full min-h-12 border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-transparent outline-none focus:border-indigo-500 disabled:opacity-60"
-                  placeholder={canApproveClient ? "Enter manager / client feedback notes..." : "No remarks recorded."}
+                  value={recruiterComment}
+                  onChange={(e) => setRecruiterComment(e.target.value)}
+                  rows={2}
+                  className="w-full border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-white dark:bg-slate-900 outline-hidden focus:border-primary resize-none text-neutral-800 dark:text-neutral-200"
+                  placeholder="Recruiter comments or screening summary notes..."
                 />
               </div>
             </div>
 
-            <div className="space-y-1 pt-1">
-              <label className="text-[10px] font-bold text-neutral-450 uppercase block">Recruiter Submission Note</label>
-              <textarea
-                value={recruiterComment}
-                onChange={(e) => setRecruiterComment(e.target.value)}
-                className="w-full min-h-12 border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-transparent outline-none focus:border-indigo-500"
-                placeholder="Recruiter comments or screening summary notes..."
-              />
-            </div>
-
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setReviewOpen(false)} className="text-xs">
+            <DialogFooter className="px-5 py-3 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850 shrink-0 flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setReviewOpen(false)} className="text-xs h-8">
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold">
+              <Button type="submit" disabled={submitting} className="bg-primary hover:bg-primary/90 text-white text-xs font-bold h-8">
                 {submitting ? "Updating..." : "Save Updates"}
               </Button>
             </DialogFooter>
