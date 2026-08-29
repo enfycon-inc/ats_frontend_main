@@ -48,15 +48,15 @@ export default async function DashboardLayout({
       if (userSub && !isMasterTenant) {
         // If current subdomain doesn't match user's tenant subdomain, direct to login on current host
         if (currentSub && currentSub !== userSub) {
-          redirect("/");
+          redirect("/auth/login");
         }
       } else if (isMasterTenant && currentSub === "enfy") {
         redirect(`${protocol}://${baseDomain}/dashboard`);
       }
     }
   } else {
-    // Session is missing — force redirect to login at the root
-    redirect("/");
+    // Session is missing — direct to login
+    redirect("/auth/login");
   }
 
   return (

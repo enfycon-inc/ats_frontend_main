@@ -8,6 +8,7 @@ export async function doLogout(): Promise<LogoutResponse> {
   try {
     const cookieStore = await cookies();
 
+    cookieStore.delete("ats.session-token");
     cookieStore.delete("authjs.session-token");
 
     return { success: true };
