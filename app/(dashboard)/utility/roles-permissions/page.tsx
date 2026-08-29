@@ -249,14 +249,31 @@ export default function RolesPermissionsPage() {
     }, {});
   }, [permissions]);
 
-  // Helper to get staff assigned to a role
+  // Helper to get staff assigned to a role with strict branch isolation
   const getAssignedUsers = (role: CustomRole): TenantUser[] => {
     return users.filter((u) => {
+      // 1. Strict branch matching:
+      // If role belongs to a specific branch office, user MUST belong to that branch
+      if (role.branchId) {
+        const userBranches = [
+          u.branchId,
+          u.branch_id,
+          ...(Array.isArray(u.assignedBranchIds) ? u.assignedBranchIds : []),
+          ...(Array.isArray(u.assigned_branch_ids) ? u.assigned_branch_ids : [])
+        ].filter(Boolean);
+
+        if (!userBranches.includes(role.branchId)) {
+          return false;
+        }
+      }
+
+      // 2. Direct custom role ID match
       if (u.roleId === role.id) return true;
+
+      // 3. Fallback name match strictly within the same branch
       const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map(r => r.toUpperCase());
       const roleNameUpper = role.name.toUpperCase();
-      const sysRoleUpper = (role.replacesSystemRole || role.systemRole || '').toUpperCase();
-      return userRolesUpper.includes(roleNameUpper) || (sysRoleUpper !== '' && userRolesUpper.includes(sysRoleUpper));
+      return userRolesUpper.includes(roleNameUpper);
     });
   };
 
@@ -1351,6 +1368,21 @@ export default function RolesPermissionsPage() {
                     {users
                       .filter((u) => {
                         if (u.roleId === viewUsersRole.id) return false;
+
+                        // Strict branch filter: User must belong to viewUsersRole.branchId (if specified)
+                        if (viewUsersRole.branchId) {
+                          const userBranches = [
+                            u.branchId,
+                            u.branch_id,
+                            ...(Array.isArray(u.assignedBranchIds) ? u.assignedBranchIds : []),
+                            ...(Array.isArray(u.assigned_branch_ids) ? u.assigned_branch_ids : [])
+                          ].filter(Boolean);
+
+                          if (!userBranches.includes(viewUsersRole.branchId)) {
+                            return false;
+                          }
+                        }
+
                         const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map(r => r.toUpperCase());
                         return !userRolesUpper.includes(viewUsersRole.name.toUpperCase());
                       })
