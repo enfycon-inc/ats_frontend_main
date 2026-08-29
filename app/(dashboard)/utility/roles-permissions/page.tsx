@@ -169,9 +169,9 @@ export default function RolesPermissionsPage() {
   const [editRoleSystemRole, setEditRoleSystemRole] = useState("RECRUITER");
   const [editRolePermissions, setEditRolePermissions] = useState<string[]>([]);
 
-  // Users Modal State (Table View & Multi-User Assignment)
+  // Users Modal State (Table View & Dedicated Multi-User Assignment Modal)
   const [viewUsersRole, setViewUsersRole] = useState<CustomRole | null>(null);
-  const [showInlineAssign, setShowInlineAssign] = useState(false);
+  const [assignModalRole, setAssignModalRole] = useState<CustomRole | null>(null);
   const [selectedUserIdsToAssign, setSelectedUserIdsToAssign] = useState<string[]>([]);
   const [assignUserSearchQuery, setAssignUserSearchQuery] = useState("");
   const [isAssigningUser, setIsAssigningUser] = useState(false);
@@ -301,12 +301,13 @@ export default function RolesPermissionsPage() {
     return list;
   }, [customRolesList, selectedBranchFilter, searchQuery]);
 
-  // Available staff members to assign to viewUsersRole (supports multiple roles per user)
+  // Available staff members to assign to assignModalRole (supports multiple roles per user)
   const availableUsersToAssign = useMemo(() => {
-    if (!viewUsersRole) return [];
+    const targetRole = assignModalRole || viewUsersRole;
+    if (!targetRole) return [];
     return users.filter((u) => {
       // 1. Strict branch filter
-      if (viewUsersRole.branchId) {
+      if (targetRole.branchId) {
         const userBranches = [
           u.branchId,
           u.branch_id,
@@ -314,17 +315,17 @@ export default function RolesPermissionsPage() {
           ...(Array.isArray(u.assigned_branch_ids) ? u.assigned_branch_ids : [])
         ].filter(Boolean);
 
-        if (!userBranches.includes(viewUsersRole.branchId)) {
+        if (!userBranches.includes(targetRole.branchId)) {
           return false;
         }
       }
 
       // 2. Exclude users who ALREADY have this role
-      if (u.roleId === viewUsersRole.id) return false;
+      if (u.roleId === targetRole.id) return false;
       const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map((r) => r.toUpperCase());
-      return !userRolesUpper.includes(viewUsersRole.name.toUpperCase());
+      return !userRolesUpper.includes(targetRole.name.toUpperCase());
     });
-  }, [users, viewUsersRole]);
+  }, [users, assignModalRole, viewUsersRole]);
 
   const filteredAvailableUsers = useMemo(() => {
     if (!assignUserSearchQuery.trim()) return availableUsersToAssign;
@@ -448,12 +449,15 @@ export default function RolesPermissionsPage() {
     }
   };
 
-  // ─── ASSIGN USER TO ROLE HANDLERS (MULTI-USER & MULTI-ROLE) ───
-  const openAssignUserModal = (role: CustomRole) => {
-    setViewUsersRole(role);
-    setShowInlineAssign(true);
+  // ─── ASSIGN USER TO ROLE HANDLERS (DEDICATED POP-UP MODAL) ───
+  const openAssignStaffPopup = (role: CustomRole) => {
+    setAssignModalRole(role);
     setSelectedUserIdsToAssign([]);
     setAssignUserSearchQuery("");
+  };
+
+  const openAssignUserModal = (role: CustomRole) => {
+    openAssignStaffPopup(role);
   };
 
   const toggleUserToAssign = (userId: string) => {
@@ -485,7 +489,7 @@ export default function RolesPermissionsPage() {
       );
       setSelectedUserIdsToAssign([]);
       setAssignUserSearchQuery("");
-      setShowInlineAssign(false);
+      setAssignModalRole(null);
       await loadData();
     } catch (err: any) {
       toast.error("Failed to assign role to staff: " + err.message);
@@ -830,10 +834,7 @@ export default function RolesPermissionsPage() {
                         >
                           <div className="inline-flex items-center gap-1">
                             <button
-                              onClick={() => {
-                                setViewUsersRole(role);
-                                setShowInlineAssign(false);
-                              }}
+                              onClick={() => setViewUsersRole(role)}
                               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold text-[11px] transition cursor-pointer border ${
                                 assignedUsers.length > 0
                                   ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 hover:bg-emerald-100"
@@ -1355,7 +1356,7 @@ export default function RolesPermissionsPage() {
         </div>
       )}
 
-      {/* ─── MODAL 3: ASSIGNED USERS TABLE VIEW (WITH ADD/ASSIGN USER OPTION) ── */}
+      {/* ─── MODAL 3: ASSIGNED USERS TABLE VIEW ─────────────────────────── */}
       {viewUsersRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[85vh] flex flex-col">
@@ -1377,153 +1378,21 @@ export default function RolesPermissionsPage() {
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
-                  onClick={() => setShowInlineAssign(!showInlineAssign)}
+                  onClick={() => openAssignStaffPopup(viewUsersRole)}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-8 px-3 font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
-                  <Icon icon={showInlineAssign ? "heroicons:x-mark" : "heroicons:user-plus"} className="h-3.5 w-3.5" />
-                  {showInlineAssign ? "Hide Form" : "+ Assign User"}
+                  <Icon icon="heroicons:user-plus" className="h-3.5 w-3.5" />
+                  + Assign Staff
                 </Button>
 
                 <button
-                  onClick={() => {
-                    setViewUsersRole(null);
-                    setShowInlineAssign(false);
-                  }}
+                  onClick={() => setViewUsersRole(null)}
                   className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg cursor-pointer"
                 >
                   <Icon icon="heroicons:x-mark" className="h-5 w-5" />
                 </button>
               </div>
             </div>
-
-            {/* INLINE MULTI-USER ASSIGNMENT PANEL */}
-            {showInlineAssign && (
-              <div className="p-4 bg-indigo-50/70 dark:bg-indigo-950/40 border-b border-indigo-100 dark:border-indigo-900/60 space-y-3 animate-fadeIn">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="h-7 w-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs shrink-0 shadow-xs">
-                      <Icon icon="heroicons:user-plus" className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
-                        Assign Staff Members to <span className="text-indigo-600 font-extrabold">{viewUsersRole.name}</span>
-                      </span>
-                      <span className="text-[10.5px] text-default-500 block">
-                        Select multiple staff members to assign this custom role. Staff can hold multiple custom roles simultaneously.
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                    <span className="text-xs font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300 px-2.5 py-0.5 rounded-full">
-                      {selectedUserIdsToAssign.length} selected
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      type="button"
-                      onClick={() => handleSelectAllUsersToAssign(filteredAvailableUsers)}
-                      className="text-[11px] h-7 px-2.5 text-indigo-600 border-indigo-200 hover:bg-indigo-100/50 cursor-pointer"
-                    >
-                      {filteredAvailableUsers.length > 0 &&
-                      filteredAvailableUsers.every((u) => selectedUserIdsToAssign.includes(u.id))
-                        ? "Deselect All"
-                        : "Select All"}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Search Bar for selecting staff */}
-                <div className="relative">
-                  <Icon
-                    icon="heroicons:magnifying-glass"
-                    className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-default-400"
-                  />
-                  <input
-                    type="text"
-                    value={assignUserSearchQuery}
-                    onChange={(e) => setAssignUserSearchQuery(e.target.value)}
-                    placeholder="Search available staff by name or email..."
-                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-default-900 dark:text-white"
-                  />
-                </div>
-
-                {/* Checklist of available staff */}
-                <div className="max-h-48 overflow-y-auto rounded-lg border border-indigo-100 dark:border-indigo-900/60 bg-white dark:bg-slate-900 divide-y divide-default-100 dark:divide-slate-800 shadow-2xs">
-                  {filteredAvailableUsers.length === 0 ? (
-                    <div className="py-6 text-center text-default-400 italic text-xs">
-                      {availableUsersToAssign.length === 0
-                        ? "All staff members in this branch are already assigned to this role."
-                        : "No matching staff members found."}
-                    </div>
-                  ) : (
-                    filteredAvailableUsers.map((u) => {
-                      const isSelected = selectedUserIdsToAssign.includes(u.id);
-                      return (
-                        <label
-                          key={u.id}
-                          className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors ${
-                            isSelected
-                              ? "bg-indigo-50/80 dark:bg-indigo-950/60"
-                              : "hover:bg-default-50 dark:hover:bg-slate-800/40"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleUserToAssign(u.id)}
-                              className="rounded border-default-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer shrink-0"
-                            />
-                            <div className="h-6 w-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center shrink-0">
-                              {u.fullName.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="truncate flex-1">
-                              <div className="flex items-center gap-1.5 flex-wrap truncate">
-                                <span className="text-xs font-semibold text-default-900 dark:text-white">
-                                  {u.fullName}
-                                </span>
-                                <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400">
-                                  ({(u.roles && u.roles.length > 0 ? u.roles : [u.roleName || "Recruiter"]).join(", ")})
-                                </span>
-                              </div>
-                              <span className="text-[10px] text-default-400 font-mono block truncate">
-                                {u.email}
-                              </span>
-                            </div>
-                          </div>
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
-
-                <div className="flex justify-end gap-2 pt-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    type="button"
-                    onClick={() => {
-                      setShowInlineAssign(false);
-                      setSelectedUserIdsToAssign([]);
-                    }}
-                    className="text-xs h-8 px-3"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={selectedUserIdsToAssign.length === 0 || isAssigningUser}
-                    onClick={() => handleBatchAssignUsersSubmit(viewUsersRole)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 px-4 cursor-pointer shadow-xs"
-                  >
-                    {isAssigningUser
-                      ? "Assigning..."
-                      : `Assign Selected (${selectedUserIdsToAssign.length})`}
-                  </Button>
-                </div>
-              </div>
-            )}
 
             <div className="p-6 overflow-y-auto flex-1">
               <div className="border border-default-150 rounded-xl overflow-hidden shadow-2xs">
@@ -1548,7 +1417,7 @@ export default function RolesPermissionsPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => setShowInlineAssign(true)}
+                              onClick={() => openAssignStaffPopup(viewUsersRole)}
                               className="mt-1 text-xs h-7 text-indigo-600 border-indigo-300 hover:bg-indigo-50 cursor-pointer"
                             >
                               + Assign Staff
@@ -1628,13 +1497,162 @@ export default function RolesPermissionsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setViewUsersRole(null);
-                  setShowInlineAssign(false);
-                }}
+                onClick={() => setViewUsersRole(null)}
                 className="text-xs h-8 px-4"
               >
                 Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL 4: DEDICATED ASSIGN STAFF POP-UP DIALOG ────────────── */}
+      {assignModalRole && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden my-auto flex flex-col max-h-[85vh]">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <Icon icon="heroicons:user-plus" className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                    Assign Staff: <span className="text-indigo-600 font-extrabold">{assignModalRole.name}</span>
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">
+                    {assignModalRole.branchName || "Default Office"} • Multi-role assignment
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setAssignModalRole(null);
+                  setSelectedUserIdsToAssign([]);
+                }}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg cursor-pointer"
+              >
+                <Icon icon="heroicons:x-mark" className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <div>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Select staff members to assign the <strong className="text-neutral-900 dark:text-white">{assignModalRole.name}</strong> role. Staff can hold multiple custom roles simultaneously.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="relative">
+                  <Icon
+                    icon="heroicons:magnifying-glass"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400"
+                  />
+                  <input
+                    type="text"
+                    value={assignUserSearchQuery}
+                    onChange={(e) => setAssignUserSearchQuery(e.target.value)}
+                    placeholder="Search staff by name or email..."
+                    className="w-full pl-8 pr-3 py-2 text-xs bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-neutral-900 dark:text-white"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+                    Available Staff ({filteredAvailableUsers.length})
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 px-2 py-0.5 rounded-full">
+                      {selectedUserIdsToAssign.length} selected
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAllUsersToAssign(filteredAvailableUsers)}
+                      className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 cursor-pointer"
+                    >
+                      {filteredAvailableUsers.length > 0 &&
+                      filteredAvailableUsers.every((u) => selectedUserIdsToAssign.includes(u.id))
+                        ? "Deselect All"
+                        : "Select All"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="max-h-56 overflow-y-auto rounded-xl border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 divide-y divide-neutral-100 dark:divide-slate-800">
+                {filteredAvailableUsers.length === 0 ? (
+                  <div className="py-8 text-center text-neutral-400 italic text-xs">
+                    {availableUsersToAssign.length === 0
+                      ? "All staff members in this branch already have this role."
+                      : "No matching staff members found."}
+                  </div>
+                ) : (
+                  filteredAvailableUsers.map((u) => {
+                    const isSelected = selectedUserIdsToAssign.includes(u.id);
+                    return (
+                      <label
+                        key={u.id}
+                        className={`flex items-center justify-between px-3.5 py-2.5 cursor-pointer transition-colors ${
+                          isSelected
+                            ? "bg-indigo-50/70 dark:bg-indigo-950/50"
+                            : "hover:bg-neutral-50 dark:hover:bg-slate-800/40"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleUserToAssign(u.id)}
+                            className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer shrink-0"
+                          />
+                          <div className="h-7 w-7 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0">
+                            {u.fullName.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="truncate flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap truncate">
+                              <span className="text-xs font-semibold text-neutral-900 dark:text-white">
+                                {u.fullName}
+                              </span>
+                              <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400">
+                                ({(u.roles && u.roles.length > 0 ? u.roles : [u.roleName || "Recruiter"]).join(", ")})
+                              </span>
+                            </div>
+                            <span className="text-[10.5px] text-neutral-400 font-mono block truncate">
+                              {u.email}
+                            </span>
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 flex justify-end items-center gap-2.5 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => {
+                  setAssignModalRole(null);
+                  setSelectedUserIdsToAssign([]);
+                }}
+                className="text-xs h-9 px-4 cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={selectedUserIdsToAssign.length === 0 || isAssigningUser}
+                onClick={() => handleBatchAssignUsersSubmit(assignModalRole)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 cursor-pointer shadow-xs"
+              >
+                {isAssigningUser
+                  ? "Assigning..."
+                  : `Confirm Assignment (${selectedUserIdsToAssign.length})`}
               </Button>
             </div>
           </div>
