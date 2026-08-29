@@ -572,8 +572,8 @@ export default function BranchManagementPage() {
                 </div>
               ) : (
                 filteredBranches.map((b) => {
-                  const branchHier = (hierarchyData?.branches || []).find((h: any) => h.id === b.id);
-                  const members = branchHier?.members || [];
+                  const branchHier = (hierarchyData?.branches || []).find((h: any) => String(h.id) === String(b.id));
+                  const members = (branchHier?.members && branchHier.members.length > 0) ? branchHier.members : (b.members || []);
 
                   return (
                     <div key={b.id} className="relative pl-6 space-y-3">
@@ -674,23 +674,44 @@ export default function BranchManagementPage() {
 
                         {/* MEMBERS NESTED NODES */}
                         <div className="pl-6 border-l-2 border-dashed border-neutral-300 dark:border-slate-700 space-y-2 pt-1">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Assigned Team</p>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Assigned Team ({members.length})</p>
                           
                           {members.length === 0 ? (
-                            <p className="text-xs text-neutral-400 italic">No recruiters assigned to this branch yet.</p>
+                            <p className="text-xs text-neutral-400 italic">No staff members assigned to this branch yet.</p>
                           ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                              {members.map((m: any) => (
-                                <div key={m.id} className="flex items-center justify-between p-2 rounded bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800">
-                                  <div className="space-y-0.5">
-                                    <p className="text-xs font-bold text-neutral-800 dark:text-white">{m.fullName}</p>
-                                    <p className="text-[10px] text-neutral-450">{m.email}</p>
+                              {members.map((m: any) => {
+                                const memberRoles = getDisplayRoles(m.roles);
+                                const isManager = b.managerId === m.id;
+                                return (
+                                  <div key={m.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 text-xs shadow-2xs">
+                                    <div className="space-y-0.5 min-w-0 pr-2">
+                                      <div className="flex items-center gap-1.5">
+                                        <p className="text-xs font-bold text-neutral-800 dark:text-white truncate">{m.fullName || m.email}</p>
+                                        {isManager && (
+                                          <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700 shrink-0 flex items-center gap-0.5">
+                                            <Crown className="h-2.5 w-2.5" /> Head
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-[10.5px] text-neutral-450 truncate">{m.email}</p>
+                                    </div>
+                                    <div className="shrink-0 flex flex-wrap gap-1">
+                                      {memberRoles.length === 0 ? (
+                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-neutral-300 border border-neutral-200 dark:border-slate-700">
+                                          Staff
+                                        </span>
+                                      ) : (
+                                        memberRoles.slice(0, 2).map((r) => (
+                                          <span key={r} className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200">
+                                            {r === "BRANCH_ADMIN" ? "Branch Admin" : r.replace(/_/g, " ")}
+                                          </span>
+                                        ))
+                                      )}
+                                    </div>
                                   </div>
-                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200">
-                                    {Array.isArray(m.roles) ? m.roles.join(", ") : "Recruiter"}
-                                  </span>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                         </div>
