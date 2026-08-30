@@ -803,20 +803,34 @@ export default function SubmissionsPage() {
 
   const handleAddDirectCustomRemark = async (type: "ACCEPT" | "REJECT", text: string) => {
     if (!text.trim()) return;
+    const items = text
+      .split(/,|\n/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (items.length === 0) return;
+
     try {
       setAddingRemark(true);
       const user = atsApi.auth.getCurrentUser();
       const stage = customRemarksStageFilter === "all" ? "review" : customRemarksStageFilter;
-      const created = await atsApi.submissions.createCustomRemark({
-        stage: stage,
-        remarkText: text.trim(),
-        remarkType: type,
-        branchId: user?.branchId || undefined,
-      });
-      setCustomRemarks((prev) => [...prev, created]);
+      const createdList = await Promise.all(
+        items.map((itemText) =>
+          atsApi.submissions.createCustomRemark({
+            stage: stage,
+            remarkText: itemText,
+            remarkType: type,
+            branchId: user?.branchId || undefined,
+          })
+        )
+      );
+      setCustomRemarks((prev) => [...prev, ...createdList]);
       if (type === "ACCEPT") setNewCustomAcceptText("");
       if (type === "REJECT") setNewCustomRejectText("");
-      toast.success(`✓ ${type === "ACCEPT" ? "Acceptance" : "Rejection"} template added for ${stage.toUpperCase()}!`);
+      if (items.length === 1) {
+        toast.success(`✓ ${type === "ACCEPT" ? "Acceptance" : "Rejection"} template added!`);
+      } else {
+        toast.success(`✓ Added ${items.length} ${type === "ACCEPT" ? "acceptance" : "rejection"} templates!`);
+      }
     } catch (err: any) {
       toast.error("Failed to add remark: " + err.message);
     } finally {
@@ -2294,7 +2308,7 @@ export default function SubmissionsPage() {
                   className="p-3 bg-emerald-50/30 dark:bg-emerald-950/10 border-b border-emerald-100 dark:border-emerald-900/30 flex gap-2"
                 >
                   <Input
-                    placeholder="Type new acceptance remark (e.g. Profile cleared)..."
+                    placeholder="Type remark(s) — separate multiple with comma (,)..."
                     value={newCustomAcceptText}
                     onChange={(e) => setNewCustomAcceptText(e.target.value)}
                     className="h-8.5 text-xs bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 focus-visible:ring-emerald-500 flex-1"
@@ -2315,7 +2329,7 @@ export default function SubmissionsPage() {
                     r.remarkType === "ACCEPT"
                   ).length === 0 ? (
                     <div className="p-6 text-center text-xs text-neutral-400 italic">
-                      No acceptance remarks added yet for this stage.
+                      No acceptance remarks added yet for this stage. Type above to add (comma-separated supported).
                     </div>
                   ) : (
                     customRemarks
@@ -2391,7 +2405,7 @@ export default function SubmissionsPage() {
                   className="p-3 bg-rose-50/30 dark:bg-rose-950/10 border-b border-rose-100 dark:border-rose-900/30 flex gap-2"
                 >
                   <Input
-                    placeholder="Type new rejection reason (e.g. Notice period too long)..."
+                    placeholder="Type rejection reason(s) — separate multiple with comma (,)..."
                     value={newCustomRejectText}
                     onChange={(e) => setNewCustomRejectText(e.target.value)}
                     className="h-8.5 text-xs bg-white dark:bg-slate-800 border-rose-200 dark:border-rose-800 focus-visible:ring-rose-500 flex-1"
