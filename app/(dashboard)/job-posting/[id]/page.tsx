@@ -2301,8 +2301,8 @@ export default function JobDetailPage() {
               <span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.client}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-neutral-500 font-medium">Submitted By:</span>
-              <span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.createdBy}</span>
+              <span className="text-neutral-500 font-medium">Created By:</span>
+              <span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.createdBy || job?.created_by || "Account Manager"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-neutral-500 font-medium">Assigned To:</span>
