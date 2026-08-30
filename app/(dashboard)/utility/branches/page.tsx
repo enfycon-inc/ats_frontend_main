@@ -1063,14 +1063,36 @@ export default function BranchManagementPage() {
                 </label>
                 <Input
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData((prev) => ({
+                      ...prev,
+                      name: val,
+                      // Auto-suggest 3-letter code if code is currently empty or untouched
+                      code: prev.code ? prev.code : val.replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase(),
+                    }));
+                  }}
                   placeholder="e.g. Bhubaneswar (Domestic IT), New York Hub, Chicago Branch..."
                   className="h-10 text-xs font-medium rounded-lg border-neutral-300 dark:border-slate-700"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Branch Code (Job Prefix) <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                    placeholder="e.g. BBS, NY, CHI, VIZ..."
+                    className="h-10 text-xs font-mono font-bold uppercase rounded-lg border-neutral-300 dark:border-slate-700"
+                    required
+                  />
+                  <span className="text-[10px] text-neutral-400 block">Used for Job IDs (e.g. BBS-260212-N0001)</span>
+                </div>
+
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
                     City <span className="text-red-500">*</span>
@@ -1078,7 +1100,7 @@ export default function BranchManagementPage() {
                   <Input
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="e.g. Bhubaneswar, New York, London..."
+                    placeholder="e.g. Bhubaneswar, New York..."
                     className="h-10 text-xs rounded-lg border-neutral-300 dark:border-slate-700"
                     required
                   />
@@ -1230,7 +1252,7 @@ export default function BranchManagementPage() {
             {/* Modal Header */}
             <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-200/80 dark:border-slate-800 bg-neutral-50/80 dark:bg-slate-850 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-650 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/60">
+                <div className="p-2 rounded-xl bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300">
                   <Edit2 className="h-4.5 w-4.5" />
                 </div>
                 <div>
