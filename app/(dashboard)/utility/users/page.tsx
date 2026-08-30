@@ -158,7 +158,7 @@ export default function UserManagementPage() {
       const [usersData, branchesData, rolesData, profileData] = await Promise.all([
         atsApi.auth.listUsers().catch(() => []),
         atsApi.branches.list().catch(() => []),
-        atsApi.auth.listRoles().catch(() => []),
+        atsApi.auth.listRoles(undefined, true).catch(() => []),
         atsApi.auth.me().catch(() => null),
       ]);
       setUsers(usersData || []);
@@ -612,8 +612,34 @@ export default function UserManagementPage() {
     return dedupeCaseInsensitiveRoles(groups.flatMap((g) => g.roles || []));
   };
 
+  const openAddModal = async () => {
+    try {
+      const freshRoles = await atsApi.auth.listRoles(undefined, true);
+      if (freshRoles && Array.isArray(freshRoles)) {
+        setRolesList(freshRoles);
+      }
+    } catch (e) {}
+    setIsAddModalOpen(true);
+  };
+
+  const handleOpenBranchRoleModal = async (branchId: string, branchName: string, isAddForm: boolean = false) => {
+    try {
+      const freshRoles = await atsApi.auth.listRoles(undefined, true);
+      if (freshRoles && Array.isArray(freshRoles)) {
+        setRolesList(freshRoles);
+      }
+    } catch (e) {}
+    setBranchRoleModalState({ branchId, branchName, isAddForm });
+  };
+
   const openEditModal = (user: UserItem) => {
     if (!user) return;
+    atsApi.auth.listRoles(undefined, true).then((freshRoles) => {
+      if (freshRoles && Array.isArray(freshRoles)) {
+        setRolesList(freshRoles);
+      }
+    }).catch(() => {});
+
     setSelectedUser(user);
     const nameParts = (user.fullName || "").trim().split(" ");
     const fName = nameParts[0] || "";
@@ -878,13 +904,7 @@ export default function UserManagementPage() {
                 ) : (
                   <>
                     <DropdownMenuItem
-                      onClick={() => {
-                        if (activeSeats >= userLimit) {
-                          toast.error(`Seat limit reached! (${userLimit} active licenses). Deactivate a user first.`);
-                          return;
-                        }
-                        setIsAddModalOpen(true);
-                      }}
+                      onClick={openAddModal}
                       className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 font-semibold"
                     >
                       <UserPlus className="h-3.5 w-3.5" /> Add New Member
@@ -1335,9 +1355,12 @@ export default function UserManagementPage() {
                   }
 
                   const selectedBranch = branches.find((b) => b.id === addForm.branchId);
-                  const branchRolesForAdd = (rolesList || []).filter(
-                    (r) => !r.branchId || r.branchId === addForm.branchId
-                  );
+                  const branchRolesForAdd = (rolesList || []).filter((r) => {
+                    if (r.isSystem) return false;
+                    const rBId = r.branchId || (r as any).branch_id;
+                    if (!rBId) return false;
+                    return String(rBId).toLowerCase() === String(addForm.branchId).toLowerCase();
+                  });
 
                   if (branchRolesForAdd.length === 0) {
                     return (
@@ -1537,9 +1560,12 @@ export default function UserManagementPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/70 dark:bg-slate-900/60 p-3.5 rounded-xl border border-neutral-200 dark:border-slate-800">
                     {branches.map((b) => {
                       const isAssigned = editForm.assignedBranchIds.includes(b.id) || editForm.branchId === b.id;
-                      const branchCustomRoles = (rolesList || []).filter(
-                        (r) => !r.isSystem && (!r.branchId || r.branchId === b.id)
-                      );
+                      const branchCustomRoles = (rolesList || []).filter((r) => {
+                        if (r.isSystem) return false;
+                        const rBId = r.branchId || (r as any).branch_id;
+                        if (!rBId) return false;
+                        return String(rBId).toLowerCase() === String(b.id).toLowerCase();
+                      });
                       const rawRoles = editForm.branchRoles[b.id];
                       const bRoles = Array.isArray(rawRoles)
                         ? rawRoles
@@ -1619,7 +1645,7 @@ export default function UserManagementPage() {
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => setBranchRoleModalState({ branchId: b.id, branchName: b.name, isAddForm: false })}
+                              onClick={() => handleOpenBranchRoleModal(b.id, b.name, false)}
                               className="h-7 text-[11px] px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold border-indigo-600 flex items-center gap-1.5 rounded-lg cursor-pointer shrink-0 ml-1 shadow-2xs whitespace-nowrap"
                             >
                               <Shield className="h-3 w-3 text-indigo-200" /> Assign Roles <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
@@ -1847,9 +1873,13 @@ export default function UserManagementPage() {
               </div>
 
               {(() => {
-                const availableRoles = (rolesList || []).filter(
-                  (r) => !r.branchId || r.branchId === branchRoleModalState.branchId
-                );
+                const targetBranchId = branchRoleModalState.branchId;
+                const availableRoles = (rolesList || []).filter((r) => {
+                  if (r.isSystem) return false;
+                  const rBId = r.branchId || (r as any).branch_id;
+                  if (!rBId) return false;
+                  return String(rBId).toLowerCase() === String(targetBranchId).toLowerCase();
+                });
 
                 if (availableRoles.length === 0) {
                   return (
