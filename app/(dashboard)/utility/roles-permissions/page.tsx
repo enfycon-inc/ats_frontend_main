@@ -27,6 +27,8 @@ interface CustomRole {
   branchName?: string | null;
   isSystem: boolean;
   systemRole?: string;
+  baseRoleId?: string | null;
+  baseRoleName?: string | null;
   isExactSubstitution?: boolean;
   replacesSystemRole?: string | null;
   permissions: string[];
@@ -44,6 +46,9 @@ interface TenantUser {
   roleId: string | null;
   roleName: string;
   roles?: string[];
+  assignedRoleIds?: string[];
+  branchRoles?: Record<string, string[]>;
+  baseRoleId?: string | null;
   branchId?: string | null;
   branch_id?: string | null;
   assignedBranchIds?: string[];
@@ -261,7 +266,7 @@ export default function RolesPermissionsPage() {
     }, {});
   }, [permissions]);
 
-  // Helper to get staff assigned to a role with strict branch isolation
+  // Helper to get staff assigned to a role with strict branch isolation and ID matching
   const getAssignedUsers = (role: CustomRole): TenantUser[] => {
     return users.filter((u) => {
       // 1. Strict branch matching:
@@ -281,6 +286,10 @@ export default function RolesPermissionsPage() {
 
       // 2. Direct custom role ID match
       if (u.roleId === role.id) return true;
+      if (Array.isArray(u.assignedRoleIds) && u.assignedRoleIds.includes(role.id)) return true;
+      if (u.branchRoles && role.branchId && Array.isArray(u.branchRoles[role.branchId])) {
+        if (u.branchRoles[role.branchId].includes(role.id)) return true;
+      }
 
       // 3. Fallback name match strictly within the same branch
       const userRolesUpper = (u.roles && u.roles.length > 0 ? u.roles : [u.roleName || '']).map(r => r.toUpperCase());
@@ -372,10 +381,12 @@ export default function RolesPermissionsPage() {
     if (!newRoleName.trim()) return toast.error("Please provide a role name.");
     try {
       setSubmitting(true);
+      const baseSystemRoleObj = roles.find(r => r.isSystem && r.name.toUpperCase() === newRoleSystemRole.toUpperCase());
       const newRole = await atsApi.auth.createCustomRole({
         name: newRoleName.trim(),
         description: newRoleDesc.trim(),
         systemRole: newRoleSystemRole,
+        baseRoleId: baseSystemRoleObj?.id,
         branchId: newRoleBranchId || undefined,
         permissions: newRolePermissions,
       });
@@ -409,10 +420,12 @@ export default function RolesPermissionsPage() {
 
     try {
       setSubmitting(true);
+      const baseSystemRoleObj = roles.find(r => r.isSystem && r.name.toUpperCase() === editRoleSystemRole.toUpperCase());
       await atsApi.auth.updateCustomRole(editingRole.id, {
         name: editRoleName.trim(),
         description: editRoleDesc.trim(),
         systemRole: editRoleSystemRole,
+        baseRoleId: baseSystemRoleObj?.id,
         branchId: editRoleBranchId || undefined,
         permissions: editRolePermissions,
       });

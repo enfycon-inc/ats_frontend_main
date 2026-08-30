@@ -495,6 +495,7 @@ const auth = {
     description: string;
     permissions: string[];
     systemRole?: string;
+    baseRoleId?: string;
     branchId?: string;
   }): Promise<any> {
     return apiFetch<any>('/api/auth/rbac/roles', {
@@ -510,6 +511,7 @@ const auth = {
       description?: string;
       permissions?: string[];
       systemRole?: string;
+      baseRoleId?: string;
       branchId?: string;
     }
   ): Promise<any> {

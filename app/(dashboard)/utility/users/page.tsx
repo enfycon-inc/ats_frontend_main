@@ -489,13 +489,13 @@ export default function UserManagementPage() {
   const handleBulkAssignRoles = async () => {
     if (selectedUserIds.length === 0) return;
     if (bulkSelectedRoleIds.length === 0) {
-      return toast.error("Please select at least one system role to assign.");
+      return toast.error("Please select at least one role to assign.");
     }
     try {
       setLoading(true);
       await Promise.all(
         selectedUserIds.map((id) =>
-          atsApi.auth.updateUserDetail(id, { roles: bulkSelectedRoleIds }).catch(() => null)
+          atsApi.auth.assignUserRoles(id, bulkSelectedRoleIds, false).catch(() => null)
         )
       );
       toast.success(
@@ -1849,7 +1849,7 @@ export default function UserManagementPage() {
               </p>
 
               {rolesList.map((r) => {
-                const roleKey = r.name || r.id;
+                const roleKey = r.id;
                 const isChecked = bulkSelectedRoleIds.includes(roleKey);
                 return (
                   <label
@@ -2074,7 +2074,7 @@ export default function UserManagementPage() {
                   <div className="grid grid-cols-2 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
                     {availableRoles.map((r) => {
                       const isChecked = bRoles.some(
-                        (item: string) => item.toUpperCase() === r.name.toUpperCase()
+                        (item: string) => item === r.id || item.toUpperCase() === r.name.toUpperCase()
                       );
 
                       return (
@@ -2092,9 +2092,9 @@ export default function UserManagementPage() {
                             onChange={(e) => {
                               const checked = e.target.checked;
                               let updated = bRoles.filter(
-                                (item: string) => item.toUpperCase() !== r.name.toUpperCase()
+                                (item: string) => item !== r.id && item.toUpperCase() !== r.name.toUpperCase()
                               );
-                              if (checked) updated.push(r.name);
+                              if (checked) updated.push(r.id);
                               if (isAdd) {
                                 setAddForm((prev) => ({
                                   ...prev,
