@@ -587,9 +587,9 @@ export default function SubmissionsPage() {
   // Tenant Custom Remarks Configuration State
   const [customRemarks, setCustomRemarks] = useState<any[]>([]);
   const [customRemarksModalOpen, setCustomRemarksModalOpen] = useState(false);
-  const [newRemarkStage, setNewRemarkStage] = useState<"review" | "l1" | "l2" | "l3" | "final">("review");
-  const [newRemarkType, setNewRemarkType] = useState<"ACCEPT" | "REJECT" | "GENERAL">("ACCEPT");
-  const [newRemarkText, setNewRemarkText] = useState("");
+  const [customRemarksStageFilter, setCustomRemarksStageFilter] = useState<"review" | "l1" | "l2" | "l3" | "final" | "all">("review");
+  const [newCustomAcceptText, setNewCustomAcceptText] = useState("");
+  const [newCustomRejectText, setNewCustomRejectText] = useState("");
   const [addingRemark, setAddingRemark] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
 
@@ -801,21 +801,22 @@ export default function SubmissionsPage() {
     }
   };
 
-  const handleAddCustomRemark = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newRemarkText.trim()) return;
+  const handleAddDirectCustomRemark = async (type: "ACCEPT" | "REJECT", text: string) => {
+    if (!text.trim()) return;
     try {
       setAddingRemark(true);
       const user = atsApi.auth.getCurrentUser();
+      const stage = customRemarksStageFilter === "all" ? "review" : customRemarksStageFilter;
       const created = await atsApi.submissions.createCustomRemark({
-        stage: newRemarkStage,
-        remarkText: newRemarkText.trim(),
-        remarkType: newRemarkType,
+        stage: stage,
+        remarkText: text.trim(),
+        remarkType: type,
         branchId: user?.branchId || undefined,
       });
       setCustomRemarks((prev) => [...prev, created]);
-      setNewRemarkText("");
-      toast.success(`Custom ${newRemarkType.toLowerCase()} remark added!`);
+      if (type === "ACCEPT") setNewCustomAcceptText("");
+      if (type === "REJECT") setNewCustomRejectText("");
+      toast.success(`✓ ${type === "ACCEPT" ? "Acceptance" : "Rejection"} template added for ${stage.toUpperCase()}!`);
     } catch (err: any) {
       toast.error("Failed to add remark: " + err.message);
     } finally {
@@ -2212,164 +2213,253 @@ export default function SubmissionsPage() {
 
       {/* ── TENANT CUSTOM REMARKS SETTINGS MODAL ── */}
       <Dialog open={customRemarksModalOpen} onOpenChange={setCustomRemarksModalOpen}>
-        <DialogContent className="sm:max-w-[600px] font-sans max-h-[85vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[950px] font-sans max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b border-default-150 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
             <DialogTitle className="text-sm font-bold text-neutral-800 dark:text-white flex items-center gap-2">
               <Icon icon="heroicons:cog-6-tooth" className="h-5 w-5 text-indigo-600" />
-              Tenant Custom Stage Remarks Templates
+              Stage Remarks Templates
             </DialogTitle>
             <DialogDescription className="text-xs text-neutral-500">
-              Configure company-wide standard remarks options for your recruiters, pod leads, and account managers.
+              Standard quick-pick templates for approving or rejecting candidates across hiring stages.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2 flex-1 overflow-y-auto pr-1">
-            {/* Add New Form */}
-            <form onSubmit={handleAddCustomRemark} className="p-3.5 border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-950/20 rounded-xl space-y-3">
-              <div className="text-xs font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
-                <Icon icon="heroicons:plus-circle" className="h-4 w-4" />
-                Add New Custom Quick-Pick Remark
-              </div>
+          {/* Stage Tabs */}
+          <div className="px-6 py-2.5 border-b border-default-150 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mr-1 shrink-0">Stage:</span>
+            {[
+              { key: "review", label: "Internal Review Gate", count: customRemarks.filter(r => r.stage === "review" || r.stage === "internal_review").length },
+              { key: "l1", label: "Round 1 (L1)", count: customRemarks.filter(r => r.stage === "l1").length },
+              { key: "l2", label: "Round 2 (L2)", count: customRemarks.filter(r => r.stage === "l2").length },
+              { key: "l3", label: "Round 3 (L3)", count: customRemarks.filter(r => r.stage === "l3").length },
+              { key: "final", label: "Final Milestone", count: customRemarks.filter(r => r.stage === "final").length },
+              { key: "all", label: "All Stages", count: customRemarks.length },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setCustomRemarksStageFilter(tab.key as any)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  customRemarksStageFilter === tab.key
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
+                  customRemarksStageFilter === tab.key
+                    ? "bg-white/20 text-white"
+                    : "bg-neutral-100 text-neutral-500 dark:bg-slate-800 dark:text-slate-400"
+                }`}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
-                <div className="sm:col-span-4 space-y-1">
-                  <label className="text-[10px] font-bold text-default-500 uppercase">Target Stage</label>
-                  <select
-                    value={newRemarkStage}
-                    onChange={(e) => setNewRemarkStage(e.target.value as "review" | "l1" | "l2" | "l3" | "final")}
-                    className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2 h-8.5 bg-white dark:bg-slate-800 text-default-850 cursor-pointer"
-                  >
-                    <option value="review">Internal Screening Gate</option>
-                    <option value="l1">Round 1 (L1) — Interview</option>
-                    <option value="l2">Round 2 (L2) — Technical Vetting</option>
-                    <option value="l3">Round 3 (L3) — Commercial Audit</option>
-                    <option value="final">Final Client Milestone</option>
-                  </select>
-                </div>
-
-                <div className="sm:col-span-4 space-y-1">
-                  <label className="text-[10px] font-bold text-default-500 uppercase">Category</label>
-                  <div className="grid grid-cols-3 gap-1 bg-white dark:bg-slate-800 p-0.5 rounded-md border border-default-250 dark:border-slate-700 h-8.5 items-center">
-                    <button
-                      type="button"
-                      onClick={() => setNewRemarkType("ACCEPT")}
-                      className={`h-7 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                        newRemarkType === "ACCEPT"
-                          ? "bg-emerald-600 text-white shadow-xs"
-                          : "text-neutral-600 hover:text-emerald-600 dark:text-neutral-300"
-                      }`}
-                    >
-                      ✓ Accept
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewRemarkType("REJECT")}
-                      className={`h-7 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                        newRemarkType === "REJECT"
-                          ? "bg-rose-600 text-white shadow-xs"
-                          : "text-neutral-600 hover:text-rose-600 dark:text-neutral-300"
-                      }`}
-                    >
-                      ✕ Reject
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewRemarkType("GENERAL")}
-                      className={`h-7 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                        newRemarkType === "GENERAL"
-                          ? "bg-slate-700 text-white shadow-xs"
-                          : "text-neutral-600 hover:text-slate-900 dark:text-neutral-300"
-                      }`}
-                    >
-                      ℹ Info
-                    </button>
+          {/* Body: 2 Columns */}
+          <div className="p-6 overflow-y-auto flex-1 bg-neutral-50/50 dark:bg-slate-900/50">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+              
+              {/* ── LEFT COLUMN: ACCEPTANCE REMARKS ── */}
+              <div className="bg-white dark:bg-slate-850 rounded-xl border border-emerald-200 dark:border-emerald-900/50 shadow-xs overflow-hidden flex flex-col">
+                <div className="px-4 py-3 bg-emerald-50/70 dark:bg-emerald-950/30 border-b border-emerald-150 dark:border-emerald-900/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-md bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+                      ✓
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-emerald-950 dark:text-emerald-300">
+                        Acceptance / Approval Remarks
+                      </h4>
+                      <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400">
+                        Quick-pick remarks when candidate is cleared or approved
+                      </p>
+                    </div>
                   </div>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    {
+                      customRemarks.filter(r => 
+                        (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
+                        r.remarkType === "ACCEPT"
+                      ).length
+                    } items
+                  </span>
                 </div>
 
-                <div className="sm:col-span-4 space-y-1">
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleAddDirectCustomRemark("ACCEPT", newCustomAcceptText);
+                  }} 
+                  className="p-3 bg-emerald-50/30 dark:bg-emerald-950/10 border-b border-emerald-100 dark:border-emerald-900/30 flex gap-2"
+                >
+                  <Input
+                    placeholder="Type new acceptance remark (e.g. Profile cleared)..."
+                    value={newCustomAcceptText}
+                    onChange={(e) => setNewCustomAcceptText(e.target.value)}
+                    className="h-8.5 text-xs bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 focus-visible:ring-emerald-500 flex-1"
+                  />
                   <Button
                     type="submit"
                     size="sm"
-                    disabled={addingRemark || !newRemarkText.trim()}
-                    className={`w-full text-white font-bold text-xs h-8.5 px-4 cursor-pointer ${
-                      newRemarkType === "ACCEPT"
-                        ? "bg-emerald-600 hover:bg-emerald-700"
-                        : newRemarkType === "REJECT"
-                        ? "bg-rose-600 hover:bg-rose-700"
-                        : "bg-indigo-600 hover:bg-indigo-700"
-                    }`}
+                    disabled={addingRemark || !newCustomAcceptText.trim()}
+                    className="h-8.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
                   >
-                    {addingRemark ? "Adding..." : "+ Add Option"}
+                    + Add
                   </Button>
-                </div>
+                </form>
 
-                <div className="sm:col-span-12 space-y-1">
-                  <label className="text-[10px] font-bold text-default-500 uppercase">Remark Text / Template</label>
-                  <Input
-                    placeholder={
-                      newRemarkType === "ACCEPT"
-                        ? "e.g. ✓ Resume screened & profile cleared for client submission"
-                        : newRemarkType === "REJECT"
-                        ? "e.g. ✕ Notice period exceeds client expectation (>45 days)"
-                        : "e.g. ℹ Screening done — awaiting interview slot"
-                    }
-                    value={newRemarkText}
-                    onChange={(e) => setNewRemarkText(e.target.value)}
-                    className="h-8.5 text-xs"
-                  />
+                <div className="p-3 space-y-2 max-h-[380px] overflow-y-auto">
+                  {customRemarks.filter(r => 
+                    (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
+                    r.remarkType === "ACCEPT"
+                  ).length === 0 ? (
+                    <div className="p-6 text-center text-xs text-neutral-400 italic">
+                      No acceptance remarks added yet for this stage.
+                    </div>
+                  ) : (
+                    customRemarks
+                      .filter(r => 
+                        (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
+                        r.remarkType === "ACCEPT"
+                      )
+                      .map((rem) => (
+                        <div 
+                          key={rem.id}
+                          className="p-2.5 bg-white dark:bg-slate-800 rounded-lg border border-neutral-200 dark:border-slate-700 flex items-center justify-between gap-2.5 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all text-xs"
+                        >
+                          <div className="flex items-start gap-2 flex-1 min-w-0">
+                            <span className="text-emerald-600 font-bold text-xs mt-0.5">✓</span>
+                            <span className="text-neutral-800 dark:text-neutral-200 font-medium leading-snug">
+                              {rem.remarkText}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {customRemarksStageFilter === "all" && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-neutral-100 text-neutral-600 dark:bg-slate-700 dark:text-slate-300">
+                                {rem.stage}
+                              </span>
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteCustomRemark(rem.id)}
+                              className="text-neutral-400 hover:text-rose-600 p-1 h-7 w-7 rounded hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                              title="Delete template"
+                            >
+                              <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                  )}
                 </div>
               </div>
-            </form>
 
-            {/* List of Custom Remarks */}
-            <div className="space-y-2">
-              <div className="text-xs font-bold text-default-700 uppercase tracking-wider">Active Custom Remarks by Stage</div>
-              {customRemarks.length === 0 ? (
-                <div className="text-xs text-default-400 p-4 border border-dashed border-default-200 rounded-lg text-center italic">
-                  No custom remarks configured yet for this branch.
-                </div>
-              ) : (
-                <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                  {customRemarks.map((rem) => (
-                    <div key={rem.id} className="flex items-center justify-between p-2.5 bg-default-50 dark:bg-slate-800/40 rounded-lg border border-default-150 text-xs gap-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className="text-[9px] uppercase font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-                          {rem.stage}
-                        </Badge>
-                        {rem.remarkType === "ACCEPT" ? (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                            ✓ Accept
-                          </span>
-                        ) : rem.remarkType === "REJECT" ? (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
-                            ✕ Reject
-                          </span>
-                        ) : (
-                          <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
-                            ℹ General
-                          </span>
-                        )}
-                        <span className="text-default-800 dark:text-default-200 font-medium">{rem.remarkText}</span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteCustomRemark(rem.id)}
-                        className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 h-7 w-7 p-0 shrink-0"
-                      >
-                        <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
-                      </Button>
+              {/* ── RIGHT COLUMN: REJECTION REMARKS ── */}
+              <div className="bg-white dark:bg-slate-850 rounded-xl border border-rose-200 dark:border-rose-900/50 shadow-xs overflow-hidden flex flex-col">
+                <div className="px-4 py-3 bg-rose-50/70 dark:bg-rose-950/30 border-b border-rose-150 dark:border-rose-900/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-md bg-rose-600 text-white flex items-center justify-center font-bold text-xs">
+                      ✕
                     </div>
-                  ))}
+                    <div>
+                      <h4 className="text-xs font-bold text-rose-950 dark:text-rose-300">
+                        Rejection / Issue Remarks
+                      </h4>
+                      <p className="text-[10px] text-rose-700/80 dark:text-rose-400">
+                        Quick-pick remarks when candidate is rejected or has issues
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                    {
+                      customRemarks.filter(r => 
+                        (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
+                        r.remarkType === "REJECT"
+                      ).length
+                    } items
+                  </span>
                 </div>
-              )}
+
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleAddDirectCustomRemark("REJECT", newCustomRejectText);
+                  }} 
+                  className="p-3 bg-rose-50/30 dark:bg-rose-950/10 border-b border-rose-100 dark:border-rose-900/30 flex gap-2"
+                >
+                  <Input
+                    placeholder="Type new rejection reason (e.g. Notice period too long)..."
+                    value={newCustomRejectText}
+                    onChange={(e) => setNewCustomRejectText(e.target.value)}
+                    className="h-8.5 text-xs bg-white dark:bg-slate-800 border-rose-200 dark:border-rose-800 focus-visible:ring-rose-500 flex-1"
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={addingRemark || !newCustomRejectText.trim()}
+                    className="h-8.5 px-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
+                  >
+                    + Add
+                  </Button>
+                </form>
+
+                <div className="p-3 space-y-2 max-h-[380px] overflow-y-auto">
+                  {customRemarks.filter(r => 
+                    (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
+                    r.remarkType === "REJECT"
+                  ).length === 0 ? (
+                    <div className="p-6 text-center text-xs text-neutral-400 italic">
+                      No rejection remarks added yet for this stage.
+                    </div>
+                  ) : (
+                    customRemarks
+                      .filter(r => 
+                        (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
+                        r.remarkType === "REJECT"
+                      )
+                      .map((rem) => (
+                        <div 
+                          key={rem.id}
+                          className="p-2.5 bg-white dark:bg-slate-800 rounded-lg border border-neutral-200 dark:border-slate-700 flex items-center justify-between gap-2.5 hover:border-rose-300 dark:hover:border-rose-700 transition-all text-xs"
+                        >
+                          <div className="flex items-start gap-2 flex-1 min-w-0">
+                            <span className="text-rose-600 font-bold text-xs mt-0.5">✕</span>
+                            <span className="text-neutral-800 dark:text-neutral-200 font-medium leading-snug">
+                              {rem.remarkText}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {customRemarksStageFilter === "all" && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-neutral-100 text-neutral-600 dark:bg-slate-700 dark:text-slate-300">
+                                {rem.stage}
+                              </span>
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteCustomRemark(rem.id)}
+                              className="text-neutral-400 hover:text-rose-600 p-1 h-7 w-7 rounded hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                              title="Delete template"
+                            >
+                              <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+
             </div>
           </div>
 
-          <DialogFooter className="pt-2 border-t border-default-150">
+          <DialogFooter className="px-6 py-3 border-t border-default-150 bg-neutral-50 dark:bg-slate-850">
             <Button variant="outline" size="sm" onClick={() => setCustomRemarksModalOpen(false)} className="text-xs">
-              Close
+              Close &amp; Finish
             </Button>
           </DialogFooter>
         </DialogContent>
