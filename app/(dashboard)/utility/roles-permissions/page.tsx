@@ -185,6 +185,10 @@ export default function RolesPermissionsPage() {
   const [expandedEditGroups, setExpandedEditGroups] = useState<Record<string, boolean>>({});
   const [expandedMatrixGroups, setExpandedMatrixGroups] = useState<Record<string, boolean>>({});
 
+  // Overall Permissions Matrix section collapse state (false = compact by default)
+  const [showCreateMatrix, setShowCreateMatrix] = useState(false);
+  const [showEditMatrix, setShowEditMatrix] = useState(false);
+
   // Delete Modal State
   const [roleToDelete, setRoleToDelete] = useState<{ role: CustomRole; staffCount: number } | null>(null);
   const [targetRoleId, setTargetRoleId] = useState<string>("");
@@ -348,6 +352,8 @@ export default function RolesPermissionsPage() {
     setNewRoleBranchId(defaultBranch);
     setNewRoleSystemRole("RECRUITER");
     setNewRolePermissions(SYSTEM_ARCHETYPES[0].perms);
+    setShowCreateMatrix(false);
+    setExpandedCreateGroups({});
     setShowAddRole(true);
   };
 
@@ -390,6 +396,8 @@ export default function RolesPermissionsPage() {
     setEditRoleBranchId(role.branchId || branches[0]?.id || "");
     setEditRoleSystemRole(role.systemRole || "RECRUITER");
     setEditRolePermissions(role.permissions || []);
+    setShowEditMatrix(false);
+    setExpandedEditGroups({});
   };
 
   const handleEditRoleSave = async (e: React.FormEvent) => {
@@ -421,6 +429,7 @@ export default function RolesPermissionsPage() {
   const openPermissionsModal = (role: CustomRole) => {
     setMatrixEditingRole(role);
     setMatrixPermissions(role.permissions || []);
+    setExpandedMatrixGroups({});
   };
 
   const handleToggleMatrixPermission = (permId: string) => {
@@ -1000,141 +1009,181 @@ export default function RolesPermissionsPage() {
                 </select>
               </div>
 
-              {/* Permissions Matrix Selector */}
-              <div className="border border-neutral-200 dark:border-slate-800 rounded-xl p-4 space-y-3 bg-neutral-50/40 dark:bg-slate-800/10">
-                <div className="flex items-center justify-between border-b border-neutral-200 dark:border-slate-800 pb-3">
-                  <div>
-                    <h4 className="text-xs font-bold text-neutral-900 dark:text-white">Custom Permissions Matrix</h4>
-                    <p className="text-[10.5px] text-neutral-400">Toggle specific security tokens enabled for this role ({newRolePermissions.length} enabled)</p>
+              {/* Overall Collapsible Permissions Matrix Section */}
+              <div className="border border-neutral-200 dark:border-slate-800 rounded-xl overflow-hidden bg-neutral-50/40 dark:bg-slate-850/60 transition-all shadow-2xs">
+                <div
+                  onClick={() => setShowCreateMatrix((prev) => !prev)}
+                  className="flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800/80 cursor-pointer select-none transition-colors border-b border-transparent data-[open=true]:border-neutral-200 dark:data-[open=true]:border-slate-800"
+                  data-open={showCreateMatrix}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
+                      <Icon icon="heroicons:shield-check" className="h-4.5 w-4.5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
+                          Custom Permissions Matrix
+                        </h4>
+                        <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full border border-indigo-200/60 dark:border-indigo-800/50">
+                          {newRolePermissions.length} enabled
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-neutral-400 mt-0.5">
+                        {showCreateMatrix
+                          ? "Configure granular security permissions & capabilities"
+                          : "Inheriting defaults from selected base archetype. Click to customize granular permissions."}
+                      </p>
+                    </div>
                   </div>
+
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedCreateGroups(
-                        Object.keys(permissionGroups).reduce((acc, k) => ({ ...acc, [k]: true }), {})
-                      )}
-                      className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
-                    >
-                      Expand All
-                    </button>
-                    <span className="text-neutral-300 dark:text-slate-700">|</span>
-                    <button
-                      type="button"
-                      onClick={() => setExpandedCreateGroups({})}
-                      className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
-                    >
-                      Collapse All
-                    </button>
-                    <span className="text-neutral-300 dark:text-slate-700">|</span>
-                    <button
-                      type="button"
-                      onClick={() => setNewRolePermissions(permissions.map(p => p.id))}
-                      className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
-                    >
-                      Select All
-                    </button>
-                    <span className="text-neutral-300 dark:text-slate-700">|</span>
-                    <button
-                      type="button"
-                      onClick={() => setNewRolePermissions([])}
-                      className="text-[10px] font-bold text-neutral-500 hover:underline cursor-pointer"
-                    >
-                      Clear All
-                    </button>
+                    <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                      {showCreateMatrix ? "Hide Permissions" : "Customize Permissions"}
+                      <Icon
+                        icon={showCreateMatrix ? "heroicons:chevron-up" : "heroicons:chevron-down"}
+                        className="h-4 w-4"
+                      />
+                    </span>
                   </div>
                 </div>
 
-                <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
-                  {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
-                    const isExpanded = !!expandedCreateGroups[groupName];
-                    const enabledInGroup = groupPerms.filter(p => newRolePermissions.includes(p.id)).length;
-                    const totalInGroup = groupPerms.length;
-
-                    return (
-                      <div
-                        key={groupName}
-                        className="border border-neutral-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-slate-900 transition-all shadow-2xs"
-                      >
-                        <div
-                          onClick={() => setExpandedCreateGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))}
-                          className="flex items-center justify-between px-3 py-2 bg-neutral-50 dark:bg-slate-850 hover:bg-neutral-100/80 dark:hover:bg-slate-800 cursor-pointer select-none transition-colors"
+                {showCreateMatrix && (
+                  <div className="p-4 space-y-3 bg-neutral-50/30 dark:bg-slate-900/40 border-t border-neutral-200 dark:border-slate-800 animate-in fade-in-0 slide-in-from-top-1 duration-150">
+                    <div className="flex items-center justify-between border-b border-neutral-200 dark:border-slate-800 pb-2.5">
+                      <div className="text-[11px] text-neutral-500">
+                        Toggle granular security tokens:
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedCreateGroups(
+                            Object.keys(permissionGroups).reduce((acc, k) => ({ ...acc, [k]: true }), {})
+                          )}
+                          className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
                         >
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon={isExpanded ? "heroicons:chevron-down" : "heroicons:chevron-right"}
-                              className="h-3.5 w-3.5 text-neutral-500 transition-transform"
-                            />
-                            <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
-                              {groupName}
-                            </span>
-                            <span
-                              className={`text-[9.5px] px-2 py-0.5 rounded-full font-semibold ${
-                                enabledInGroup > 0
-                                  ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
-                                  : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
-                              }`}
-                            >
-                              {enabledInGroup} / {totalInGroup} enabled
-                            </span>
-                          </div>
+                          Expand All
+                        </button>
+                        <span className="text-neutral-300 dark:text-slate-700">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedCreateGroups({})}
+                          className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
+                        >
+                          Collapse All
+                        </button>
+                        <span className="text-neutral-300 dark:text-slate-700">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setNewRolePermissions(permissions.map(p => p.id))}
+                          className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                        >
+                          Select All
+                        </button>
+                        <span className="text-neutral-300 dark:text-slate-700">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setNewRolePermissions([])}
+                          className="text-[10px] font-bold text-neutral-500 hover:underline cursor-pointer"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                    </div>
 
-                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const ids = groupPerms.map(p => p.id);
-                                const all = ids.every(id => newRolePermissions.includes(id));
-                                if (all) {
-                                  setNewRolePermissions(prev => prev.filter(id => !ids.includes(id)));
-                                } else {
-                                  setNewRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
-                                }
-                              }}
-                              className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                            >
-                              {groupPerms.every(p => newRolePermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
-                            </button>
-                          </div>
-                        </div>
+                    <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                      {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
+                        const isExpanded = !!expandedCreateGroups[groupName];
+                        const enabledInGroup = groupPerms.filter(p => newRolePermissions.includes(p.id)).length;
+                        const totalInGroup = groupPerms.length;
 
-                        {isExpanded && (
-                          <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50/20 dark:bg-slate-900/30">
-                            {groupPerms.map((perm) => {
-                              const isChecked = newRolePermissions.includes(perm.id);
-                              return (
-                                <label
-                                  key={perm.id}
-                                  className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
-                                    isChecked
-                                      ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs"
-                                      : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300"
+                        return (
+                          <div
+                            key={groupName}
+                            className="border border-neutral-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-slate-900 transition-all shadow-2xs"
+                          >
+                            <div
+                              onClick={() => setExpandedCreateGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))}
+                              className="flex items-center justify-between px-3 py-2 bg-neutral-50 dark:bg-slate-850 hover:bg-neutral-100/80 dark:hover:bg-slate-800 cursor-pointer select-none transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Icon
+                                  icon={isExpanded ? "heroicons:chevron-down" : "heroicons:chevron-right"}
+                                  className="h-3.5 w-3.5 text-neutral-500 transition-transform"
+                                />
+                                <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
+                                  {groupName}
+                                </span>
+                                <span
+                                  className={`text-[9.5px] px-2 py-0.5 rounded-full font-semibold ${
+                                    enabledInGroup > 0
+                                      ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
+                                      : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
                                   }`}
                                 >
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => {
-                                      setNewRolePermissions(prev =>
-                                        prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
-                                      );
-                                    }}
-                                    className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
-                                  />
-                                  <div className="min-w-0 flex-1">
-                                    <span className="font-semibold text-neutral-800 dark:text-neutral-200 block text-[11px]">{perm.name}</span>
-                                    {perm.description && (
-                                      <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
-                                    )}
-                                  </div>
-                                </label>
-                              );
-                            })}
+                                  {enabledInGroup} / {totalInGroup} enabled
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const ids = groupPerms.map(p => p.id);
+                                    const all = ids.every(id => newRolePermissions.includes(id));
+                                    if (all) {
+                                      setNewRolePermissions(prev => prev.filter(id => !ids.includes(id)));
+                                    } else {
+                                      setNewRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
+                                    }
+                                  }}
+                                  className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                >
+                                  {groupPerms.every(p => newRolePermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {isExpanded && (
+                              <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50/20 dark:bg-slate-900/30">
+                                {groupPerms.map((perm) => {
+                                  const isChecked = newRolePermissions.includes(perm.id);
+                                  return (
+                                    <label
+                                      key={perm.id}
+                                      className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
+                                        isChecked
+                                          ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs"
+                                          : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300"
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() => {
+                                          setNewRolePermissions(prev =>
+                                            prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
+                                          );
+                                        }}
+                                        className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <span className="font-semibold text-neutral-800 dark:text-neutral-200 block text-[11px]">{perm.name}</span>
+                                        {perm.description && (
+                                          <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
+                                        )}
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2.5 pt-2">
@@ -1251,141 +1300,181 @@ export default function RolesPermissionsPage() {
                 </select>
               </div>
 
-              {/* Permissions Matrix */}
-              <div className="border border-neutral-200 dark:border-slate-800 rounded-xl p-4 space-y-3 bg-neutral-50/40 dark:bg-slate-800/10">
-                <div className="flex items-center justify-between border-b border-neutral-200 dark:border-slate-800 pb-3">
-                  <div>
-                    <h4 className="text-xs font-bold text-neutral-900 dark:text-white">Custom Permissions Matrix</h4>
-                    <p className="text-[10.5px] text-neutral-400">Configure access tokens for this role ({editRolePermissions.length} enabled)</p>
+              {/* Overall Collapsible Permissions Matrix Section */}
+              <div className="border border-neutral-200 dark:border-slate-800 rounded-xl overflow-hidden bg-neutral-50/40 dark:bg-slate-850/60 transition-all shadow-2xs">
+                <div
+                  onClick={() => setShowEditMatrix((prev) => !prev)}
+                  className="flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800/80 cursor-pointer select-none transition-colors border-b border-transparent data-[open=true]:border-neutral-200 dark:data-[open=true]:border-slate-800"
+                  data-open={showEditMatrix}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
+                      <Icon icon="heroicons:shield-check" className="h-4.5 w-4.5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
+                          Custom Permissions Matrix
+                        </h4>
+                        <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full border border-indigo-200/60 dark:border-indigo-800/50">
+                          {editRolePermissions.length} enabled
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-neutral-400 mt-0.5">
+                        {showEditMatrix
+                          ? "Configure granular security permissions & capabilities"
+                          : "Inheriting defaults from selected base archetype. Click to customize granular permissions."}
+                      </p>
+                    </div>
                   </div>
+
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedEditGroups(
-                        Object.keys(permissionGroups).reduce((acc, k) => ({ ...acc, [k]: true }), {})
-                      )}
-                      className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
-                    >
-                      Expand All
-                    </button>
-                    <span className="text-neutral-300 dark:text-slate-700">|</span>
-                    <button
-                      type="button"
-                      onClick={() => setExpandedEditGroups({})}
-                      className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
-                    >
-                      Collapse All
-                    </button>
-                    <span className="text-neutral-300 dark:text-slate-700">|</span>
-                    <button
-                      type="button"
-                      onClick={() => setEditRolePermissions(permissions.map(p => p.id))}
-                      className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
-                    >
-                      Select All
-                    </button>
-                    <span className="text-neutral-300 dark:text-slate-700">|</span>
-                    <button
-                      type="button"
-                      onClick={() => setEditRolePermissions([])}
-                      className="text-[10px] font-bold text-neutral-500 hover:underline cursor-pointer"
-                    >
-                      Clear All
-                    </button>
+                    <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                      {showEditMatrix ? "Hide Permissions" : "Customize Permissions"}
+                      <Icon
+                        icon={showEditMatrix ? "heroicons:chevron-up" : "heroicons:chevron-down"}
+                        className="h-4 w-4"
+                      />
+                    </span>
                   </div>
                 </div>
 
-                <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
-                  {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
-                    const isExpanded = !!expandedEditGroups[groupName];
-                    const enabledInGroup = groupPerms.filter(p => editRolePermissions.includes(p.id)).length;
-                    const totalInGroup = groupPerms.length;
-
-                    return (
-                      <div
-                        key={groupName}
-                        className="border border-neutral-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-slate-900 transition-all shadow-2xs"
-                      >
-                        <div
-                          onClick={() => setExpandedEditGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))}
-                          className="flex items-center justify-between px-3 py-2 bg-neutral-50 dark:bg-slate-850 hover:bg-neutral-100/80 dark:hover:bg-slate-800 cursor-pointer select-none transition-colors"
+                {showEditMatrix && (
+                  <div className="p-4 space-y-3 bg-neutral-50/30 dark:bg-slate-900/40 border-t border-neutral-200 dark:border-slate-800 animate-in fade-in-0 slide-in-from-top-1 duration-150">
+                    <div className="flex items-center justify-between border-b border-neutral-200 dark:border-slate-800 pb-2.5">
+                      <div className="text-[11px] text-neutral-500">
+                        Configure access tokens for this role:
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedEditGroups(
+                            Object.keys(permissionGroups).reduce((acc, k) => ({ ...acc, [k]: true }), {})
+                          )}
+                          className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
                         >
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              icon={isExpanded ? "heroicons:chevron-down" : "heroicons:chevron-right"}
-                              className="h-3.5 w-3.5 text-neutral-500 transition-transform"
-                            />
-                            <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
-                              {groupName}
-                            </span>
-                            <span
-                              className={`text-[9.5px] px-2 py-0.5 rounded-full font-semibold ${
-                                enabledInGroup > 0
-                                  ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
-                                  : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
-                              }`}
-                            >
-                              {enabledInGroup} / {totalInGroup} enabled
-                            </span>
-                          </div>
+                          Expand All
+                        </button>
+                        <span className="text-neutral-300 dark:text-slate-700">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedEditGroups({})}
+                          className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
+                        >
+                          Collapse All
+                        </button>
+                        <span className="text-neutral-300 dark:text-slate-700">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setEditRolePermissions(permissions.map(p => p.id))}
+                          className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                        >
+                          Select All
+                        </button>
+                        <span className="text-neutral-300 dark:text-slate-700">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setEditRolePermissions([])}
+                          className="text-[10px] font-bold text-neutral-500 hover:underline cursor-pointer"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                    </div>
 
-                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const ids = groupPerms.map(p => p.id);
-                                const all = ids.every(id => editRolePermissions.includes(id));
-                                if (all) {
-                                  setEditRolePermissions(prev => prev.filter(id => !ids.includes(id)));
-                                } else {
-                                  setEditRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
-                                }
-                              }}
-                              className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                            >
-                              {groupPerms.every(p => editRolePermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
-                            </button>
-                          </div>
-                        </div>
+                    <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                      {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
+                        const isExpanded = !!expandedEditGroups[groupName];
+                        const enabledInGroup = groupPerms.filter(p => editRolePermissions.includes(p.id)).length;
+                        const totalInGroup = groupPerms.length;
 
-                        {isExpanded && (
-                          <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50/20 dark:bg-slate-900/30">
-                            {groupPerms.map((perm) => {
-                              const isChecked = editRolePermissions.includes(perm.id);
-                              return (
-                                <label
-                                  key={perm.id}
-                                  className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
-                                    isChecked
-                                      ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs"
-                                      : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300"
+                        return (
+                          <div
+                            key={groupName}
+                            className="border border-neutral-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-slate-900 transition-all shadow-2xs"
+                          >
+                            <div
+                              onClick={() => setExpandedEditGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))}
+                              className="flex items-center justify-between px-3 py-2 bg-neutral-50 dark:bg-slate-850 hover:bg-neutral-100/80 dark:hover:bg-slate-800 cursor-pointer select-none transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Icon
+                                  icon={isExpanded ? "heroicons:chevron-down" : "heroicons:chevron-right"}
+                                  className="h-3.5 w-3.5 text-neutral-500 transition-transform"
+                                />
+                                <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
+                                  {groupName}
+                                </span>
+                                <span
+                                  className={`text-[9.5px] px-2 py-0.5 rounded-full font-semibold ${
+                                    enabledInGroup > 0
+                                      ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
+                                      : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
                                   }`}
                                 >
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => {
-                                      setEditRolePermissions(prev =>
-                                        prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
-                                      );
-                                    }}
-                                    className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
-                                  />
-                                  <div className="min-w-0 flex-1">
-                                    <span className="font-semibold text-neutral-800 dark:text-neutral-200 block text-[11px]">{perm.name}</span>
-                                    {perm.description && (
-                                      <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
-                                    )}
-                                  </div>
-                                </label>
-                              );
-                            })}
+                                  {enabledInGroup} / {totalInGroup} enabled
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const ids = groupPerms.map(p => p.id);
+                                    const all = ids.every(id => editRolePermissions.includes(id));
+                                    if (all) {
+                                      setEditRolePermissions(prev => prev.filter(id => !ids.includes(id)));
+                                    } else {
+                                      setEditRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
+                                    }
+                                  }}
+                                  className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                >
+                                  {groupPerms.every(p => editRolePermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {isExpanded && (
+                              <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50/20 dark:bg-slate-900/30">
+                                {groupPerms.map((perm) => {
+                                  const isChecked = editRolePermissions.includes(perm.id);
+                                  return (
+                                    <label
+                                      key={perm.id}
+                                      className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
+                                        isChecked
+                                          ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs"
+                                          : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300"
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() => {
+                                          setEditRolePermissions(prev =>
+                                            prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
+                                          );
+                                        }}
+                                        className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <span className="font-semibold text-neutral-800 dark:text-neutral-200 block text-[11px]">{perm.name}</span>
+                                        {perm.description && (
+                                          <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
+                                        )}
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2.5 pt-2">
