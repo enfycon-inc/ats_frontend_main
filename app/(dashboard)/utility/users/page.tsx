@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Users, UserPlus, Search, Edit2, Key, Shield, Building2, MapPin, 
   CheckCircle2, XCircle, RefreshCw, Mail, Lock, Sparkles, Filter, ShieldAlert, X, ChevronRight, Loader2,
@@ -34,6 +34,8 @@ interface UserItem {
   branchName: string | null;
   jobReviewerId?: string | null;
   jobReviewerName?: string | null;
+  permissions?: string[];
+  canReview?: boolean;
   isActive: boolean;
   lastLoginAt?: string;
   createdAt: string;
@@ -57,6 +59,31 @@ export default function UserManagementPage() {
   };
   const tenantDomain = getDomainSuffix();
   const userLimit = profile?.userLimit || 10;
+
+  // Filter reviewers who have internal screening & review permissions enabled
+  const eligibleReviewers = useMemo(() => {
+    return users.filter((u) => {
+      if (!u.isActive) return false;
+      if (u.canReview) return true;
+      const perms = u.permissions || [];
+      if (
+        perms.includes("submission:internal_screening") ||
+        perms.includes("job:approve") ||
+        perms.includes("job:reject")
+      ) {
+        return true;
+      }
+      const r = (u.roles || []).map((x: string) => (x || "").toUpperCase());
+      return (
+        r.includes("DELIVERY_HEAD") ||
+        r.includes("ADMIN") ||
+        r.includes("SUPER_ADMIN") ||
+        r.includes("BRANCH_ADMIN") ||
+        r.includes("POD_LEAD") ||
+        r.includes("ACCOUNT_MANAGER")
+      );
+    });
+  }, [users]);
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
@@ -889,7 +916,7 @@ export default function UserManagementPage() {
                       }}
                       className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-semibold"
                     >
-                      <Shield className="h-3.5 w-3.5 text-indigo-600" /> Assign System Roles...
+                      <Shield className="h-3.5 w-3.5 text-indigo-600" /> Roles...
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
@@ -1725,11 +1752,11 @@ export default function UserManagementPage() {
                   className="w-full h-8.5 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-medium text-neutral-800 dark:text-neutral-200"
                 >
                   <option value="">⚡ Inherit from Pod / Branch Default (Recommended)</option>
-                  {users
-                    .filter((u) => u.id !== selectedUser?.id && u.isActive)
-                    .map((u) => (
+                  {eligibleReviewers
+                    .filter((u: UserItem) => u.id !== selectedUser?.id)
+                    .map((u: UserItem) => (
                       <option key={u.id} value={u.id}>
-                        {u.fullName} ({u.roleName || (u.roles && u.roles[0]) || "Team Member"}) - {u.email}
+                        {u.fullName} ({u.roleName || (u.roles && u.roles[0]) || "Reviewer"}) - {u.email}
                       </option>
                     ))}
                 </select>
@@ -1799,7 +1826,7 @@ export default function UserManagementPage() {
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md flex flex-col overflow-hidden">
             <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <Shield className="h-4 w-4 text-indigo-600" /> Assign System Roles ({selectedUserIds.length} Users)
+                <Shield className="h-4 w-4 text-indigo-600" /> Roles ({selectedUserIds.length} Users)
               </h3>
               <button onClick={() => setIsBulkRoleModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 cursor-pointer">
                 <X className="h-4 w-4" />
@@ -1808,7 +1835,7 @@ export default function UserManagementPage() {
 
             <div className="p-5 space-y-3 max-h-72 overflow-y-auto">
               <p className="text-xs text-neutral-500 mb-2">
-                Select one or more system roles to assign simultaneously to the <strong>{selectedUserIds.length} selected team members</strong>:
+                Select roles to assign to the <strong>{selectedUserIds.length} selected team members</strong>:
               </p>
 
               {rolesList.map((r) => {
@@ -1946,13 +1973,11 @@ export default function UserManagementPage() {
                   className="w-full h-9 text-xs font-medium rounded-md border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-neutral-900 dark:text-neutral-100 outline-none"
                 >
                   <option value="">⚡ Inherit from Pod / Branch Default</option>
-                  {users
-                    .filter((u) => u.isActive)
-                    .map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.fullName} ({u.roleName || (u.roles && u.roles[0]) || "Team Member"}) - {u.email}
-                      </option>
-                    ))}
+                  {eligibleReviewers.map((u: UserItem) => (
+                    <option key={u.id} value={u.id}>
+                      {u.fullName} ({u.roleName || (u.roles && u.roles[0]) || "Reviewer"}) - {u.email}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
