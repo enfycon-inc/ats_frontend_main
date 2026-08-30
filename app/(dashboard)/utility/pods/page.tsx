@@ -727,7 +727,7 @@ export default function PodsPage() {
                       >
                         {branches.map((b) => (
                           <option key={b.id} value={b.id}>
-                            {b.name} ({b.market || "General"})
+                            {b.name}
                           </option>
                         ))}
                       </select>

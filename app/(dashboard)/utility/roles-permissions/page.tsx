@@ -942,7 +942,7 @@ export default function RolesPermissionsPage() {
                     >
                       {branches.map((b) => (
                         <option key={b.id} value={b.id}>
-                          {b.name} ({b.market || "General"})
+                          {b.name}
                         </option>
                       ))}
                     </select>
@@ -1142,7 +1142,7 @@ export default function RolesPermissionsPage() {
                     >
                       {branches.map((b) => (
                         <option key={b.id} value={b.id}>
-                          {b.name} ({b.market || "General"})
+                          {b.name}
                         </option>
                       ))}
                     </select>
