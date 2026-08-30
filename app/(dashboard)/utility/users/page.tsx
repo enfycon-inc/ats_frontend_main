@@ -1419,7 +1419,7 @@ export default function UserManagementPage() {
                         </div>
                       </td>
 
-                      {/* Branch Location — Plain Comma-Separated Text + Quick Manage */}
+                      {/* Branch Location — Plain Comma-Separated Text */}
                       <td className="py-3 px-4 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                         {(() => {
                           const assignedIds = (user.assignedBranchIds && user.assignedBranchIds.length > 0)
@@ -1432,24 +1432,12 @@ export default function UserManagementPage() {
                             return bObj.name;
                           });
 
-                          return (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {assignedIds.length === 0 ? (
-                                <span className="text-neutral-400 font-normal">-- Unassigned (HQ Shared) --</span>
-                              ) : (
-                                <span className="truncate max-w-[200px] inline-block font-medium text-neutral-800 dark:text-neutral-200" title={branchNames.join(", ")}>
-                                  🏢 {branchNames.join(", ")}
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => openEditModal(user)}
-                                className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold inline-flex items-center gap-0.5 bg-indigo-50 dark:bg-indigo-950/70 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800/80 transition-colors cursor-pointer"
-                                title="Add more branches or edit branch assignments"
-                              >
-                                + Add
-                              </button>
-                            </div>
+                          return assignedIds.length === 0 ? (
+                            <span className="text-neutral-400 font-normal">-- Unassigned (HQ Shared) --</span>
+                          ) : (
+                            <span className="truncate max-w-[220px] inline-block font-medium text-neutral-800 dark:text-neutral-200" title={branchNames.join(", ")}>
+                              🏢 {branchNames.join(", ")}
+                            </span>
                           );
                         })()}
                       </td>
@@ -1461,9 +1449,14 @@ export default function UserManagementPage() {
                             <UserCheck className="h-3 w-3 text-emerald-600" /> {user.jobReviewerName}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-medium bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-neutral-400 border border-neutral-200 dark:border-slate-700">
-                            ⚡ Pod / Branch Default
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(user)}
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800/60 transition-colors cursor-pointer"
+                            title="Assign a designated Job Reviewer"
+                          >
+                            + Assign
+                          </button>
                         )}
                       </td>
 
