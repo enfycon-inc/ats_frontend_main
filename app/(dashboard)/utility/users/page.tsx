@@ -992,20 +992,41 @@ export default function UserManagementPage() {
                             const hasMultipleBranches = (user.assignedBranchIds && user.assignedBranchIds.length > 1) ||
                               (user.branchRoles && Object.keys(user.branchRoles).length > 1);
 
-                            const formatRoleLabel = (r: string) => {
+                            const formatRoleLabel = (r: string, bId?: string) => {
                               if (!r || typeof r !== "string") return "Recruiter";
-                              const upper = r.toUpperCase();
-                              if (upper === "ACCOUNT_MANAGER") return "Account Manager";
+                              const upper = r.trim().toUpperCase();
+
+                              // 1. Dynamic custom role lookup from rolesList
+                              const customRole = (rolesList || []).find(
+                                (cr) =>
+                                  !cr.isSystem &&
+                                  ((!bId || !cr.branchId || cr.branchId === bId) &&
+                                    (cr.name.toUpperCase() === upper ||
+                                      cr.id === r ||
+                                      (cr.systemRole && cr.systemRole.toUpperCase() === upper)))
+                              ) || (rolesList || []).find(
+                                (cr) =>
+                                  !cr.isSystem &&
+                                  (cr.name.toUpperCase() === upper ||
+                                    cr.id === r ||
+                                    (cr.systemRole && cr.systemRole.toUpperCase() === upper))
+                              );
+
+                              if (customRole) {
+                                return customRole.name;
+                              }
+
+                              if (upper === "ACCOUNT_MANAGER" || upper === "BDM" || upper === "BD_MANAGER" || upper === "BD MANAGER") return "Account Manager";
                               if (upper === "POD_LEAD") return "Pod Lead";
                               if (upper === "BRANCH_ADMIN") return "Branch Admin";
                               if (upper === "DELIVERY_HEAD") return "Delivery Head";
                               if (upper === "RECRUITER") return "Recruiter";
-                              if (upper === "ADMIN") return "Tenant Admin";
+                              if (upper === "ADMIN" || upper === "SUPER_ADMIN") return "Tenant Admin";
                               return r.replace(/_/g, " ");
                             };
 
                             return groups.map((group, idx) => {
-                              const roleLabels = group.roles.map((r) => formatRoleLabel(r));
+                              const roleLabels = group.roles.map((r) => formatRoleLabel(r, group.branchId));
                               return (
                                 <span
                                   key={`${group.branchId || idx}`}
