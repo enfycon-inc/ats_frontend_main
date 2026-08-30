@@ -180,6 +180,11 @@ export default function RolesPermissionsPage() {
   const [matrixEditingRole, setMatrixEditingRole] = useState<CustomRole | null>(null);
   const [matrixPermissions, setMatrixPermissions] = useState<string[]>([]);
 
+  // Collapsed Permission Groups State (empty = all groups collapsed by default)
+  const [expandedCreateGroups, setExpandedCreateGroups] = useState<Record<string, boolean>>({});
+  const [expandedEditGroups, setExpandedEditGroups] = useState<Record<string, boolean>>({});
+  const [expandedMatrixGroups, setExpandedMatrixGroups] = useState<Record<string, boolean>>({});
+
   // Delete Modal State
   const [roleToDelete, setRoleToDelete] = useState<{ role: CustomRole; staffCount: number } | null>(null);
   const [targetRoleId, setTargetRoleId] = useState<string>("");
@@ -996,7 +1001,7 @@ export default function RolesPermissionsPage() {
               </div>
 
               {/* Permissions Matrix Selector */}
-              <div className="border border-neutral-200 dark:border-slate-800 rounded-xl p-4 space-y-4 bg-neutral-50/40 dark:bg-slate-800/10">
+              <div className="border border-neutral-200 dark:border-slate-800 rounded-xl p-4 space-y-3 bg-neutral-50/40 dark:bg-slate-800/10">
                 <div className="flex items-center justify-between border-b border-neutral-200 dark:border-slate-800 pb-3">
                   <div>
                     <h4 className="text-xs font-bold text-neutral-900 dark:text-white">Custom Permissions Matrix</h4>
@@ -1005,12 +1010,30 @@ export default function RolesPermissionsPage() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
+                      onClick={() => setExpandedCreateGroups(
+                        Object.keys(permissionGroups).reduce((acc, k) => ({ ...acc, [k]: true }), {})
+                      )}
+                      className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
+                    >
+                      Expand All
+                    </button>
+                    <span className="text-neutral-300 dark:text-slate-700">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedCreateGroups({})}
+                      className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
+                    >
+                      Collapse All
+                    </button>
+                    <span className="text-neutral-300 dark:text-slate-700">|</span>
+                    <button
+                      type="button"
                       onClick={() => setNewRolePermissions(permissions.map(p => p.id))}
                       className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
                     >
                       Select All
                     </button>
-                    <span className="text-neutral-300">|</span>
+                    <span className="text-neutral-300 dark:text-slate-700">|</span>
                     <button
                       type="button"
                       onClick={() => setNewRolePermissions([])}
@@ -1021,61 +1044,96 @@ export default function RolesPermissionsPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                  {Object.entries(permissionGroups).map(([groupName, groupPerms]) => (
-                    <div key={groupName} className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">{groupName}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const ids = groupPerms.map(p => p.id);
-                            const all = ids.every(id => newRolePermissions.includes(id));
-                            if (all) {
-                              setNewRolePermissions(prev => prev.filter(id => !ids.includes(id)));
-                            } else {
-                              setNewRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
-                            }
-                          }}
-                          className="text-[10px] font-semibold text-indigo-600 hover:underline cursor-pointer"
+                <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+                  {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
+                    const isExpanded = !!expandedCreateGroups[groupName];
+                    const enabledInGroup = groupPerms.filter(p => newRolePermissions.includes(p.id)).length;
+                    const totalInGroup = groupPerms.length;
+
+                    return (
+                      <div
+                        key={groupName}
+                        className="border border-neutral-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-slate-900 transition-all shadow-2xs"
+                      >
+                        <div
+                          onClick={() => setExpandedCreateGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))}
+                          className="flex items-center justify-between px-3 py-2 bg-neutral-50 dark:bg-slate-850 hover:bg-neutral-100/80 dark:hover:bg-slate-800 cursor-pointer select-none transition-colors"
                         >
-                          Toggle Group
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {groupPerms.map((perm) => {
-                          const isChecked = newRolePermissions.includes(perm.id);
-                          return (
-                            <label
-                              key={perm.id}
-                              className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
-                                isChecked
-                                  ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white"
-                                  : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300"
+                          <div className="flex items-center gap-2">
+                            <Icon
+                              icon={isExpanded ? "heroicons:chevron-down" : "heroicons:chevron-right"}
+                              className="h-3.5 w-3.5 text-neutral-500 transition-transform"
+                            />
+                            <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
+                              {groupName}
+                            </span>
+                            <span
+                              className={`text-[9.5px] px-2 py-0.5 rounded-full font-semibold ${
+                                enabledInGroup > 0
+                                  ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
+                                  : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
                               }`}
                             >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {
-                                  setNewRolePermissions(prev =>
-                                    prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
-                                  );
-                                }}
-                                className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <span className="font-semibold text-neutral-800 dark:text-neutral-200 block text-[11px]">{perm.name}</span>
-                                {perm.description && (
-                                  <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
-                                )}
-                              </div>
-                            </label>
-                          );
-                        })}
+                              {enabledInGroup} / {totalInGroup} enabled
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const ids = groupPerms.map(p => p.id);
+                                const all = ids.every(id => newRolePermissions.includes(id));
+                                if (all) {
+                                  setNewRolePermissions(prev => prev.filter(id => !ids.includes(id)));
+                                } else {
+                                  setNewRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
+                                }
+                              }}
+                              className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                            >
+                              {groupPerms.every(p => newRolePermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50/20 dark:bg-slate-900/30">
+                            {groupPerms.map((perm) => {
+                              const isChecked = newRolePermissions.includes(perm.id);
+                              return (
+                                <label
+                                  key={perm.id}
+                                  className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
+                                    isChecked
+                                      ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs"
+                                      : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      setNewRolePermissions(prev =>
+                                        prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
+                                      );
+                                    }}
+                                    className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <span className="font-semibold text-neutral-800 dark:text-neutral-200 block text-[11px]">{perm.name}</span>
+                                    {perm.description && (
+                                      <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
+                                    )}
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1194,7 +1252,7 @@ export default function RolesPermissionsPage() {
               </div>
 
               {/* Permissions Matrix */}
-              <div className="border border-neutral-200 dark:border-slate-800 rounded-xl p-4 space-y-4 bg-neutral-50/40 dark:bg-slate-800/10">
+              <div className="border border-neutral-200 dark:border-slate-800 rounded-xl p-4 space-y-3 bg-neutral-50/40 dark:bg-slate-800/10">
                 <div className="flex items-center justify-between border-b border-neutral-200 dark:border-slate-800 pb-3">
                   <div>
                     <h4 className="text-xs font-bold text-neutral-900 dark:text-white">Custom Permissions Matrix</h4>
@@ -1203,12 +1261,30 @@ export default function RolesPermissionsPage() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
+                      onClick={() => setExpandedEditGroups(
+                        Object.keys(permissionGroups).reduce((acc, k) => ({ ...acc, [k]: true }), {})
+                      )}
+                      className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
+                    >
+                      Expand All
+                    </button>
+                    <span className="text-neutral-300 dark:text-slate-700">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedEditGroups({})}
+                      className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
+                    >
+                      Collapse All
+                    </button>
+                    <span className="text-neutral-300 dark:text-slate-700">|</span>
+                    <button
+                      type="button"
                       onClick={() => setEditRolePermissions(permissions.map(p => p.id))}
                       className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
                     >
                       Select All
                     </button>
-                    <span className="text-neutral-300">|</span>
+                    <span className="text-neutral-300 dark:text-slate-700">|</span>
                     <button
                       type="button"
                       onClick={() => setEditRolePermissions([])}
@@ -1219,61 +1295,96 @@ export default function RolesPermissionsPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                  {Object.entries(permissionGroups).map(([groupName, groupPerms]) => (
-                    <div key={groupName} className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">{groupName}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const ids = groupPerms.map(p => p.id);
-                            const all = ids.every(id => editRolePermissions.includes(id));
-                            if (all) {
-                              setEditRolePermissions(prev => prev.filter(id => !ids.includes(id)));
-                            } else {
-                              setEditRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
-                            }
-                          }}
-                          className="text-[10px] font-semibold text-indigo-600 hover:underline cursor-pointer"
+                <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+                  {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
+                    const isExpanded = !!expandedEditGroups[groupName];
+                    const enabledInGroup = groupPerms.filter(p => editRolePermissions.includes(p.id)).length;
+                    const totalInGroup = groupPerms.length;
+
+                    return (
+                      <div
+                        key={groupName}
+                        className="border border-neutral-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-slate-900 transition-all shadow-2xs"
+                      >
+                        <div
+                          onClick={() => setExpandedEditGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))}
+                          className="flex items-center justify-between px-3 py-2 bg-neutral-50 dark:bg-slate-850 hover:bg-neutral-100/80 dark:hover:bg-slate-800 cursor-pointer select-none transition-colors"
                         >
-                          Toggle Group
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {groupPerms.map((perm) => {
-                          const isChecked = editRolePermissions.includes(perm.id);
-                          return (
-                            <label
-                              key={perm.id}
-                              className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
-                                isChecked
-                                  ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white"
-                                  : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300"
+                          <div className="flex items-center gap-2">
+                            <Icon
+                              icon={isExpanded ? "heroicons:chevron-down" : "heroicons:chevron-right"}
+                              className="h-3.5 w-3.5 text-neutral-500 transition-transform"
+                            />
+                            <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
+                              {groupName}
+                            </span>
+                            <span
+                              className={`text-[9.5px] px-2 py-0.5 rounded-full font-semibold ${
+                                enabledInGroup > 0
+                                  ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
+                                  : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
                               }`}
                             >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {
-                                  setEditRolePermissions(prev =>
-                                    prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
-                                  );
-                                }}
-                                className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <span className="font-semibold text-neutral-800 dark:text-neutral-200 block text-[11px]">{perm.name}</span>
-                                {perm.description && (
-                                  <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
-                                )}
-                              </div>
-                            </label>
-                          );
-                        })}
+                              {enabledInGroup} / {totalInGroup} enabled
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const ids = groupPerms.map(p => p.id);
+                                const all = ids.every(id => editRolePermissions.includes(id));
+                                if (all) {
+                                  setEditRolePermissions(prev => prev.filter(id => !ids.includes(id)));
+                                } else {
+                                  setEditRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
+                                }
+                              }}
+                              className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                            >
+                              {groupPerms.every(p => editRolePermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50/20 dark:bg-slate-900/30">
+                            {groupPerms.map((perm) => {
+                              const isChecked = editRolePermissions.includes(perm.id);
+                              return (
+                                <label
+                                  key={perm.id}
+                                  className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
+                                    isChecked
+                                      ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs"
+                                      : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      setEditRolePermissions(prev =>
+                                        prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
+                                      );
+                                    }}
+                                    className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <span className="font-semibold text-neutral-800 dark:text-neutral-200 block text-[11px]">{perm.name}</span>
+                                    {perm.description && (
+                                      <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
+                                    )}
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1637,12 +1748,30 @@ export default function RolesPermissionsPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => setExpandedMatrixGroups(
+                      Object.keys(permissionGroups).reduce((acc, k) => ({ ...acc, [k]: true }), {})
+                    )}
+                    className="text-xs font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
+                  >
+                    Expand All
+                  </button>
+                  <span className="text-neutral-300 dark:text-slate-700">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedMatrixGroups({})}
+                    className="text-xs font-bold text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline cursor-pointer"
+                  >
+                    Collapse All
+                  </button>
+                  <span className="text-neutral-300 dark:text-slate-700">|</span>
+                  <button
+                    type="button"
                     onClick={() => setMatrixPermissions(permissions.map(p => p.id))}
                     className="text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
                   >
                     Select All
                   </button>
-                  <span className="text-neutral-300">|</span>
+                  <span className="text-neutral-300 dark:text-slate-700">|</span>
                   <button
                     type="button"
                     onClick={() => setMatrixPermissions([])}
@@ -1653,53 +1782,85 @@ export default function RolesPermissionsPage() {
                 </div>
               </div>
 
-              <div className="space-y-6">
-                {Object.entries(permissionGroups).map(([groupName, groupPerms]) => (
-                  <div key={groupName} className="space-y-2 border-b border-neutral-200 dark:border-slate-800 pb-5 last:border-b-0 last:pb-0">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider flex items-center gap-1.5">
-                        <Icon icon="heroicons:folder" className="h-3.5 w-3.5 text-neutral-400" />
-                        {groupName}
-                      </h4>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleMatrixGroup(groupPerms)}
-                        className="text-[10px] font-semibold text-indigo-600 hover:underline cursor-pointer"
+              <div className="space-y-3">
+                {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
+                  const isExpanded = !!expandedMatrixGroups[groupName];
+                  const enabledInGroup = groupPerms.filter(p => matrixPermissions.includes(p.id)).length;
+                  const totalInGroup = groupPerms.length;
+
+                  return (
+                    <div
+                      key={groupName}
+                      className="border border-neutral-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-2xs transition-all"
+                    >
+                      <div
+                        onClick={() => setExpandedMatrixGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))}
+                        className="flex items-center justify-between px-4 py-3 bg-neutral-50 dark:bg-slate-850 hover:bg-neutral-100/80 dark:hover:bg-slate-800 cursor-pointer select-none transition-colors"
                       >
-                        Toggle All in {groupName}
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2">
-                      {groupPerms.map((perm) => {
-                        const isChecked = matrixPermissions.includes(perm.id);
-                        return (
-                          <label
-                            key={perm.id}
-                            className={`flex items-start gap-2.5 p-3 rounded-lg border transition cursor-pointer select-none ${
-                              isChecked
-                                ? "border-indigo-300 dark:border-indigo-800 bg-indigo-50/20 dark:bg-indigo-950/20 text-neutral-900 dark:text-white"
-                                : "border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300"
+                        <div className="flex items-center gap-2.5">
+                          <Icon
+                            icon={isExpanded ? "heroicons:chevron-down" : "heroicons:chevron-right"}
+                            className="h-4 w-4 text-neutral-500 transition-transform"
+                          />
+                          <h4 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider flex items-center gap-1.5">
+                            {groupName}
+                          </h4>
+                          <span
+                            className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold ${
+                              enabledInGroup > 0
+                                ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
+                                : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
                             }`}
                           >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => handleToggleMatrixPermission(perm.id)}
-                              className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-xs font-bold text-neutral-900 dark:text-white">{perm.name}</div>
-                              <div className="text-[10px] text-neutral-400 font-mono mt-0.5">Token: &apos;{perm.id}&apos;</div>
-                              {perm.description && (
-                                <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-1 leading-snug">{perm.description}</p>
-                              )}
-                            </div>
-                          </label>
-                        );
-                      })}
+                            {enabledInGroup} / {totalInGroup} enabled
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleMatrixGroup(groupPerms)}
+                            className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                          >
+                            {groupPerms.every(p => matrixPermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50/20 dark:bg-slate-900/30">
+                          {groupPerms.map((perm) => {
+                            const isChecked = matrixPermissions.includes(perm.id);
+                            return (
+                              <label
+                                key={perm.id}
+                                className={`flex items-start gap-2.5 p-3 rounded-lg border transition cursor-pointer select-none ${
+                                  isChecked
+                                    ? "border-indigo-300 dark:border-indigo-800 bg-indigo-50/20 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs"
+                                    : "border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => handleToggleMatrixPermission(perm.id)}
+                                  className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-xs font-bold text-neutral-900 dark:text-white">{perm.name}</div>
+                                  <div className="text-[10px] text-neutral-400 font-mono mt-0.5">Token: &apos;{perm.id}&apos;</div>
+                                  {perm.description && (
+                                    <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-1 leading-snug">{perm.description}</p>
+                                  )}
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
