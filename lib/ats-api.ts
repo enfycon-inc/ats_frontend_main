@@ -437,10 +437,17 @@ const auth = {
     });
   },
 
-  async updateUserDetail(userId: string, data: { fullName?: string; email?: string; password?: string; branchId?: string; assignedBranchIds?: string[]; branchRoles?: Record<string, string[]>; businessUnitId?: string; roles?: string[] }): Promise<any> {
+  async updateUserDetail(userId: string, data: { fullName?: string; email?: string; password?: string; branchId?: string; assignedBranchIds?: string[]; branchRoles?: Record<string, string[]>; businessUnitId?: string; roles?: string[]; jobReviewerId?: string | null }): Promise<any> {
     return apiFetch<any>(`/api/auth/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+  },
+
+  async bulkSetJobReviewer(userIds: string[], reviewerId?: string | null): Promise<any> {
+    return apiFetch<any>('/api/auth/users/bulk-reviewer', {
+      method: 'POST',
+      body: JSON.stringify({ userIds, reviewerId: reviewerId || null }),
     });
   },
 

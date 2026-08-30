@@ -32,6 +32,8 @@ interface UserItem {
   assignedBranchIds?: string[];
   branchRoles?: Record<string, string[]>;
   branchName: string | null;
+  jobReviewerId?: string | null;
+  jobReviewerName?: string | null;
   isActive: boolean;
   lastLoginAt?: string;
   createdAt: string;
@@ -68,6 +70,8 @@ export default function UserManagementPage() {
   const [bulkSelectedRoleIds, setBulkSelectedRoleIds] = useState<string[]>([]);
   const [isBulkMoveBranchModalOpen, setIsBulkMoveBranchModalOpen] = useState(false);
   const [targetMoveBranchId, setTargetMoveBranchId] = useState("");
+  const [isBulkReviewerModalOpen, setIsBulkReviewerModalOpen] = useState(false);
+  const [targetBulkReviewerId, setTargetBulkReviewerId] = useState("");
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -140,6 +144,7 @@ export default function UserManagementPage() {
     branchId: "",
     assignedBranchIds: [] as string[],
     branchRoles: {} as Record<string, string[]>,
+    jobReviewerId: "",
     roles: ["RECRUITER"],
   });
 
@@ -283,6 +288,7 @@ export default function UserManagementPage() {
         branchId: editForm.branchId || undefined,
         assignedBranchIds: assignedBranchIds,
         branchRoles: cleanBranchRoles,
+        jobReviewerId: editForm.jobReviewerId || null,
         roles: finalRoles,
       });
 
@@ -464,6 +470,23 @@ export default function UserManagementPage() {
       loadData();
     } catch (err: any) {
       toast.error("Failed bulk role assignment.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkAssignReviewer = async () => {
+    if (selectedUserIds.length === 0) return;
+    try {
+      setLoading(true);
+      await atsApi.auth.bulkSetJobReviewer(selectedUserIds, targetBulkReviewerId || null);
+      toast.success(`Updated Job Reviewer for ${selectedUserIds.length} user(s)!`);
+      setIsBulkReviewerModalOpen(false);
+      setSelectedUserIds([]);
+      setTargetBulkReviewerId("");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed bulk reviewer assignment.");
     } finally {
       setLoading(false);
     }
@@ -665,6 +688,7 @@ export default function UserManagementPage() {
       branchId: user.branchId || "",
       assignedBranchIds: initialAssigned,
       branchRoles: cleanedBranchRoles,
+      jobReviewerId: user.jobReviewerId || "",
       roles: [...rawRoles],
     });
     setIsEditModalOpen(true);
@@ -879,6 +903,16 @@ export default function UserManagementPage() {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
+                      onClick={() => {
+                        setTargetBulkReviewerId("");
+                        setIsBulkReviewerModalOpen(true);
+                      }}
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-semibold"
+                    >
+                      <UserCheck className="h-3.5 w-3.5 text-indigo-600" /> Assign Job Reviewer...
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
                       onClick={() => handleBulkStatusChange(true)}
                       className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-emerald-700 font-semibold"
                     >
@@ -993,6 +1027,7 @@ export default function UserManagementPage() {
                   <th className="py-3 px-4">Work Email</th>
                   <th className="py-3 px-4">Assigned Role(s)</th>
                   <th className="py-3 px-4">Branch Location</th>
+                  <th className="py-3 px-4">Job Reviewer</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -1132,6 +1167,19 @@ export default function UserManagementPage() {
                             </div>
                           );
                         })()}
+                      </td>
+
+                      {/* Designated Job Reviewer */}
+                      <td className="py-3 px-4 text-xs font-semibold">
+                        {user.jobReviewerName ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs">
+                            <UserCheck className="h-3 w-3 text-emerald-600" /> {user.jobReviewerName}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-medium bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-neutral-400 border border-neutral-200 dark:border-slate-700">
+                            ⚡ Pod / Branch Default
+                          </span>
+                        )}
                       </td>
 
                       {/* Status Toggle */}
@@ -1658,6 +1706,35 @@ export default function UserManagementPage() {
                 </div>
               </div>
 
+              {/* DESIGNATED JOB REVIEWER / APPROVER */}
+              <div className="space-y-2 pt-3 border-t border-neutral-100 dark:border-slate-800">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                    <UserCheck className="h-4 w-4 text-indigo-600" /> Designated Job Reviewer / Approver
+                  </label>
+                  <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded">
+                    Approval Routing
+                  </span>
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  Select who reviews and approves job orders created by this user. If left on default, it automatically routes to their Recruitment Pod Lead or Branch Delivery Head.
+                </p>
+                <select
+                  value={editForm.jobReviewerId}
+                  onChange={(e) => setEditForm({ ...editForm, jobReviewerId: e.target.value })}
+                  className="w-full h-8.5 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-medium text-neutral-800 dark:text-neutral-200"
+                >
+                  <option value="">⚡ Inherit from Pod / Branch Default (Recommended)</option>
+                  {users
+                    .filter((u) => u.id !== selectedUser?.id && u.isActive)
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.fullName} ({u.roleName || (u.roles && u.roles[0]) || "Team Member"}) - {u.email}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
 
 
               <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100 dark:border-slate-800 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
@@ -1837,6 +1914,60 @@ export default function UserManagementPage() {
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs"
               >
                 {loading ? "Relocating..." : `Move ${selectedUserIds.length} Users`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK ASSIGN JOB REVIEWER MODAL */}
+      {isBulkReviewerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in-0">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md flex flex-col overflow-hidden">
+            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
+              <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-indigo-600" /> Assign Job Reviewer ({selectedUserIds.length} Selected)
+              </h3>
+              <button onClick={() => setIsBulkReviewerModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 cursor-pointer">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-neutral-500">
+                Set who will review and approve jobs created by the <strong>{selectedUserIds.length} selected team members</strong>:
+              </p>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Designated Job Reviewer *</label>
+                <select
+                  value={targetBulkReviewerId}
+                  onChange={(e) => setTargetBulkReviewerId(e.target.value)}
+                  className="w-full h-9 text-xs font-medium rounded-md border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-neutral-900 dark:text-neutral-100 outline-none"
+                >
+                  <option value="">⚡ Inherit from Pod / Branch Default</option>
+                  {users
+                    .filter((u) => u.isActive)
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.fullName} ({u.roleName || (u.roles && u.roles[0]) || "Team Member"}) - {u.email}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="border-t border-neutral-100 dark:border-slate-800 p-4 bg-neutral-50 dark:bg-slate-850 flex justify-end gap-2">
+              <Button size="sm" variant="outline" type="button" onClick={() => setIsBulkReviewerModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleBulkAssignReviewer}
+                disabled={loading}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs"
+              >
+                {loading ? "Updating..." : `Set Reviewer for ${selectedUserIds.length} Users`}
               </Button>
             </div>
           </div>
