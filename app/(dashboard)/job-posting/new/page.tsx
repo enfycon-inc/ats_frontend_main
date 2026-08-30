@@ -320,6 +320,39 @@ export default function NewJobPostingPage() {
   const [isWorkAuthOpen, setIsWorkAuthOpen] = useState(false);
   const workAuthDropdownRef = useRef<HTMLDivElement>(null);
   
+const getInitialActiveBranchContext = () => {
+  if (typeof window === "undefined") {
+    return {
+      market: "IN" as "US" | "IN",
+      isUs: false,
+      branchName: "",
+      branchId: "",
+    };
+  }
+  const bId = localStorage.getItem("active_branch_id") || "";
+  const bName = localStorage.getItem("active_branch_name") || "";
+  const bMarket = localStorage.getItem("active_branch_market") || "";
+
+  let isUs = false;
+  if (bMarket) {
+    const upper = bMarket.toUpperCase();
+    if (upper === "US" || upper === "USA") isUs = true;
+  }
+  if (!bMarket && bName) {
+    const lower = bName.toLowerCase();
+    if (lower.includes("us") || lower.includes("night")) isUs = true;
+  }
+
+  return {
+    market: (isUs ? "US" : "IN") as "US" | "IN",
+    isUs,
+    branchName: bName,
+    branchId: bId,
+  };
+};
+
+  const initialBranchContext = useMemo(() => getInitialActiveBranchContext(), []);
+
   // Pod & User selection and approver routing
   const [podsList, setPodsList] = useState<any[]>([]);
   const [branchUsers, setBranchUsers] = useState<any[]>([]);
@@ -328,8 +361,8 @@ export default function NewJobPostingPage() {
   const [selectedApproverId, setSelectedApproverId] = useState<string>("");
   const [activeBranch, setActiveBranch] = useState<any>(null);
   
-  const [tenantName, setTenantName] = useState("enfycon Inc");
-  const [market, setMarket] = useState<"US" | "IN">("US");
+  const [tenantName, setTenantName] = useState(() => initialBranchContext.branchName || "enfycon Inc");
+  const [market, setMarket] = useState<"US" | "IN">(() => initialBranchContext.market);
   const currentWorkAuthOptions = market === "IN" ? INDIAN_WORK_AUTHORIZATION_OPTIONS : WORK_AUTHORIZATION_OPTIONS;
 
   // Active Perspective & Approver Persona Calculations
@@ -374,18 +407,18 @@ export default function NewJobPostingPage() {
   }, [branchUsers]);
 
   // Currency, Unit, and Term States for Bill Rate
-  const [billCurrency, setBillCurrency] = useState("USD");
-  const [billUnit, setBillUnit] = useState("Hourly");
-  const [billTerm, setBillTerm] = useState("C2C");
+  const [billCurrency, setBillCurrency] = useState(() => initialBranchContext.isUs ? "USD" : "INR");
+  const [billUnit, setBillUnit] = useState(() => initialBranchContext.isUs ? "Hourly" : "LPA");
+  const [billTerm, setBillTerm] = useState(() => initialBranchContext.isUs ? "C2C" : "Permanent");
 
   // Commission States for Domestic Indian Permanent Roles
   const [commissionType, setCommissionType] = useState<string>("8.33");
   const [customCommission, setCustomCommission] = useState<string>("");
 
   // Currency, Unit, and Term States for Pay Rate
-  const [payCurrency, setPayCurrency] = useState("USD");
-  const [payUnit, setPayUnit] = useState("Hourly");
-  const [payTerm, setPayTerm] = useState("C2C");
+  const [payCurrency, setPayCurrency] = useState(() => initialBranchContext.isUs ? "USD" : "INR");
+  const [payUnit, setPayUnit] = useState(() => initialBranchContext.isUs ? "Hourly" : "LPA");
+  const [payTerm, setPayTerm] = useState(() => initialBranchContext.isUs ? "C2C" : "Permanent");
   const [payRateMin, setPayRateMin] = useState("");
   const [payRateMax, setPayRateMax] = useState("");
 
@@ -414,19 +447,19 @@ export default function NewJobPostingPage() {
     mode: "onSubmit",
     resolver: zodResolver(formSchema),
     defaultValues: {
-      businessUnit: "enfycon Inc",
+      businessUnit: initialBranchContext.branchName || "enfycon Inc",
       jobCode: "",
-      clientBillRate: "8.33% Placement Commission",
-      country: "",
+      clientBillRate: initialBranchContext.isUs ? "80" : "8.33% Placement Commission",
+      country: initialBranchContext.isUs ? "United States" : "India",
       states: "",
       city: "",
       remoteJob: "",
       hoursPerWeek: undefined,
       jobStatus: "Active",
       priority: "Warm",
-      workAuthorization: undefined,
+      workAuthorization: initialBranchContext.isUs ? "US Authorized" : "Indian Citizen",
       jobType: "Full Time",
-      taxTerms: "Permanent",
+      taxTerms: initialBranchContext.isUs ? "C2C" : "Permanent",
       expMin: undefined,
       expMax: undefined,
       numPositions: 1,
@@ -436,7 +469,7 @@ export default function NewJobPostingPage() {
       jobDescription: "",
       noticePeriod: "",
       endClientName: "",
-      shiftTiming: "General Shift",
+      shiftTiming: initialBranchContext.isUs ? "US Shift" : "General Shift",
     },
   });
 
@@ -1439,22 +1472,6 @@ export default function NewJobPostingPage() {
                 <SectionHeader title="Business Information" sectionKey="businessInfo" />
                 {!collapsedSections.businessInfo && (
                   <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                    {/* Active Branch Schedule Banner */}
-                    {activeBranch && (
-                      <div className="md:col-span-4 p-2.5 bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 rounded-lg flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                          <div>
-                            <span className="font-bold text-amber-950 dark:text-amber-200">
-                              Branch Timing: {activeBranch.workStartTime || "09:00"} - {activeBranch.workEndTime || "18:00"} ({activeBranch.timezone ? activeBranch.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"})
-                            </span>
-                            <p className="text-[11px] text-amber-800/90 dark:text-amber-400/90 font-medium">
-                              {activeBranch.shiftTiming || (activeBranch.market === "US" ? "US Shift" : "General Shift")} • {Array.isArray(activeBranch.workingDays) && activeBranch.workingDays.length > 0 ? (activeBranch.workingDays.length === 5 ? "Mon - Fri" : activeBranch.workingDays.join(", ")) : "Mon - Fri"}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
                     {/* BU */}
                     <div className="space-y-1">
