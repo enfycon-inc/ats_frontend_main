@@ -691,12 +691,11 @@ export default function UserManagementPage() {
               className="h-9 text-xs rounded-md border border-default-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-medium text-default-700 dark:text-neutral-200 outline-none hover:border-indigo-500"
             >
               <option value="ALL">All Roles</option>
-              <option value="ADMIN">Tenant Admin</option>
-              <option value="BRANCH_ADMIN">Branch Admin</option>
-              <option value="RECRUITER">Recruiter</option>
-              <option value="ACCOUNT_MANAGER">Account Manager (BDM)</option>
-              <option value="POD_LEAD">Pod Lead</option>
-              <option value="DELIVERY_HEAD">Delivery Head</option>
+              {rolesList.map((r) => (
+                <option key={r.id || r.name} value={r.name}>
+                  {r.name}
+                </option>
+              ))}
             </select>
 
             {/* BRANCH FILTER */}
@@ -1209,60 +1208,34 @@ export default function UserManagementPage() {
                 </div>
               </div>
 
-              {/* ROLE SELECTION */}
+              {/* CUSTOM ROLE SELECTION */}
               <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
-                    <Shield className="h-3.5 w-3.5 text-indigo-600" /> Assigned System Role(s) <span className="text-red-500">*</span>
+                    <Shield className="h-3.5 w-3.5 text-indigo-600" /> Assigned Custom Role(s) <span className="text-red-500">*</span>
                   </label>
-                  <span className="text-[10px] text-neutral-500">
-                    Additional branches can be added anytime in user edit.
-                  </span>
+                  <a
+                    href="/utility/roles-permissions"
+                    className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    + Manage Custom Roles
+                  </a>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
-                  {[
-                    { key: "RECRUITER", label: "Recruiter" },
-                    { key: "ACCOUNT_MANAGER", label: "Account Manager" },
-                    { key: "POD_LEAD", label: "Pod Lead" },
-                    { key: "BRANCH_ADMIN", label: "Branch Admin" },
-                    { key: "DELIVERY_HEAD", label: "Delivery Head" },
-                    { key: "ADMIN", label: "Tenant Admin" },
-                  ].map((r) => {
-                    const isChecked = addForm.roles.includes(r.key);
-                    return (
-                      <label
-                        key={r.key}
-                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors select-none ${
-                          isChecked
-                            ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
-                            : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            let nextRoles = addForm.roles.filter((x) => x !== r.key);
-                            if (checked) nextRoles.push(r.key);
-                            if (nextRoles.length === 0) nextRoles = ["RECRUITER"];
-                            setAddForm({ ...addForm, roles: nextRoles });
-                          }}
-                          className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
-                        />
-                        <span className="truncate">{r.label}</span>
-                      </label>
-                    );
-                  })}
-                  {/* Custom Roles if any */}
-                  {(rolesList || [])
-                    .filter((r) => !r.isSystem)
-                    .map((r) => {
+                {rolesList.length === 0 ? (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
+                    <span>No custom roles configured yet.</span>
+                    <a href="/utility/roles-permissions" className="font-bold underline text-amber-900 dark:text-amber-200">
+                      Create Custom Role →
+                    </a>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
+                    {rolesList.map((r) => {
                       const isChecked = addForm.roles.includes(r.name);
                       return (
                         <label
-                          key={r.name}
+                          key={r.id || r.name}
                           className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors select-none ${
                             isChecked
                               ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
@@ -1276,7 +1249,6 @@ export default function UserManagementPage() {
                               const checked = e.target.checked;
                               let nextRoles = addForm.roles.filter((x) => x !== r.name);
                               if (checked) nextRoles.push(r.name);
-                              if (nextRoles.length === 0) nextRoles = ["RECRUITER"];
                               setAddForm({ ...addForm, roles: nextRoles });
                             }}
                             className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
@@ -1285,7 +1257,8 @@ export default function UserManagementPage() {
                         </label>
                       );
                     })}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* PASSWORD + CONFIRM PASSWORD GRID */}
@@ -1698,10 +1671,10 @@ export default function UserManagementPage() {
       {/* DEDICATED BRANCH ROLE ASSIGNMENT POPUP MODAL */}
       {branchRoleModalState && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in-0">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col animate-in zoom-in-95">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
             <div className="flex justify-between items-center px-5 py-3.5 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
               <h3 className="text-xs font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <Shield className="h-4 w-4 text-indigo-600" /> Assign Roles for 🏢 {branchRoleModalState.branchName}
+                <Shield className="h-4 w-4 text-indigo-600" /> Assign Custom Roles for 🏢 {branchRoleModalState.branchName}
               </h3>
               <button
                 onClick={() => setBranchRoleModalState(null)}
@@ -1712,131 +1685,100 @@ export default function UserManagementPage() {
             </div>
 
             <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-              <p className="text-xs text-neutral-500">
-                Configure specific system & custom roles assigned to this employee under <strong className="text-neutral-800 dark:text-neutral-200">{branchRoleModalState.branchName}</strong>:
-              </p>
-
-              {/* TENANT CUSTOM ROLES */}
-              {(rolesList || []).some((r) => !r.isSystem) && (
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block">
-                    🎨 Tenant Custom Roles (Aliases)
-                  </label>
-                  <div className="grid grid-cols-2 gap-2 bg-indigo-50/40 dark:bg-indigo-950/20 p-3 rounded-lg border border-indigo-200/60 dark:border-indigo-900/50">
-                    {(rolesList || [])
-                      .filter((r) => !r.isSystem)
-                      .map((r) => {
-                        const isAdd = branchRoleModalState.isAddForm;
-                        const targetForm = isAdd ? addForm : editForm;
-                        const bRoles = targetForm.branchRoles[branchRoleModalState.branchId] || targetForm.roles || ["RECRUITER"];
-                        const isChecked = bRoles.some((item: string) => item.toUpperCase() === r.name.toUpperCase());
-
-                        return (
-                          <label
-                            key={r.name}
-                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer transition-colors ${
-                              isChecked
-                                ? "bg-indigo-600 text-white font-bold border-indigo-600 shadow-2xs"
-                                : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                const checked = e.target.checked;
-                                let updated = bRoles.filter((item: string) => item.toUpperCase() !== r.name.toUpperCase());
-                                if (checked) updated.push(r.name);
-                                if (isAdd) {
-                                  setAddForm((prev) => ({
-                                    ...prev,
-                                    branchRoles: {
-                                      ...prev.branchRoles,
-                                      [branchRoleModalState.branchId]: updated,
-                                    },
-                                  }));
-                                } else {
-                                  setEditForm((prev) => ({
-                                    ...prev,
-                                    branchRoles: {
-                                      ...prev.branchRoles,
-                                      [branchRoleModalState.branchId]: updated,
-                                    },
-                                  }));
-                                }
-                              }}
-                              className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
-                            />
-                            <span className="truncate">{r.name} {r.isExactSubstitution ? `(Alias: ${r.replacesSystemRole || r.systemRole})` : ''}</span>
-                          </label>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
-
-              {/* STANDARD SYSTEM ROLES */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider block">
-                  ⚙️ Standard System Roles
-                </label>
-                <div className="grid grid-cols-2 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
-                  {[
-                    { key: "RECRUITER", label: "Recruiter" },
-                    { key: "ACCOUNT_MANAGER", label: "Account Manager" },
-                    { key: "POD_LEAD", label: "Pod Lead" },
-                    { key: "BRANCH_ADMIN", label: "Branch Admin" },
-                    { key: "DELIVERY_HEAD", label: "Delivery Head" },
-                    { key: "ADMIN", label: "Tenant Admin" },
-                  ].map((r) => {
-                    const isAdd = branchRoleModalState.isAddForm;
-                    const targetForm = isAdd ? addForm : editForm;
-                    const setTargetForm = isAdd ? setAddForm : setEditForm;
-                    const bRoles = targetForm.branchRoles[branchRoleModalState.branchId] || targetForm.roles || ["RECRUITER"];
-                    const isChecked = bRoles.some((item: string) => item.toUpperCase() === r.key.toUpperCase());
-
-                    return (
-                      <label
-                        key={r.key}
-                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer transition-colors ${
-                          isChecked
-                            ? "bg-indigo-600 text-white font-bold border-indigo-600 shadow-2xs"
-                            : "bg-white dark:bg-slate-900 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-slate-700 hover:bg-neutral-100"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            let updated = bRoles.filter((item: string) => item.toUpperCase() !== r.key.toUpperCase());
-                            if (checked) updated.push(r.key);
-                            if (isAdd) {
-                              setAddForm((prev) => ({
-                                ...prev,
-                                branchRoles: {
-                                  ...prev.branchRoles,
-                                  [branchRoleModalState.branchId]: updated,
-                                },
-                              }));
-                            } else {
-                              setEditForm((prev) => ({
-                                ...prev,
-                                branchRoles: {
-                                  ...prev.branchRoles,
-                                  [branchRoleModalState.branchId]: updated,
-                                },
-                              }));
-                            }
-                          }}
-                          className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
-                        />
-                        <span className="truncate">{r.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-neutral-500">
+                  Select custom roles assigned to this employee under <strong className="text-neutral-800 dark:text-neutral-200">{branchRoleModalState.branchName}</strong>:
+                </p>
+                <a
+                  href="/utility/roles-permissions"
+                  className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  + Manage Custom Roles
+                </a>
               </div>
+
+              {(() => {
+                const availableRoles = (rolesList || []).filter(
+                  (r) => !r.branchId || r.branchId === branchRoleModalState.branchId
+                );
+
+                if (availableRoles.length === 0) {
+                  return (
+                    <div className="p-5 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-lg text-center space-y-2">
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                        No custom roles configured for this branch yet.
+                      </p>
+                      <a
+                        href="/utility/roles-permissions"
+                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline inline-block"
+                      >
+                        + Create Custom Roles in Role Management →
+                      </a>
+                    </div>
+                  );
+                }
+
+                const isAdd = branchRoleModalState.isAddForm;
+                const targetForm = isAdd ? addForm : editForm;
+                const bRoles = targetForm.branchRoles[branchRoleModalState.branchId] || targetForm.roles || [];
+
+                return (
+                  <div className="grid grid-cols-2 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
+                    {availableRoles.map((r) => {
+                      const isChecked = bRoles.some(
+                        (item: string) => item.toUpperCase() === r.name.toUpperCase()
+                      );
+
+                      return (
+                        <label
+                          key={r.id || r.name}
+                          className={`flex items-center gap-2 px-2.5 py-2 rounded-md border text-xs cursor-pointer select-none transition-colors ${
+                            isChecked
+                              ? "bg-indigo-600 text-white font-bold border-indigo-600 shadow-2xs"
+                              : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              let updated = bRoles.filter(
+                                (item: string) => item.toUpperCase() !== r.name.toUpperCase()
+                              );
+                              if (checked) updated.push(r.name);
+                              if (isAdd) {
+                                setAddForm((prev) => ({
+                                  ...prev,
+                                  branchRoles: {
+                                    ...prev.branchRoles,
+                                    [branchRoleModalState.branchId]: updated,
+                                  },
+                                }));
+                              } else {
+                                setEditForm((prev) => ({
+                                  ...prev,
+                                  branchRoles: {
+                                    ...prev.branchRoles,
+                                    [branchRoleModalState.branchId]: updated,
+                                  },
+                                }));
+                              }
+                            }}
+                            className="h-4 w-4 accent-indigo-600 rounded cursor-pointer"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <span className="block truncate font-semibold">{r.name}</span>
+                            {r.description && (
+                              <span className="block truncate text-[10px] opacity-80">{r.description}</span>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="flex justify-end px-5 py-3 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
