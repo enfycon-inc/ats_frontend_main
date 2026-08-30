@@ -84,7 +84,7 @@ export default function UserManagementPage() {
   const [addForm, setAddForm] = useState({
     firstName: "",
     lastName: "",
-    emailPrefix: "",
+    email: "",
     password: "",
     confirmPassword: "",
     roles: ["RECRUITER"],
@@ -99,8 +99,8 @@ export default function UserManagementPage() {
   const [emailCheckMsg, setEmailCheckMsg] = useState("");
 
   useEffect(() => {
-    const rawPrefix = addForm.emailPrefix.trim().toLowerCase();
-    if (!rawPrefix) {
+    const rawEmail = addForm.email.trim().toLowerCase();
+    if (!rawEmail || !rawEmail.includes("@")) {
       setEmailStatus("idle");
       setEmailCheckMsg("");
       return;
@@ -108,20 +108,19 @@ export default function UserManagementPage() {
 
     setEmailStatus("checking");
     const timer = setTimeout(() => {
-      const fullEmail = `${rawPrefix}@${tenantDomain}.com`;
-      const isTaken = users.some((u) => u.email.toLowerCase() === fullEmail);
+      const isTaken = users.some((u) => u.email.toLowerCase() === rawEmail);
 
       if (isTaken) {
         setEmailStatus("taken");
-        setEmailCheckMsg(`Email ${fullEmail} is already registered.`);
+        setEmailCheckMsg(`Email ${rawEmail} is already registered.`);
       } else {
         setEmailStatus("available");
-        setEmailCheckMsg(`Email ${fullEmail} is available!`);
+        setEmailCheckMsg(`Email ${rawEmail} is available!`);
       }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [addForm.emailPrefix, users, tenantDomain]);
+  }, [addForm.email, users]);
 
   // Role checkbox toggle function — independent selection for every system and custom role
   const handleRoleToggle = (currentRoles: string[], targetRole: string, isChecking: boolean) => {
@@ -181,11 +180,14 @@ export default function UserManagementPage() {
     const firstName = addForm.firstName.trim();
     const lastName = addForm.lastName.trim();
     const trimmedName = `${firstName} ${lastName}`.trim();
-    const trimmedPrefix = addForm.emailPrefix.trim().toLowerCase();
+    const fullEmail = addForm.email.trim().toLowerCase();
     const password = addForm.password;
 
-    if (!firstName || !lastName || !trimmedPrefix || !password) {
+    if (!firstName || !lastName || !fullEmail || !password) {
       return toast.error("Please fill in First Name, Last Name, Email, and Password.");
+    }
+    if (!fullEmail.includes("@") || !fullEmail.includes(".")) {
+      return toast.error("Please enter a valid email address.");
     }
     if (trimmedName.length < 2) {
       return toast.error("Name must be at least 2 characters.");
@@ -204,7 +206,6 @@ export default function UserManagementPage() {
 
     try {
       setSubmitting(true);
-      const fullEmail = `${trimmedPrefix}@${tenantDomain}.com`;
       const tenantId = profile?.tenantId || currentUser?.tenantId || "";
 
       await atsApi.auth.registerUser({
@@ -238,7 +239,7 @@ export default function UserManagementPage() {
       setAddForm({
         firstName: "",
         lastName: "",
-        emailPrefix: "",
+        email: "",
         password: "",
         confirmPassword: "",
         roles: ["RECRUITER"],
@@ -704,7 +705,7 @@ export default function UserManagementPage() {
               <option value="UNASSIGNED">Unassigned (HQ Shared)</option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.name} ({b.market === "US" ? "US IT" : "Domestic"})
+                  {b.name}
                 </option>
               ))}
             </select>
@@ -1003,11 +1004,11 @@ export default function UserManagementPage() {
                           const branchNames = assignedIds.map((id) => {
                             const bObj = branches.find((b) => b.id === id);
                             if (!bObj) return user.branchName || id;
-                            return `${bObj.name} (${bObj.market === 'US' ? 'US IT' : 'Domestic'})`;
+                            return bObj.name;
                           });
 
                           return (
-                            <span className="truncate max-w-[280px] inline-block" title={branchNames.join(", ")}>
+                            <span className="truncate max-w-[280px] inline-block font-medium" title={branchNames.join(", ")}>
                               🏢 {branchNames.join(", ")}
                             </span>
                           );
@@ -1125,31 +1126,29 @@ export default function UserManagementPage() {
                 </div>
               </div>
 
-              {/* DOMAIN SUFFIX AUTO-LOCKING & LIVE AVAILABILITY CHECK + BRANCH IN ONE ROW */}
+              {/* WORK EMAIL & PRIMARY BRANCH */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Work Email Username *</label>
-                  <div className="flex items-center">
-                    <Input
-                      value={addForm.emailPrefix}
-                      onChange={(e) => setAddForm({ ...addForm, emailPrefix: e.target.value })}
-                      placeholder="e.g. rajesh"
-                      className={`h-8 text-xs rounded-l font-mono ${
-                        emailStatus === "taken"
-                          ? "border-red-500 bg-red-50/40 dark:bg-red-950/20 text-red-600 font-semibold"
-                          : emailStatus === "available"
-                          ? "border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-700 font-semibold"
-                          : "border-neutral-300"
-                      }`}
-                      required
-                    />
-                    <span className="h-8 px-2 text-[11px] font-mono font-bold bg-neutral-100 dark:bg-slate-800 border border-l-0 border-neutral-300 dark:border-slate-700 rounded-r text-indigo-650 flex items-center shrink-0">
-                      @{tenantDomain}.com
-                    </span>
-                  </div>
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Work Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="email"
+                    value={addForm.email}
+                    onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                    placeholder="e.g. rajesh.kumar@company.com"
+                    className={`h-8 text-xs rounded-lg ${
+                      emailStatus === "taken"
+                        ? "border-red-500 bg-red-50/40 dark:bg-red-950/20 text-red-600 font-semibold"
+                        : emailStatus === "available"
+                        ? "border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-700 font-semibold"
+                        : "border-neutral-300 dark:border-slate-700"
+                    }`}
+                    required
+                  />
 
                   {/* Debounced Inline Availability Message */}
-                  {addForm.emailPrefix.trim() ? (
+                  {addForm.email.trim() && (
                     <div className="flex items-center gap-1.5 text-[11px] font-semibold pt-0.5">
                       {emailStatus === "checking" && (
                         <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
@@ -1167,117 +1166,113 @@ export default function UserManagementPage() {
                         </span>
                       )}
                     </div>
-                  ) : (
-                    <p className="text-[10px] text-neutral-400">Locked to company domain.</p>
                   )}
                 </div>
 
-                {/* MULTI-BRANCH ASSIGNMENT CHECKBOXES WITH POPUP ROLE ASSIGNMENT */}
-                <div className="space-y-2 col-span-1 sm:col-span-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
-                  <div className="space-y-1 bg-slate-50 dark:bg-slate-850 p-2.5 rounded-lg border border-neutral-200 dark:border-slate-800 mb-2">
-                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">
-                      Primary Office Branch (Home Office) *
-                    </label>
-                    <select
-                      value={addForm.branchId}
-                      onChange={(e) => {
-                        const newPrimary = e.target.value;
-                        const nextAssigned = newPrimary && !addForm.assignedBranchIds.includes(newPrimary)
-                          ? [...addForm.assignedBranchIds, newPrimary]
-                          : addForm.assignedBranchIds;
-                        setAddForm({
-                          ...addForm,
-                          branchId: newPrimary,
-                          assignedBranchIds: nextAssigned,
-                        });
-                      }}
-                      className="w-full h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 font-semibold"
-                      required
-                    >
-                      <option value="">Select Primary Branch...</option>
-                      {branches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name} ({b.market === "US" ? "US IT" : "Domestic"})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <label className="text-[11px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider block">
-                    🏢 Office Branch Assignments & Branch-Wise Roles
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Primary Office Branch (Home Office) <span className="text-red-500">*</span>
                   </label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/70 dark:bg-slate-900/60 p-3.5 rounded-xl border border-neutral-200 dark:border-slate-800">
-                    {branches.map((b) => {
-                      const isAssigned = addForm.assignedBranchIds.includes(b.id) || addForm.branchId === b.id;
-                      const bRoles = addForm.branchRoles[b.id] || addForm.roles || [];
+                  <select
+                    value={addForm.branchId}
+                    onChange={(e) => {
+                      const newPrimary = e.target.value;
+                      const nextAssigned = newPrimary && !addForm.assignedBranchIds.includes(newPrimary)
+                        ? [...addForm.assignedBranchIds, newPrimary]
+                        : addForm.assignedBranchIds;
+                      setAddForm({
+                        ...addForm,
+                        branchId: newPrimary,
+                        assignedBranchIds: nextAssigned,
+                      });
+                    }}
+                    className="w-full h-8 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white"
+                    required
+                  >
+                    <option value="">Select Primary Branch...</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-                      return (
-                        <div
-                          key={b.id}
-                          className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-[11px] transition-all shadow-2xs ${
-                            isAssigned
-                              ? "bg-white dark:bg-slate-800 border-indigo-300 dark:border-indigo-800 ring-1 ring-indigo-500/10"
-                              : "bg-neutral-50/80 dark:bg-slate-850 border-neutral-200/80 dark:border-slate-800 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300"
-                          }`}
-                        >
-                          <label className="flex items-start gap-2.5 cursor-pointer flex-1 min-w-0 select-none pt-0.5">
-                            <input
-                              type="checkbox"
-                              checked={isAssigned}
-                              onChange={(e) => {
-                                const checked = e.target.checked;
-                                let nextAssigned = addForm.assignedBranchIds.filter((id) => id !== b.id);
-                                let nextBranchRoles = { ...addForm.branchRoles };
+              {/* MULTI-BRANCH ASSIGNMENT CHECKBOXES WITH POPUP ROLE ASSIGNMENT */}
+              <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+                <label className="text-[11px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider block">
+                  🏢 Office Branch Assignments &amp; Branch-Wise Roles
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/70 dark:bg-slate-900/60 p-3.5 rounded-xl border border-neutral-200 dark:border-slate-800">
+                  {branches.map((b) => {
+                    const isAssigned = addForm.assignedBranchIds.includes(b.id) || addForm.branchId === b.id;
+                    const bRoles = addForm.branchRoles[b.id] || addForm.roles || [];
 
-                                if (checked) {
-                                  nextAssigned.push(b.id);
-                                  if (!nextBranchRoles[b.id]) {
-                                    nextBranchRoles[b.id] = addForm.roles.length > 0 ? [...addForm.roles] : ["RECRUITER"];
-                                  }
-                                } else {
-                                  delete nextBranchRoles[b.id];
+                    return (
+                      <div
+                        key={b.id}
+                        className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-[11px] transition-all shadow-2xs ${
+                          isAssigned
+                            ? "bg-white dark:bg-slate-800 border-indigo-300 dark:border-indigo-800 ring-1 ring-indigo-500/10"
+                            : "bg-neutral-50/80 dark:bg-slate-850 border-neutral-200/80 dark:border-slate-800 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300"
+                        }`}
+                      >
+                        <label className="flex items-start gap-2.5 cursor-pointer flex-1 min-w-0 select-none pt-0.5">
+                          <input
+                            type="checkbox"
+                            checked={isAssigned}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              let nextAssigned = addForm.assignedBranchIds.filter((id) => id !== b.id);
+                              let nextBranchRoles = { ...addForm.branchRoles };
+
+                              if (checked) {
+                                nextAssigned.push(b.id);
+                                if (!nextBranchRoles[b.id]) {
+                                  nextBranchRoles[b.id] = addForm.roles.length > 0 ? [...addForm.roles] : ["RECRUITER"];
                                 }
+                              } else {
+                                delete nextBranchRoles[b.id];
+                              }
 
-                                setAddForm({
-                                  ...addForm,
-                                  assignedBranchIds: nextAssigned,
-                                  branchRoles: nextBranchRoles,
-                                });
-                              }}
-                              className="h-4 w-4 mt-0.5 accent-indigo-600 rounded cursor-pointer shrink-0"
-                            />
-                            <div className="flex flex-col gap-1 min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className={`font-bold text-xs ${isAssigned ? "text-neutral-900 dark:text-white" : "text-neutral-700 dark:text-neutral-300"}`}>
-                                  🏢 {b.name}
+                              setAddForm({
+                                ...addForm,
+                                assignedBranchIds: nextAssigned,
+                                branchRoles: nextBranchRoles,
+                              });
+                            }}
+                            className="h-4 w-4 mt-0.5 accent-indigo-600 rounded cursor-pointer shrink-0"
+                          />
+                          <div className="flex flex-col gap-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`font-bold text-xs ${isAssigned ? "text-neutral-900 dark:text-white" : "text-neutral-700 dark:text-neutral-300"}`}>
+                                🏢 {b.name}
+                              </span>
+                              {b.id === addForm.branchId && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200">
+                                  Primary Home
                                 </span>
-                                <span className="text-[9.5px] font-semibold px-1.5 py-0.2 rounded bg-neutral-100 dark:bg-slate-700 text-neutral-600 dark:text-neutral-300 border border-neutral-200/80 dark:border-slate-600">
-                                  {b.market === "US" ? "US IT" : "Domestic"}
-                                </span>
-                                {b.id === addForm.branchId && (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200">
-                                    Primary Home
+                              )}
+                            </div>
+                            {isAssigned && (
+                              <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                                <span className="text-[10px] font-semibold text-neutral-500">Roles:</span>
+                                {bRoles.length > 0 ? (
+                                  bRoles.map((r: string) => (
+                                    <span key={r} className="text-[9.5px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.2 rounded border border-indigo-200/80">
+                                      {r.replace("_", " ")}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-[9.5px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.2 rounded border border-indigo-200/80">
+                                    Recruiter
                                   </span>
                                 )}
                               </div>
-                              {isAssigned && (
-                                <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                                  <span className="text-[10px] font-semibold text-neutral-500">Roles:</span>
-                                  {bRoles.length > 0 ? (
-                                    bRoles.map((r: string) => (
-                                      <span key={r} className="text-[9.5px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.2 rounded border border-indigo-200/80">
-                                        {r.replace("_", " ")}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="text-[9.5px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.2 rounded border border-indigo-200/80">
-                                      Recruiter
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </label>
+                            )}
+                          </div>
+                        </label>
 
                           {isAssigned && (
                             <Button
@@ -1295,7 +1290,6 @@ export default function UserManagementPage() {
                     })}
                   </div>
                 </div>
-              </div>
 
               {/* PASSWORD + CONFIRM PASSWORD GRID */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1360,8 +1354,8 @@ export default function UserManagementPage() {
             </div>
 
             <form onSubmit={handleUpdateMember} className="p-5 space-y-4 overflow-y-auto flex-1">
-              {/* FIRST NAME + LAST NAME GRID */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* FIRST NAME + LAST NAME + EMAIL GRID */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">First Name *</label>
                   <Input
@@ -1383,13 +1377,25 @@ export default function UserManagementPage() {
                     required
                   />
                 </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Work Email *</label>
+                  <Input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    placeholder="e.g. rajesh.kumar@company.com"
+                    className="h-8 text-xs rounded border-neutral-300 font-mono"
+                    required
+                  />
+                </div>
               </div>
 
               {/* MULTI-BRANCH ASSIGNMENT & BRANCH-WISE ROLE MATRIX */}
               <div className="space-y-3 pt-2 border-t border-neutral-100 dark:border-slate-800">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                    <Building2 className="h-4 w-4 text-indigo-600" /> Office Branch Assignments & Branch-Wise Roles
+                    <Building2 className="h-4 w-4 text-indigo-600" /> Office Branch Assignments &amp; Branch-Wise Roles
                   </label>
                   <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded">
                     {editForm.assignedBranchIds.length} Branch(es) Selected
@@ -1418,7 +1424,7 @@ export default function UserManagementPage() {
                   >
                     <option value="">Select Primary Branch...</option>
                     {branches.map(b => (
-                      <option key={b.id} value={b.id}>{b.name} ({b.market === 'US' ? 'US IT' : 'Domestic'})</option>
+                      <option key={b.id} value={b.id}>{b.name}</option>
                     ))}
                   </select>
                 </div>
@@ -1426,7 +1432,7 @@ export default function UserManagementPage() {
                 {/* MULTI-BRANCH ASSIGNMENT CHECKBOXES WITH POPUP ROLE ASSIGNMENT */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider block">
-                    🏢 Office Branch Assignments & Branch-Wise Roles
+                    🏢 Office Branch Assignments &amp; Branch-Wise Roles
                   </label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/70 dark:bg-slate-900/60 p-3.5 rounded-xl border border-neutral-200 dark:border-slate-800">
                     {branches.map((b) => {
@@ -1472,9 +1478,6 @@ export default function UserManagementPage() {
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className={`font-bold text-xs ${isAssigned ? "text-neutral-900 dark:text-white" : "text-neutral-700 dark:text-neutral-300"}`}>
                                   🏢 {b.name}
-                                </span>
-                                <span className="text-[9.5px] font-semibold px-1.5 py-0.2 rounded bg-neutral-100 dark:bg-slate-700 text-neutral-600 dark:text-neutral-300 border border-neutral-200/80 dark:border-slate-600">
-                                  {b.market === 'US' ? 'US IT' : 'Domestic'}
                                 </span>
                                 {b.id === editForm.branchId && (
                                   <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200">
@@ -1670,7 +1673,7 @@ export default function UserManagementPage() {
                   <option value="">-- Unassigned (HQ Shared) --</option>
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.name} ({b.market === "US" ? "US IT" : "Domestic"})
+                      {b.name}
                     </option>
                   ))}
                 </select>
