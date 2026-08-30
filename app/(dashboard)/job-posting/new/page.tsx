@@ -538,6 +538,8 @@ const getInitialActiveBranchContext = () => {
     }
   }, [selectedCountry, setValue, commissionType, customCommission]);
 
+  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
+
   const fetchClients = useCallback(async () => {
     try {
       const res = await atsApi.clients.list();
@@ -554,6 +556,7 @@ const getInitialActiveBranchContext = () => {
       try {
         const prof = await atsApi.auth.me();
         if (prof) {
+          setCurrentUserProfile(prof);
           let tName = prof.tenant?.name || prof.tenantDomain || "";
           if (!tName) {
             tName = typeof window !== 'undefined' ? getTenantIdentifier() : "";
@@ -1116,6 +1119,17 @@ const getInitialActiveBranchContext = () => {
         resolvedApproverRole = "BRANCH_ADMIN";
       }
 
+      // Determine initial approval status based on creator's permissions and designated reviewer
+      const hasDirectPublish = currentUserProfile?.permissions?.includes("job:publish_direct") || 
+        currentUserProfile?.roles?.some((r: string) => ["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
+      const hasDesignatedReviewer = Boolean(currentUserProfile?.jobReviewerId || currentUserProfile?.jobReviewerName || currentUserProfile?.job_reviewer_id);
+
+      const shouldRequireApproval = !hasDirectPublish || hasDesignatedReviewer;
+      const initialApprovalStatus = shouldRequireApproval ? "PENDING_APPROVAL" : "APPROVED";
+      const initialJobStatus = shouldRequireApproval ? "Pending Approval" : (data.jobStatus || "Active");
+      const finalApproverId = hasDesignatedReviewer ? (currentUserProfile?.jobReviewerId || currentUserProfile?.job_reviewer_id || resolvedApproverId) : resolvedApproverId;
+      const finalApproverRole = hasDesignatedReviewer ? "DESIGNATED_REVIEWER" : resolvedApproverRole;
+
       // Map frontend form fields → backend CreateJobDto
       const payload = {
         jobCode: data.jobCode,
@@ -1132,10 +1146,10 @@ const getInitialActiveBranchContext = () => {
         state: data.states,
         city: data.city || undefined,
         country: data.country,
-        status: data.jobStatus || "Active",
-        approvalStatus: "APPROVED",
-        assignedApproverId: resolvedApproverId,
-        assignedApproverRole: resolvedApproverRole,
+        status: initialJobStatus,
+        approvalStatus: initialApprovalStatus,
+        assignedApproverId: finalApproverId,
+        assignedApproverRole: finalApproverRole,
         visaType: data.workAuthorization,
         clientBillRate: assembledBillRate,
         payRate: assembledPayRate,
@@ -1433,14 +1447,32 @@ const getInitialActiveBranchContext = () => {
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                size="sm"
-                className="h-8.5 font-bold text-white shadow-xs cursor-pointer text-xs flex items-center gap-1.5 bg-primary hover:bg-primary/95"
-              >
-                <Send className="h-3.5 w-3.5" />
-                Publish Job Requirement
-              </Button>
+              {(() => {
+                const hasDirectPublish = currentUserProfile?.permissions?.includes("job:publish_direct") || 
+                  currentUserProfile?.roles?.some((r: string) => ["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
+                const hasDesignatedReviewer = Boolean(currentUserProfile?.jobReviewerId || currentUserProfile?.jobReviewerName || currentUserProfile?.job_reviewer_id);
+                const requiresApproval = !hasDirectPublish || hasDesignatedReviewer;
+
+                return (
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="h-8.5 font-bold text-white shadow-xs cursor-pointer text-xs flex items-center gap-1.5 bg-primary hover:bg-primary/95"
+                  >
+                    {requiresApproval ? (
+                      <>
+                        <Shield className="h-3.5 w-3.5 text-amber-300" />
+                        Submit for Approval
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-3.5 w-3.5" />
+                        Publish Job Requirement
+                      </>
+                    )}
+                  </Button>
+                );
+              })()}
             </div>
           </div>
 
