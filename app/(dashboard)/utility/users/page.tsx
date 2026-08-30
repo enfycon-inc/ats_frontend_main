@@ -207,12 +207,14 @@ export default function UserManagementPage() {
     try {
       setSubmitting(true);
       const tenantId = profile?.tenantId || currentUser?.tenantId || "";
+      const primaryBranchId = addForm.branchId || (branches.length > 0 ? branches[0].id : "");
+      const selectedRoles = Array.isArray(addForm.roles) && addForm.roles.length > 0 ? addForm.roles : ["RECRUITER"];
 
       await atsApi.auth.registerUser({
         email: fullEmail,
         fullName: trimmedName,
         password: password,
-        role: addForm.roles?.[0] || "RECRUITER",
+        role: selectedRoles[0] || "RECRUITER",
         tenantId: tenantId,
         isApproved: true,
         sendEmailInvite: true,
@@ -222,15 +224,11 @@ export default function UserManagementPage() {
       const freshUsers = await atsApi.auth.listUsers();
       const createdUser = freshUsers.find((u: any) => u.email === fullEmail);
       if (createdUser) {
-        const allBranchRoleValues = Object.values(addForm.branchRoles || {}).flat();
-        const combinedRoles = Array.from(new Set([...allBranchRoleValues, ...(addForm.roles || [])]));
-        const finalRoles = combinedRoles.length > 0 ? combinedRoles : (addForm.roles || ["RECRUITER"]);
-
         await atsApi.auth.updateUserDetail(createdUser.id, {
-          branchId: addForm.branchId || undefined,
-          assignedBranchIds: addForm.assignedBranchIds || [],
-          branchRoles: addForm.branchRoles || {},
-          roles: finalRoles,
+          branchId: primaryBranchId || undefined,
+          assignedBranchIds: primaryBranchId ? [primaryBranchId] : [],
+          branchRoles: primaryBranchId ? { [primaryBranchId]: selectedRoles } : {},
+          roles: selectedRoles,
         });
       }
 
@@ -243,7 +241,7 @@ export default function UserManagementPage() {
         password: "",
         confirmPassword: "",
         roles: ["RECRUITER"],
-        branchId: "",
+        branchId: branches[0]?.id || "",
         assignedBranchIds: [],
         branchRoles: {},
         sendEmailInvite: false,
@@ -997,16 +995,12 @@ export default function UserManagementPage() {
                         </div>
                       </td>
 
-                      {/* Branch Location — Plain Comma-Separated Text */}
+                      {/* Branch Location — Plain Comma-Separated Text + Quick Manage */}
                       <td className="py-3 px-4 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                         {(() => {
                           const assignedIds = (user.assignedBranchIds && user.assignedBranchIds.length > 0)
                             ? user.assignedBranchIds
                             : (user.branchId ? [user.branchId] : []);
-
-                          if (assignedIds.length === 0) {
-                            return <span className="text-neutral-400 font-normal">-- Unassigned (HQ Shared) --</span>;
-                          }
 
                           const branchNames = assignedIds.map((id) => {
                             const bObj = branches.find((b) => b.id === id);
@@ -1015,9 +1009,23 @@ export default function UserManagementPage() {
                           });
 
                           return (
-                            <span className="truncate max-w-[280px] inline-block font-medium" title={branchNames.join(", ")}>
-                              🏢 {branchNames.join(", ")}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {assignedIds.length === 0 ? (
+                                <span className="text-neutral-400 font-normal">-- Unassigned (HQ Shared) --</span>
+                              ) : (
+                                <span className="truncate max-w-[200px] inline-block font-medium text-neutral-800 dark:text-neutral-200" title={branchNames.join(", ")}>
+                                  🏢 {branchNames.join(", ")}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(user)}
+                                className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold inline-flex items-center gap-0.5 bg-indigo-50 dark:bg-indigo-950/70 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800/80 transition-colors cursor-pointer"
+                                title="Add more branches or edit branch assignments"
+                              >
+                                + Add / Edit
+                              </button>
+                            </div>
                           );
                         })()}
                       </td>
@@ -1097,11 +1105,16 @@ export default function UserManagementPage() {
       {/* ADD MEMBER MODAL */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-4xl lg:max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95">
             <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <UserPlus className="h-4 w-4 text-indigo-650" /> Add Team Member
-              </h3>
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                  <UserPlus className="h-4 w-4 text-indigo-600" /> Add Team Member
+                </h3>
+                <p className="text-[11px] text-neutral-500 mt-0.5">
+                  Create a new staff account with their primary office branch and assigned roles.
+                </p>
+              </div>
               <button onClick={() => setIsAddModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 cursor-pointer">
                 <X className="h-4 w-4" />
               </button>
@@ -1116,7 +1129,7 @@ export default function UserManagementPage() {
                     value={addForm.firstName}
                     onChange={(e) => setAddForm({ ...addForm, firstName: e.target.value })}
                     placeholder="e.g. Rajesh"
-                    className="h-8 text-xs rounded border-neutral-300"
+                    className="h-8.5 text-xs rounded border-neutral-300 dark:border-slate-700"
                     required
                   />
                 </div>
@@ -1127,7 +1140,7 @@ export default function UserManagementPage() {
                     value={addForm.lastName}
                     onChange={(e) => setAddForm({ ...addForm, lastName: e.target.value })}
                     placeholder="e.g. Kumar"
-                    className="h-8 text-xs rounded border-neutral-300"
+                    className="h-8.5 text-xs rounded border-neutral-300 dark:border-slate-700"
                     required
                   />
                 </div>
@@ -1144,7 +1157,7 @@ export default function UserManagementPage() {
                     value={addForm.email}
                     onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
                     placeholder="e.g. rajesh.kumar@company.com"
-                    className={`h-8 text-xs rounded-lg ${
+                    className={`h-8.5 text-xs rounded-lg ${
                       emailStatus === "taken"
                         ? "border-red-500 bg-red-50/40 dark:bg-red-950/20 text-red-600 font-semibold"
                         : emailStatus === "available"
@@ -1178,22 +1191,12 @@ export default function UserManagementPage() {
 
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">
-                    Primary Office Branch (Home Office) <span className="text-red-500">*</span>
+                    Primary Office Branch <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={addForm.branchId}
-                    onChange={(e) => {
-                      const newPrimary = e.target.value;
-                      const nextAssigned = newPrimary && !addForm.assignedBranchIds.includes(newPrimary)
-                        ? [...addForm.assignedBranchIds, newPrimary]
-                        : addForm.assignedBranchIds;
-                      setAddForm({
-                        ...addForm,
-                        branchId: newPrimary,
-                        assignedBranchIds: nextAssigned,
-                      });
-                    }}
-                    className="w-full h-8 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white"
+                    onChange={(e) => setAddForm({ ...addForm, branchId: e.target.value })}
+                    className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
                     required
                   >
                     <option value="">Select Primary Branch...</option>
@@ -1206,100 +1209,87 @@ export default function UserManagementPage() {
                 </div>
               </div>
 
-              {/* MULTI-BRANCH ASSIGNMENT CHECKBOXES WITH POPUP ROLE ASSIGNMENT */}
+              {/* ROLE SELECTION */}
               <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
-                <label className="text-[11px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider block">
-                  🏢 Office Branch Assignments &amp; Branch-Wise Roles
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/70 dark:bg-slate-900/60 p-3.5 rounded-xl border border-neutral-200 dark:border-slate-800">
-                  {branches.map((b) => {
-                    const isAssigned = addForm.assignedBranchIds.includes(b.id) || addForm.branchId === b.id;
-                    const bRoles = addForm.branchRoles[b.id] || addForm.roles || [];
-
-                    return (
-                      <div
-                        key={b.id}
-                        className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-[11px] transition-all shadow-2xs ${
-                          isAssigned
-                            ? "bg-white dark:bg-slate-800 border-indigo-300 dark:border-indigo-800 ring-1 ring-indigo-500/10"
-                            : "bg-neutral-50/80 dark:bg-slate-850 border-neutral-200/80 dark:border-slate-800 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300"
-                        }`}
-                      >
-                        <label className="flex items-start gap-2.5 cursor-pointer flex-1 min-w-0 select-none pt-0.5">
-                          <input
-                            type="checkbox"
-                            checked={isAssigned}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              let nextAssigned = addForm.assignedBranchIds.filter((id) => id !== b.id);
-                              let nextBranchRoles = { ...addForm.branchRoles };
-
-                              if (checked) {
-                                nextAssigned.push(b.id);
-                                if (!nextBranchRoles[b.id]) {
-                                  nextBranchRoles[b.id] = addForm.roles.length > 0 ? [...addForm.roles] : ["RECRUITER"];
-                                }
-                              } else {
-                                delete nextBranchRoles[b.id];
-                              }
-
-                              setAddForm({
-                                ...addForm,
-                                assignedBranchIds: nextAssigned,
-                                branchRoles: nextBranchRoles,
-                              });
-                            }}
-                            className="h-4 w-4 mt-0.5 accent-indigo-600 rounded cursor-pointer shrink-0"
-                          />
-                          <div className="flex flex-col gap-1 min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className={`font-bold text-xs ${isAssigned ? "text-neutral-900 dark:text-white" : "text-neutral-700 dark:text-neutral-300"}`}>
-                                🏢 {b.name}
-                              </span>
-                              {b.id === addForm.branchId && (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200">
-                                  Primary Home
-                                </span>
-                              )}
-                            </div>
-                            {isAssigned && (
-                              <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                                <span className="text-[10px] font-semibold text-neutral-500">Roles:</span>
-                                {bRoles.length > 0 ? (
-                                  bRoles.map((r: string) => (
-                                    <span key={r} className="text-[9.5px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.2 rounded border border-indigo-200/80">
-                                      {r.replace("_", " ")}
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span className="text-[9.5px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.2 rounded border border-indigo-200/80">
-                                    Recruiter
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </label>
-
-                          {isAssigned && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setBranchRoleModalState({ branchId: b.id, branchName: b.name, isAddForm: true })}
-                              className="h-7 text-[11px] px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold border-indigo-600 flex items-center gap-1.5 rounded-lg cursor-pointer shrink-0 ml-1 shadow-2xs whitespace-nowrap"
-                            >
-                              <Shield className="h-3 w-3 text-indigo-200" /> Assign Roles <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
+                    <Shield className="h-3.5 w-3.5 text-indigo-600" /> Assigned System Role(s) <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[10px] text-neutral-500">
+                    Additional branches can be added anytime in user edit.
+                  </span>
                 </div>
 
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
+                  {[
+                    { key: "RECRUITER", label: "Recruiter" },
+                    { key: "ACCOUNT_MANAGER", label: "Account Manager" },
+                    { key: "POD_LEAD", label: "Pod Lead" },
+                    { key: "BRANCH_ADMIN", label: "Branch Admin" },
+                    { key: "DELIVERY_HEAD", label: "Delivery Head" },
+                    { key: "ADMIN", label: "Tenant Admin" },
+                  ].map((r) => {
+                    const isChecked = addForm.roles.includes(r.key);
+                    return (
+                      <label
+                        key={r.key}
+                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors select-none ${
+                          isChecked
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
+                            : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            let nextRoles = addForm.roles.filter((x) => x !== r.key);
+                            if (checked) nextRoles.push(r.key);
+                            if (nextRoles.length === 0) nextRoles = ["RECRUITER"];
+                            setAddForm({ ...addForm, roles: nextRoles });
+                          }}
+                          className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                        />
+                        <span className="truncate">{r.label}</span>
+                      </label>
+                    );
+                  })}
+                  {/* Custom Roles if any */}
+                  {(rolesList || [])
+                    .filter((r) => !r.isSystem)
+                    .map((r) => {
+                      const isChecked = addForm.roles.includes(r.name);
+                      return (
+                        <label
+                          key={r.name}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors select-none ${
+                            isChecked
+                              ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
+                              : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              let nextRoles = addForm.roles.filter((x) => x !== r.name);
+                              if (checked) nextRoles.push(r.name);
+                              if (nextRoles.length === 0) nextRoles = ["RECRUITER"];
+                              setAddForm({ ...addForm, roles: nextRoles });
+                            }}
+                            className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                          />
+                          <span className="truncate">{r.name}</span>
+                        </label>
+                      );
+                    })}
+                </div>
+              </div>
+
               {/* PASSWORD + CONFIRM PASSWORD GRID */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Initial Password *</label>
                   <Input
@@ -1307,7 +1297,7 @@ export default function UserManagementPage() {
                     value={addForm.password}
                     onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
                     placeholder="At least 8 characters"
-                    className="h-8 text-xs rounded border-neutral-300 font-mono"
+                    className="h-8.5 text-xs rounded border-neutral-300 dark:border-slate-700 font-mono"
                     required
                   />
                 </div>
@@ -1319,10 +1309,10 @@ export default function UserManagementPage() {
                     value={addForm.confirmPassword}
                     onChange={(e) => setAddForm({ ...addForm, confirmPassword: e.target.value })}
                     placeholder="Re-enter password"
-                    className={`h-8 text-xs rounded font-mono ${
+                    className={`h-8.5 text-xs rounded font-mono ${
                       addForm.confirmPassword && addForm.confirmPassword !== addForm.password
                         ? "border-red-500 bg-red-50/50 dark:bg-red-950/20"
-                        : "border-neutral-300"
+                        : "border-neutral-300 dark:border-slate-700"
                     }`}
                     required
                   />
@@ -1332,13 +1322,11 @@ export default function UserManagementPage() {
                 <p className="text-[10px] font-semibold text-red-500 -mt-2">Passwords do not match</p>
               )}
 
-
-
               <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100 dark:border-slate-800 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
-                <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)} className="h-8 text-xs cursor-pointer">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)} className="h-8.5 text-xs cursor-pointer">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submitting || emailStatus === "taken"} size="sm" className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer disabled:opacity-50">
+                <Button type="submit" disabled={submitting || emailStatus === "taken"} size="sm" className="h-8.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer disabled:opacity-50">
                   {submitting ? "Adding..." : "Add Member"}
                 </Button>
               </div>
