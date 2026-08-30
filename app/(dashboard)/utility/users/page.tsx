@@ -69,19 +69,29 @@ export default function UserManagementPage() {
       if (
         perms.includes("submission:internal_screening") ||
         perms.includes("job:approve") ||
-        perms.includes("job:reject")
+        perms.includes("job:reject") ||
+        perms.includes("job:publish_direct")
       ) {
         return true;
       }
-      const r = (u.roles || []).map((x: string) => (x || "").toUpperCase());
-      return (
-        r.includes("DELIVERY_HEAD") ||
-        r.includes("ADMIN") ||
-        r.includes("SUPER_ADMIN") ||
-        r.includes("BRANCH_ADMIN") ||
-        r.includes("POD_LEAD") ||
-        r.includes("ACCOUNT_MANAGER")
-      );
+      const allRoles: string[] = [
+        ...(u.roles || []),
+        u.roleName || "",
+        ...(u.branchRoles ? Object.values(u.branchRoles).flat() : []),
+      ].filter(Boolean);
+
+      return allRoles.some((r) => {
+        const norm = (r || "").toUpperCase().replace(/[\s-_]+/g, "");
+        return (
+          norm === "ADMIN" ||
+          norm === "SUPERADMIN" ||
+          norm === "TENANTADMIN" ||
+          norm === "DELIVERYHEAD" ||
+          norm === "BRANCHADMIN" ||
+          norm === "PODLEAD" ||
+          norm === "ACCOUNTMANAGER"
+        );
+      });
     });
   }, [users]);
 
