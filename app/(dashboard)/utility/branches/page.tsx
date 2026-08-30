@@ -5,7 +5,7 @@ import {
   Building2, MapPin, Plus, Edit2, Users, CheckCircle2, XCircle, 
   Search, ShieldAlert, Sparkles, X, Globe, UserPlus, Briefcase, Crown, Shield,
   GitFork, ChevronRight, ChevronDown, Layers, Rocket, ArrowRight, MessageSquare, ListChecks, Trash2,
-  Clock, Calendar, Sun, Moon, Check, Loader2
+  Clock, Calendar, Sun, Moon, Check, Loader2, Table as TableIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +46,7 @@ export default function BranchManagementPage() {
   const [hierarchyData, setHierarchyData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"tree" | "cards">("tree");
+  const [viewMode, setViewMode] = useState<"table" | "tree" | "cards">("table");
   
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -57,6 +57,8 @@ export default function BranchManagementPage() {
   const [isChangeManagerOpen, setIsChangeManagerOpen] = useState(false);
   const [managerSearchQuery, setManagerSearchQuery] = useState("");
   const [savingManager, setSavingManager] = useState(false);
+  const [branchToDelete, setBranchToDelete] = useState<any>(null);
+  const [isDeletingBranch, setIsDeletingBranch] = useState(false);
 
   // Branch Stage Remarks Modal State
   const [isRemarksOpen, setIsRemarksOpen] = useState(false);
@@ -215,6 +217,21 @@ export default function BranchManagementPage() {
       toast.error(err.message || "Failed to update branch");
     } finally {
       setIsSubmittingBranch(false);
+    }
+  };
+
+  const handleDeleteBranchConfirm = async () => {
+    if (!branchToDelete) return;
+    try {
+      setIsDeletingBranch(true);
+      await atsApi.branches.delete(branchToDelete.id);
+      toast.success(`Branch "${branchToDelete.name}" deleted successfully!`);
+      setBranchToDelete(null);
+      await loadBranchesAndHierarchy();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete branch");
+    } finally {
+      setIsDeletingBranch(false);
     }
   };
 
@@ -448,27 +465,34 @@ export default function BranchManagementPage() {
       {/* HEADER SECTION */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-xl border border-neutral-200 dark:border-slate-800 shadow-sm">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-indigo-50 dark:bg-indigo-950/50 rounded-lg text-indigo-650">
-              <GitFork className="h-5 w-5" />
-            </div>
+          <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-bold text-neutral-900 dark:text-white">
-              Organizational Hierarchy & Branch Management
+              Branch &amp; Office Locations
             </h1>
           </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Define dynamic branch structures, assign Branch Managers (`BRANCH_ADMIN`), and visualize your entire organizational tree.
+            Configure dynamic branch structures, operating work shifts, recruitment pods, and staff allocations.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* VIEW MODE TOGGLE */}
           <div className="flex items-center bg-neutral-100 dark:bg-slate-800 p-1 rounded-lg border border-neutral-200 dark:border-slate-700">
             <button
+              onClick={() => setViewMode("table")}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
+                viewMode === "table"
+                  ? "bg-white dark:bg-slate-900 text-indigo-600 shadow-xs"
+                  : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400"
+              }`}
+            >
+              <TableIcon className="h-3.5 w-3.5" /> Table
+            </button>
+            <button
               onClick={() => setViewMode("tree")}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
                 viewMode === "tree"
-                  ? "bg-white dark:bg-slate-900 text-indigo-650 shadow-sm"
+                  ? "bg-white dark:bg-slate-900 text-indigo-600 shadow-xs"
                   : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400"
               }`}
             >
@@ -476,9 +500,9 @@ export default function BranchManagementPage() {
             </button>
             <button
               onClick={() => setViewMode("cards")}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
                 viewMode === "cards"
-                  ? "bg-white dark:bg-slate-900 text-indigo-650 shadow-sm"
+                  ? "bg-white dark:bg-slate-900 text-indigo-600 shadow-xs"
                   : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400"
               }`}
             >
@@ -491,7 +515,7 @@ export default function BranchManagementPage() {
               resetForm();
               setIsCreateOpen(true);
             }}
-            className="bg-indigo-650 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-lg flex items-center gap-1.5 shadow"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
             <Plus className="h-4 w-4" /> Add New Branch
           </Button>
@@ -518,14 +542,14 @@ export default function BranchManagementPage() {
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button
               onClick={() => openCreateWithPreset("INDIA")}
-              className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs h-9 px-4 rounded-lg flex items-center gap-2 shadow"
+              className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs h-9 px-4 rounded-lg flex items-center gap-2 shadow cursor-pointer"
             >
               <Building2 className="h-4 w-4" /> + Add Domestic India Branch <ArrowRight className="h-3.5 w-3.5" />
             </Button>
             <Button
               onClick={() => openCreateWithPreset("US")}
               variant="outline"
-              className="border-indigo-400/50 text-indigo-100 hover:bg-indigo-800/50 font-bold text-xs h-9 px-4 rounded-lg flex items-center gap-2"
+              className="border-indigo-400/50 text-indigo-100 hover:bg-indigo-800/50 font-bold text-xs h-9 px-4 rounded-lg flex items-center gap-2 cursor-pointer"
             >
               <Globe className="h-4 w-4" /> + Add US IT Staffing Branch
             </Button>
@@ -540,47 +564,210 @@ export default function BranchManagementPage() {
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search branches by name, city, or code..."
+            placeholder="Search branches by name or city..."
             className="pl-9 h-9 text-xs bg-white dark:bg-slate-900 rounded-lg border-neutral-300 dark:border-slate-700"
           />
         </div>
-        <div className="text-xs font-semibold text-neutral-500">
-          Total Configured Branches: <span className="text-indigo-650 font-bold">{branches.length}</span>
+        <div className="text-xs font-medium text-neutral-500">
+          Total Configured Branches: <span className="text-neutral-900 dark:text-white font-bold">{branches.length}</span>
         </div>
       </div>
 
       {/* CONTENT AREA */}
       {loading ? (
         <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-650 mx-auto"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="text-xs text-neutral-500 mt-2 font-medium">Loading organization hierarchy...</p>
         </div>
+      ) : viewMode === "table" ? (
+        /* ─── UNIVERSAL TABLE VIEW (DEFAULT) ─────────────────────────── */
+        <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-xs rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-neutral-50/80 dark:bg-slate-800/40 border-b border-neutral-200 dark:border-slate-800 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
+                  <th className="py-3.5 px-4">Branch Office</th>
+                  <th className="py-3.5 px-4">Market</th>
+                  <th className="py-3.5 px-4">Hours &amp; Shift</th>
+                  <th className="py-3.5 px-4">Branch Head</th>
+                  <th className="py-3.5 px-4">Staff Members</th>
+                  <th className="py-3.5 px-4">Requisitions</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100 dark:divide-slate-800 text-xs">
+                {filteredBranches.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-16 text-center text-neutral-400">
+                      <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                        <Building2 className="h-10 w-10 text-neutral-300 dark:text-neutral-600" />
+                        <p className="font-semibold text-neutral-700 dark:text-neutral-200 text-sm">
+                          {searchQuery ? "No matching branches found" : "No branch locations configured"}
+                        </p>
+                        <p className="text-xs text-neutral-400 leading-relaxed">
+                          {searchQuery
+                            ? "Try clearing your search query to see all configured branches."
+                            : "Create your first operating branch location to manage staff and jobs."}
+                        </p>
+                        {!searchQuery && (
+                          <Button
+                            onClick={() => {
+                              resetForm();
+                              setIsCreateOpen(true);
+                            }}
+                            className="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <Plus className="h-3.5 w-3.5" /> + Add New Branch
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredBranches.map((b) => {
+                    const branchHier = (hierarchyData?.branches || []).find((h: any) => String(h.id) === String(b.id));
+                    const members = (b.members && b.members.length > 0)
+                      ? b.members
+                      : (branchHier?.members && branchHier.members.length > 0)
+                      ? branchHier.members
+                      : [];
+
+                    return (
+                      <tr key={b.id} className="hover:bg-neutral-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                        <td className="py-3.5 px-4 font-semibold text-neutral-900 dark:text-white">
+                          <div>
+                            <button
+                              onClick={() => openEditModal(b)}
+                              className="font-bold text-xs text-neutral-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 text-left transition-colors cursor-pointer block"
+                            >
+                              {b.name}
+                            </button>
+                            <p className="text-[11px] text-neutral-500 font-normal mt-0.5">
+                              {b.city || "City Unspecified"}, {b.country || "India"}
+                            </p>
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <span className="text-[10.5px] font-medium font-mono px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-slate-700">
+                            {b.market === "US" ? "US IT Market" : "Domestic India"}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <div className="space-y-0.5">
+                            <div className="font-medium text-neutral-800 dark:text-neutral-200 text-xs">
+                              {formatTime12(b.workStartTime)} - {formatTime12(b.workEndTime)}
+                            </div>
+                            <div className="text-[10.5px] text-neutral-400 font-mono">
+                              {b.shiftTiming || (b.market === "US" ? "US Shift" : "General Shift")} • {b.timezone ? b.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          {b.managerName ? (
+                            <div className="flex items-center gap-1.5">
+                              <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                              <span className="text-xs font-semibold text-neutral-900 dark:text-white">
+                                {b.managerName}
+                              </span>
+                              <button
+                                onClick={() => openChangeManagerModal(b)}
+                                className="text-[10.5px] font-medium text-neutral-500 hover:text-indigo-600 hover:underline cursor-pointer ml-1"
+                              >
+                                (Change)
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => openChangeManagerModal(b)}
+                              className="text-xs font-medium text-neutral-400 hover:text-indigo-600 italic cursor-pointer"
+                            >
+                              Unassigned (Assign)
+                            </button>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <button
+                            onClick={() => openMembersModal(b)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-neutral-100 hover:bg-neutral-200/70 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-800 dark:text-neutral-200 border border-neutral-200/80 dark:border-slate-700 font-medium text-[11px] transition cursor-pointer"
+                            title="View assigned staff members"
+                          >
+                            <Users className="h-3.5 w-3.5 text-neutral-500" />
+                            <span>{b.usersCount || members.length} Staff</span>
+                          </button>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                          {b.jobsCount || 0} Requisitions
+                        </td>
+
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              onClick={() => openBranchRemarksModal(b)}
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px] font-semibold border-neutral-200 dark:border-slate-700 rounded-md flex items-center gap-1 cursor-pointer"
+                              title="Configure stage remark templates"
+                            >
+                              <MessageSquare className="h-3 w-3" /> Remarks
+                            </Button>
+
+                            <Button
+                              onClick={() => openEditModal(b)}
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px] font-semibold border-neutral-200 dark:border-slate-700 rounded-md flex items-center gap-1 cursor-pointer"
+                              title="Edit branch parameters & routing policy"
+                            >
+                              <Edit2 className="h-3 w-3" /> Edit
+                            </Button>
+
+                            <Button
+                              onClick={() => setBranchToDelete(b)}
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px] font-semibold border-neutral-200 dark:border-slate-700 rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-1 cursor-pointer"
+                              title="Delete branch"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       ) : viewMode === "tree" ? (
-        /* VISUAL HIERARCHY TREE VIEW */
+        /* ─── VISUAL HIERARCHY TREE VIEW ─────────────────────────────── */
         <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-sm p-6">
           <div className="space-y-6">
             {/* ROOT NODE: TENANT HQ */}
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800">
-              <div className="p-3 bg-indigo-650 text-white rounded-lg shadow">
-                <Building2 className="h-6 w-6" />
-              </div>
+            <div className="p-4 rounded-xl bg-neutral-50/80 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800">
               <div>
-                <span className="px-2 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">
+                <span className="px-2 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider bg-neutral-200 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300">
                   Tenant Organization HQ
                 </span>
-                <h2 className="text-base font-bold text-neutral-900 dark:text-white mt-0.5">
+                <h2 className="text-base font-bold text-neutral-900 dark:text-white mt-1">
                   {hierarchyData?.tenant?.name || "Company Tenant Workspace"}
                 </h2>
-                <p className="text-xs text-neutral-500">
-                  Domain: <span className="font-mono text-indigo-650 font-semibold">{hierarchyData?.tenant?.domain || "workspace"}</span>
+                <p className="text-xs text-neutral-500 mt-0.5">
+                  Domain: <span className="font-mono text-neutral-700 dark:text-neutral-300 font-semibold">{hierarchyData?.tenant?.domain || "workspace"}</span>
                 </p>
               </div>
             </div>
 
             {/* BRANCH NODES CONTAINER */}
-            <div className="pl-6 border-l-2 border-indigo-200 dark:border-slate-800 space-y-6 ml-6">
+            <div className="pl-6 border-l-2 border-neutral-200 dark:border-slate-800 space-y-6 ml-6">
               {filteredBranches.length === 0 ? (
-                <div className="py-6 text-xs text-neutral-450 italic border border-dashed border-neutral-300 p-4 rounded-lg text-center">
+                <div className="py-6 text-xs text-neutral-450 italic border border-dashed border-neutral-300 dark:border-slate-800 p-4 rounded-lg text-center">
                   No branches configured under this tenant yet. Click <strong>"+ Add New Branch"</strong> above to create your first operating location.
                 </div>
               ) : (
@@ -595,34 +782,18 @@ export default function BranchManagementPage() {
                   return (
                     <div key={b.id} className="relative pl-6 space-y-3">
                       {/* CONNECTOR LINE */}
-                      <div className="absolute -left-[25px] top-4 w-6 h-[2px] bg-indigo-200 dark:bg-slate-800" />
+                      <div className="absolute -left-[25px] top-4 w-6 h-[2px] bg-neutral-200 dark:border-slate-800" />
                       
                       {/* BRANCH CARD NODE */}
                       <div className="bg-neutral-50/80 dark:bg-slate-850 p-4 rounded-xl border border-neutral-200 dark:border-slate-800 shadow-sm space-y-3">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                          <div className="flex items-center gap-2.5">
-                            <div className="p-2 bg-white dark:bg-slate-800 rounded-lg text-indigo-650 border border-neutral-200 dark:border-slate-700 shadow-xs">
-                              <MapPin className="h-4 w-4" />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-neutral-900 dark:text-white">{b.name}</span>
-                                {b.code && (
-                                  <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono font-bold bg-neutral-200 dark:bg-slate-700 text-neutral-700 dark:text-slate-300">
-                                    {b.code}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-neutral-500">{b.city || "City Unspecified"}, {b.country || "Country"}</p>
-                            </div>
+                          <div>
+                            <span className="text-sm font-bold text-neutral-900 dark:text-white">{b.name}</span>
+                            <p className="text-[11px] text-neutral-500">{b.city || "City Unspecified"}, {b.country || "Country"}</p>
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                              b.market === "US" 
-                                ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300"
-                                : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300"
-                            }`}>
+                            <span className="text-[10.5px] font-medium font-mono px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-slate-700">
                               {b.market === "US" ? "US IT Market" : "Domestic India"}
                             </span>
 
@@ -630,7 +801,7 @@ export default function BranchManagementPage() {
                               onClick={() => openBranchRemarksModal(b)}
                               size="sm"
                               variant="outline"
-                              className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1"
+                              className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer"
                             >
                               <MessageSquare className="h-3 w-3 mr-1" /> Stage Remarks
                             </Button>
@@ -639,7 +810,7 @@ export default function BranchManagementPage() {
                               onClick={() => openEditModal(b)}
                               size="sm"
                               variant="outline"
-                              className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1"
+                              className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer"
                             >
                               <Edit2 className="h-3 w-3 mr-1" /> Edit Branch
                             </Button>
@@ -648,7 +819,7 @@ export default function BranchManagementPage() {
                               onClick={() => openMembersModal(b)}
                               size="sm"
                               variant="outline"
-                              className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1"
+                              className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer"
                             >
                               Manage Users ({b.usersCount || 0})
                             </Button>
@@ -656,17 +827,17 @@ export default function BranchManagementPage() {
                         </div>
 
                         {/* OPERATING HOURS & SHIFT BADGE */}
-                        <div className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 p-2.5 rounded-lg flex items-center justify-between text-xs">
+                        <div className="bg-neutral-100/80 dark:bg-slate-800/60 border border-neutral-200/80 dark:border-slate-700 p-2.5 rounded-lg flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                            <Clock className="h-4 w-4 text-neutral-600 dark:text-neutral-400 shrink-0" />
                             <div>
-                              <div className="flex items-center gap-1.5 font-bold text-amber-950 dark:text-amber-200">
+                              <div className="flex items-center gap-1.5 font-semibold text-neutral-900 dark:text-white">
                                 <span>{formatTime12(b.workStartTime)} - {formatTime12(b.workEndTime)}</span>
-                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 font-mono font-bold">
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-neutral-200 dark:bg-slate-700 text-neutral-700 dark:text-neutral-300 font-mono font-medium">
                                   {b.timezone ? b.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}
                                 </span>
                               </div>
-                              <p className="text-[10.5px] text-amber-800/80 dark:text-amber-400/80 font-medium">
+                              <p className="text-[10.5px] text-neutral-500 font-normal">
                                 {b.shiftTiming || (b.market === "US" ? "US Shift" : "General Shift")} • {Array.isArray(b.workingDays) && b.workingDays.length > 0 ? (b.workingDays.length === 5 ? "Mon - Fri" : b.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon - Fri"}
                               </p>
                             </div>
@@ -683,7 +854,7 @@ export default function BranchManagementPage() {
                           </div>
                           <button
                             onClick={() => openChangeManagerModal(b)}
-                            className="text-[11px] font-bold text-indigo-650 hover:underline cursor-pointer"
+                            className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer"
                           >
                             {b.managerName ? "Change Manager" : "Assign Manager"}
                           </button>
@@ -720,7 +891,7 @@ export default function BranchManagementPage() {
                                         </span>
                                       ) : (
                                         memberRoles.slice(0, 2).map((r) => (
-                                          <span key={r} className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200">
+                                          <span key={r} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-neutral-100 text-neutral-700 dark:bg-slate-800 dark:text-neutral-300 border border-neutral-200/80 dark:border-slate-700">
                                             {r === "BRANCH_ADMIN" ? "Branch Admin" : r.replace(/_/g, " ")}
                                           </span>
                                         ))
@@ -742,35 +913,23 @@ export default function BranchManagementPage() {
           </div>
         </Card>
       ) : (
-        /* CARDS GRID VIEW */
+        /* ─── CARDS GRID VIEW ────────────────────────────────────────── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredBranches.map((b) => (
             <Card key={b.id} className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-sm hover:shadow transition-all">
               <CardContent className="p-5 space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base font-bold text-neutral-800 dark:text-white">
-                        {b.name}
-                      </span>
-                      {b.code && (
-                        <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono font-bold bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-slate-300 border border-neutral-200 dark:border-slate-700">
-                          {b.code}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-neutral-500">
-                      <MapPin className="h-3.5 w-3.5 text-neutral-400" />
+                    <span className="text-base font-bold text-neutral-800 dark:text-white">
+                      {b.name}
+                    </span>
+                    <div className="text-xs text-neutral-500">
                       <span>{b.city || "Unspecified"}, {b.country || "India"}</span>
                     </div>
                   </div>
 
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                    b.market === "US" 
-                      ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300"
-                      : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300"
-                  }`}>
-                    {b.market === "US" ? "US IT Segment" : "Domestic India"}
+                  <span className="text-[10.5px] font-medium font-mono px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-slate-700">
+                    {b.market === "US" ? "US IT Market" : "Domestic India"}
                   </span>
                 </div>
 
@@ -787,24 +946,24 @@ export default function BranchManagementPage() {
                   </div>
                   <button
                     onClick={() => openChangeManagerModal(b)}
-                    className="text-[10px] font-bold text-indigo-650 hover:underline cursor-pointer"
+                    className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
                   >
                     {b.managerName ? "Change" : "Assign"}
                   </button>
                 </div>
 
                 {/* OPERATING HOURS & SHIFT BADGE */}
-                <div className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 p-2.5 rounded-lg flex items-center justify-between text-xs">
+                <div className="bg-neutral-100/80 dark:bg-slate-800/60 border border-neutral-200/80 dark:border-slate-700 p-2.5 rounded-lg flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <Clock className="h-4 w-4 text-neutral-600 dark:text-neutral-400 shrink-0" />
                     <div>
-                      <div className="flex items-center gap-1.5 font-bold text-amber-950 dark:text-amber-200">
+                      <div className="flex items-center gap-1.5 font-semibold text-neutral-900 dark:text-white">
                         <span>{formatTime12(b.workStartTime)} - {formatTime12(b.workEndTime)}</span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 font-mono font-bold">
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-neutral-200 dark:bg-slate-700 text-neutral-700 dark:text-neutral-300 font-mono font-medium">
                           {b.timezone ? b.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}
                         </span>
                       </div>
-                      <p className="text-[10.5px] text-amber-800/80 dark:text-amber-400/80 font-medium">
+                      <p className="text-[10.5px] text-neutral-500 font-normal">
                         {b.shiftTiming || (b.market === "US" ? "US Shift" : "General Shift")} • {Array.isArray(b.workingDays) && b.workingDays.length > 0 ? (b.workingDays.length === 5 ? "Mon - Fri" : b.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon - Fri"}
                       </p>
                     </div>
@@ -815,7 +974,7 @@ export default function BranchManagementPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-neutral-50 dark:bg-slate-850 p-2 rounded text-center">
                     <span className="text-[10px] uppercase font-bold text-neutral-400 block">Assigned Staff</span>
-                    <span className="text-sm font-bold text-indigo-650 dark:text-indigo-400">{b.usersCount || 0}</span>
+                    <span className="text-sm font-bold text-neutral-900 dark:text-white">{b.usersCount || 0}</span>
                   </div>
                   <div className="bg-neutral-50 dark:bg-slate-850 p-2 rounded text-center">
                     <span className="text-[10px] uppercase font-bold text-neutral-400 block">Active Requisitions</span>
@@ -829,7 +988,7 @@ export default function BranchManagementPage() {
                     onClick={() => openMembersModal(b)}
                     variant="outline"
                     size="sm"
-                    className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1"
+                    className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer"
                   >
                     <Users className="h-3.5 w-3.5" /> Users ({b.usersCount || 0})
                   </Button>
@@ -838,7 +997,7 @@ export default function BranchManagementPage() {
                     onClick={() => openBranchRemarksModal(b)}
                     variant="outline"
                     size="sm"
-                    className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1"
+                    className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer"
                   >
                     <MessageSquare className="h-3 w-3 mr-1" /> Remarks
                   </Button>
@@ -847,9 +1006,18 @@ export default function BranchManagementPage() {
                     onClick={() => openEditModal(b)}
                     variant="outline"
                     size="sm"
-                    className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1"
+                    className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer"
                   >
                     <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
+                  </Button>
+
+                  <Button
+                    onClick={() => setBranchToDelete(b)}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </CardContent>
@@ -860,96 +1028,102 @@ export default function BranchManagementPage() {
 
       {/* CREATE BRANCH MODAL */}
       {isCreateOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-xl overflow-hidden animate-in fade-in-0 zoom-in-95">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <Plus className="h-4 w-4 text-indigo-650" /> Create New Branch
-              </h3>
-              <button onClick={() => setIsCreateOpen(false)} className="text-neutral-400 hover:text-neutral-600">
-                <X className="h-4 w-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden my-auto max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-300 flex items-center justify-center">
+                  <Plus className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Create New Branch Location
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">Establish a new operating office location and work shift schedule</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCreateOpen(false)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg cursor-pointer"
+              >
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateBranch} className="p-5 space-y-4">
+            <form onSubmit={handleCreateBranch} className="p-6 space-y-4 overflow-y-auto flex-1">
               {formError && (
-                <div className="p-3 bg-red-50 text-red-700 text-xs font-semibold rounded border border-red-200">
+                <div className="p-3 bg-red-50 text-red-700 text-xs font-semibold rounded-lg border border-red-200">
                   {formError}
                 </div>
               )}
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Name *</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                  Branch Name <span className="text-red-500">*</span>
+                </label>
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Primary Branch, Main Office, Tech Hub"
-                  className="h-8 text-xs rounded border-neutral-300"
+                  placeholder="e.g. Bhubaneswar (Domestic IT), New York Hub, Chicago Branch..."
+                  className="h-10 text-xs font-medium rounded-lg border-neutral-300 dark:border-slate-700"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Code (Job Prefix)</label>
-                  <Input
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    placeholder="e.g. BBS, VIZ, NY"
-                    className="h-8 text-xs font-mono rounded border-neutral-300"
-                  />
-                  <span className="text-[10px] text-neutral-400 block">Used for Job Code (e.g. BBS-260212-N0001)</span>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">City</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    City <span className="text-red-500">*</span>
+                  </label>
                   <Input
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="e.g. City Name"
-                    className="h-8 text-xs rounded border-neutral-300"
+                    placeholder="e.g. Bhubaneswar, New York, London..."
+                    className="h-10 text-xs rounded-lg border-neutral-300 dark:border-slate-700"
+                    required
                   />
                 </div>
-              </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Market Segment *</label>
-                <select
-                  value={formData.market}
-                  onChange={(e) => {
-                    const m = e.target.value;
-                    setFormData({
-                      ...formData,
-                      market: m,
-                      country: m === "US" ? "United States" : "India",
-                      timezone: m === "US" ? "America/New_York" : "Asia/Kolkata",
-                      shiftTiming: m === "US" ? "US Shift" : "General Shift",
-                    });
-                  }}
-                  className="w-full h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 font-semibold"
-                >
-                  <option value="INDIA">Domestic India Segment</option>
-                  <option value="US">US IT Segment</option>
-                </select>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Market Segment <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.market}
+                    onChange={(e) => {
+                      const m = e.target.value;
+                      setFormData({
+                        ...formData,
+                        market: m,
+                        country: m === "US" ? "United States" : "India",
+                        timezone: m === "US" ? "America/New_York" : "Asia/Kolkata",
+                        shiftTiming: m === "US" ? "US Shift" : "General Shift",
+                      });
+                    }}
+                    className="w-full h-10 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-semibold text-neutral-900 dark:text-white cursor-pointer"
+                  >
+                    <option value="INDIA">Domestic India Segment</option>
+                    <option value="US">US IT Segment</option>
+                  </select>
+                </div>
               </div>
 
               {/* Operating Hours & Shift Timing Section */}
-              <div className="p-3.5 bg-neutral-50 dark:bg-slate-850 rounded-xl border border-neutral-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center justify-between border-b border-neutral-200/60 dark:border-slate-800 pb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                    <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">
-                      Working Hours &amp; Shift Schedule
-                    </span>
-                  </div>
+              <div className="p-4 bg-neutral-50 dark:bg-slate-850 rounded-xl border border-neutral-200 dark:border-slate-800 space-y-3">
+                <div className="flex items-center gap-1.5 border-b border-neutral-200/60 dark:border-slate-800 pb-2">
+                  <Clock className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                  <span className="text-xs font-bold text-neutral-900 dark:text-white">
+                    Working Hours &amp; Shift Schedule
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Timezone</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Timezone</label>
                     <select
                       value={formData.timezone}
                       onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                      className="w-full h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 font-semibold"
+                      className="w-full h-9 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 font-medium text-neutral-900 dark:text-white cursor-pointer"
                     >
                       <option value="Asia/Kolkata">Asia/Kolkata (IST +5:30)</option>
                       <option value="America/New_York">America/New_York (EST -5:00)</option>
@@ -964,42 +1138,42 @@ export default function BranchManagementPage() {
                     </select>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Shift Name</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Shift Name</label>
                     <Input
                       value={formData.shiftTiming}
                       onChange={(e) => setFormData({ ...formData, shiftTiming: e.target.value })}
-                      placeholder="e.g. Day Shift (09:00 - 18:00)"
-                      className="h-8 text-xs rounded border-neutral-300 bg-white dark:bg-slate-900"
+                      placeholder="e.g. General Shift, Night Shift..."
+                      className="h-9 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Start Time</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Start Time</label>
                     <Input
                       type="time"
                       value={formData.workStartTime}
                       onChange={(e) => setFormData({ ...formData, workStartTime: e.target.value })}
-                      className="h-8 text-xs font-mono rounded border-neutral-300 bg-white dark:bg-slate-900"
+                      className="h-9 text-xs font-mono rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">End Time</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">End Time</label>
                     <Input
                       type="time"
                       value={formData.workEndTime}
                       onChange={(e) => setFormData({ ...formData, workEndTime: e.target.value })}
-                      className="h-8 text-xs font-mono rounded border-neutral-300 bg-white dark:bg-slate-900"
+                      className="h-9 text-xs font-mono rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Working Days</label>
-                  <div className="flex flex-wrap gap-1">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Working Days</label>
+                  <div className="flex flex-wrap gap-1.5">
                     {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => {
                       const isSel = formData.workingDays.includes(day);
                       return (
@@ -1012,10 +1186,10 @@ export default function BranchManagementPage() {
                               : [...formData.workingDays, day];
                             setFormData({ ...formData, workingDays: updated });
                           }}
-                          className={`px-2 py-0.5 rounded text-[10.5px] font-semibold border ${
+                          className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition cursor-pointer ${
                             isSel
                               ? "bg-indigo-600 text-white border-indigo-600"
-                              : "bg-white dark:bg-slate-900 text-neutral-600 dark:text-neutral-300 border-neutral-200 dark:border-slate-700"
+                              : "bg-white dark:bg-slate-900 text-neutral-600 dark:text-neutral-300 border-neutral-200 dark:border-slate-700 hover:border-neutral-300"
                           }`}
                         >
                           {day.slice(0, 3)}
@@ -1026,12 +1200,22 @@ export default function BranchManagementPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
-                <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateOpen(false)} className="h-8 text-xs">
+              <div className="flex justify-end gap-2.5 pt-2 border-t border-neutral-100 dark:border-slate-800">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCreateOpen(false)}
+                  className="h-9 text-xs font-bold px-4 cursor-pointer"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-4">
-                  Save Branch
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="h-9 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 shadow-xs cursor-pointer"
+                >
+                  Save Branch Location
                 </Button>
               </div>
             </form>
@@ -2142,6 +2326,45 @@ export default function BranchManagementPage() {
               </Button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ── DELETE BRANCH CONFIRMATION MODAL ── */}
+      {branchToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
+            <div className="h-12 w-12 rounded-full bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center mx-auto">
+              <Trash2 className="h-6 w-6" />
+            </div>
+
+            <div className="text-center">
+              <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                Delete Branch: {branchToDelete.name}
+              </h3>
+              <p className="text-xs text-neutral-500 mt-2 leading-relaxed">
+                Are you sure you want to permanently delete this branch location? Staff and jobs assigned to this branch should be reassigned first.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-neutral-100 dark:border-slate-800">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBranchToDelete(null)}
+                className="text-xs font-bold px-4 cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={isDeletingBranch}
+                onClick={handleDeleteBranchConfirm}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-5 shadow-xs cursor-pointer"
+              >
+                {isDeletingBranch ? "Deleting..." : "Confirm Delete"}
+              </Button>
+            </div>
           </div>
         </div>
       )}
