@@ -1267,10 +1267,14 @@ const submissions = {
   async getTrackerStats(): Promise<any> {
     return apiFetch<any>('/api/recruiter-submissions/tracker-stats');
   },
-  async getCustomRemarks(branchId?: string): Promise<any[]> {
-    return apiFetch<any[]>(`/api/recruiter-submissions/custom-remarks${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''}`);
+  async getCustomRemarks(branchId?: string, includeGlobal?: boolean): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (branchId) params.append('branchId', branchId);
+    if (includeGlobal !== undefined) params.append('includeGlobal', String(includeGlobal));
+    const qs = params.toString();
+    return apiFetch<any[]>(`/api/recruiter-submissions/custom-remarks${qs ? `?${qs}` : ''}`);
   },
-  async createCustomRemark(data: { stage: string; remarkText: string; branchId?: string }): Promise<any> {
+  async createCustomRemark(data: { stage: string; remarkText: string; remarkType?: 'ACCEPT' | 'REJECT' | 'GENERAL' | string; branchId?: string; isGlobal?: boolean }): Promise<any> {
     return apiFetch<any>('/api/recruiter-submissions/custom-remarks', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -1290,6 +1294,12 @@ const branches = {
   async get(id: string): Promise<any> {
     return apiFetch<any>(`/api/branches/${id}`);
   },
+  async toggleGlobalRemarks(id: string, enableGlobalRemarks?: boolean): Promise<any> {
+    return apiFetch<any>(`/api/branches/${id}/toggle-global-remarks`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enableGlobalRemarks }),
+    });
+  },
   async create(data: {
     name: string;
     code?: string;
@@ -1303,6 +1313,7 @@ const branches = {
     workingDays?: string[];
     shiftTiming?: string;
     breakDurationMinutes?: number;
+    enableGlobalRemarks?: boolean;
   }): Promise<any> {
     return apiFetch<any>('/api/branches', {
       method: 'POST',

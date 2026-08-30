@@ -588,6 +588,7 @@ export default function SubmissionsPage() {
   const [customRemarks, setCustomRemarks] = useState<any[]>([]);
   const [customRemarksModalOpen, setCustomRemarksModalOpen] = useState(false);
   const [newRemarkStage, setNewRemarkStage] = useState<"review" | "l1" | "l2" | "l3" | "final">("review");
+  const [newRemarkType, setNewRemarkType] = useState<"ACCEPT" | "REJECT" | "GENERAL">("ACCEPT");
   const [newRemarkText, setNewRemarkText] = useState("");
   const [addingRemark, setAddingRemark] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
@@ -655,6 +656,43 @@ export default function SubmissionsPage() {
     setStartDate("");
     setEndDate("");
     setTimeout(() => loadData(), 50);
+  };
+
+  // Helper function to render categorized dropdown options (Accept / Reject / General)
+  const renderCategorizedRemarkOptions = (stage: string) => {
+    const stageKey = stage.toLowerCase();
+    const stageItems = customRemarks.filter(
+      r => r.stage?.toLowerCase() === stageKey || (stageKey === "review" && r.stage?.toLowerCase() === "internal_review")
+    );
+    const acceptItems = stageItems.filter(r => r.remarkType === "ACCEPT");
+    const rejectItems = stageItems.filter(r => r.remarkType === "REJECT");
+    const generalItems = stageItems.filter(r => r.remarkType === "GENERAL" || !r.remarkType);
+
+    return (
+      <>
+        {acceptItems.length > 0 && (
+          <optgroup label="✓ Accept / Cleared">
+            {acceptItems.map(r => (
+              <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
+            ))}
+          </optgroup>
+        )}
+        {rejectItems.length > 0 && (
+          <optgroup label="✕ Reject / Issue">
+            {rejectItems.map(r => (
+              <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
+            ))}
+          </optgroup>
+        )}
+        {generalItems.length > 0 && (
+          <optgroup label="ℹ General Feedback">
+            {generalItems.map(r => (
+              <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
+            ))}
+          </optgroup>
+        )}
+      </>
+    );
   };
 
   const openEditPanel = (sub: Submission) => {
@@ -768,13 +806,16 @@ export default function SubmissionsPage() {
     if (!newRemarkText.trim()) return;
     try {
       setAddingRemark(true);
+      const user = atsApi.auth.getCurrentUser();
       const created = await atsApi.submissions.createCustomRemark({
         stage: newRemarkStage,
         remarkText: newRemarkText.trim(),
+        remarkType: newRemarkType,
+        branchId: user?.branchId || undefined,
       });
       setCustomRemarks((prev) => [...prev, created]);
       setNewRemarkText("");
-      toast.success("Custom stage remark added!");
+      toast.success(`Custom ${newRemarkType.toLowerCase()} remark added!`);
     } catch (err: any) {
       toast.error("Failed to add remark: " + err.message);
     } finally {
@@ -1579,9 +1620,7 @@ export default function SubmissionsPage() {
                               className="text-[10px] border border-border rounded px-1.5 py-0.5 bg-background text-muted-foreground hover:text-foreground font-medium cursor-pointer"
                             >
                               <option value="" disabled>+ Template</option>
-                              {resolvedTemplates.l1.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
+                              {renderCategorizedRemarkOptions("l1")}
                             </select>
                           )}
                         </div>
@@ -1641,9 +1680,7 @@ export default function SubmissionsPage() {
                               className="text-[10px] border border-border rounded px-1.5 py-0.5 bg-background text-muted-foreground hover:text-foreground font-medium cursor-pointer"
                             >
                               <option value="" disabled>+ Template</option>
-                              {resolvedTemplates.l2.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
+                              {renderCategorizedRemarkOptions("l2")}
                             </select>
                           )}
                         </div>
@@ -1703,9 +1740,7 @@ export default function SubmissionsPage() {
                               className="text-[10px] border border-border rounded px-1.5 py-0.5 bg-background text-muted-foreground hover:text-foreground font-medium cursor-pointer"
                             >
                               <option value="" disabled>+ Template</option>
-                              {resolvedTemplates.l3.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
+                              {renderCategorizedRemarkOptions("l3")}
                             </select>
                           )}
                         </div>
@@ -1756,9 +1791,7 @@ export default function SubmissionsPage() {
                               className="text-[10px] border border-border rounded px-1.5 py-0.5 bg-background text-muted-foreground hover:text-foreground font-medium cursor-pointer"
                             >
                               <option value="" disabled>+ Template</option>
-                              {resolvedTemplates.final.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
+                              {renderCategorizedRemarkOptions("final")}
                             </select>
                           )}
                         </div>
@@ -1806,9 +1839,7 @@ export default function SubmissionsPage() {
                               className="text-[10px] border border-border rounded px-1.5 py-0.5 bg-background text-muted-foreground hover:text-foreground font-medium cursor-pointer"
                             >
                               <option value="" disabled>+ Template</option>
-                              {resolvedTemplates.review.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
+                              {renderCategorizedRemarkOptions("review")}
                             </select>
                           )}
                         </div>
@@ -2194,45 +2225,99 @@ export default function SubmissionsPage() {
 
           <div className="space-y-4 py-2 flex-1 overflow-y-auto pr-1">
             {/* Add New Form */}
-            <form onSubmit={handleAddCustomRemark} className="p-3 border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-950/20 rounded-xl space-y-3">
+            <form onSubmit={handleAddCustomRemark} className="p-3.5 border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-950/20 rounded-xl space-y-3">
               <div className="text-xs font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
                 <Icon icon="heroicons:plus-circle" className="h-4 w-4" />
                 Add New Custom Quick-Pick Remark
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div className="space-y-1">
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                <div className="sm:col-span-4 space-y-1">
                   <label className="text-[10px] font-bold text-default-500 uppercase">Target Stage</label>
                   <select
                     value={newRemarkStage}
                     onChange={(e) => setNewRemarkStage(e.target.value as "review" | "l1" | "l2" | "l3" | "final")}
-                    className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2 h-8.5 bg-white dark:bg-slate-800 text-default-850"
+                    className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-2 h-8.5 bg-white dark:bg-slate-800 text-default-850 cursor-pointer"
                   >
-                    <option value="review">Internal Screening &amp; Review Gate</option>
+                    <option value="review">Internal Screening Gate</option>
                     <option value="l1">Round 1 (L1) — Interview</option>
                     <option value="l2">Round 2 (L2) — Technical Vetting</option>
                     <option value="l3">Round 3 (L3) — Commercial Audit</option>
                     <option value="final">Final Client Milestone</option>
                   </select>
                 </div>
-                <div className="sm:col-span-2 space-y-1">
+
+                <div className="sm:col-span-4 space-y-1">
+                  <label className="text-[10px] font-bold text-default-500 uppercase">Category</label>
+                  <div className="grid grid-cols-3 gap-1 bg-white dark:bg-slate-800 p-0.5 rounded-md border border-default-250 dark:border-slate-700 h-8.5 items-center">
+                    <button
+                      type="button"
+                      onClick={() => setNewRemarkType("ACCEPT")}
+                      className={`h-7 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                        newRemarkType === "ACCEPT"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "text-neutral-600 hover:text-emerald-600 dark:text-neutral-300"
+                      }`}
+                    >
+                      ✓ Accept
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewRemarkType("REJECT")}
+                      className={`h-7 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                        newRemarkType === "REJECT"
+                          ? "bg-rose-600 text-white shadow-xs"
+                          : "text-neutral-600 hover:text-rose-600 dark:text-neutral-300"
+                      }`}
+                    >
+                      ✕ Reject
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewRemarkType("GENERAL")}
+                      className={`h-7 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                        newRemarkType === "GENERAL"
+                          ? "bg-slate-700 text-white shadow-xs"
+                          : "text-neutral-600 hover:text-slate-900 dark:text-neutral-300"
+                      }`}
+                    >
+                      ℹ Info
+                    </button>
+                  </div>
+                </div>
+
+                <div className="sm:col-span-4 space-y-1">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={addingRemark || !newRemarkText.trim()}
+                    className={`w-full text-white font-bold text-xs h-8.5 px-4 cursor-pointer ${
+                      newRemarkType === "ACCEPT"
+                        ? "bg-emerald-600 hover:bg-emerald-700"
+                        : newRemarkType === "REJECT"
+                        ? "bg-rose-600 hover:bg-rose-700"
+                        : "bg-indigo-600 hover:bg-indigo-700"
+                    }`}
+                  >
+                    {addingRemark ? "Adding..." : "+ Add Option"}
+                  </Button>
+                </div>
+
+                <div className="sm:col-span-12 space-y-1">
                   <label className="text-[10px] font-bold text-default-500 uppercase">Remark Text / Template</label>
                   <Input
-                    placeholder="e.g. ✓ Resume screened & profile cleared for client submission"
+                    placeholder={
+                      newRemarkType === "ACCEPT"
+                        ? "e.g. ✓ Resume screened & profile cleared for client submission"
+                        : newRemarkType === "REJECT"
+                        ? "e.g. ✕ Notice period exceeds client expectation (>45 days)"
+                        : "e.g. ℹ Screening done — awaiting interview slot"
+                    }
                     value={newRemarkText}
                     onChange={(e) => setNewRemarkText(e.target.value)}
                     className="h-8.5 text-xs"
                   />
                 </div>
-              </div>
-              <div className="flex justify-end">
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={addingRemark || !newRemarkText.trim()}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-7.5 px-4"
-                >
-                  {addingRemark ? "Adding..." : "+ Add Option"}
-                </Button>
               </div>
             </form>
 
@@ -2241,16 +2326,29 @@ export default function SubmissionsPage() {
               <div className="text-xs font-bold text-default-700 uppercase tracking-wider">Active Custom Remarks by Stage</div>
               {customRemarks.length === 0 ? (
                 <div className="text-xs text-default-400 p-4 border border-dashed border-default-200 rounded-lg text-center italic">
-                  No tenant-specific custom remarks configured yet. The standard system defaults are active.
+                  No custom remarks configured yet for this branch.
                 </div>
               ) : (
-                <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                <div className="space-y-1.5 max-h-64 overflow-y-auto">
                   {customRemarks.map((rem) => (
-                    <div key={rem.id} className="flex items-center justify-between p-2.5 bg-default-50 dark:bg-slate-800/40 rounded-lg border border-default-150 text-xs">
-                      <div className="flex items-center gap-2">
+                    <div key={rem.id} className="flex items-center justify-between p-2.5 bg-default-50 dark:bg-slate-800/40 rounded-lg border border-default-150 text-xs gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Badge className="text-[9px] uppercase font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
                           {rem.stage}
                         </Badge>
+                        {rem.remarkType === "ACCEPT" ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                            ✓ Accept
+                          </span>
+                        ) : rem.remarkType === "REJECT" ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                            ✕ Reject
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                            ℹ General
+                          </span>
+                        )}
                         <span className="text-default-800 dark:text-default-200 font-medium">{rem.remarkText}</span>
                       </div>
                       <Button
@@ -2258,7 +2356,7 @@ export default function SubmissionsPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteCustomRemark(rem.id)}
-                        className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 h-7 w-7 p-0"
+                        className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 h-7 w-7 p-0 shrink-0"
                       >
                         <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
                       </Button>
@@ -2347,9 +2445,7 @@ export default function SubmissionsPage() {
                   className="text-[10px] border border-amber-300 dark:border-amber-900 rounded px-2 py-0.5 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-semibold cursor-pointer"
                 >
                   <option value="" disabled>+ Quick Pick Pre-Defined Remark</option>
-                  {resolvedTemplates.review.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
+                  {renderCategorizedRemarkOptions("review")}
                 </select>
               </div>
               <textarea

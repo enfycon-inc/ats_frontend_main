@@ -540,6 +540,42 @@ export default function JobDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [customRemarks, setCustomRemarks] = useState<any[]>([]);
 
+  const renderCategorizedRemarkOptions = (stage: string) => {
+    const stageKey = stage.toLowerCase();
+    const stageItems = customRemarks.filter(
+      (r) => r.stage?.toLowerCase() === stageKey || (stageKey === "review" && r.stage?.toLowerCase() === "internal_review")
+    );
+    const acceptItems = stageItems.filter((r) => r.remarkType === "ACCEPT");
+    const rejectItems = stageItems.filter((r) => r.remarkType === "REJECT");
+    const generalItems = stageItems.filter((r) => r.remarkType === "GENERAL" || !r.remarkType);
+
+    return (
+      <>
+        {acceptItems.length > 0 && (
+          <optgroup label="✓ Accept / Cleared">
+            {acceptItems.map((r) => (
+              <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
+            ))}
+          </optgroup>
+        )}
+        {rejectItems.length > 0 && (
+          <optgroup label="✕ Reject / Issue">
+            {rejectItems.map((r) => (
+              <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
+            ))}
+          </optgroup>
+        )}
+        {generalItems.length > 0 && (
+          <optgroup label="ℹ General Feedback">
+            {generalItems.map((r) => (
+              <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
+            ))}
+          </optgroup>
+        )}
+      </>
+    );
+  };
+
   const resolvedTemplates = useMemo(() => ({
     l1: Array.from(new Set(customRemarks.filter((r) => r.stage?.toLowerCase() === "l1").map((r) => r.remarkText))),
     l2: Array.from(new Set(customRemarks.filter((r) => r.stage?.toLowerCase() === "l2").map((r) => r.remarkText))),
@@ -618,10 +654,10 @@ export default function JobDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const [jobData, subsData, remarksData] = await Promise.all([
-        atsApi.jobs.get(id),
+      const jobData = await atsApi.jobs.get(id);
+      const [subsData, remarksData] = await Promise.all([
         atsApi.submissions.list({ jobId: id }),
-        atsApi.submissions.getCustomRemarks().catch(() => []),
+        atsApi.submissions.getCustomRemarks((jobData as any)?.branchId || undefined).catch(() => []),
       ]);
 
       setJob(mapApiJobToJob(jobData));
@@ -1915,9 +1951,7 @@ export default function JobDetailPage() {
                           className="w-full border border-neutral-300 dark:border-slate-700 rounded h-7 text-[11px] bg-white dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 px-1.5 font-medium cursor-pointer"
                         >
                           <option value="" disabled>+ Quick Remark</option>
-                          {resolvedTemplates.l1.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
+                          {renderCategorizedRemarkOptions("l1")}
                         </select>
                       )}
                     </div>
@@ -1967,9 +2001,7 @@ export default function JobDetailPage() {
                           className="w-full border border-neutral-300 dark:border-slate-700 rounded h-7 text-[11px] bg-white dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 px-1.5 font-medium cursor-pointer"
                         >
                           <option value="" disabled>+ Quick Remark</option>
-                          {resolvedTemplates.l2.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
+                          {renderCategorizedRemarkOptions("l2")}
                         </select>
                       )}
                     </div>
@@ -2019,9 +2051,7 @@ export default function JobDetailPage() {
                           className="w-full border border-neutral-300 dark:border-slate-700 rounded h-7 text-[11px] bg-white dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 px-1.5 font-medium cursor-pointer"
                         >
                           <option value="" disabled>+ Quick Remark</option>
-                          {resolvedTemplates.l3.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
+                          {renderCategorizedRemarkOptions("l3")}
                         </select>
                       )}
                     </div>
@@ -2093,9 +2123,7 @@ export default function JobDetailPage() {
                         className="text-[10px] border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-0.5 bg-white dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 font-medium cursor-pointer"
                       >
                         <option value="" disabled>+ Client Quick Remark</option>
-                        {resolvedTemplates.final.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
+                        {renderCategorizedRemarkOptions("final")}
                       </select>
                     )}
                   </div>
@@ -2313,7 +2341,7 @@ export default function JobDetailPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-neutral-500 font-medium">Created By:</span>
-              <span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.createdBy || job?.created_by || "Account Manager"}</span>
+              <span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.createdBy || "Account Manager"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-neutral-500 font-medium">Assigned To:</span>
