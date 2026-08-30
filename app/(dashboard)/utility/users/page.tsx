@@ -99,7 +99,7 @@ export default function UserManagementPage() {
   const [emailCheckMsg, setEmailCheckMsg] = useState("");
 
   useEffect(() => {
-    const rawEmail = addForm.email.trim().toLowerCase();
+    const rawEmail = (addForm?.email || "").trim().toLowerCase();
     if (!rawEmail || !rawEmail.includes("@")) {
       setEmailStatus("idle");
       setEmailCheckMsg("");
@@ -108,7 +108,7 @@ export default function UserManagementPage() {
 
     setEmailStatus("checking");
     const timer = setTimeout(() => {
-      const isTaken = users.some((u) => u.email.toLowerCase() === rawEmail);
+      const isTaken = users.some((u) => (u.email || "").toLowerCase() === rawEmail);
 
       if (isTaken) {
         setEmailStatus("taken");
@@ -177,11 +177,11 @@ export default function UserManagementPage() {
 
   const handleCreateMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    const firstName = addForm.firstName.trim();
-    const lastName = addForm.lastName.trim();
+    const firstName = (addForm.firstName || "").trim();
+    const lastName = (addForm.lastName || "").trim();
     const trimmedName = `${firstName} ${lastName}`.trim();
-    const fullEmail = addForm.email.trim().toLowerCase();
-    const password = addForm.password;
+    const fullEmail = (addForm.email || "").trim().toLowerCase();
+    const password = addForm.password || "";
 
     if (!firstName || !lastName || !fullEmail || !password) {
       return toast.error("Please fill in First Name, Last Name, Email, and Password.");
@@ -212,7 +212,7 @@ export default function UserManagementPage() {
         email: fullEmail,
         fullName: trimmedName,
         password: password,
-        role: addForm.roles[0] || "RECRUITER",
+        role: addForm.roles?.[0] || "RECRUITER",
         tenantId: tenantId,
         isApproved: true,
         sendEmailInvite: true,
@@ -223,13 +223,13 @@ export default function UserManagementPage() {
       const createdUser = freshUsers.find((u: any) => u.email === fullEmail);
       if (createdUser) {
         const allBranchRoleValues = Object.values(addForm.branchRoles || {}).flat();
-        const combinedRoles = Array.from(new Set([...allBranchRoleValues, ...addForm.roles]));
-        const finalRoles = combinedRoles.length > 0 ? combinedRoles : addForm.roles;
+        const combinedRoles = Array.from(new Set([...allBranchRoleValues, ...(addForm.roles || [])]));
+        const finalRoles = combinedRoles.length > 0 ? combinedRoles : (addForm.roles || ["RECRUITER"]);
 
         await atsApi.auth.updateUserDetail(createdUser.id, {
           branchId: addForm.branchId || undefined,
-          assignedBranchIds: addForm.assignedBranchIds,
-          branchRoles: addForm.branchRoles,
+          assignedBranchIds: addForm.assignedBranchIds || [],
+          branchRoles: addForm.branchRoles || {},
           roles: finalRoles,
         });
       }
@@ -259,11 +259,12 @@ export default function UserManagementPage() {
   const handleUpdateMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
-    const firstName = editForm.firstName.trim();
-    const lastName = editForm.lastName.trim();
+    const firstName = (editForm.firstName || "").trim();
+    const lastName = (editForm.lastName || "").trim();
     const trimmedName = `${firstName} ${lastName}`.trim();
+    const editEmail = (editForm.email || "").trim().toLowerCase();
 
-    if (!firstName || !lastName || !editForm.email.trim()) {
+    if (!firstName || !lastName || !editEmail) {
       return toast.error("First Name, Last Name, and Work Email are required.");
     }
 
@@ -276,11 +277,11 @@ export default function UserManagementPage() {
           cleanBranchRoles[bId] = editForm.branchRoles[bId];
         }
       });
-      const finalRoles = editForm.roles.length > 0 ? editForm.roles : ["RECRUITER"];
+      const finalRoles = Array.isArray(editForm.roles) && editForm.roles.length > 0 ? editForm.roles : ["RECRUITER"];
 
       await atsApi.auth.updateUserDetail(selectedUser.id, {
         fullName: trimmedName,
-        email: editForm.email.trim().toLowerCase(),
+        email: editEmail,
         branchId: editForm.branchId || undefined,
         assignedBranchIds: assignedBranchIds,
         branchRoles: cleanBranchRoles,
@@ -511,6 +512,7 @@ export default function UserManagementPage() {
 
   // Helper function to resolve effective assigned role groups with single branch identification tag
   const getUserEffectiveRoleGroups = (u: UserItem, selectedBranchFilter: string = "ALL"): BranchRoleGroup[] => {
+    if (!u) return [];
     const resolveBranchName = (bId: string) => {
       const bObj = branches.find((b) => b.id === bId);
       return bObj ? bObj.name : (u.branchName || bId);
@@ -521,11 +523,11 @@ export default function UserManagementPage() {
       const targetBranchId = targetBranchObj ? targetBranchObj.id : selectedBranchFilter;
       const bName = resolveBranchName(targetBranchId);
 
-      if (u.branchRoles && u.branchRoles[targetBranchId] && u.branchRoles[targetBranchId].length > 0) {
+      if (u.branchRoles && u.branchRoles[targetBranchId] && Array.isArray(u.branchRoles[targetBranchId]) && u.branchRoles[targetBranchId].length > 0) {
         return [{
           branchId: targetBranchId,
           branchName: bName,
-          roles: Array.from(new Set(u.branchRoles[targetBranchId]))
+          roles: Array.from(new Set(u.branchRoles[targetBranchId].filter(Boolean)))
         }];
       }
     }
@@ -538,14 +540,14 @@ export default function UserManagementPage() {
           groups.push({
             branchId: bId,
             branchName: bName,
-            roles: Array.from(new Set(rList))
+            roles: Array.from(new Set(rList.filter(Boolean)))
           });
         }
       });
       if (groups.length > 0) return groups;
     }
 
-    const defaultRoles = u.roles && u.roles.length > 0 ? u.roles : [u.roleName || "RECRUITER"];
+    const defaultRoles = Array.isArray(u.roles) && u.roles.length > 0 ? u.roles.filter(Boolean) : [u.roleName || "RECRUITER"];
     const singleBranchName = u.branchId ? resolveBranchName(u.branchId) : undefined;
     return [{
       branchId: u.branchId || undefined,
@@ -555,11 +557,13 @@ export default function UserManagementPage() {
   };
 
   const getUserEffectiveRoles = (u: UserItem, selectedBranchFilter: string = "ALL") => {
+    if (!u) return [];
     const groups = getUserEffectiveRoleGroups(u, selectedBranchFilter);
-    return Array.from(new Set(groups.flatMap((g) => g.roles)));
+    return Array.from(new Set(groups.flatMap((g) => g.roles || []))).filter(Boolean);
   };
 
   const openEditModal = (user: UserItem) => {
+    if (!user) return;
     setSelectedUser(user);
     const nameParts = (user.fullName || "").trim().split(" ");
     const fName = nameParts[0] || "";
@@ -582,6 +586,7 @@ export default function UserManagementPage() {
   };
 
   const openPasswordModal = (user: UserItem) => {
+    if (!user) return;
     setSelectedUser(user);
     setNewPassword("");
     setIsPasswordModalOpen(true);
@@ -589,7 +594,8 @@ export default function UserManagementPage() {
 
   // Filtering
   const filteredUsers = users.filter((u) => {
-    const query = searchQuery.trim().toLowerCase();
+    if (!u) return false;
+    const query = (searchQuery || "").trim().toLowerCase();
     const userRolesList = getUserEffectiveRoles(u, branchFilter);
 
     const matchesSearch =
@@ -598,11 +604,11 @@ export default function UserManagementPage() {
       (u.email || "").toLowerCase().includes(query) ||
       (u.roleName || "").toLowerCase().includes(query) ||
       (u.branchName || "").toLowerCase().includes(query) ||
-      userRolesList.some(r => r.toLowerCase().includes(query));
+      userRolesList.some(r => typeof r === "string" && r.toLowerCase().includes(query));
 
     const matchesRole =
       roleFilter === "ALL" ||
-      userRolesList.some(r => r.toUpperCase() === roleFilter.toUpperCase());
+      userRolesList.some(r => typeof r === "string" && r.toUpperCase() === roleFilter.toUpperCase());
 
     const matchesBranch =
       branchFilter === "ALL" ||
@@ -960,6 +966,7 @@ export default function UserManagementPage() {
                               (user.branchRoles && Object.keys(user.branchRoles).length > 1);
 
                             const formatRoleLabel = (r: string) => {
+                              if (!r || typeof r !== "string") return "Recruiter";
                               const upper = r.toUpperCase();
                               if (upper === "ACCOUNT_MANAGER") return "Account Manager";
                               if (upper === "POD_LEAD") return "Pod Lead";
@@ -1148,7 +1155,7 @@ export default function UserManagementPage() {
                   />
 
                   {/* Debounced Inline Availability Message */}
-                  {addForm.email.trim() && (
+                  {Boolean((addForm?.email || "").trim()) && (
                     <div className="flex items-center gap-1.5 text-[11px] font-semibold pt-0.5">
                       {emailStatus === "checking" && (
                         <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">

@@ -82,7 +82,7 @@ export function OfficeClock() {
 
   // 2. Parse shift start & end times
   const parseTime = (timeStr?: string, defaultH = 9, defaultM = 0) => {
-    if (!timeStr) return { hour: defaultH, minute: defaultM };
+    if (!timeStr || typeof timeStr !== "string") return { hour: defaultH, minute: defaultM };
     const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
     if (!match) return { hour: defaultH, minute: defaultM };
     let hours = parseInt(match[1], 10);
