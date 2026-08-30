@@ -1474,7 +1474,7 @@ export default function BranchManagementPage() {
                       </div>
                       <div>
                         <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
-                          Job Assignment &amp; Routing Policies
+                          Job Assignment
                         </h4>
                         <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
                           Control how job orders are assigned and broadcast to recruitment personnel.

@@ -393,18 +393,40 @@ const getInitialActiveBranchContext = () => {
   }, [userPerspective, session]);
 
   const deliveryHeads = useMemo(() => {
-    return branchUsers.filter((u) => {
-      const r = u.roles || [];
-      return r.includes("DELIVERY_HEAD") || r.includes("ADMIN") || r.includes("BRANCH_ADMIN") || r.includes("SUPER_ADMIN");
-    });
+    const seen = new Set<string>();
+    const list: any[] = [];
+    for (const u of branchUsers) {
+      const uid = u.id || u.email;
+      if (!uid || seen.has(uid)) continue;
+      const r = (u.roles || []).map((x: string) => x.toUpperCase());
+      if (r.includes("DELIVERY_HEAD") || r.includes("ADMIN") || r.includes("BRANCH_ADMIN") || r.includes("SUPER_ADMIN")) {
+        seen.add(uid);
+        list.push(u);
+      }
+    }
+    return list;
   }, [branchUsers]);
 
   const recruitersList = useMemo(() => {
-    return branchUsers.filter((u) => {
-      const r = u.roles || [];
-      return r.includes("RECRUITER") || r.length === 0;
-    });
+    const seen = new Set<string>();
+    const list: any[] = [];
+    for (const u of branchUsers) {
+      const uid = u.id || u.email;
+      if (!uid || seen.has(uid)) continue;
+      const r = (u.roles || []).map((x: string) => x.toUpperCase());
+      if (r.includes("RECRUITER") || r.length === 0) {
+        seen.add(uid);
+        list.push(u);
+      }
+    }
+    return list;
   }, [branchUsers]);
+
+  const branchPods = useMemo(() => {
+    const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
+    if (!activeBranchId) return podsList;
+    return podsList.filter((p: any) => !p.branchId || !p.branch_id || p.branchId === activeBranchId || p.branch_id === activeBranchId);
+  }, [podsList]);
 
   // Currency, Unit, and Term States for Bill Rate
   const [billCurrency, setBillCurrency] = useState(() => initialBranchContext.isUs ? "USD" : "INR");
@@ -2729,14 +2751,14 @@ const getInitialActiveBranchContext = () => {
                         />
                       </div>
 
-                      {/* Job Assignment & Pod Routing */}
+                      {/* Job Assignment */}
                       <div className="space-y-1.5">
                         <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center justify-between h-5">
                           <span className="flex items-center gap-1.5">
                             <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
                               <User className="h-2.5 w-2.5" />
                             </span>
-                            Job Assignment &amp; Recruiter Allocation
+                            Job Assignment
                           </span>
                         </label>
                         <select
@@ -2746,7 +2768,7 @@ const getInitialActiveBranchContext = () => {
                             setSelectedPodId(val);
                             if (val.startsWith("pod:")) {
                               const pid = val.replace("pod:", "");
-                              const pod = podsList.find((p) => p.id === pid);
+                              const pod = (branchPods || podsList).find((p: any) => p.id === pid);
                               setSelectedApproverRole("POD_LEAD");
                               setSelectedApproverId(pod?.podHeadId || "");
                             } else if (val.startsWith("rec:")) {
@@ -2766,19 +2788,23 @@ const getInitialActiveBranchContext = () => {
                           className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-medium"
                         >
                           {/* 1. Recruitment Pods (if allowed by branch policy) */}
-                          {(!activeBranch || ((activeBranch.allowPods ?? activeBranch.allow_pods) !== false)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && podsList && podsList.length > 0 && (
-                            <optgroup label="1. Recruitment Pods">
-                              {podsList.map((pod: any) => (
-                                <option key={`pod:${pod.id}`} value={`pod:${pod.id}`}>
-                                  Pod: {pod.name} {pod.podHeadName ? `(Lead: ${pod.podHeadName})` : ""}
-                                </option>
-                              ))}
+                          {(!activeBranch || ((activeBranch.allowPods ?? activeBranch.allow_pods) !== false)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
+                            <optgroup label="Recruitment Pods">
+                              {branchPods && branchPods.length > 0 ? (
+                                branchPods.map((pod: any) => (
+                                  <option key={`pod:${pod.id}`} value={`pod:${pod.id}`}>
+                                    Pod: {pod.name} {pod.podHeadName ? `(Lead: ${pod.podHeadName})` : ""}
+                                  </option>
+                                ))
+                              ) : (
+                                <option value="auto_pod">Recruitment Pod System (Auto Broadcast)</option>
+                              )}
                             </optgroup>
                           )}
 
-                          {/* 2. Direct Recruiter Assignment */}
-                          {recruitersList && recruitersList.length > 0 && (
-                            <optgroup label="2. Direct Recruiter Assignment">
+                          {/* 2. Direct Recruiter Assignment (only if branch policy allows Direct Assignment) */}
+                          {(!activeBranch || !!(activeBranch.allowNone ?? activeBranch.allow_none)) && recruitersList && recruitersList.length > 0 && (
+                            <optgroup label="Direct Recruiter Assignment">
                               {recruitersList.map((rec: any) => (
                                 <option key={`rec:${rec.id}`} value={`rec:${rec.id}`}>
                                   Recruiter: {rec.fullName || rec.name || rec.email}
@@ -2788,12 +2814,12 @@ const getInitialActiveBranchContext = () => {
                           )}
 
                           {/* 3. Branch Pool & Allocation (if allowed by branch policy) */}
-                          {!(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
-                            <optgroup label="3. Branch Pool & Allocation">
-                              {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) !== false)) && (
+                          {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true) || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) === true)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
+                            <optgroup label="Branch Pool & Allocation">
+                              {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true)) && (
                                 <option value="all">All Branch Recruiters (Pool Broadcast)</option>
                               )}
-                              {(!activeBranch || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) !== false)) && (
+                              {(!activeBranch || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) === true)) && (
                                 <option value="none">Unassigned Allocation (Hold for Manager Assignment)</option>
                               )}
                             </optgroup>

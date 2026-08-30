@@ -321,18 +321,40 @@ export default function EditJobPostingPage() {
   } | null>(null);
 
   const deliveryHeads = useMemo(() => {
-    return branchUsers.filter((u) => {
-      const r = u.roles || [];
-      return r.includes("DELIVERY_HEAD") || r.includes("ADMIN") || r.includes("BRANCH_ADMIN") || r.includes("SUPER_ADMIN");
-    });
+    const seen = new Set<string>();
+    const list: any[] = [];
+    for (const u of branchUsers) {
+      const uid = u.id || u.email;
+      if (!uid || seen.has(uid)) continue;
+      const r = (u.roles || []).map((x: string) => x.toUpperCase());
+      if (r.includes("DELIVERY_HEAD") || r.includes("ADMIN") || r.includes("BRANCH_ADMIN") || r.includes("SUPER_ADMIN")) {
+        seen.add(uid);
+        list.push(u);
+      }
+    }
+    return list;
   }, [branchUsers]);
 
   const recruitersList = useMemo(() => {
-    return branchUsers.filter((u) => {
-      const r = u.roles || [];
-      return r.includes("RECRUITER") || r.length === 0;
-    });
+    const seen = new Set<string>();
+    const list: any[] = [];
+    for (const u of branchUsers) {
+      const uid = u.id || u.email;
+      if (!uid || seen.has(uid)) continue;
+      const r = (u.roles || []).map((x: string) => x.toUpperCase());
+      if (r.includes("RECRUITER") || r.length === 0) {
+        seen.add(uid);
+        list.push(u);
+      }
+    }
+    return list;
   }, [branchUsers]);
+
+  const branchPods = useMemo(() => {
+    const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
+    if (!activeBranchId) return podsList;
+    return podsList.filter((p: any) => !p.branchId || !p.branch_id || p.branchId === activeBranchId || p.branch_id === activeBranchId);
+  }, [podsList]);
   
   const [tenantName, setTenantName] = useState("enfycon Inc");
   const [market, setMarket] = useState<"US" | "IN">("US");
@@ -2472,46 +2494,37 @@ export default function EditJobPostingPage() {
                         />
                       </div>
 
-                      {/* Job Assignment & Pod Routing */}
+                      {/* Job Assignment */}
                       <div className="space-y-1.5">
                         <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 h-5">
                           <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
                             <User className="h-2.5 w-2.5" />
                           </span>
-                          Job Assignment & Pod Routing
+                          Job Assignment
                         </label>
                         <select
                           value={selectedPodId}
                           onChange={(e) => setSelectedPodId(e.target.value)}
                           className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-medium"
                         >
-                          {/* 1. Pod Leads */}
-                          <optgroup label="1. Recruitment Pod Leads (Review & Broadcast)">
-                            {podsList && podsList.length > 0 ? (
-                              podsList.map((pod: any) => (
-                                <option key={`pod:${pod.id}`} value={`pod:${pod.id}`}>
-                                  Pod Lead: {pod.podHeadName ? `${pod.podHeadName} (${pod.name})` : pod.name}
-                                </option>
-                              ))
-                            ) : (
-                              <option value="">Pod System (Auto Broadcast / Round-Robin)</option>
-                            )}
-                          </optgroup>
-
-                          {/* 2. Delivery Heads */}
-                          {deliveryHeads && deliveryHeads.length > 0 && (
-                            <optgroup label="2. Delivery Heads / Operations Leads">
-                              {deliveryHeads.map((dh: any) => (
-                                <option key={`dh:${dh.id}`} value={`dh:${dh.id}`}>
-                                  Delivery Head: {dh.fullName || dh.name || dh.email}
-                                </option>
-                              ))}
+                          {/* 1. Recruitment Pods (if allowed by branch policy) */}
+                          {(!activeBranch || ((activeBranch.allowPods ?? activeBranch.allow_pods) !== false)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
+                            <optgroup label="Recruitment Pods">
+                              {branchPods && branchPods.length > 0 ? (
+                                branchPods.map((pod: any) => (
+                                  <option key={`pod:${pod.id}`} value={`pod:${pod.id}`}>
+                                    Pod: {pod.name} {pod.podHeadName ? `(Lead: ${pod.podHeadName})` : ""}
+                                  </option>
+                                ))
+                              ) : (
+                                <option value="auto_pod">Recruitment Pod System (Auto Broadcast)</option>
+                              )}
                             </optgroup>
                           )}
 
-                          {/* 3. Primary Recruiters */}
-                          {recruitersList && recruitersList.length > 0 && (
-                            <optgroup label="3. Primary Recruiter Assignment">
+                          {/* 2. Direct Recruiter Assignment (only if branch policy allows Direct Assignment) */}
+                          {(!activeBranch || !!(activeBranch.allowNone ?? activeBranch.allow_none)) && recruitersList && recruitersList.length > 0 && (
+                            <optgroup label="Direct Recruiter Assignment">
                               {recruitersList.map((rec: any) => (
                                 <option key={`rec:${rec.id}`} value={`rec:${rec.id}`}>
                                   Recruiter: {rec.fullName || rec.name || rec.email}
@@ -2520,11 +2533,17 @@ export default function EditJobPostingPage() {
                             </optgroup>
                           )}
 
-                          {/* 4. Pooled Routing */}
-                          <optgroup label="4. Pooled & Branch Routing">
-                            <option value="all">All Branch Recruiters</option>
-                            <option value="none">Unassigned (Pending Allocation / Review)</option>
-                          </optgroup>
+                          {/* 3. Branch Pool & Allocation (if allowed by branch policy) */}
+                          {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true) || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) === true)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
+                            <optgroup label="Branch Pool & Allocation">
+                              {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true)) && (
+                                <option value="all">All Branch Recruiters (Pool Broadcast)</option>
+                              )}
+                              {(!activeBranch || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) === true)) && (
+                                <option value="none">Unassigned Allocation (Hold for Manager Assignment)</option>
+                              )}
+                            </optgroup>
+                          )}
                         </select>
                       </div>
 
