@@ -523,6 +523,40 @@ export default function UserManagementPage() {
     return res;
   };
 
+  // Unified helper to resolve human-readable labels from dynamic custom roles or standard archetypes
+  const formatRoleLabel = (r: string, bId?: string): string => {
+    if (!r || typeof r !== "string") return "Recruiter";
+    const upper = r.trim().toUpperCase();
+
+    // 1. Dynamic custom role lookup from rolesList
+    const customRole = (rolesList || []).find(
+      (cr) =>
+        !cr.isSystem &&
+        ((!bId || !cr.branchId || cr.branchId === bId) &&
+          (cr.name.toUpperCase() === upper ||
+            cr.id === r ||
+            (cr.systemRole && cr.systemRole.toUpperCase() === upper)))
+    ) || (rolesList || []).find(
+      (cr) =>
+        !cr.isSystem &&
+        (cr.name.toUpperCase() === upper ||
+          cr.id === r ||
+          (cr.systemRole && cr.systemRole.toUpperCase() === upper))
+    );
+
+    if (customRole) {
+      return customRole.name;
+    }
+
+    if (upper === "ACCOUNT_MANAGER" || upper === "BDM" || upper === "BD_MANAGER" || upper === "BD MANAGER") return "Account Manager";
+    if (upper === "POD_LEAD") return "Pod Lead";
+    if (upper === "BRANCH_ADMIN") return "Branch Admin";
+    if (upper === "DELIVERY_HEAD") return "Delivery Head";
+    if (upper === "RECRUITER") return "Recruiter";
+    if (upper === "ADMIN" || upper === "SUPER_ADMIN") return "Tenant Admin";
+    return r.replace(/_/g, " ");
+  };
+
   // Helper function to resolve effective assigned role groups with single branch identification tag
   const getUserEffectiveRoleGroups = (u: UserItem, selectedBranchFilter: string = "ALL"): BranchRoleGroup[] => {
     if (!u) return [];
@@ -1503,7 +1537,13 @@ export default function UserManagementPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/70 dark:bg-slate-900/60 p-3.5 rounded-xl border border-neutral-200 dark:border-slate-800">
                     {branches.map((b) => {
                       const isAssigned = editForm.assignedBranchIds.includes(b.id) || editForm.branchId === b.id;
-                      const bRoles = editForm.branchRoles[b.id] || editForm.roles || [];
+                      const branchCustomRoles = (rolesList || []).filter(
+                        (r) => !r.isSystem && (!r.branchId || r.branchId === b.id)
+                      );
+                      const rawRoles = editForm.branchRoles[b.id];
+                      const bRoles = Array.isArray(rawRoles)
+                        ? rawRoles
+                        : (b.id === editForm.branchId ? (editForm.roles || []) : []);
 
                       return (
                         <div
@@ -1526,7 +1566,7 @@ export default function UserManagementPage() {
                                 if (checked) {
                                   nextAssigned.push(b.id);
                                   if (!nextBranchRoles[b.id]) {
-                                    nextBranchRoles[b.id] = editForm.roles.length > 0 ? [...editForm.roles] : ["RECRUITER"];
+                                    nextBranchRoles[b.id] = [];
                                   }
                                 } else {
                                   delete nextBranchRoles[b.id];
@@ -1557,12 +1597,16 @@ export default function UserManagementPage() {
                                   {bRoles.length > 0 ? (
                                     bRoles.map((r: string) => (
                                       <span key={r} className="text-[9.5px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.2 rounded border border-indigo-200/80">
-                                        {r.replace('_', ' ')}
+                                        {formatRoleLabel(r, b.id)}
                                       </span>
                                     ))
+                                  ) : branchCustomRoles.length === 0 ? (
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-400 italic">
+                                      No custom roles for this branch
+                                    </span>
                                   ) : (
-                                    <span className="text-[9.5px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.2 rounded border border-indigo-200/80">
-                                      Recruiter
+                                    <span className="text-[10px] text-neutral-400 italic">
+                                      No roles assigned yet
                                     </span>
                                   )}
                                 </div>
@@ -1825,7 +1869,10 @@ export default function UserManagementPage() {
 
                 const isAdd = branchRoleModalState.isAddForm;
                 const targetForm = isAdd ? addForm : editForm;
-                const bRoles = targetForm.branchRoles[branchRoleModalState.branchId] || targetForm.roles || [];
+                const rawBranchRoles = targetForm.branchRoles[branchRoleModalState.branchId];
+                const bRoles = Array.isArray(rawBranchRoles)
+                  ? rawBranchRoles
+                  : (branchRoleModalState.branchId === targetForm.branchId ? (targetForm.roles || []) : []);
 
                 return (
                   <div className="grid grid-cols-2 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
