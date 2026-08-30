@@ -487,7 +487,7 @@ function ProfileDropdownNav() {
   }, []);
 
   useEffect(() => {
-    atsApi.auth.listRoles().then(data => {
+    atsApi.auth.listRoles(undefined, true).then(data => {
       if (Array.isArray(data) && data.length > 0) {
         setAvailableRoles(data);
       }
@@ -508,6 +508,41 @@ function ProfileDropdownNav() {
   const userRoles = currentUser?.roles || (session as any)?.user?.roles || [];
   const systemRole = (session as any)?.user?.systemRole || userRoles[0];
 
+const IGNORED_KEYCLOAK_ROLES = new Set([
+  "DEFAULT_ROLES_ENFYCON_ATS",
+  "DEFAULT_ROLES_ATS",
+  "DEFAULT_ROLES",
+  "OFFLINE_ACCESS",
+  "UMA_AUTHORIZATION",
+  "MANAGE_ACCOUNT",
+  "MANAGE_ACCOUNT_LINKS",
+  "VIEW_PROFILE",
+  "ACCOUNT",
+  "ADMIN_CLI",
+  "BROKER",
+  "REALM_ADMIN",
+  "CREATE_CLIENT",
+  "MANAGE_USERS",
+  "MANAGE_REALM",
+  "MANAGE_EVENTS",
+  "MANAGE_CLIENTS",
+  "MANAGE_AUTHORIZATION",
+  "VIEW_USERS",
+  "VIEW_REALM",
+  "VIEW_EVENTS",
+  "VIEW_CLIENTS",
+  "VIEW_AUTHORIZATION",
+  "IMPERSONATION",
+  "USER",
+]);
+
+const isTechnicalKeycloakRole = (r: string): boolean => {
+  if (!r || typeof r !== "string") return true;
+  const upper = r.trim().toUpperCase().replace(/[-\s]/g, "_");
+  if (upper.startsWith("DEFAULT_ROLES_") || upper.startsWith("DEFAULT_ROLES")) return true;
+  return IGNORED_KEYCLOAK_ROLES.has(upper);
+};
+
   const systemRoleLabels: Record<string, string> = {
     SUPER_ADMIN: "Global Admin",
     ADMIN: "Tenant Admin",
@@ -521,6 +556,7 @@ function ProfileDropdownNav() {
   // Dynamically resolve display label for any system role or tenant custom role alias
   const getDynamicRoleLabel = (roleStr: string): string => {
     if (!roleStr) return "User";
+    if (isTechnicalKeycloakRole(roleStr)) return "Recruiter";
     const upper = roleStr.toUpperCase();
     if (systemRoleLabels[upper]) {
       return systemRoleLabels[upper];
@@ -531,18 +567,21 @@ function ProfileDropdownNav() {
     if (customRole) {
       return customRole.name;
     }
+    if (upper === "ACCOUNT_MANAGER" || upper === "BDM" || upper === "BD_MANAGER" || upper === "BD MANAGER") {
+      return "Account Manager";
+    }
     return roleStr.replace(/_/g, " ");
   };
 
   const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
   const branchSpecificRoles: string[] = (activeBranchId && (currentUser as any)?.branchRoles?.[activeBranchId]) || [];
-  const effectiveRoles = branchSpecificRoles.length > 0 ? branchSpecificRoles : userRoles;
+  const effectiveRoles = (branchSpecificRoles.length > 0 ? branchSpecificRoles : userRoles).filter((r: string) => !isTechnicalKeycloakRole(r));
 
   const userAssignedRoles: string[] = (effectiveRoles && effectiveRoles.length > 0)
     ? effectiveRoles
-    : (session as any)?.user?.roles && (session as any)?.user?.roles.length > 0
-    ? (session as any)?.user?.roles
-    : (systemRole ? [systemRole] : []);
+    : ((session as any)?.user?.roles && (session as any)?.user?.roles.length > 0
+        ? (session as any).user.roles.filter((r: string) => !isTechnicalKeycloakRole(r))
+        : (systemRole && !isTechnicalKeycloakRole(systemRole) ? [systemRole] : []));
 
   const assignedRoleOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -550,6 +589,7 @@ function ProfileDropdownNav() {
 
     for (const uRole of userAssignedRoles) {
       if (!uRole || typeof uRole !== "string") continue;
+      if (isTechnicalKeycloakRole(uRole)) continue;
       const uUpper = uRole.trim().toUpperCase();
 
       // 1. Check for matching custom role (prefer active branch if set)
@@ -574,6 +614,10 @@ function ProfileDropdownNav() {
         name = customRole.name;
         icon = "🎨";
         replacesSystemRole = customRole.systemRole || customRole.replacesSystemRole;
+      } else if (uUpper === "ACCOUNT_MANAGER" || uUpper === "BDM" || uUpper === "BD_MANAGER" || uUpper === "BD MANAGER") {
+        key = "Account Manager";
+        name = "Account Manager";
+        icon = "💼";
       } else if (systemRoleLabels[uUpper]) {
         key = uUpper;
         name = systemRoleLabels[uUpper];
