@@ -96,13 +96,10 @@ export default function DataTable({
     const roles = (currentUser.roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
     return (
       permissions.includes("job:approve") ||
-      permissions.includes("job:publish_direct") ||
       roles.includes("SUPERADMIN") ||
       roles.includes("ADMIN") ||
       roles.includes("DELIVERYHEAD") ||
-      roles.includes("BRANCHADMIN") ||
-      roles.includes("PODLEAD") ||
-      roles.includes("ACCOUNTMANAGER")
+      roles.includes("BRANCHADMIN")
     );
   }, [currentUser]);
 
@@ -889,7 +886,31 @@ export default function DataTable({
                               const isPending = job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL";
                               const status = isPending ? "Pending Approval" : (job.jobStatus || "Active");
 
-                              if (isPending && hasApprovePermission) {
+                              const isAssignedReviewer = Boolean(
+                                job.assignedApproverId &&
+                                (currentUser?.id === job.assignedApproverId || (currentUser as any)?.dbId === job.assignedApproverId || (currentUser as any)?.keycloakId === job.assignedApproverId)
+                              );
+
+                              const isJobCreator = Boolean(
+                                (job.createdBy && currentUser?.fullName && job.createdBy.toLowerCase() === currentUser.fullName.toLowerCase()) ||
+                                (job.createdBy && currentUser?.email && job.createdBy.toLowerCase() === currentUser.email.toLowerCase()) ||
+                                (job.createdBy && currentUser?.id && job.createdBy === currentUser.id)
+                              );
+
+                              const isAdminOrDeliveryHead = Boolean(
+                                currentUser?.roles?.some((r: string) => {
+                                  const norm = r.toUpperCase().replace(/[\s-_]+/g, "");
+                                  return norm === "SUPERADMIN" || norm === "ADMIN" || norm === "DELIVERYHEAD" || norm === "BRANCHADMIN";
+                                })
+                              );
+
+                              // Only show Approve/Reject if user is the assigned reviewer OR has reviewer/admin privileges (and is not an unprivileged creator self-approving)
+                              const canApproveThisJob = isPending && (
+                                isAssignedReviewer ||
+                                (hasApprovePermission && (!isJobCreator || isAdminOrDeliveryHead))
+                              );
+
+                              if (isPending && canApproveThisJob) {
                                 return (
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 select-none">

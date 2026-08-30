@@ -556,16 +556,27 @@ export default function JobDetailPage() {
   const canApproveJob = useMemo(() => {
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
+    const normalizedRoles = (roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
+    const isAdminOrDeliveryHead = Boolean(
+      normalizedRoles.includes("SUPERADMIN") ||
+      normalizedRoles.includes("ADMIN") ||
+      normalizedRoles.includes("DELIVERYHEAD") ||
+      normalizedRoles.includes("BRANCHADMIN")
+    );
     const isAssigned = Boolean(
       job?.assignedApproverId &&
-      (currentUser.dbId === job.assignedApproverId || currentUser.keycloakId === job.assignedApproverId)
+      (currentUser.dbId === job.assignedApproverId || currentUser.keycloakId === job.assignedApproverId || currentUser.id === job.assignedApproverId)
     );
+    const isJobCreator = Boolean(
+      (job?.createdBy && currentUser?.fullName && job.createdBy.toLowerCase() === currentUser.fullName.toLowerCase()) ||
+      (job?.createdBy && currentUser?.email && job.createdBy.toLowerCase() === currentUser.email.toLowerCase()) ||
+      (job?.createdBy && currentUser?.id && job.createdBy === currentUser.id)
+    );
+
     return (
       isAssigned ||
-      permissions.includes("job:approve") ||
-      roles.includes("SUPER_ADMIN") ||
-      roles.includes("ADMIN") ||
-      roles.includes("BRANCH_ADMIN")
+      (permissions.includes("job:approve") && (!isJobCreator || isAdminOrDeliveryHead)) ||
+      isAdminOrDeliveryHead
     );
   }, [currentUser, roles, job]);
 
