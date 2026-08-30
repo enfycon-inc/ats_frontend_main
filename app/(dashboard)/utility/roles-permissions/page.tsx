@@ -204,7 +204,9 @@ export default function RolesPermissionsPage() {
     setIsAdmin(hasAccess);
 
     if (hasAccess) {
-      const storedBranch = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+      const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const urlBranch = urlParams?.get("branch");
+      const storedBranch = urlBranch || (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null);
       if (storedBranch) setSelectedBranchFilter(storedBranch);
       loadData(storedBranch || "all");
 

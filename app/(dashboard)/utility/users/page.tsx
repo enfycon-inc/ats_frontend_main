@@ -691,9 +691,12 @@ export default function UserManagementPage() {
               className="h-9 text-xs rounded-md border border-default-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-medium text-default-700 dark:text-neutral-200 outline-none hover:border-indigo-500"
             >
               <option value="ALL">All Roles</option>
-              {rolesList.map((r) => (
+              {(branchFilter === "ALL" || branchFilter === "UNASSIGNED"
+                ? rolesList
+                : rolesList.filter((r) => !r.branchId || r.branchId === branchFilter)
+              ).map((r) => (
                 <option key={r.id || r.name} value={r.name}>
-                  {r.name}
+                  {r.name}{r.branchName && branchFilter === "ALL" ? ` (${r.branchName})` : ""}
                 </option>
               ))}
             </select>
@@ -1194,7 +1197,17 @@ export default function UserManagementPage() {
                   </label>
                   <select
                     value={addForm.branchId}
-                    onChange={(e) => setAddForm({ ...addForm, branchId: e.target.value })}
+                    onChange={(e) => {
+                      const newBranchId = e.target.value;
+                      const validRolesForNewBranch = (rolesList || [])
+                        .filter((r) => !r.branchId || r.branchId === newBranchId)
+                        .map((r) => r.name);
+                      setAddForm((prev) => ({
+                        ...prev,
+                        branchId: newBranchId,
+                        roles: prev.roles.filter((roleName) => validRolesForNewBranch.includes(roleName)),
+                      }));
+                    }}
                     className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
                     required
                   >
@@ -1208,57 +1221,94 @@ export default function UserManagementPage() {
                 </div>
               </div>
 
-              {/* CUSTOM ROLE SELECTION */}
+              {/* CUSTOM ROLE SELECTION (STRICTLY ISOLATED PER SELECTED BRANCH) */}
               <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
-                    <Shield className="h-3.5 w-3.5 text-indigo-600" /> Assigned Custom Role(s) <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <Shield className="h-3.5 w-3.5 text-indigo-600" />
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                      Assigned Custom Role(s) <span className="text-red-500">*</span>
+                    </label>
+                    {addForm.branchId && (
+                      <span className="text-[10.5px] text-neutral-400 font-medium">
+                        ({branches.find((b) => b.id === addForm.branchId)?.name || "Selected Branch"})
+                      </span>
+                    )}
+                  </div>
                   <a
-                    href="/utility/roles-permissions"
+                    href={addForm.branchId ? `/utility/roles-permissions?branch=${addForm.branchId}` : "/utility/roles-permissions"}
                     className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
                   >
                     + Manage Custom Roles
                   </a>
                 </div>
 
-                {rolesList.length === 0 ? (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
-                    <span>No custom roles configured yet.</span>
-                    <a href="/utility/roles-permissions" className="font-bold underline text-amber-900 dark:text-amber-200">
-                      Create Custom Role →
-                    </a>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
-                    {rolesList.map((r) => {
-                      const isChecked = addForm.roles.includes(r.name);
-                      return (
-                        <label
-                          key={r.id || r.name}
-                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors select-none ${
-                            isChecked
-                              ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
-                              : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"
-                          }`}
+                {(() => {
+                  if (!addForm.branchId) {
+                    return (
+                      <div className="p-3 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-lg text-xs text-neutral-500 text-center">
+                        Please select a Primary Office Branch above to view its custom staffing roles.
+                      </div>
+                    );
+                  }
+
+                  const selectedBranch = branches.find((b) => b.id === addForm.branchId);
+                  const branchRolesForAdd = (rolesList || []).filter(
+                    (r) => !r.branchId || r.branchId === addForm.branchId
+                  );
+
+                  if (branchRolesForAdd.length === 0) {
+                    return (
+                      <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div>
+                          <span className="font-bold block">
+                            No custom roles configured for {selectedBranch?.name || "this branch"} yet.
+                          </span>
+                          <span className="text-[10.5px] text-amber-700/80 dark:text-amber-400">
+                            Custom roles are strictly isolated per branch office.
+                          </span>
+                        </div>
+                        <a
+                          href={`/utility/roles-permissions?branch=${addForm.branchId}`}
+                          className="font-bold underline text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-800/80 px-2.5 py-1 rounded text-xs shrink-0 self-start sm:self-auto hover:bg-amber-100/50 transition-colors shadow-2xs"
                         >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              let nextRoles = addForm.roles.filter((x) => x !== r.name);
-                              if (checked) nextRoles.push(r.name);
-                              setAddForm({ ...addForm, roles: nextRoles });
-                            }}
-                            className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
-                          />
-                          <span className="truncate">{r.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
+                          + Create Role for Branch →
+                        </a>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
+                      {branchRolesForAdd.map((r) => {
+                        const isChecked = addForm.roles.includes(r.name);
+                        return (
+                          <label
+                            key={r.id || r.name}
+                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors select-none ${
+                              isChecked
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
+                                : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                let nextRoles = addForm.roles.filter((x) => x !== r.name);
+                                if (checked) nextRoles.push(r.name);
+                                setAddForm({ ...addForm, roles: nextRoles });
+                              }}
+                              className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                            />
+                            <span className="truncate">{r.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* PASSWORD + CONFIRM PASSWORD GRID */}
@@ -1588,9 +1638,16 @@ export default function UserManagementPage() {
                       }}
                       className="h-4 w-4 accent-indigo-600 rounded cursor-pointer"
                     />
-                    <div>
-                      <span className="text-xs font-bold text-neutral-900 dark:text-white block">{r.name}</span>
-                      {r.description && <span className="text-[10px] text-neutral-500 block">{r.description}</span>}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-neutral-900 dark:text-white">{r.name}</span>
+                        {r.branchName && (
+                          <span className="text-[9.5px] px-1.5 py-0.2 rounded font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/50">
+                            🏢 {r.branchName}
+                          </span>
+                        )}
+                      </div>
+                      {r.description && <span className="text-[10px] text-neutral-500 block mt-0.5">{r.description}</span>}
                     </div>
                   </label>
                 );
