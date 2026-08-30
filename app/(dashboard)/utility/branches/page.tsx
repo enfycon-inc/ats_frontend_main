@@ -2168,7 +2168,7 @@ export default function BranchManagementPage() {
         </div>
       )}
 
-      {/* ── BRANCH-SPECIFIC STAGE REMARKS MODAL (CLASSIC ENTERPRISE DESIGN) ── */}
+      {/* ── BRANCH-SPECIFIC STAGE REMARKS MODAL (THEME MATCHED ENTERPRISE DESIGN) ── */}
       {isRemarksOpen && selectedBranchForRemarks && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95 my-auto">
@@ -2176,7 +2176,7 @@ export default function BranchManagementPage() {
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold border border-slate-200 dark:border-slate-700">
+                <div className="h-9 w-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold border border-indigo-100 dark:border-indigo-900/50">
                   <MessageSquare className="h-4.5 w-4.5" />
                 </div>
                 <div>
@@ -2198,7 +2198,7 @@ export default function BranchManagementPage() {
                 {/* Global Remarks Toggle */}
                 <div className="flex items-center gap-2.5 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs">
                   <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <Globe className="h-3.5 w-3.5 text-slate-500" />
+                    <Globe className="h-3.5 w-3.5 text-indigo-500" />
                     Include Global Remarks:
                   </span>
                   <button
@@ -2206,7 +2206,7 @@ export default function BranchManagementPage() {
                     onClick={handleToggleBranchGlobalRemarks}
                     disabled={isTogglingGlobalRemarks}
                     className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
-                      selectedBranchForRemarks.enableGlobalRemarks ? 'bg-slate-900 dark:bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
+                      selectedBranchForRemarks.enableGlobalRemarks ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
                     }`}
                     title={selectedBranchForRemarks.enableGlobalRemarks ? "Click to disable global remarks" : "Click to enable global remarks (Default: Disabled)"}
                   >
@@ -2217,7 +2217,7 @@ export default function BranchManagementPage() {
                     />
                   </button>
                   <span className={`text-[10px] font-semibold uppercase tracking-wider ${
-                    selectedBranchForRemarks.enableGlobalRemarks ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400'
+                    selectedBranchForRemarks.enableGlobalRemarks ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'
                   }`}>
                     {selectedBranchForRemarks.enableGlobalRemarks ? 'Enabled' : 'Disabled'}
                   </span>
@@ -2251,14 +2251,14 @@ export default function BranchManagementPage() {
                   onClick={() => setRemarksStageFilter(tab.key)}
                   className={`px-3.5 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                     remarksStageFilter === tab.key
-                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold shadow-xs"
+                      ? "bg-indigo-600 text-white font-semibold shadow-xs"
                       : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium"
                   }`}
                 >
                   <span>{tab.label}</span>
                   <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
                     remarksStageFilter === tab.key
-                      ? "bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900"
+                      ? "bg-white/20 text-white"
                       : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                   }`}>
                     {tab.count}
@@ -2271,7 +2271,7 @@ export default function BranchManagementPage() {
             <div className="p-6 overflow-y-auto flex-1 bg-slate-50/40 dark:bg-slate-900/40">
               {loadingRemarks ? (
                 <div className="p-12 text-center text-xs text-slate-400 italic">
-                  <div className="h-6 w-6 border-2 border-slate-700 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                  <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                   Loading templates...
                 </div>
               ) : (
@@ -2317,13 +2317,13 @@ export default function BranchManagementPage() {
                         placeholder="Type remark(s) — separate multiple with comma (,)..."
                         value={newAcceptText}
                         onChange={(e) => setNewAcceptText(e.target.value)}
-                        className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-slate-400 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
+                        className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
                       />
                       <Button
                         type="submit"
                         size="sm"
                         disabled={addingBranchRemark || !newAcceptText.trim()}
-                        className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
+                        className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
                       >
                         <Plus className="h-3.5 w-3.5 mr-1" /> Add
                       </Button>
@@ -2362,7 +2362,7 @@ export default function BranchManagementPage() {
                                   </span>
                                 )}
                                 {rem.branchId ? (
-                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-700 dark:bg-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-600">
+                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
                                     Branch
                                   </span>
                                 ) : (
@@ -2427,13 +2427,13 @@ export default function BranchManagementPage() {
                         placeholder="Type rejection reason(s) — separate multiple with comma (,)..."
                         value={newRejectText}
                         onChange={(e) => setNewRejectText(e.target.value)}
-                        className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-slate-400 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
+                        className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
                       />
                       <Button
                         type="submit"
                         size="sm"
                         disabled={addingBranchRemark || !newRejectText.trim()}
-                        className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
+                        className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
                       >
                         <Plus className="h-3.5 w-3.5 mr-1" /> Add
                       </Button>
@@ -2472,7 +2472,7 @@ export default function BranchManagementPage() {
                                   </span>
                                 )}
                                 {rem.branchId ? (
-                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-700 dark:bg-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-600">
+                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
                                     Branch
                                   </span>
                                 ) : (

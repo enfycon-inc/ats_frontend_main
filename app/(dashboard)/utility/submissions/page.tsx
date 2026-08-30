@@ -2225,12 +2225,12 @@ export default function SubmissionsPage() {
         onSuccess={loadData}
       />
 
-      {/* ── TENANT CUSTOM REMARKS SETTINGS MODAL (CLASSIC ENTERPRISE DESIGN) ── */}
+      {/* ── TENANT CUSTOM REMARKS SETTINGS MODAL (THEME MATCHED ENTERPRISE DESIGN) ── */}
       <Dialog open={customRemarksModalOpen} onOpenChange={setCustomRemarksModalOpen}>
         <DialogContent className="sm:max-w-[950px] font-sans max-h-[90vh] flex flex-col p-0 overflow-hidden border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl">
           <DialogHeader className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850">
             <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <Icon icon="heroicons:cog-6-tooth" className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+              <Icon icon="heroicons:cog-6-tooth" className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               Stage Remarks Templates
             </DialogTitle>
             <DialogDescription className="text-[11.5px] text-slate-500 dark:text-slate-400">
@@ -2254,14 +2254,14 @@ export default function SubmissionsPage() {
                 onClick={() => setCustomRemarksStageFilter(tab.key as any)}
                 className={`px-3.5 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                   customRemarksStageFilter === tab.key
-                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold shadow-xs"
+                    ? "bg-indigo-600 text-white font-semibold shadow-xs"
                     : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium"
                 }`}
               >
                 <span>{tab.label}</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
                   customRemarksStageFilter === tab.key
-                    ? "bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900"
+                    ? "bg-white/20 text-white"
                     : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                 }`}>
                   {tab.count}
@@ -2311,13 +2311,13 @@ export default function SubmissionsPage() {
                     placeholder="Type remark(s) — separate multiple with comma (,)..."
                     value={newCustomAcceptText}
                     onChange={(e) => setNewCustomAcceptText(e.target.value)}
-                    className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-slate-400 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
+                    className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
                   />
                   <Button
                     type="submit"
                     size="sm"
                     disabled={addingRemark || !newCustomAcceptText.trim()}
-                    className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
+                    className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
                   >
                     + Add
                   </Button>
@@ -2408,13 +2408,13 @@ export default function SubmissionsPage() {
                     placeholder="Type rejection reason(s) — separate multiple with comma (,)..."
                     value={newCustomRejectText}
                     onChange={(e) => setNewCustomRejectText(e.target.value)}
-                    className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-slate-400 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
+                    className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
                   />
                   <Button
                     type="submit"
                     size="sm"
                     disabled={addingRemark || !newCustomRejectText.trim()}
-                    className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
+                    className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
                   >
                     + Add
                   </Button>
