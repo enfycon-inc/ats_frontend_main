@@ -265,10 +265,19 @@ async function apiFetch<T = any>(
       }
     }
 
+    // If request failed with 401 Unauthorized after all refresh attempts:
+    if (res.status === 401 && typeof window !== 'undefined' && !path.includes('/api/auth/login') && !path.includes('/api/auth/session')) {
+      clearToken();
+      if (!window.location.pathname.startsWith('/auth/')) {
+        window.location.href = '/auth/login?expired=true';
+      }
+      throw new Error('Your session has expired. Please sign in again.');
+    }
+
     const errMsg = body.message || `API Error: ${res.status}`;
-    if (typeof window !== 'undefined' && (res.status === 403 || (res.status === 401 && !path.includes('/api/auth/session')))) {
+    if (typeof window !== 'undefined' && res.status === 403) {
       const event = new CustomEvent("app_show_error_modal", {
-        detail: { message: errMsg, title: res.status === 403 ? "Permission Access Required" : "Authentication Required" },
+        detail: { message: errMsg, title: "Permission Access Required" },
       });
       window.dispatchEvent(event);
     }

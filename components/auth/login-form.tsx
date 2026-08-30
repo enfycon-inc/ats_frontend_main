@@ -32,6 +32,14 @@ const LoginForm = () => {
   const [isAuthorizingSso, setIsAuthorizingSso] = useState(false);
 
   React.useEffect(() => {
+    const isExpired = searchParams.get("expired");
+    if (isExpired === "true") {
+      toast.error("Your session has expired for security. Please sign in again.", {
+        id: "session-expired",
+        duration: 5000,
+      });
+    }
+
     const errorParam = searchParams.get("error");
     if (errorParam === "AccessDenied" || errorParam === "Callback") {
       toast.error(

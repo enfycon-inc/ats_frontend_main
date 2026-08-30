@@ -1168,6 +1168,9 @@ const getInitialActiveBranchContext = () => {
       router.push("/job-posting");
     } catch (err: any) {
       console.error("[NewJob] API error:", err);
+      if (err.message && (err.message.includes('expired') || err.message.includes('Unauthorized') || err.message.includes('Session has expired'))) {
+        return;
+      }
       showErrorModal(err.message || "Backend connection failed.", "Job Posting Error");
     }
   };

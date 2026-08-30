@@ -295,7 +295,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             const data = await res.json()
             token.accessToken = data.accessToken
             if (data.refreshToken) token.refreshToken = data.refreshToken
-            token.accessTokenExpiry = Date.now() + ((data.expiresIn || 300) * 1000)
+            token.accessTokenExpiry = Date.now() + ((data.expiresIn || 36000) * 1000)
             delete token.error
             console.log('[auth.ts jwt] Access token silently refreshed.')
             return token
