@@ -21,7 +21,7 @@ import {
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import userImg from "@/public/assets/images/user.png";
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { atsApi } from "@/lib/ats-api";
@@ -534,46 +534,74 @@ function ProfileDropdownNav() {
     return roleStr.replace(/_/g, " ");
   };
 
-  const userAssignedRoles: string[] = (currentUser?.roles && currentUser.roles.length > 0)
-    ? currentUser.roles
+  const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+  const branchSpecificRoles: string[] = (activeBranchId && (currentUser as any)?.branchRoles?.[activeBranchId]) || [];
+  const effectiveRoles = branchSpecificRoles.length > 0 ? branchSpecificRoles : userRoles;
+
+  const userAssignedRoles: string[] = (effectiveRoles && effectiveRoles.length > 0)
+    ? effectiveRoles
     : (session as any)?.user?.roles && (session as any)?.user?.roles.length > 0
     ? (session as any)?.user?.roles
     : (systemRole ? [systemRole] : []);
 
-  const allPossibleRoles: { key: string; name: string; icon: string; replacesSystemRole?: string }[] = [
-    { key: "ADMIN", name: "Tenant Admin", icon: "⚙️" },
-    { key: "ACCOUNT_MANAGER", name: "Account Manager", icon: "💼" },
-    { key: "BRANCH_ADMIN", name: "Branch Admin", icon: "🏢" },
-    { key: "DELIVERY_HEAD", name: "Delivery Head", icon: "🚀" },
-    { key: "POD_LEAD", name: "Pod Lead", icon: "👑" },
-    { key: "RECRUITER", name: "Recruiter", icon: "👤" },
-    ...availableRoles.filter(r => !r.isSystem).map(r => ({
-      key: r.name,
-      name: r.name,
-      icon: "🎨",
-      replacesSystemRole: r.replacesSystemRole || r.systemRole
-    }))
-  ];
+  const assignedRoleOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const options: { key: string; name: string; icon: string; replacesSystemRole?: string }[] = [];
 
-  const assignedRoleOptions = allPossibleRoles.filter(rOpt => {
-    const rKeyUpper = rOpt.key.toUpperCase();
-    const rNameUpper = rOpt.name.toUpperCase();
-    return userAssignedRoles.some(uRole => {
-      const uUpper = uRole.toUpperCase();
-      return uUpper === rKeyUpper || 
-             uUpper === rNameUpper || 
-             (rOpt.replacesSystemRole && rOpt.replacesSystemRole.toUpperCase() === uUpper);
-    });
-  });
+    for (const uRole of userAssignedRoles) {
+      if (!uRole || typeof uRole !== "string") continue;
+      const uUpper = uRole.trim().toUpperCase();
+
+      // 1. Check for matching custom role (prefer active branch if set)
+      const customRole = availableRoles.find(
+        (r) => !r.isSystem && (
+          (!activeBranchId || !r.branchId || r.branchId === activeBranchId) &&
+          (r.name.toUpperCase() === uUpper || r.id === uRole || (r.systemRole && r.systemRole.toUpperCase() === uUpper))
+        )
+      ) || availableRoles.find(
+        (r) => !r.isSystem && (
+          r.name.toUpperCase() === uUpper || r.id === uRole || (r.systemRole && r.systemRole.toUpperCase() === uUpper)
+        )
+      );
+
+      let key = uRole;
+      let name = uRole;
+      let icon = "👤";
+      let replacesSystemRole: string | undefined = undefined;
+
+      if (customRole) {
+        key = customRole.name;
+        name = customRole.name;
+        icon = "🎨";
+        replacesSystemRole = customRole.systemRole || customRole.replacesSystemRole;
+      } else if (systemRoleLabels[uUpper]) {
+        key = uUpper;
+        name = systemRoleLabels[uUpper];
+        icon = uUpper === "ADMIN" || uUpper === "SUPER_ADMIN" ? "⚙️" : (uUpper === "ACCOUNT_MANAGER" ? "💼" : "👤");
+      } else {
+        key = uRole;
+        name = uRole.replace(/_/g, " ");
+      }
+
+      const dedupeKey = name.trim().toUpperCase();
+      if (!seen.has(dedupeKey)) {
+        seen.add(dedupeKey);
+        options.push({ key, name, icon, replacesSystemRole });
+      }
+    }
+
+    return options;
+  }, [userAssignedRoles, availableRoles, activeBranchId, systemRoleLabels]);
 
   // Auto-clear invalid override_role from localStorage ONLY AFTER availableRoles has finished loading
   useEffect(() => {
     if (rolesLoaded && overrideRole && assignedRoleOptions.length > 0) {
       const overrideUpper = overrideRole.toUpperCase();
       const isValidOverride = assignedRoleOptions.some(
-        opt => opt.key.toUpperCase() === overrideUpper ||
-               opt.name.toUpperCase() === overrideUpper ||
-               (opt.replacesSystemRole && opt.replacesSystemRole.toUpperCase() === overrideUpper)
+        (opt: { key: string; name: string; replacesSystemRole?: string }) =>
+          opt.key.toUpperCase() === overrideUpper ||
+          opt.name.toUpperCase() === overrideUpper ||
+          (opt.replacesSystemRole && opt.replacesSystemRole.toUpperCase() === overrideUpper)
       );
       if (!isValidOverride) {
         if (typeof window !== "undefined") {
@@ -598,11 +626,7 @@ function ProfileDropdownNav() {
     setOpen(false);
   };
 
-  const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
-  const branchSpecificRoles = (activeBranchId && (currentUser as any)?.branchRoles?.[activeBranchId]) || [];
-  const effectiveRoles = branchSpecificRoles.length > 0 ? branchSpecificRoles : userRoles;
-
-  const currentActiveRole = overrideRole || effectiveRoles[0] || (userAssignedRoles.length > 0 ? userAssignedRoles[0] : "RECRUITER");
+  const currentActiveRole = overrideRole || (assignedRoleOptions.length > 0 ? assignedRoleOptions[0].key : (userAssignedRoles[0] || "RECRUITER"));
   const displayRole = getDynamicRoleLabel(currentActiveRole);
   const isAdminActive = isRoleAdmin(currentActiveRole, availableRoles, currentUser);
 
@@ -674,8 +698,9 @@ function ProfileDropdownNav() {
                 Switch Active Perspective
               </div>
               <div className="space-y-0.5 max-h-[160px] overflow-y-auto">
-                {assignedRoleOptions.map((r) => {
-                  const isActive = currentActiveRole.toUpperCase() === r.key.toUpperCase();
+                {assignedRoleOptions.map((r: { key: string; name: string; icon: string }) => {
+                  const isActive = currentActiveRole.toUpperCase() === r.key.toUpperCase() ||
+                                   currentActiveRole.toUpperCase() === r.name.toUpperCase();
                   return (
                     <button
                       key={r.key}
@@ -840,35 +865,47 @@ function SandboxSwitcher() {
           >
             🔄 System Default
           </button>
-          {[
-            { key: "ADMIN", name: "Tenant Admin", icon: "⚙️" },
-            { key: "ACCOUNT_MANAGER", name: "Account Manager", icon: "💼" },
-            { key: "BRANCH_ADMIN", name: "Branch Admin", icon: "🏢" },
-            { key: "DELIVERY_HEAD", name: "Delivery Head", icon: "🚀" },
-            { key: "POD_LEAD", name: "Pod Lead", icon: "👑" },
-            { key: "RECRUITER", name: "Recruiter", icon: "👤" },
-            ...availableRoles.filter(r => !r.isSystem).map(r => ({
-              key: r.name,
-              name: r.name,
-              icon: "🎨"
-            }))
-          ].map((r) => (
-            <button
-              key={r.key}
-              onClick={() => handleSelectRole(r.key)}
-              role="menuitem"
-              className={`w-full text-left px-3 py-1.5 text-[12px] transition-colors cursor-pointer font-medium flex justify-between items-center ${
-                currentOverride?.toUpperCase() === r.key.toUpperCase()
-                  ? "bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-bold"
-                  : "text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white"
-              }`}
-            >
-              <span className="truncate">{r.icon} {r.name}</span>
-              {currentOverride?.toUpperCase() === r.key.toUpperCase() && (
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-              )}
-            </button>
-          ))}
+          {(() => {
+            const seen = new Set<string>();
+            const list: { key: string; name: string; icon: string }[] = [];
+            const baseRoles = [
+              { key: "ADMIN", name: "Tenant Admin", icon: "⚙️" },
+              { key: "ACCOUNT_MANAGER", name: "Account Manager", icon: "💼" },
+              { key: "BRANCH_ADMIN", name: "Branch Admin", icon: "🏢" },
+              { key: "DELIVERY_HEAD", name: "Delivery Head", icon: "🚀" },
+              { key: "POD_LEAD", name: "Pod Lead", icon: "👑" },
+              { key: "RECRUITER", name: "Recruiter", icon: "👤" },
+              ...availableRoles.filter((r) => !r.isSystem).map((r) => ({
+                key: r.name,
+                name: r.name,
+                icon: "🎨",
+              })),
+            ];
+            for (const item of baseRoles) {
+              const k = item.name.toUpperCase();
+              if (!seen.has(k)) {
+                seen.add(k);
+                list.push(item);
+              }
+            }
+            return list.map((r) => (
+              <button
+                key={r.key}
+                onClick={() => handleSelectRole(r.key)}
+                role="menuitem"
+                className={`w-full text-left px-3 py-1.5 text-[12px] transition-colors cursor-pointer font-medium flex justify-between items-center ${
+                  currentOverride?.toUpperCase() === r.key.toUpperCase() || currentOverride?.toUpperCase() === r.name.toUpperCase()
+                    ? "bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-bold"
+                    : "text-neutral-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-white/8 hover:text-blue-700 dark:hover:text-white"
+                }`}
+              >
+                <span className="truncate">{r.icon} {r.name}</span>
+                {(currentOverride?.toUpperCase() === r.key.toUpperCase() || currentOverride?.toUpperCase() === r.name.toUpperCase()) && (
+                  <span className="h-2 w-2 rounded-full bg-amber-500" />
+                )}
+              </button>
+            ));
+          })()}
         </div>
       )}
     </div>
