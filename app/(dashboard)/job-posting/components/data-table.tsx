@@ -145,24 +145,79 @@ export default function DataTable({
   const [clientSearchText, setClientSearchText] = useState("");
   const [addClientModalOpen, setAddClientModalOpen] = useState(false);
 
+  // Approve Job Modal State
+  const [approveModalJob, setApproveModalJob] = useState<Job | null>(null);
+  const [approvePreset, setApprovePreset] = useState<string>("Approved — Requisition verified and rates validated");
+  const [approveRemark, setApproveRemark] = useState<string>("");
+  const [isApproving, setIsApproving] = useState<boolean>(false);
+
   // Reject Job Modal State
   const [rejectModalJob, setRejectModalJob] = useState<Job | null>(null);
+  const [rejectCategory, setRejectCategory] = useState<string>("Rate / Budget is too low for required experience level");
   const [rejectReason, setRejectReason] = useState<string>("");
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
 
+  const APPROVE_REMARK_OPTIONS = [
+    "Approved — Requisition verified and rates validated",
+    "Approved — High priority requirement, ready for immediate sourcing",
+    "Approved with client budget sign-off",
+    "Approved with rate exception ceiling",
+    "Custom Note / Instructions...",
+  ];
+
+  const REJECT_REASON_OPTIONS = [
+    "Rate / Budget is too low for required experience level",
+    "Incomplete job description or missing critical skill details",
+    "Client contract or billing terms not finalized",
+    "Duplicate job requirement",
+    "Incorrect visa or work authorization terms",
+    "Client requirement put on hold / cancelled",
+    "Custom Reason / Feedback...",
+  ];
+
+  const handleConfirmApprove = async () => {
+    if (!approveModalJob) return;
+    setIsApproving(true);
+    try {
+      const finalRemark = approvePreset === "Custom Note / Instructions..." 
+        ? approveRemark.trim() 
+        : (approveRemark.trim() ? `${approvePreset}: ${approveRemark.trim()}` : approvePreset);
+      
+      toast.loading(`Activating ${approveModalJob.jobCode || "job"}...`, { id: `approve-job-${approveModalJob.id}` });
+      await atsApi.jobs.approve(approveModalJob.id);
+      toast.success(`Job ${approveModalJob.jobCode || ""} approved & activated!`, { id: `approve-job-${approveModalJob.id}` });
+      if (onUpdateJob) {
+        onUpdateJob(approveModalJob.id, { jobStatus: "Active", approvalStatus: "APPROVED" as any });
+      }
+      if (onRefresh) {
+        onRefresh();
+      }
+      setApproveModalJob(null);
+      setApproveRemark("");
+    } catch (err: any) {
+      toast.error("Failed to approve job: " + (err?.message || "Unknown error"), { id: `approve-job-${approveModalJob.id}` });
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
   const handleConfirmReject = async () => {
     if (!rejectModalJob) return;
-    if (!rejectReason.trim()) {
-      toast.error("Please provide a reason for rejection.");
+    const finalReason = rejectCategory === "Custom Reason / Feedback..."
+      ? rejectReason.trim()
+      : (rejectReason.trim() ? `[${rejectCategory}] ${rejectReason.trim()}` : rejectCategory);
+
+    if (!finalReason) {
+      toast.error("Please provide a reason or feedback for rejection.");
       return;
     }
     setIsRejecting(true);
     try {
       toast.loading(`Rejecting ${rejectModalJob.jobCode || "job"}...`, { id: `reject-job-${rejectModalJob.id}` });
-      await atsApi.jobs.reject(rejectModalJob.id, rejectReason.trim());
+      await atsApi.jobs.reject(rejectModalJob.id, finalReason);
       toast.success(`Job ${rejectModalJob.jobCode || ""} rejected with feedback.`, { id: `reject-job-${rejectModalJob.id}` });
       if (onUpdateJob) {
-        onUpdateJob(rejectModalJob.id, { jobStatus: "Draft" as any, approvalStatus: "REJECTED" as any, rejectionReason: rejectReason.trim() });
+        onUpdateJob(rejectModalJob.id, { jobStatus: "Draft" as any, approvalStatus: "REJECTED" as any, rejectionReason: finalReason });
       }
       if (onRefresh) {
         onRefresh();
@@ -912,47 +967,36 @@ export default function DataTable({
 
                               if (isPending && canApproveThisJob) {
                                 return (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 select-none">
+                                  <div className="inline-flex items-center gap-1.5 bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-md px-2 py-0.5 select-none">
+                                    <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 whitespace-nowrap">
                                       Pending Approval
                                     </span>
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-0.5 pl-1 border-l border-amber-200 dark:border-amber-800/60">
                                       <button
                                         type="button"
-                                        onClick={async (e) => {
+                                        onClick={(e) => {
                                           e.stopPropagation();
-                                          try {
-                                            toast.loading(`Activating ${job.jobCode || "job"}...`, { id: `approve-job-${job.id}` });
-                                            await atsApi.jobs.approve(job.id);
-                                            toast.success(`Job ${job.jobCode || ""} approved & activated!`, { id: `approve-job-${job.id}` });
-                                            if (onUpdateJob) {
-                                              onUpdateJob(job.id, { jobStatus: "Active", approvalStatus: "APPROVED" as any });
-                                            }
-                                            if (onRefresh) {
-                                              onRefresh();
-                                            }
-                                          } catch (err: any) {
-                                            toast.error("Failed to approve job: " + err.message, { id: `approve-job-${job.id}` });
-                                          }
+                                          setApproveModalJob(job);
+                                          setApprovePreset("Approved — Requisition verified and rates validated");
+                                          setApproveRemark("");
                                         }}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded shadow-xs transition-all cursor-pointer hover:shadow"
-                                        title="Direct 1-Click Approve & Activate Job"
+                                        className="p-1 rounded-sm text-emerald-600 hover:text-white hover:bg-emerald-600 dark:text-emerald-400 dark:hover:bg-emerald-600 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                                        title="Review & Approve Job Requisition"
                                       >
-                                        <CheckCircle className="h-3 w-3" />
-                                        <span>Approve</span>
+                                        <CheckCircle className="h-3.5 w-3.5" />
                                       </button>
                                       <button
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setRejectModalJob(job);
+                                          setRejectCategory("Rate / Budget is too low for required experience level");
                                           setRejectReason("");
                                         }}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-white bg-rose-600 hover:bg-rose-700 active:scale-95 rounded shadow-xs transition-all cursor-pointer hover:shadow"
-                                        title="Reject Job with Feedback / Reason"
+                                        className="p-1 rounded-sm text-rose-600 hover:text-white hover:bg-rose-600 dark:text-rose-400 dark:hover:bg-rose-600 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                                        title="Review & Reject Job Requisition"
                                       >
-                                        <XCircle className="h-3 w-3" />
-                                        <span>Reject</span>
+                                        <XCircle className="h-3.5 w-3.5" />
                                       </button>
                                     </div>
                                   </div>
@@ -1799,18 +1843,168 @@ export default function DataTable({
         />
       )}
 
-      {/* Reject Job Feedback Modal */}
+      {/* ── APPROVE JOB CONFIRMATION MODAL ───────────────────────── */}
+      {approveModalJob && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in"
+          onClick={(e) => { e.stopPropagation(); setApproveModalJob(null); }}
+        >
+          <div 
+            className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 bg-emerald-50/70 dark:bg-emerald-950/30 border-b border-emerald-100 dark:border-emerald-900/40">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-lg">
+                  <CheckCircle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
+                    Approve & Activate Job Requisition
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    Verify requirement details before activating for recruiters
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setApproveModalJob(null)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 text-lg leading-none cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Compact Job Info Card */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-lg p-3.5 space-y-2.5 text-xs">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="font-mono text-[10px] font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded text-blue-600 dark:text-blue-400">
+                        {approveModalJob.jobCode}
+                      </span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                        Pending Approval
+                      </span>
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                        🔥 {approveModalJob.priority || "Warm"}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                      {approveModalJob.jobTitle}
+                    </h4>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2 border-t border-slate-200/70 dark:border-slate-700/70 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-medium">Client / End Client</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                      {approveModalJob.client} {approveModalJob.endClientName && approveModalJob.endClientName !== approveModalJob.client ? `(${approveModalJob.endClientName})` : ""}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-medium">Location & Work Mode</span>
+                    <span className="font-medium text-slate-800 dark:text-slate-200">
+                      {approveModalJob.location || "Remote"}{approveModalJob.states ? `, ${approveModalJob.states}` : ""}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-medium">Client Bill Rate / CTC</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                      {approveModalJob.clientBillRate || "N/A"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-medium">Pay Rate / Salary</span>
+                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                      {approveModalJob.payRate || "N/A"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-medium">Job Created By</span>
+                    <span className="font-medium text-slate-800 dark:text-slate-200">
+                      {approveModalJob.createdBy || "Account Manager"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-medium">Assigned Pod / Recruiter</span>
+                    <span className="font-medium text-slate-800 dark:text-slate-200">
+                      {approveModalJob.podName || approveModalJob.assignedTo || "Unassigned"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Approval Remarks Dropdown & Custom Note */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  Approval Remarks / Sign-off Template
+                </label>
+                <select
+                  value={approvePreset}
+                  onChange={(e) => setApprovePreset(e.target.value)}
+                  className="w-full p-2 bg-neutral-50 dark:bg-slate-800/80 border border-neutral-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-neutral-900 dark:text-neutral-100 font-medium cursor-pointer"
+                >
+                  {APPROVE_REMARK_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400 mb-1">
+                    {approvePreset === "Custom Note / Instructions..." ? "Custom Remarks *" : "Additional Reviewer Notes (Optional)"}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={approveRemark}
+                    onChange={(e) => setApproveRemark(e.target.value)}
+                    placeholder={approvePreset === "Custom Note / Instructions..." ? "Enter specific reviewer instructions or approval notes..." : "Optional internal notes for recruiters / AM..."}
+                    className="w-full p-2 bg-neutral-50 dark:bg-slate-800/80 border border-neutral-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-neutral-900 dark:text-neutral-100 resize-none transition-all placeholder:text-neutral-400"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 px-5 py-3 bg-neutral-50 dark:bg-slate-900/60 border-t border-neutral-200 dark:border-slate-800 text-xs">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setApproveModalJob(null)}
+                disabled={isApproving}
+                className="text-xs font-medium cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={isApproving || (approvePreset === "Custom Note / Instructions..." && !approveRemark.trim())}
+                onClick={handleConfirmApprove}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-xs"
+              >
+                {isApproving ? "Activating..." : "Confirm & Activate Job"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── REJECT JOB CONFIRMATION MODAL ────────────────────────── */}
       {rejectModalJob && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in"
           onClick={(e) => { e.stopPropagation(); setRejectModalJob(null); }}
         >
           <div 
-            className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95"
+            className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 bg-rose-50/60 dark:bg-rose-950/30 border-b border-rose-100 dark:border-rose-900/40">
+            <div className="flex items-center justify-between px-5 py-3.5 bg-rose-50/70 dark:bg-rose-950/30 border-b border-rose-100 dark:border-rose-900/40">
               <div className="flex items-center gap-2.5">
                 <div className="p-1.5 bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 rounded-lg">
                   <XCircle className="h-5 w-5" />
@@ -1820,7 +2014,7 @@ export default function DataTable({
                     Reject Job Requirement
                   </h3>
                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                    {rejectModalJob.jobCode} — {rejectModalJob.jobTitle}
+                    Provide reason and feedback for the Account Manager to revise
                   </p>
                 </div>
               </div>
@@ -1833,23 +2027,101 @@ export default function DataTable({
             </div>
 
             {/* Body */}
-            <div className="p-5 space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
-                  Reason for Rejection / Reviewer Feedback <span className="text-rose-500">*</span>
-                </label>
-                <textarea
-                  autoFocus
-                  rows={4}
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="e.g. Rate is too low for the required seniority / missing client bill rate details / incorrect tech stack..."
-                  className="w-full p-2.5 bg-neutral-50 dark:bg-slate-800/80 border border-neutral-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-neutral-900 dark:text-neutral-100 resize-none transition-all placeholder:text-neutral-400"
-                />
+            <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Compact Job Info Card */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-lg p-3.5 space-y-2.5 text-xs">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="font-mono text-[10px] font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded text-blue-600 dark:text-blue-400">
+                        {rejectModalJob.jobCode}
+                      </span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                        Pending Approval
+                      </span>
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                        🔥 {rejectModalJob.priority || "Warm"}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                      {rejectModalJob.jobTitle}
+                    </h4>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2 border-t border-slate-200/70 dark:border-slate-700/70 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-medium">Client / End Client</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                      {rejectModalJob.client} {rejectModalJob.endClientName && rejectModalJob.endClientName !== rejectModalJob.client ? `(${rejectModalJob.endClientName})` : ""}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-medium">Location & Work Mode</span>
+                    <span className="font-medium text-slate-800 dark:text-slate-200">
+                      {rejectModalJob.location || "Remote"}{rejectModalJob.states ? `, ${rejectModalJob.states}` : ""}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-medium">Client Bill Rate / CTC</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                      {rejectModalJob.clientBillRate || "N/A"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-medium">Pay Rate / Salary</span>
+                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                      {rejectModalJob.payRate || "N/A"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-medium">Job Created By</span>
+                    <span className="font-medium text-slate-800 dark:text-slate-200">
+                      {rejectModalJob.createdBy || "Account Manager"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-medium">Assigned Pod / Recruiter</span>
+                    <span className="font-medium text-slate-800 dark:text-slate-200">
+                      {rejectModalJob.podName || rejectModalJob.assignedTo || "Unassigned"}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
-                This requirement will be returned to <span className="font-semibold text-neutral-700 dark:text-neutral-300">{rejectModalJob.createdBy || "the creator"}</span> as a Draft with your feedback.
-              </p>
+
+              {/* Rejection Category Dropdown & Custom Feedback */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  Reason for Rejection / Issue Category <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={rejectCategory}
+                  onChange={(e) => setRejectCategory(e.target.value)}
+                  className="w-full p-2 bg-neutral-50 dark:bg-slate-800/80 border border-neutral-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-neutral-900 dark:text-neutral-100 font-medium cursor-pointer"
+                >
+                  {REJECT_REASON_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-neutral-500 dark:text-neutral-400 mb-1">
+                    {rejectCategory === "Custom Reason / Feedback..." ? "Detailed Rejection Reason *" : "Detailed Reviewer Remarks / Feedback (Optional)"}
+                  </label>
+                  <textarea
+                    autoFocus={rejectCategory === "Custom Reason / Feedback..."}
+                    rows={3}
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder="e.g. Please revise the CTC ceiling to 14 LPA as market rate for this experience is higher, and clarify visa/notice period requirements..."
+                    className="w-full p-2.5 bg-neutral-50 dark:bg-slate-800/80 border border-neutral-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-neutral-900 dark:text-neutral-100 resize-none transition-all placeholder:text-neutral-400"
+                  />
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-rose-50/60 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-lg text-[10.5px] text-neutral-600 dark:text-neutral-300">
+                This requirement will be moved to <span className="font-semibold text-rose-600 dark:text-rose-400">Draft</span> and returned to <span className="font-semibold text-neutral-800 dark:text-neutral-200">{rejectModalJob.createdBy || "the creator"}</span> with your feedback.
+              </div>
             </div>
 
             {/* Footer */}
@@ -1865,7 +2137,7 @@ export default function DataTable({
               </Button>
               <Button
                 size="sm"
-                disabled={isRejecting || !rejectReason.trim()}
+                disabled={isRejecting || (rejectCategory === "Custom Reason / Feedback..." && !rejectReason.trim())}
                 onClick={handleConfirmReject}
                 className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer shadow-xs"
               >
