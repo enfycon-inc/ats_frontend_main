@@ -508,6 +508,21 @@ export default function UserManagementPage() {
     roles: string[];
   }
 
+  // Helper to dedupe roles case-insensitively while preserving clean display casing
+  const dedupeCaseInsensitiveRoles = (roleList: (string | undefined | null)[]): string[] => {
+    const seen = new Set<string>();
+    const res: string[] = [];
+    for (const r of roleList) {
+      if (!r || typeof r !== "string") continue;
+      const key = r.trim().toUpperCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        res.push(r.trim());
+      }
+    }
+    return res;
+  };
+
   // Helper function to resolve effective assigned role groups with single branch identification tag
   const getUserEffectiveRoleGroups = (u: UserItem, selectedBranchFilter: string = "ALL"): BranchRoleGroup[] => {
     if (!u) return [];
@@ -525,7 +540,7 @@ export default function UserManagementPage() {
         return [{
           branchId: targetBranchId,
           branchName: bName,
-          roles: Array.from(new Set(u.branchRoles[targetBranchId].filter(Boolean)))
+          roles: dedupeCaseInsensitiveRoles(u.branchRoles[targetBranchId])
         }];
       }
     }
@@ -535,29 +550,32 @@ export default function UserManagementPage() {
       Object.entries(u.branchRoles).forEach(([bId, rList]) => {
         if (Array.isArray(rList) && rList.length > 0) {
           const bName = resolveBranchName(bId);
-          groups.push({
-            branchId: bId,
-            branchName: bName,
-            roles: Array.from(new Set(rList.filter(Boolean)))
-          });
+          const deduped = dedupeCaseInsensitiveRoles(rList);
+          if (deduped.length > 0) {
+            groups.push({
+              branchId: bId,
+              branchName: bName,
+              roles: deduped
+            });
+          }
         }
       });
       if (groups.length > 0) return groups;
     }
 
-    const defaultRoles = Array.isArray(u.roles) && u.roles.length > 0 ? u.roles.filter(Boolean) : [u.roleName || "RECRUITER"];
+    const defaultRoles = Array.isArray(u.roles) && u.roles.length > 0 ? u.roles : [u.roleName || "RECRUITER"];
     const singleBranchName = u.branchId ? resolveBranchName(u.branchId) : undefined;
     return [{
       branchId: u.branchId || undefined,
       branchName: singleBranchName,
-      roles: Array.from(new Set(defaultRoles))
+      roles: dedupeCaseInsensitiveRoles(defaultRoles)
     }];
   };
 
   const getUserEffectiveRoles = (u: UserItem, selectedBranchFilter: string = "ALL") => {
     if (!u) return [];
     const groups = getUserEffectiveRoleGroups(u, selectedBranchFilter);
-    return Array.from(new Set(groups.flatMap((g) => g.roles || []))).filter(Boolean);
+    return dedupeCaseInsensitiveRoles(groups.flatMap((g) => g.roles || []));
   };
 
   const openEditModal = (user: UserItem) => {
@@ -571,13 +589,22 @@ export default function UserManagementPage() {
       ? user.assignedBranchIds
       : (user.branchId ? [user.branchId] : []);
 
+    const cleanedBranchRoles: Record<string, string[]> = {};
+    if (user.branchRoles) {
+      Object.entries(user.branchRoles).forEach(([bId, rList]) => {
+        if (Array.isArray(rList)) {
+          cleanedBranchRoles[bId] = dedupeCaseInsensitiveRoles(rList);
+        }
+      });
+    }
+
     setEditForm({
       firstName: fName,
       lastName: lName,
       email: user.email || "",
       branchId: user.branchId || "",
       assignedBranchIds: initialAssigned,
-      branchRoles: user.branchRoles || {},
+      branchRoles: cleanedBranchRoles,
       roles: [...rawRoles],
     });
     setIsEditModalOpen(true);
@@ -1025,7 +1052,7 @@ export default function UserManagementPage() {
                                 className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold inline-flex items-center gap-0.5 bg-indigo-50 dark:bg-indigo-950/70 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800/80 transition-colors cursor-pointer"
                                 title="Add more branches or edit branch assignments"
                               >
-                                + Add / Edit
+                                + Add
                               </button>
                             </div>
                           );
@@ -1841,9 +1868,9 @@ export default function UserManagementPage() {
             <div className="flex justify-end px-5 py-3 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
               <Button
                 onClick={() => setBranchRoleModalState(null)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 px-4 rounded-md cursor-pointer"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 px-5 rounded-md cursor-pointer shadow-2xs"
               >
-                Done / Save Roles
+                Save
               </Button>
             </div>
           </div>
