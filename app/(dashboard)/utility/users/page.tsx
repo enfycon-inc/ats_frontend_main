@@ -576,10 +576,32 @@ export default function UserManagementPage() {
         roles: finalRoles,
       });
 
+      const chosenReviewer = editForm.jobReviewerId
+        ? users.find((u) => u.id === editForm.jobReviewerId)
+        : null;
+
+      setUsers((prevUsers) =>
+        prevUsers.map((u) =>
+          u.id === selectedUser.id
+            ? {
+                ...u,
+                fullName: trimmedName,
+                email: editEmail,
+                branchId: editForm.branchId || null,
+                assignedBranchIds: assignedBranchIds,
+                branchRoles: cleanBranchRoles,
+                jobReviewerId: editForm.jobReviewerId || null,
+                jobReviewerName: chosenReviewer ? chosenReviewer.fullName : null,
+                roles: finalRoles,
+              }
+            : u
+        )
+      );
+
       toast.success("User details updated successfully!");
       setIsEditModalOpen(false);
       setSelectedUser(null);
-      loadData();
+      await loadData();
     } catch (err: any) {
       toast.error(err.message || "Failed to update user details.");
     } finally {
@@ -973,7 +995,7 @@ export default function UserManagementPage() {
       branchId: user.branchId || "",
       assignedBranchIds: initialAssigned,
       branchRoles: cleanedBranchRoles,
-      jobReviewerId: user.jobReviewerId || "",
+      jobReviewerId: user.jobReviewerId || (user as any).job_reviewer_id || "",
       roles: [...rawRoles],
     });
     setIsEditModalOpen(true);
@@ -1444,20 +1466,36 @@ export default function UserManagementPage() {
 
                       {/* Designated Job Reviewer */}
                       <td className="py-3 px-4 text-xs font-semibold">
-                        {user.jobReviewerName ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs">
-                            <UserCheck className="h-3 w-3 text-emerald-600" /> {user.jobReviewerName}
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(user)}
-                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800/60 transition-colors cursor-pointer"
-                            title="Assign a designated Job Reviewer"
-                          >
-                            + Assign
-                          </button>
-                        )}
+                        {(() => {
+                          const reviewerId = user.jobReviewerId || (user as any).job_reviewer_id;
+                          const reviewerUser = reviewerId ? users.find((u) => u.id === reviewerId) : null;
+                          const reviewerName = user.jobReviewerName || (user as any).job_reviewer_name || reviewerUser?.fullName;
+
+                          if (reviewerName) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(user)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer"
+                                title="Click to change designated Job Reviewer"
+                              >
+                                <UserCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                <span>{reviewerName}</span>
+                              </button>
+                            );
+                          }
+
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(user)}
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800/60 transition-colors cursor-pointer"
+                              title="Assign a designated Job Reviewer"
+                            >
+                              + Assign
+                            </button>
+                          );
+                        })()}
                       </td>
 
                       {/* Status Toggle */}
