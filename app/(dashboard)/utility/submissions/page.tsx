@@ -2225,22 +2225,22 @@ export default function SubmissionsPage() {
         onSuccess={loadData}
       />
 
-      {/* ── TENANT CUSTOM REMARKS SETTINGS MODAL ── */}
+      {/* ── TENANT CUSTOM REMARKS SETTINGS MODAL (CLASSIC ENTERPRISE DESIGN) ── */}
       <Dialog open={customRemarksModalOpen} onOpenChange={setCustomRemarksModalOpen}>
-        <DialogContent className="sm:max-w-[950px] font-sans max-h-[90vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="px-6 py-4 border-b border-default-150 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
-            <DialogTitle className="text-sm font-bold text-neutral-800 dark:text-white flex items-center gap-2">
-              <Icon icon="heroicons:cog-6-tooth" className="h-5 w-5 text-indigo-600" />
+        <DialogContent className="sm:max-w-[950px] font-sans max-h-[90vh] flex flex-col p-0 overflow-hidden border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl">
+          <DialogHeader className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850">
+            <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <Icon icon="heroicons:cog-6-tooth" className="h-5 w-5 text-slate-600 dark:text-slate-300" />
               Stage Remarks Templates
             </DialogTitle>
-            <DialogDescription className="text-xs text-neutral-500">
+            <DialogDescription className="text-[11.5px] text-slate-500 dark:text-slate-400">
               Standard quick-pick templates for approving or rejecting candidates across hiring stages.
             </DialogDescription>
           </DialogHeader>
 
           {/* Stage Tabs */}
-          <div className="px-6 py-2.5 border-b border-default-150 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mr-1 shrink-0">Stage:</span>
+          <div className="px-6 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mr-1.5 shrink-0">Stage:</span>
             {[
               { key: "review", label: "Internal Review Gate", count: customRemarks.filter(r => r.stage === "review" || r.stage === "internal_review").length },
               { key: "l1", label: "Round 1 (L1)", count: customRemarks.filter(r => r.stage === "l1").length },
@@ -2252,17 +2252,17 @@ export default function SubmissionsPage() {
               <button
                 key={tab.key}
                 onClick={() => setCustomRemarksStageFilter(tab.key as any)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                   customRemarksStageFilter === tab.key
-                    ? "bg-indigo-600 text-white shadow-xs"
-                    : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-slate-800"
+                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium"
                 }`}
               >
                 <span>{tab.label}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
                   customRemarksStageFilter === tab.key
-                    ? "bg-white/20 text-white"
-                    : "bg-neutral-100 text-neutral-500 dark:bg-slate-800 dark:text-slate-400"
+                    ? "bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900"
+                    : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                 }`}>
                   {tab.count}
                 </span>
@@ -2271,26 +2271,26 @@ export default function SubmissionsPage() {
           </div>
 
           {/* Body: 2 Columns */}
-          <div className="p-6 overflow-y-auto flex-1 bg-neutral-50/50 dark:bg-slate-900/50">
+          <div className="p-6 overflow-y-auto flex-1 bg-slate-50/40 dark:bg-slate-900/40">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
               
               {/* ── LEFT COLUMN: ACCEPTANCE REMARKS ── */}
-              <div className="bg-white dark:bg-slate-850 rounded-xl border border-emerald-200 dark:border-emerald-900/50 shadow-xs overflow-hidden flex flex-col">
-                <div className="px-4 py-3 bg-emerald-50/70 dark:bg-emerald-950/30 border-b border-emerald-150 dark:border-emerald-900/40 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded-md bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+              <div className="bg-white dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
+                <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-6 w-6 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center font-bold text-xs">
                       ✓
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-emerald-950 dark:text-emerald-300">
-                        Acceptance / Approval Remarks
+                      <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                        Acceptance / Approval Templates
                       </h4>
-                      <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400">
-                        Quick-pick remarks when candidate is cleared or approved
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Predefined remarks when approving or clearing candidates
                       </p>
                     </div>
                   </div>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
                     {
                       customRemarks.filter(r => 
                         (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
@@ -2305,19 +2305,19 @@ export default function SubmissionsPage() {
                     e.preventDefault();
                     handleAddDirectCustomRemark("ACCEPT", newCustomAcceptText);
                   }} 
-                  className="p-3 bg-emerald-50/30 dark:bg-emerald-950/10 border-b border-emerald-100 dark:border-emerald-900/30 flex gap-2"
+                  className="p-3 bg-white dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex gap-2"
                 >
                   <Input
                     placeholder="Type remark(s) — separate multiple with comma (,)..."
                     value={newCustomAcceptText}
                     onChange={(e) => setNewCustomAcceptText(e.target.value)}
-                    className="h-8.5 text-xs bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 focus-visible:ring-emerald-500 flex-1"
+                    className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-slate-400 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
                   />
                   <Button
                     type="submit"
                     size="sm"
                     disabled={addingRemark || !newCustomAcceptText.trim()}
-                    className="h-8.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
+                    className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
                   >
                     + Add
                   </Button>
@@ -2328,7 +2328,7 @@ export default function SubmissionsPage() {
                     (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
                     r.remarkType === "ACCEPT"
                   ).length === 0 ? (
-                    <div className="p-6 text-center text-xs text-neutral-400 italic">
+                    <div className="p-6 text-center text-xs text-slate-400 italic">
                       No acceptance remarks added yet for this stage. Type above to add (comma-separated supported).
                     </div>
                   ) : (
@@ -2340,17 +2340,17 @@ export default function SubmissionsPage() {
                       .map((rem) => (
                         <div 
                           key={rem.id}
-                          className="p-2.5 bg-white dark:bg-slate-800 rounded-lg border border-neutral-200 dark:border-slate-700 flex items-center justify-between gap-2.5 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all text-xs"
+                          className="p-2.5 bg-slate-50/60 dark:bg-slate-800/50 rounded-lg border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between gap-2.5 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors text-xs"
                         >
-                          <div className="flex items-start gap-2 flex-1 min-w-0">
+                          <div className="flex items-start gap-2.5 flex-1 min-w-0">
                             <span className="text-emerald-600 font-bold text-xs mt-0.5">✓</span>
-                            <span className="text-neutral-800 dark:text-neutral-200 font-medium leading-snug">
+                            <span className="text-slate-800 dark:text-slate-200 font-normal leading-relaxed">
                               {rem.remarkText}
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {customRemarksStageFilter === "all" && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-neutral-100 text-neutral-600 dark:bg-slate-700 dark:text-slate-300">
+                              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded uppercase bg-slate-200/70 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                                 {rem.stage}
                               </span>
                             )}
@@ -2359,7 +2359,7 @@ export default function SubmissionsPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteCustomRemark(rem.id)}
-                              className="text-neutral-400 hover:text-rose-600 p-1 h-7 w-7 rounded hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                              className="text-slate-400 hover:text-rose-600 p-1 h-7 w-7 rounded hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                               title="Delete template"
                             >
                               <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
@@ -2372,22 +2372,22 @@ export default function SubmissionsPage() {
               </div>
 
               {/* ── RIGHT COLUMN: REJECTION REMARKS ── */}
-              <div className="bg-white dark:bg-slate-850 rounded-xl border border-rose-200 dark:border-rose-900/50 shadow-xs overflow-hidden flex flex-col">
-                <div className="px-4 py-3 bg-rose-50/70 dark:bg-rose-950/30 border-b border-rose-150 dark:border-rose-900/40 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded-md bg-rose-600 text-white flex items-center justify-center font-bold text-xs">
+              <div className="bg-white dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
+                <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-6 w-6 rounded-md bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 flex items-center justify-center font-bold text-xs">
                       ✕
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-rose-950 dark:text-rose-300">
-                        Rejection / Issue Remarks
+                      <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                        Rejection / Issue Templates
                       </h4>
-                      <p className="text-[10px] text-rose-700/80 dark:text-rose-400">
-                        Quick-pick remarks when candidate is rejected or has issues
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Predefined feedback reasons when candidate does not qualify
                       </p>
                     </div>
                   </div>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
                     {
                       customRemarks.filter(r => 
                         (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
@@ -2402,19 +2402,19 @@ export default function SubmissionsPage() {
                     e.preventDefault();
                     handleAddDirectCustomRemark("REJECT", newCustomRejectText);
                   }} 
-                  className="p-3 bg-rose-50/30 dark:bg-rose-950/10 border-b border-rose-100 dark:border-rose-900/30 flex gap-2"
+                  className="p-3 bg-white dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex gap-2"
                 >
                   <Input
                     placeholder="Type rejection reason(s) — separate multiple with comma (,)..."
                     value={newCustomRejectText}
                     onChange={(e) => setNewCustomRejectText(e.target.value)}
-                    className="h-8.5 text-xs bg-white dark:bg-slate-800 border-rose-200 dark:border-rose-800 focus-visible:ring-rose-500 flex-1"
+                    className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-slate-400 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
                   />
                   <Button
                     type="submit"
                     size="sm"
                     disabled={addingRemark || !newCustomRejectText.trim()}
-                    className="h-8.5 px-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
+                    className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
                   >
                     + Add
                   </Button>
@@ -2425,8 +2425,8 @@ export default function SubmissionsPage() {
                     (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
                     r.remarkType === "REJECT"
                   ).length === 0 ? (
-                    <div className="p-6 text-center text-xs text-neutral-400 italic">
-                      No rejection remarks added yet for this stage.
+                    <div className="p-6 text-center text-xs text-slate-400 italic">
+                      No rejection remarks added yet for this stage. Type above to add (comma-separated supported).
                     </div>
                   ) : (
                     customRemarks
@@ -2437,17 +2437,17 @@ export default function SubmissionsPage() {
                       .map((rem) => (
                         <div 
                           key={rem.id}
-                          className="p-2.5 bg-white dark:bg-slate-800 rounded-lg border border-neutral-200 dark:border-slate-700 flex items-center justify-between gap-2.5 hover:border-rose-300 dark:hover:border-rose-700 transition-all text-xs"
+                          className="p-2.5 bg-slate-50/60 dark:bg-slate-800/50 rounded-lg border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between gap-2.5 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors text-xs"
                         >
-                          <div className="flex items-start gap-2 flex-1 min-w-0">
-                            <span className="text-rose-600 font-bold text-xs mt-0.5">✕</span>
-                            <span className="text-neutral-800 dark:text-neutral-200 font-medium leading-snug">
+                          <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                            <span className="text-rose-500 font-bold text-xs mt-0.5">✕</span>
+                            <span className="text-slate-800 dark:text-slate-200 font-normal leading-relaxed">
                               {rem.remarkText}
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {customRemarksStageFilter === "all" && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-neutral-100 text-neutral-600 dark:bg-slate-700 dark:text-slate-300">
+                              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded uppercase bg-slate-200/70 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                                 {rem.stage}
                               </span>
                             )}
@@ -2456,7 +2456,7 @@ export default function SubmissionsPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteCustomRemark(rem.id)}
-                              className="text-neutral-400 hover:text-rose-600 p-1 h-7 w-7 rounded hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                              className="text-slate-400 hover:text-rose-600 p-1 h-7 w-7 rounded hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                               title="Delete template"
                             >
                               <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
@@ -2471,8 +2471,8 @@ export default function SubmissionsPage() {
             </div>
           </div>
 
-          <DialogFooter className="px-6 py-3 border-t border-default-150 bg-neutral-50 dark:bg-slate-850">
-            <Button variant="outline" size="sm" onClick={() => setCustomRemarksModalOpen(false)} className="text-xs">
+          <DialogFooter className="px-6 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850">
+            <Button variant="outline" size="sm" onClick={() => setCustomRemarksModalOpen(false)} className="text-xs font-semibold px-5 rounded-lg border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 cursor-pointer">
               Close &amp; Finish
             </Button>
           </DialogFooter>

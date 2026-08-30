@@ -2168,27 +2168,27 @@ export default function BranchManagementPage() {
         </div>
       )}
 
-      {/* ── BRANCH-SPECIFIC STAGE REMARKS MODAL (CLEAN & SIMPLE 2-COLUMN DESIGN) ── */}
+      {/* ── BRANCH-SPECIFIC STAGE REMARKS MODAL (CLASSIC ENTERPRISE DESIGN) ── */}
       {isRemarksOpen && selectedBranchForRemarks && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95 my-auto">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95 my-auto">
             
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-neutral-150 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 flex items-center justify-between shrink-0">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-indigo-600/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 flex items-center justify-center font-bold">
-                  <MessageSquare className="h-5 w-5" />
+                <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold border border-slate-200 dark:border-slate-700">
+                  <MessageSquare className="h-4.5 w-4.5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
                       Stage Remarks: {selectedBranchForRemarks.name}
                     </h3>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium">
                       {selectedBranchForRemarks.market || "INDIA"}
                     </span>
                   </div>
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  <p className="text-[11.5px] text-slate-500 dark:text-slate-400">
                     Standard quick-pick templates for approving or rejecting candidates across hiring stages
                   </p>
                 </div>
@@ -2196,9 +2196,9 @@ export default function BranchManagementPage() {
 
               <div className="flex items-center gap-3">
                 {/* Global Remarks Toggle */}
-                <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-slate-700 shadow-2xs">
-                  <span className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
-                    <Globe className="h-3.5 w-3.5 text-indigo-500" />
+                <div className="flex items-center gap-2.5 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs">
+                  <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Globe className="h-3.5 w-3.5 text-slate-500" />
                     Include Global Remarks:
                   </span>
                   <button
@@ -2206,7 +2206,7 @@ export default function BranchManagementPage() {
                     onClick={handleToggleBranchGlobalRemarks}
                     disabled={isTogglingGlobalRemarks}
                     className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
-                      selectedBranchForRemarks.enableGlobalRemarks ? 'bg-indigo-600' : 'bg-neutral-300 dark:bg-slate-600'
+                      selectedBranchForRemarks.enableGlobalRemarks ? 'bg-slate-900 dark:bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
                     }`}
                     title={selectedBranchForRemarks.enableGlobalRemarks ? "Click to disable global remarks" : "Click to enable global remarks (Default: Disabled)"}
                   >
@@ -2216,8 +2216,8 @@ export default function BranchManagementPage() {
                       }`}
                     />
                   </button>
-                  <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                    selectedBranchForRemarks.enableGlobalRemarks ? 'text-indigo-600 dark:text-indigo-400' : 'text-neutral-500'
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${
+                    selectedBranchForRemarks.enableGlobalRemarks ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400'
                   }`}>
                     {selectedBranchForRemarks.enableGlobalRemarks ? 'Enabled' : 'Disabled'}
                   </span>
@@ -2228,16 +2228,16 @@ export default function BranchManagementPage() {
                     setIsRemarksOpen(false);
                     setSelectedBranchForRemarks(null);
                   }} 
-                  className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
             </div>
 
-            {/* Stage Navigation Pills */}
-            <div className="px-6 py-2.5 border-b border-neutral-150 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mr-1 shrink-0">Stage:</span>
+            {/* Stage Navigation Tabs */}
+            <div className="px-6 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mr-1.5 shrink-0">Stage:</span>
               {[
                 { key: "review", label: "Internal Review Gate", count: branchRemarks.filter(r => r.stage === "review" || r.stage === "internal_review").length },
                 { key: "l1", label: "Round 1 (L1)", count: branchRemarks.filter(r => r.stage === "l1").length },
@@ -2249,17 +2249,17 @@ export default function BranchManagementPage() {
                 <button
                   key={tab.key}
                   onClick={() => setRemarksStageFilter(tab.key)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                     remarksStageFilter === tab.key
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-slate-800"
+                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold shadow-xs"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium"
                   }`}
                 >
                   <span>{tab.label}</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
                     remarksStageFilter === tab.key
-                      ? "bg-white/20 text-white"
-                      : "bg-neutral-100 text-neutral-500 dark:bg-slate-800 dark:text-slate-400"
+                      ? "bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900"
+                      : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                   }`}>
                     {tab.count}
                   </span>
@@ -2267,35 +2267,35 @@ export default function BranchManagementPage() {
               ))}
             </div>
 
-            {/* Modal Body - 2 Simple Cards for Accept vs Reject */}
-            <div className="p-6 overflow-y-auto flex-1 bg-neutral-50/50 dark:bg-slate-900/50">
+            {/* Modal Body - 2 Columns */}
+            <div className="p-6 overflow-y-auto flex-1 bg-slate-50/40 dark:bg-slate-900/40">
               {loadingRemarks ? (
-                <div className="p-12 text-center text-xs text-neutral-400 italic">
-                  <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <div className="p-12 text-center text-xs text-slate-400 italic">
+                  <div className="h-6 w-6 border-2 border-slate-700 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                   Loading templates...
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
                   
                   {/* ── LEFT COLUMN: ACCEPTANCE REMARKS ── */}
-                  <div className="bg-white dark:bg-slate-850 rounded-xl border border-emerald-200 dark:border-emerald-900/50 shadow-xs overflow-hidden flex flex-col">
+                  <div className="bg-white dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
                     
                     {/* Header */}
-                    <div className="px-4 py-3 bg-emerald-50/70 dark:bg-emerald-950/30 border-b border-emerald-150 dark:border-emerald-900/40 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-md bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+                    <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-6 w-6 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center font-bold text-xs">
                           ✓
                         </div>
                         <div>
-                          <h4 className="text-xs font-bold text-emerald-950 dark:text-emerald-300">
-                            Acceptance / Approval Remarks
+                          <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                            Acceptance / Approval Templates
                           </h4>
-                          <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400">
-                            Quick-pick remarks when candidate is cleared or approved
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Predefined remarks when approving or clearing candidates
                           </p>
                         </div>
                       </div>
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
                         {
                           branchRemarks.filter(r => 
                             (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review")) &&
@@ -2311,19 +2311,19 @@ export default function BranchManagementPage() {
                         e.preventDefault();
                         handleAddDirectRemark("ACCEPT", newAcceptText);
                       }} 
-                      className="p-3 bg-emerald-50/30 dark:bg-emerald-950/10 border-b border-emerald-100 dark:border-emerald-900/30 flex gap-2"
+                      className="p-3 bg-white dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex gap-2"
                     >
                       <Input
                         placeholder="Type remark(s) — separate multiple with comma (,)..."
                         value={newAcceptText}
                         onChange={(e) => setNewAcceptText(e.target.value)}
-                        className="h-8.5 text-xs bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 focus-visible:ring-emerald-500 flex-1"
+                        className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-slate-400 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
                       />
                       <Button
                         type="submit"
                         size="sm"
                         disabled={addingBranchRemark || !newAcceptText.trim()}
-                        className="h-8.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
+                        className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
                       >
                         <Plus className="h-3.5 w-3.5 mr-1" /> Add
                       </Button>
@@ -2335,7 +2335,7 @@ export default function BranchManagementPage() {
                         (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review")) &&
                         r.remarkType === "ACCEPT"
                       ).length === 0 ? (
-                        <div className="p-6 text-center text-xs text-neutral-400 italic">
+                        <div className="p-6 text-center text-xs text-slate-400 italic">
                           No acceptance remarks added yet for this stage. Type above to add (comma-separated supported).
                         </div>
                       ) : (
@@ -2347,26 +2347,26 @@ export default function BranchManagementPage() {
                           .map((rem) => (
                             <div 
                               key={rem.id}
-                              className="p-2.5 bg-white dark:bg-slate-800 rounded-lg border border-neutral-200 dark:border-slate-700 flex items-center justify-between gap-2.5 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all text-xs"
+                              className="p-2.5 bg-slate-50/60 dark:bg-slate-800/50 rounded-lg border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between gap-2.5 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors text-xs"
                             >
-                              <div className="flex items-start gap-2 flex-1 min-w-0">
+                              <div className="flex items-start gap-2.5 flex-1 min-w-0">
                                 <span className="text-emerald-600 font-bold text-xs mt-0.5">✓</span>
-                                <span className="text-neutral-800 dark:text-neutral-200 font-medium leading-snug">
+                                <span className="text-slate-800 dark:text-slate-200 font-normal leading-relaxed">
                                   {rem.remarkText}
                                 </span>
                               </div>
                               <div className="flex items-center gap-1.5 shrink-0">
                                 {remarksStageFilter === "all" && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-neutral-100 text-neutral-600 dark:bg-slate-700 dark:text-slate-300">
+                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded uppercase bg-slate-200/70 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                                     {rem.stage}
                                   </span>
                                 )}
                                 {rem.branchId ? (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300">
+                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-700 dark:bg-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-600">
                                     Branch
                                   </span>
                                 ) : (
-                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 dark:bg-slate-800">
+                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-800">
                                     Global
                                   </span>
                                 )}
@@ -2374,7 +2374,7 @@ export default function BranchManagementPage() {
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteBranchRemark(rem.id)}
-                                    className="text-neutral-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                                    className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                                     title="Delete template"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
@@ -2388,24 +2388,24 @@ export default function BranchManagementPage() {
                   </div>
 
                   {/* ── RIGHT COLUMN: REJECTION REMARKS ── */}
-                  <div className="bg-white dark:bg-slate-850 rounded-xl border border-rose-200 dark:border-rose-900/50 shadow-xs overflow-hidden flex flex-col">
+                  <div className="bg-white dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
                     
                     {/* Header */}
-                    <div className="px-4 py-3 bg-rose-50/70 dark:bg-rose-950/30 border-b border-rose-150 dark:border-rose-900/40 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-md bg-rose-600 text-white flex items-center justify-center font-bold text-xs">
+                    <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-6 w-6 rounded-md bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 flex items-center justify-center font-bold text-xs">
                           ✕
                         </div>
                         <div>
-                          <h4 className="text-xs font-bold text-rose-950 dark:text-rose-300">
-                            Rejection / Issue Remarks
+                          <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                            Rejection / Issue Templates
                           </h4>
-                          <p className="text-[10px] text-rose-700/80 dark:text-rose-400">
-                            Quick-pick remarks when candidate is rejected or has issues
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Predefined feedback reasons when candidate does not qualify
                           </p>
                         </div>
                       </div>
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
                         {
                           branchRemarks.filter(r => 
                             (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review")) &&
@@ -2421,19 +2421,19 @@ export default function BranchManagementPage() {
                         e.preventDefault();
                         handleAddDirectRemark("REJECT", newRejectText);
                       }} 
-                      className="p-3 bg-rose-50/30 dark:bg-rose-950/10 border-b border-rose-100 dark:border-rose-900/30 flex gap-2"
+                      className="p-3 bg-white dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex gap-2"
                     >
                       <Input
                         placeholder="Type rejection reason(s) — separate multiple with comma (,)..."
                         value={newRejectText}
                         onChange={(e) => setNewRejectText(e.target.value)}
-                        className="h-8.5 text-xs bg-white dark:bg-slate-800 border-rose-200 dark:border-rose-800 focus-visible:ring-rose-500 flex-1"
+                        className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-slate-400 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
                       />
                       <Button
                         type="submit"
                         size="sm"
                         disabled={addingBranchRemark || !newRejectText.trim()}
-                        className="h-8.5 px-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
+                        className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
                       >
                         <Plus className="h-3.5 w-3.5 mr-1" /> Add
                       </Button>
@@ -2445,8 +2445,8 @@ export default function BranchManagementPage() {
                         (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review")) &&
                         r.remarkType === "REJECT"
                       ).length === 0 ? (
-                        <div className="p-6 text-center text-xs text-neutral-400 italic">
-                          No rejection remarks added yet for this stage. Type above to add one.
+                        <div className="p-6 text-center text-xs text-slate-400 italic">
+                          No rejection remarks added yet for this stage. Type above to add (comma-separated supported).
                         </div>
                       ) : (
                         branchRemarks
@@ -2457,26 +2457,26 @@ export default function BranchManagementPage() {
                           .map((rem) => (
                             <div 
                               key={rem.id}
-                              className="p-2.5 bg-white dark:bg-slate-800 rounded-lg border border-neutral-200 dark:border-slate-700 flex items-center justify-between gap-2.5 hover:border-rose-300 dark:hover:border-rose-700 transition-all text-xs"
+                              className="p-2.5 bg-slate-50/60 dark:bg-slate-800/50 rounded-lg border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between gap-2.5 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors text-xs"
                             >
-                              <div className="flex items-start gap-2 flex-1 min-w-0">
-                                <span className="text-rose-600 font-bold text-xs mt-0.5">✕</span>
-                                <span className="text-neutral-800 dark:text-neutral-200 font-medium leading-snug">
+                              <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                                <span className="text-rose-500 font-bold text-xs mt-0.5">✕</span>
+                                <span className="text-slate-800 dark:text-slate-200 font-normal leading-relaxed">
                                   {rem.remarkText}
                                 </span>
                               </div>
                               <div className="flex items-center gap-1.5 shrink-0">
                                 {remarksStageFilter === "all" && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-neutral-100 text-neutral-600 dark:bg-slate-700 dark:text-slate-300">
+                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded uppercase bg-slate-200/70 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                                     {rem.stage}
                                   </span>
                                 )}
                                 {rem.branchId ? (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300">
+                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-700 dark:bg-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-600">
                                     Branch
                                   </span>
                                 ) : (
-                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 dark:bg-slate-800">
+                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-800">
                                     Global
                                   </span>
                                 )}
@@ -2484,7 +2484,7 @@ export default function BranchManagementPage() {
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteBranchRemark(rem.id)}
-                                    className="text-neutral-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                                    className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                                     title="Delete template"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
@@ -2502,7 +2502,7 @@ export default function BranchManagementPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-3.5 border-t border-neutral-150 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 flex justify-end shrink-0">
+            <div className="px-6 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850 flex justify-end shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -2510,7 +2510,7 @@ export default function BranchManagementPage() {
                   setIsRemarksOpen(false);
                   setSelectedBranchForRemarks(null);
                 }}
-                className="text-xs font-bold px-5 rounded-lg cursor-pointer"
+                className="text-xs font-semibold px-5 rounded-lg border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 cursor-pointer"
               >
                 Close &amp; Finish
               </Button>
