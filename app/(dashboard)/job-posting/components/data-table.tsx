@@ -90,6 +90,22 @@ export default function DataTable({
     return permissions.includes("job:create") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("ADMIN");
   }, [currentUser]);
 
+  const hasApprovePermission = useMemo(() => {
+    if (!currentUser) return false;
+    const permissions = currentUser.permissions || [];
+    const roles = (currentUser.roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
+    return (
+      permissions.includes("job:approve") ||
+      permissions.includes("job:publish_direct") ||
+      roles.includes("SUPERADMIN") ||
+      roles.includes("ADMIN") ||
+      roles.includes("DELIVERYHEAD") ||
+      roles.includes("BRANCHADMIN") ||
+      roles.includes("PODLEAD") ||
+      roles.includes("ACCOUNTMANAGER")
+    );
+  }, [currentUser]);
+
   const activeSelectedColumns = useMemo(() => {
     if (!hasEditPermission) {
       return selectedColumns.filter((colId) => colId !== "clientBillRate");
@@ -841,6 +857,41 @@ export default function DataTable({
                             (() => {
                               const isPending = job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL";
                               const status = isPending ? "Pending Approval" : (job.jobStatus || "Active");
+
+                              if (isPending && hasApprovePermission) {
+                                return (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 select-none">
+                                      Pending Approval
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                          toast.loading(`Activating ${job.jobCode || "job"}...`, { id: `approve-job-${job.id}` });
+                                          await atsApi.jobs.approve(job.id);
+                                          toast.success(`Job ${job.jobCode || ""} approved & activated!`, { id: `approve-job-${job.id}` });
+                                          if (onUpdateJob) {
+                                            onUpdateJob(job.id, { jobStatus: "Active", approvalStatus: "APPROVED" as any });
+                                          }
+                                          if (onRefresh) {
+                                            onRefresh();
+                                          }
+                                        } catch (err: any) {
+                                          toast.error("Failed to approve job: " + err.message, { id: `approve-job-${job.id}` });
+                                        }
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded shadow-xs transition-all cursor-pointer hover:shadow"
+                                      title="Direct 1-Click Approve & Activate Job"
+                                    >
+                                      <CheckCircle className="h-3 w-3" />
+                                      <span>Approve</span>
+                                    </button>
+                                  </div>
+                                );
+                              }
+
                               return (
                                 <span
                                   className={cn(
@@ -901,6 +952,10 @@ export default function DataTable({
                                 </Badge>
                               )}
                             </div>
+                          ) : colId === "createdBy" ? (
+                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                              {String(job.createdBy || (job as any).creator_name || (job as any).created_by || "Account Manager")}
+                            </span>
                           ) : colId === "submissionsCount" ? (
                             <div className="flex items-center gap-1.5">
                               <span className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md font-medium text-[10px]">

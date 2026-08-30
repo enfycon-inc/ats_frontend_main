@@ -22,6 +22,7 @@ const DEFAULT_JOB_COLUMNS = [
   "jobCode",
   "jobTitle",
   "businessUnit",
+  "createdBy",
   "client",
   "endClientName",
   "location",
@@ -73,14 +74,25 @@ export default function JobPostingDashboard({
   }, [currentUser]);
 
   // Table Configuration States (User Persistent)
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(() =>
-    getUserColumnPreferences("jobs", DEFAULT_JOB_COLUMNS)
-  );
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
+    const cols = getUserColumnPreferences("jobs", DEFAULT_JOB_COLUMNS);
+    if (!cols.includes("createdBy")) {
+      const buIdx = cols.indexOf("businessUnit");
+      if (buIdx !== -1) cols.splice(buIdx + 1, 0, "createdBy");
+      else cols.unshift("createdBy");
+    }
+    return cols;
+  });
 
   // Sync user-specific columns when currentUser resolves or changes
   useEffect(() => {
     if (currentUser) {
       const userSavedCols = getUserColumnPreferences("jobs", DEFAULT_JOB_COLUMNS);
+      if (!userSavedCols.includes("createdBy")) {
+        const buIdx = userSavedCols.indexOf("businessUnit");
+        if (buIdx !== -1) userSavedCols.splice(buIdx + 1, 0, "createdBy");
+        else userSavedCols.unshift("createdBy");
+      }
       setSelectedColumns(userSavedCols);
     }
   }, [currentUser]);
@@ -221,6 +233,7 @@ export default function JobPostingDashboard({
       { id: "jobCode", label: "Job Code" },
       { id: "jobTitle", label: "Job Title" },
       { id: "businessUnit", label: "Business Unit" },
+      { id: "createdBy", label: "Job Created By" },
       { id: "client", label: "Client" },
       { id: "endClientName", label: "End Client" },
       { id: "clientJobId", label: "Client Job ID" },
@@ -240,7 +253,6 @@ export default function JobPostingDashboard({
       { id: "recruitmentManager", label: "Recruitment Manager" },
       { id: "primaryRecruiter", label: "Primary Recruiter" },
       { id: "assignedTo", label: "Assigned To" },
-      { id: "createdBy", label: "Job Posting Created By" },
       { id: "createdOn", label: "Job Created" },
       { id: "modifiedOn", label: "Job Modified On" },
       { id: "submissionsCount", label: "Submissions & Pipeline" },
