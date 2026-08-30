@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { 
   Users, UserPlus, Search, Edit2, Key, Shield, Building2, MapPin, 
   CheckCircle2, XCircle, RefreshCw, Mail, Lock, Sparkles, Filter, ShieldAlert, X, ChevronRight, Loader2,
-  MoreVertical, Trash2, UserCheck, UserX
+  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -39,6 +39,253 @@ interface UserItem {
   isActive: boolean;
   lastLoginAt?: string;
   createdAt: string;
+}
+
+function ReviewerSelect({
+  value,
+  onChange,
+  eligibleUsers,
+  excludeUserId,
+  rolesList,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  eligibleUsers: UserItem[];
+  excludeUserId?: string;
+  rolesList?: any[];
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isOpen]);
+
+  const candidates = useMemo(() => {
+    return eligibleUsers.filter((u) => u.id !== excludeUserId);
+  }, [eligibleUsers, excludeUserId]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return candidates;
+    const q = search.toLowerCase().trim();
+    return candidates.filter(
+      (u) =>
+        u.fullName?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.roleName?.toLowerCase().includes(q) ||
+        (u.roles && u.roles.some((r) => r.toLowerCase().includes(q)))
+    );
+  }, [candidates, search]);
+
+  const selectedUser = candidates.find((u) => u.id === value);
+
+  const getRoleBadgeStyle = (roleName: string = "") => {
+    const norm = roleName.toUpperCase().replace(/[\s-_]+/g, "");
+    if (norm.includes("DELIVERYHEAD")) {
+      return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800";
+    }
+    if (norm.includes("ADMIN")) {
+      return "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800";
+    }
+    if (norm.includes("ACCOUNTMANAGER") || norm.includes("BDM")) {
+      return "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800";
+    }
+    if (norm.includes("BRANCHADMIN")) {
+      return "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800";
+    }
+    if (norm.includes("PODLEAD")) {
+      return "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800";
+    }
+    return "bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+  };
+
+  const getDisplayRole = (u: UserItem) => {
+    if (u.roleName && u.roleName.toUpperCase() !== "RECRUITER") return u.roleName;
+    const nonRecruiter = u.roles?.find((r) => r.toUpperCase().replace(/[\s-_]+/g, "") !== "RECRUITER");
+    if (nonRecruiter) return nonRecruiter;
+    return u.roleName || u.roles?.[0] || "Reviewer";
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      {/* Trigger Button */}
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full p-2.5 rounded-lg border text-left cursor-pointer transition flex items-center justify-between gap-2 select-none ${
+          isOpen
+            ? "border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/20 dark:bg-indigo-950/20"
+            : "border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-neutral-300 dark:hover:border-slate-600 shadow-2xs"
+        }`}
+      >
+        {selectedUser ? (
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="h-7 w-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+              {selectedUser.fullName ? selectedUser.fullName.charAt(0).toUpperCase() : "U"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-bold text-neutral-900 dark:text-white truncate">
+                  {selectedUser.fullName}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold border ${getRoleBadgeStyle(getDisplayRole(selectedUser))}`}>
+                  {getDisplayRole(selectedUser)}
+                </span>
+              </div>
+              <span className="text-[10.5px] text-neutral-500 font-mono block truncate">
+                {selectedUser.email}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="h-7 w-7 rounded-full bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 font-bold text-xs">
+              ⚡
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                  Inherit from Pod / Branch Default
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.2 rounded font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  Recommended
+                </span>
+              </div>
+              <span className="text-[10px] text-neutral-500 block truncate">
+                Auto-routes approvals to Pod Lead or Branch Delivery Head
+              </span>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-1 shrink-0 text-neutral-400">
+          {value && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange("");
+              }}
+              className="p-1 hover:text-red-500 rounded-md transition cursor-pointer"
+              title="Reset to default inheritance"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isOpen ? "rotate-180 text-indigo-600" : ""}`} />
+        </div>
+      </div>
+
+      {/* Dropdown Menu Popover */}
+      {isOpen && (
+        <div className="absolute z-50 mt-1.5 w-full bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95">
+          {/* Search Input */}
+          <div className="p-2 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850/50">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search reviewers by name, role or email..."
+                className="w-full h-8 pl-8 pr-3 text-xs rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* Reviewer Options List */}
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-1">
+            {/* Option: Inherit from Default */}
+            <div
+              onClick={() => {
+                onChange("");
+                setIsOpen(false);
+              }}
+              className={`flex items-center justify-between gap-2 p-2 rounded-lg cursor-pointer transition select-none ${
+                !value
+                  ? "bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800"
+                  : "hover:bg-neutral-50 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="h-6 w-6 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xs font-bold shrink-0">
+                  ⚡
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                      Inherit from Pod / Branch Default
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                      Recommended
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-neutral-500 block">
+                    Auto-routes based on Pod or Branch Delivery Head hierarchy
+                  </span>
+                </div>
+              </div>
+              {!value && <Check className="h-4 w-4 text-indigo-600 shrink-0" />}
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="py-6 text-center text-xs text-neutral-400">
+                No eligible reviewers found matching &quot;{search}&quot;
+              </div>
+            ) : (
+              filtered.map((u) => {
+                const isSelected = value === u.id;
+                const displayRole = getDisplayRole(u);
+                return (
+                  <div
+                    key={u.id}
+                    onClick={() => {
+                      onChange(u.id);
+                      setIsOpen(false);
+                    }}
+                    className={`flex items-center justify-between gap-2 p-2 rounded-lg cursor-pointer transition select-none ${
+                      isSelected
+                        ? "bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800"
+                        : "hover:bg-neutral-50 dark:hover:bg-slate-800/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="h-7 w-7 rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0 border border-indigo-200 dark:border-indigo-800">
+                        {u.fullName ? u.fullName.charAt(0).toUpperCase() : "U"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-neutral-900 dark:text-white truncate">
+                            {u.fullName}
+                          </span>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold border ${getRoleBadgeStyle(displayRole)}`}>
+                            {displayRole}
+                          </span>
+                        </div>
+                        <span className="text-[10.5px] text-neutral-500 font-mono block truncate">
+                          {u.email}
+                        </span>
+                      </div>
+                    </div>
+                    {isSelected && <Check className="h-4 w-4 text-indigo-600 shrink-0" />}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function UserManagementPage() {
@@ -568,16 +815,17 @@ export default function UserManagementPage() {
     roles: string[];
   }
 
-  // Helper to dedupe roles case-insensitively while preserving clean display casing
-  const dedupeCaseInsensitiveRoles = (roleList: (string | undefined | null)[]): string[] => {
+  // Helper to dedupe roles case-insensitively and space/underscore-insensitively
+  const dedupeCaseInsensitiveRoles = (roleList: (string | undefined | null)[], bId?: string): string[] => {
     const seen = new Set<string>();
     const res: string[] = [];
     for (const r of roleList) {
       if (!r || typeof r !== "string") continue;
-      const key = r.trim().toUpperCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        res.push(r.trim());
+      const formatted = formatRoleLabel(r, bId);
+      const canonicalKey = formatted.trim().toUpperCase().replace(/[\s-_]+/g, "");
+      if (!seen.has(canonicalKey)) {
+        seen.add(canonicalKey);
+        res.push(formatted);
       }
     }
     return res;
@@ -608,12 +856,12 @@ export default function UserManagementPage() {
       return customRole.name;
     }
 
-    if (upper === "ACCOUNT_MANAGER" || upper === "BDM" || upper === "BD_MANAGER" || upper === "BD MANAGER") return "Account Manager";
-    if (upper === "POD_LEAD") return "Pod Lead";
-    if (upper === "BRANCH_ADMIN") return "Branch Admin";
-    if (upper === "DELIVERY_HEAD") return "Delivery Head";
+    if (upper === "ACCOUNT_MANAGER" || upper === "ACCOUNT MANAGER" || upper === "BDM" || upper === "BD_MANAGER" || upper === "BD MANAGER") return "Account Manager";
+    if (upper === "POD_LEAD" || upper === "POD LEAD") return "Pod Lead";
+    if (upper === "BRANCH_ADMIN" || upper === "BRANCH ADMIN") return "Branch Admin";
+    if (upper === "DELIVERY_HEAD" || upper === "DELIVERY HEAD") return "Delivery Head";
     if (upper === "RECRUITER") return "Recruiter";
-    if (upper === "ADMIN" || upper === "SUPER_ADMIN") return "Tenant Admin";
+    if (upper === "ADMIN" || upper === "SUPER_ADMIN" || upper === "SUPER ADMIN" || upper === "TENANT_ADMIN" || upper === "TENANT ADMIN") return "Tenant Admin";
     return r.replace(/_/g, " ");
   };
 
@@ -1152,7 +1400,7 @@ export default function UserManagementPage() {
                             };
 
                             return groups.map((group, idx) => {
-                              const roleLabels = group.roles.map((r) => formatRoleLabel(r, group.branchId));
+                              const roleLabels = dedupeCaseInsensitiveRoles(group.roles, group.branchId);
                               return (
                                 <span
                                   key={`${group.branchId || idx}`}
@@ -1753,23 +2001,13 @@ export default function UserManagementPage() {
                     Approval Routing
                   </span>
                 </div>
-                <p className="text-[11px] text-neutral-500">
-                  Select who reviews and approves job orders created by this user. If left on default, it automatically routes to their Recruitment Pod Lead or Branch Delivery Head.
-                </p>
-                <select
-                  value={editForm.jobReviewerId}
-                  onChange={(e) => setEditForm({ ...editForm, jobReviewerId: e.target.value })}
-                  className="w-full h-8.5 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-medium text-neutral-800 dark:text-neutral-200"
-                >
-                  <option value="">⚡ Inherit from Pod / Branch Default (Recommended)</option>
-                  {eligibleReviewers
-                    .filter((u: UserItem) => u.id !== selectedUser?.id)
-                    .map((u: UserItem) => (
-                      <option key={u.id} value={u.id}>
-                        {u.fullName} ({u.roleName || (u.roles && u.roles[0]) || "Reviewer"}) - {u.email}
-                      </option>
-                    ))}
-                </select>
+                <ReviewerSelect
+                  value={editForm.jobReviewerId || ""}
+                  onChange={(val) => setEditForm({ ...editForm, jobReviewerId: val })}
+                  eligibleUsers={eligibleReviewers}
+                  excludeUserId={selectedUser?.id}
+                  rolesList={rolesList}
+                />
               </div>
 
 
@@ -1977,18 +2215,12 @@ export default function UserManagementPage() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Designated Job Reviewer *</label>
-                <select
-                  value={targetBulkReviewerId}
-                  onChange={(e) => setTargetBulkReviewerId(e.target.value)}
-                  className="w-full h-9 text-xs font-medium rounded-md border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-neutral-900 dark:text-neutral-100 outline-none"
-                >
-                  <option value="">⚡ Inherit from Pod / Branch Default</option>
-                  {eligibleReviewers.map((u: UserItem) => (
-                    <option key={u.id} value={u.id}>
-                      {u.fullName} ({u.roleName || (u.roles && u.roles[0]) || "Reviewer"}) - {u.email}
-                    </option>
-                  ))}
-                </select>
+                <ReviewerSelect
+                  value={targetBulkReviewerId || ""}
+                  onChange={(val) => setTargetBulkReviewerId(val)}
+                  eligibleUsers={eligibleReviewers}
+                  rolesList={rolesList}
+                />
               </div>
             </div>
 
