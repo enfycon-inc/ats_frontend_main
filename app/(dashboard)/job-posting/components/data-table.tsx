@@ -148,6 +148,37 @@ export default function DataTable({
   const [clientSearchText, setClientSearchText] = useState("");
   const [addClientModalOpen, setAddClientModalOpen] = useState(false);
 
+  // Reject Job Modal State
+  const [rejectModalJob, setRejectModalJob] = useState<Job | null>(null);
+  const [rejectReason, setRejectReason] = useState<string>("");
+  const [isRejecting, setIsRejecting] = useState<boolean>(false);
+
+  const handleConfirmReject = async () => {
+    if (!rejectModalJob) return;
+    if (!rejectReason.trim()) {
+      toast.error("Please provide a reason for rejection.");
+      return;
+    }
+    setIsRejecting(true);
+    try {
+      toast.loading(`Rejecting ${rejectModalJob.jobCode || "job"}...`, { id: `reject-job-${rejectModalJob.id}` });
+      await atsApi.jobs.reject(rejectModalJob.id, rejectReason.trim());
+      toast.success(`Job ${rejectModalJob.jobCode || ""} rejected with feedback.`, { id: `reject-job-${rejectModalJob.id}` });
+      if (onUpdateJob) {
+        onUpdateJob(rejectModalJob.id, { jobStatus: "Draft" as any, approvalStatus: "REJECTED" as any, rejectionReason: rejectReason.trim() });
+      }
+      if (onRefresh) {
+        onRefresh();
+      }
+      setRejectModalJob(null);
+      setRejectReason("");
+    } catch (err: any) {
+      toast.error("Failed to reject job: " + (err?.message || "Unknown error"), { id: `reject-job-${rejectModalJob.id}` });
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
   const fetchClientsList = async () => {
     try {
       const clients = await atsApi.clients.list();
@@ -860,34 +891,49 @@ export default function DataTable({
 
                               if (isPending && hasApprovePermission) {
                                 return (
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1.5">
                                     <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 select-none">
                                       Pending Approval
                                     </span>
-                                    <button
-                                      type="button"
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        try {
-                                          toast.loading(`Activating ${job.jobCode || "job"}...`, { id: `approve-job-${job.id}` });
-                                          await atsApi.jobs.approve(job.id);
-                                          toast.success(`Job ${job.jobCode || ""} approved & activated!`, { id: `approve-job-${job.id}` });
-                                          if (onUpdateJob) {
-                                            onUpdateJob(job.id, { jobStatus: "Active", approvalStatus: "APPROVED" as any });
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          try {
+                                            toast.loading(`Activating ${job.jobCode || "job"}...`, { id: `approve-job-${job.id}` });
+                                            await atsApi.jobs.approve(job.id);
+                                            toast.success(`Job ${job.jobCode || ""} approved & activated!`, { id: `approve-job-${job.id}` });
+                                            if (onUpdateJob) {
+                                              onUpdateJob(job.id, { jobStatus: "Active", approvalStatus: "APPROVED" as any });
+                                            }
+                                            if (onRefresh) {
+                                              onRefresh();
+                                            }
+                                          } catch (err: any) {
+                                            toast.error("Failed to approve job: " + err.message, { id: `approve-job-${job.id}` });
                                           }
-                                          if (onRefresh) {
-                                            onRefresh();
-                                          }
-                                        } catch (err: any) {
-                                          toast.error("Failed to approve job: " + err.message, { id: `approve-job-${job.id}` });
-                                        }
-                                      }}
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded shadow-xs transition-all cursor-pointer hover:shadow"
-                                      title="Direct 1-Click Approve & Activate Job"
-                                    >
-                                      <CheckCircle className="h-3 w-3" />
-                                      <span>Approve</span>
-                                    </button>
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded shadow-xs transition-all cursor-pointer hover:shadow"
+                                        title="Direct 1-Click Approve & Activate Job"
+                                      >
+                                        <CheckCircle className="h-3 w-3" />
+                                        <span>Approve</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setRejectModalJob(job);
+                                          setRejectReason("");
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-white bg-rose-600 hover:bg-rose-700 active:scale-95 rounded shadow-xs transition-all cursor-pointer hover:shadow"
+                                        title="Reject Job with Feedback / Reason"
+                                      >
+                                        <XCircle className="h-3 w-3" />
+                                        <span>Reject</span>
+                                      </button>
+                                    </div>
                                   </div>
                                 );
                               }
@@ -1730,6 +1776,83 @@ export default function DataTable({
           }}
           job={selectedJobForSourcing}
         />
+      )}
+
+      {/* Reject Job Feedback Modal */}
+      {rejectModalJob && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in"
+          onClick={(e) => { e.stopPropagation(); setRejectModalJob(null); }}
+        >
+          <div 
+            className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 bg-rose-50/60 dark:bg-rose-950/30 border-b border-rose-100 dark:border-rose-900/40">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 rounded-lg">
+                  <XCircle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
+                    Reject Job Requirement
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    {rejectModalJob.jobCode} — {rejectModalJob.jobTitle}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRejectModalJob(null)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 text-lg leading-none cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                  Reason for Rejection / Reviewer Feedback <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  autoFocus
+                  rows={4}
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="e.g. Rate is too low for the required seniority / missing client bill rate details / incorrect tech stack..."
+                  className="w-full p-2.5 bg-neutral-50 dark:bg-slate-800/80 border border-neutral-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-neutral-900 dark:text-neutral-100 resize-none transition-all placeholder:text-neutral-400"
+                />
+              </div>
+              <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                This requirement will be returned to <span className="font-semibold text-neutral-700 dark:text-neutral-300">{rejectModalJob.createdBy || "the creator"}</span> as a Draft with your feedback.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 px-5 py-3 bg-neutral-50 dark:bg-slate-900/60 border-t border-neutral-200 dark:border-slate-800 text-xs">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRejectModalJob(null)}
+                disabled={isRejecting}
+                className="text-xs font-medium cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={isRejecting || !rejectReason.trim()}
+                onClick={handleConfirmReject}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer shadow-xs"
+              >
+                {isRejecting ? "Rejecting..." : "Confirm Rejection"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Add Client Modal */}
