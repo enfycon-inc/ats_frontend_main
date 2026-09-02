@@ -92,6 +92,7 @@ import {
   Megaphone,
   Briefcase,
   UserCheck,
+  ChevronRight,
 } from "lucide-react";
 
 // ─── Notification dropdown ────────────────────────────────────────────────────
@@ -99,6 +100,7 @@ function NotificationDropdownNav() {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"ALL" | "UNREAD" | "JOBS" | "REVIEWS">("ALL");
   const ref = useRef<HTMLDivElement>(null);
+  const { data: session } = useSession();
 
   const {
     notifications,
@@ -109,6 +111,15 @@ function NotificationDropdownNav() {
     setSoundEnabled,
   } = useNotifications();
   const { isConnected } = useSocket();
+
+  const sessionUser = (session as any)?.user;
+  const userPerms: string[] = sessionUser?.permissions || [];
+  const userRoles: string[] = sessionUser?.roles || [sessionUser?.systemRole || "RECRUITER"];
+  const canViewActivityStream =
+    userRoles.some((r: string) => ["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "DELIVERY_HEAD"].includes(r)) ||
+    userPerms.includes("notification:view_all") ||
+    userPerms.includes("notification:broadcast") ||
+    userPerms.includes("audit:view");
 
   useEffect(() => {
     const handle = (e: MouseEvent) => {
@@ -146,17 +157,8 @@ function NotificationDropdownNav() {
     }
   };
 
-  const formatTime = (dateStr?: string) => {
-    if (!dateStr) return "Just now";
-    try {
-      return formatDistanceToNow(parseISO(dateStr), { addSuffix: true });
-    } catch {
-      return "Recently";
-    }
-  };
-
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative h-full flex items-center">
       <NavIconBtn
         id="navbar-notifications"
         aria-label="Notifications"
@@ -170,13 +172,13 @@ function NotificationDropdownNav() {
       {open && (
         <div
           role="dialog"
-          aria-label="Notifications panel"
+          aria-label="Notifications Panel"
           className="
-            absolute top-full right-0 mt-1 z-[300]
-            w-[380px]
-            bg-white dark:bg-[#1a233a]
-            border border-neutral-200 dark:border-white/10
-            rounded-lg shadow-2xl shadow-black/25
+            absolute right-0 top-full z-[300]
+            mt-1 w-[380px] max-w-[calc(100vw-24px)]
+            bg-white dark:bg-neutral-900
+            border border-neutral-200 dark:border-neutral-800
+            rounded-xl shadow-2xl
             overflow-hidden
             animate-in fade-in-0 slide-in-from-top-2
           "
@@ -197,7 +199,6 @@ function NotificationDropdownNav() {
             </div>
 
             <div className="flex items-center gap-1.5">
-              {/* Quick Sound Mute Toggle */}
               <button
                 type="button"
                 onClick={() => setSoundEnabled(!settings.soundEnabled)}
@@ -233,55 +234,33 @@ function NotificationDropdownNav() {
           </div>
 
           {/* Filter Tabs */}
-          <div className="flex items-center border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 px-2 py-1 gap-1 text-[11.5px]">
-            <button
-              onClick={() => setActiveTab("ALL")}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                activeTab === "ALL"
-                  ? "bg-white dark:bg-neutral-800 text-[#1a4fa0] dark:text-blue-400 font-semibold shadow-xs"
-                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
-              }`}
-            >
-              All ({notifications.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("UNREAD")}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                activeTab === "UNREAD"
-                  ? "bg-white dark:bg-neutral-800 text-[#1a4fa0] dark:text-blue-400 font-semibold shadow-xs"
-                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
-              }`}
-            >
-              Unread ({unreadCount})
-            </button>
-            <button
-              onClick={() => setActiveTab("REVIEWS")}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                activeTab === "REVIEWS"
-                  ? "bg-white dark:bg-neutral-800 text-[#1a4fa0] dark:text-blue-400 font-semibold shadow-xs"
-                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
-              }`}
-            >
-              Reviews
-            </button>
-            <button
-              onClick={() => setActiveTab("JOBS")}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                activeTab === "JOBS"
-                  ? "bg-white dark:bg-neutral-800 text-[#1a4fa0] dark:text-blue-400 font-semibold shadow-xs"
-                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
-              }`}
-            >
-              Jobs
-            </button>
+          <div className="flex items-center border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/80 dark:bg-neutral-900/50 px-3 py-1.5 gap-1 text-[11.5px]">
+            {(["ALL", "UNREAD", "REVIEWS", "JOBS"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`
+                  px-2.5 py-1 rounded font-medium transition-colors
+                  ${activeTab === tab
+                    ? "bg-[#1a4fa0] text-white font-semibold"
+                    : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/60 dark:hover:bg-neutral-800"
+                  }
+                `}
+              >
+                {tab === "ALL" && `All (${notifications.length})`}
+                {tab === "UNREAD" && `Unread (${unreadCount})`}
+                {tab === "REVIEWS" && "Reviews"}
+                {tab === "JOBS" && "Jobs"}
+              </button>
+            ))}
           </div>
 
           {/* List */}
-          <div className="max-h-[340px] overflow-y-auto divide-y divide-neutral-100 dark:divide-neutral-800/60">
+          <div className="max-h-[360px] overflow-y-auto divide-y divide-neutral-100 dark:divide-neutral-800/60">
             {filteredNotifications.length === 0 ? (
-              <div className="py-12 text-center text-neutral-400 text-xs">
-                <Bell className="w-7 h-7 mx-auto mb-2 opacity-30 text-neutral-400" />
-                No {activeTab.toLowerCase()} notifications
+              <div className="py-8 text-center text-neutral-400 dark:text-neutral-500 text-xs">
+                No notifications to display
               </div>
             ) : (
               filteredNotifications.map((n) => (
@@ -291,32 +270,30 @@ function NotificationDropdownNav() {
                     if (!n.isRead) markAsRead(n.id);
                   }}
                   className={`
-                    flex items-start gap-3 px-4 py-3 cursor-pointer
-                    transition-colors duration-100
-                    ${
-                      !n.isRead
-                        ? "bg-blue-50/40 dark:bg-blue-900/10 hover:bg-blue-50/70 dark:hover:bg-blue-900/20"
-                        : "hover:bg-neutral-50 dark:hover:bg-neutral-800/40"
+                    px-4 py-3 transition-colors cursor-pointer flex gap-3 items-start
+                    ${!n.isRead
+                      ? "bg-blue-50/40 dark:bg-blue-950/20 hover:bg-blue-50/70 dark:hover:bg-blue-950/30"
+                      : "hover:bg-neutral-50 dark:hover:bg-neutral-800/40"
                     }
                   `}
                 >
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mt-0.5 shadow-xs">
+                  <div className="mt-0.5 p-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 flex-shrink-0">
                     {getIcon(n.type)}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 space-y-0.5">
                     <div className="flex items-center justify-between gap-1">
-                      <p className="text-[12.5px] font-semibold text-neutral-800 dark:text-white truncate">
+                      <p className={`text-[12.5px] leading-tight truncate ${!n.isRead ? "font-semibold text-neutral-900 dark:text-white" : "font-medium text-neutral-700 dark:text-neutral-300"}`}>
                         {n.title}
                       </p>
                       {!n.isRead && (
-                        <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#1a4fa0] dark:bg-blue-400 flex-shrink-0" />
                       )}
                     </div>
-                    <p className="text-[11.5px] text-neutral-600 dark:text-neutral-300 line-clamp-2 mt-0.5 leading-relaxed">
+                    <p className="text-[11.5px] text-neutral-500 dark:text-neutral-400 leading-snug line-clamp-2">
                       {n.message}
                     </p>
-                    <div className="mt-1 flex items-center justify-between text-[10.5px] text-neutral-400 dark:text-neutral-400">
-                      <span>{formatTime(n.createdAt || n.timestamp)}</span>
+                    <div className="flex items-center justify-between pt-1 text-[10.5px] text-neutral-400">
+                      <span>{formatDistanceToNow(parseISO(n.createdAt || n.timestamp || new Date().toISOString()), { addSuffix: true })}</span>
                       {n.data?.jobCode && (
                         <span className="font-semibold text-[#1a4fa0] dark:text-blue-400">
                           {n.data.jobCode}
@@ -337,16 +314,19 @@ function NotificationDropdownNav() {
               className="text-neutral-600 dark:text-neutral-300 font-medium hover:text-[#1a4fa0] dark:hover:text-blue-400 flex items-center gap-1"
             >
               <Settings className="w-3.5 h-3.5" />
-              <span>Sound & Tone Settings</span>
+              <span>Sound & Tone Preferences</span>
             </Link>
 
-            <Link
-              href="/utility/notifications"
-              onClick={() => setOpen(false)}
-              className="text-[#1a4fa0] dark:text-blue-400 font-semibold hover:underline"
-            >
-              Admin Hub
-            </Link>
+            {canViewActivityStream && (
+              <Link
+                href="/utility/notifications"
+                onClick={() => setOpen(false)}
+                className="text-[#1a4fa0] dark:text-blue-400 font-semibold hover:underline flex items-center gap-1"
+              >
+                <span>Live Activity Stream</span>
+                <ChevronRight className="w-3 h-3" />
+              </Link>
+            )}
           </div>
         </div>
       )}
@@ -685,7 +665,10 @@ const isTechnicalKeycloakRole = (r: string): boolean => {
     if (customRole) {
       return customRole.name;
     }
-    if (upper === "ACCOUNT_MANAGER" || upper === "BDM" || upper === "BD_MANAGER" || upper === "BD MANAGER") {
+    if (upper === "BDM") {
+      return "BDM";
+    }
+    if (upper === "ACCOUNT_MANAGER" || upper === "BD_MANAGER" || upper === "BD MANAGER") {
       return "Account Manager";
     }
     return roleStr.replace(/_/g, " ");
@@ -732,7 +715,12 @@ const isTechnicalKeycloakRole = (r: string): boolean => {
         name = customRole.name;
         icon = "🎨";
         replacesSystemRole = customRole.systemRole || customRole.replacesSystemRole;
-      } else if (uUpper === "ACCOUNT_MANAGER" || uUpper === "BDM" || uUpper === "BD_MANAGER" || uUpper === "BD MANAGER") {
+      } else if (uUpper === "BDM") {
+        key = "BDM";
+        name = "BDM";
+        icon = "💼";
+        replacesSystemRole = "ACCOUNT_MANAGER";
+      } else if (uUpper === "ACCOUNT_MANAGER" || uUpper === "BD_MANAGER" || uUpper === "BD MANAGER") {
         key = "Account Manager";
         name = "Account Manager";
         icon = "💼";

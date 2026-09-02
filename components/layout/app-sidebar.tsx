@@ -131,14 +131,46 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {filteredMoreNav.map((item) => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
-                    <Link href={item.href}>
-                      {item.icon && <item.icon />}
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                item.children && item.children.length > 0 ? (
+                  <Collapsible
+                    key={item.id}
+                    asChild
+                    defaultOpen={pathname?.startsWith(item.href) || item.children.some(c => pathname?.startsWith(c.href))}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton tooltip={item.label} isActive={pathname === item.href || item.children.some(c => pathname === c.href || pathname?.startsWith(c.href))}>
+                          {item.icon && <item.icon />}
+                          <span>{item.label}</span>
+                          <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {item.children.map((subItem) => (
+                            <SidebarMenuSubItem key={subItem.label}>
+                              <SidebarMenuSubButton asChild isActive={pathname === subItem.href}>
+                                <Link href={subItem.href}>
+                                  <span>{subItem.label}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                ) : (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
+                      <Link href={item.href}>
+                        {item.icon && <item.icon />}
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
               ))}
             </SidebarMenu>
           </SidebarGroupContent>

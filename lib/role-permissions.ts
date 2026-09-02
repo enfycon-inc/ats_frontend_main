@@ -383,8 +383,13 @@ export function getFilteredMoreNav(
   const baseMore = ["email", "calendar", "documents", "settings", "help"];
   const allowedIds = new Set(baseMore);
 
+  const isAdmin = sysRole === "ADMIN" || sysRole === "TENANT_ADMIN";
+  const isBranchAdmin = sysRole === "BRANCH_ADMIN";
+  const isDeliveryHead = sysRole === "DELIVERY_HEAD";
+  const isPodLead = sysRole === "POD_LEAD";
+
   // Role specific More items
-  if (sysRole === "ADMIN" || sysRole === "TENANT_ADMIN") {
+  if (isAdmin) {
     allowedIds.add("database");
     allowedIds.add("integrations");
     allowedIds.add("user-management");
@@ -392,30 +397,72 @@ export function getFilteredMoreNav(
     allowedIds.add("role-management");
     allowedIds.add("pod-management");
     allowedIds.add("dictionaries");
-  } else if (sysRole === "BRANCH_ADMIN") {
+  } else if (isBranchAdmin) {
     allowedIds.add("user-management");
     allowedIds.add("pod-management");
-  } else if (sysRole === "DELIVERY_HEAD" || sysRole === "POD_LEAD") {
+  } else if (isDeliveryHead) {
+    allowedIds.add("pod-management");
+  } else if (isPodLead) {
     allowedIds.add("pod-management");
   }
 
   // Permission based additions
+  const canViewLiveStream = isAdmin || isDeliveryHead || isBranchAdmin || permissions.includes("notification:broadcast") || permissions.includes("notification:view_all");
+  const canViewAuditLogs = isAdmin || permissions.includes("audit:view") || permissions.includes("tenant:audit_logs");
+
+  if (canViewLiveStream || canViewAuditLogs) {
+    allowedIds.add("operations-logs");
+  }
+
   if (
     permissions.includes("pod:manage") ||
-    (permissions.includes("pod:view") && (sysRole === "POD_LEAD" || sysRole === "DELIVERY_HEAD" || sysRole === "BRANCH_ADMIN" || sysRole === "ADMIN" || sysRole === "TENANT_ADMIN"))
+    (permissions.includes("pod:view") && (isPodLead || isDeliveryHead || isBranchAdmin || isAdmin))
   ) {
     allowedIds.add("pod-management");
   }
-  if (permissions.includes("user:manage") && (sysRole === "ADMIN" || sysRole === "BRANCH_ADMIN")) {
+  if (permissions.includes("user:manage") && (isAdmin || isBranchAdmin)) {
     allowedIds.add("user-management");
   }
-  if (permissions.includes("branch_admin:manage") && sysRole === "ADMIN") {
+  if (permissions.includes("branch_admin:manage") && isAdmin) {
     allowedIds.add("branch-management");
   }
-  if (permissions.includes("tenant:settings") && (sysRole === "ADMIN" || sysRole === "TENANT_ADMIN")) {
+  if (permissions.includes("tenant:settings") && isAdmin) {
     allowedIds.add("dictionaries");
     allowedIds.add("settings");
   }
 
-  return MORE_NAV_ITEMS.filter((item) => allowedIds.has(item.id));
+  const canManageCompany = isAdmin || permissions.includes("tenant:settings") || permissions.includes("company:manage") || permissions.includes("company:view");
+
+  return MORE_NAV_ITEMS
+    .filter((item) => allowedIds.has(item.id))
+    .map((item) => {
+      if (item.id === "operations-logs") {
+        const subChildren: { label: string; href: string }[] = [];
+        if (canViewLiveStream) {
+          subChildren.push({ label: "Live Activity Stream", href: "/utility/notifications" });
+        }
+        if (canViewAuditLogs) {
+          subChildren.push({ label: "Security Audit Logs", href: "/utility/audit-logs" });
+        }
+        return {
+          ...item,
+          children: subChildren,
+        };
+      }
+
+      if (item.id === "settings") {
+        const subChildren: { label: string; href: string }[] = [];
+        if (canManageCompany) {
+          subChildren.push({ label: "Company & Workspace", href: "/company" });
+        }
+        subChildren.push({ label: "Sound & Tone Preferences", href: "/utility/settings-notifications" });
+        return {
+          ...item,
+          children: subChildren,
+        };
+      }
+
+      return item;
+    })
+    .filter((item) => !item.children || item.children.length > 0);
 }

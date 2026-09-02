@@ -194,9 +194,26 @@ export const MORE_NAV_ITEMS: NavItem[] = [
   { id: "role-management", label: "Role Management", href: "/utility/roles-permissions", icon: UserCheck },
   { id: "pod-management", label: "Recruitment Pods", href: "/utility/pods", icon: Users },
   { id: "dictionaries", label: "Master Dictionaries", href: "/utility/dictionaries", icon: Database },
-  { id: "notifications-hub", label: "Live Notification Hub", href: "/utility/notifications", icon: Bell },
-  { id: "notification-settings", label: "Notification Preferences", href: "/utility/settings-notifications", icon: Settings },
-  { id: "settings", label: "Settings", href: "/company", icon: Settings },
+  {
+    id: "operations-logs",
+    label: "Operations & Logs",
+    href: "/utility/notifications",
+    icon: Activity,
+    children: [
+      { label: "Live Activity Stream", href: "/utility/notifications" },
+      { label: "Security Audit Logs", href: "/utility/audit-logs" },
+    ],
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    href: "/company",
+    icon: Settings,
+    children: [
+      { label: "Company & Workspace", href: "/company" },
+      { label: "Sound & Tone Preferences", href: "/utility/settings-notifications" },
+    ],
+  },
   { id: "help", label: "Help & Support", href: "/help", icon: HelpCircle },
 ];
 
@@ -249,7 +266,26 @@ export const GLOBAL_ADMIN_NAV_ITEMS: NavItem[] = [
 
 export const GLOBAL_ADMIN_MORE_ITEMS: NavItem[] = [
   { id: "email-integration", label: "Mass Mail", href: "/email", icon: Mail },
-  { id: "system-settings", label: "Settings", href: "/company", icon: Settings },
+  {
+    id: "operations-logs",
+    label: "Operations & Logs",
+    href: "/utility/notifications",
+    icon: Activity,
+    children: [
+      { label: "Live Activity Stream", href: "/utility/notifications" },
+      { label: "Security Audit Logs", href: "/utility/audit-logs" },
+    ],
+  },
+  {
+    id: "system-settings",
+    label: "Settings",
+    href: "/company",
+    icon: Settings,
+    children: [
+      { label: "Company & Workspace", href: "/company" },
+      { label: "Sound & Tone Preferences", href: "/utility/settings-notifications" },
+    ],
+  },
   { id: "reports-analytics", label: "Reports", href: "/reports", icon: BarChart3 },
   { id: "help-support", label: "Help & Support", href: "/help", icon: HelpCircle },
 ];
