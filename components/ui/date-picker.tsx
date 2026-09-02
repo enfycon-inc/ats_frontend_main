@@ -153,19 +153,18 @@ export function DateTimePicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
+        <button
           type="button"
-          variant="outline"
           disabled={disabled}
           className={cn(
-            "h-8.5 px-2.5 w-full justify-between text-left font-normal text-xs bg-background border-input hover:bg-muted/50 cursor-pointer shadow-none",
-            !parsedDate && "text-muted-foreground",
-            disabled && "opacity-50 cursor-not-allowed",
+            "group inline-flex items-center justify-between h-8.5 px-2.5 w-full text-left font-normal text-xs rounded-md border border-input bg-background shadow-xs transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-ring hover:bg-accent/60 hover:text-foreground hover:border-neutral-400 dark:hover:border-slate-600",
+            parsedDate ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground",
+            disabled && "opacity-50 cursor-not-allowed pointer-events-none",
             className
           )}
         >
           <div className="flex items-center gap-1.5 truncate">
-            <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <CalendarIcon className={cn("h-3.5 w-3.5 shrink-0 transition-colors", parsedDate ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
             <span className="truncate">
               {parsedDate ? (
                 showTime ? (
@@ -192,7 +191,7 @@ export function DateTimePicker({
               <X className="h-3 w-3" />
             </span>
           )}
-        </Button>
+        </button>
       </PopoverTrigger>
       <PopoverContent
         className="w-[280px] p-3 bg-popover text-popover-foreground border-border shadow-xl rounded-xl z-50 space-y-2.5"

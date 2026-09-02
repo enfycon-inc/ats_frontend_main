@@ -593,12 +593,12 @@ export default function JobDetailPage() {
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
     const normalizedRoles = (roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
-    const isAdminOrDeliveryHead = Boolean(
+    const isSuperOrAdmin = Boolean(
       normalizedRoles.includes("SUPERADMIN") ||
       normalizedRoles.includes("ADMIN") ||
-      normalizedRoles.includes("DELIVERYHEAD") ||
-      normalizedRoles.includes("BRANCHADMIN")
+      normalizedRoles.includes("SUPER_ADMIN")
     );
+    const hasJobApprovePerm = permissions.includes("job:approve") || (permissions.length === 0 && isSuperOrAdmin);
     const isAssigned = Boolean(
       job?.assignedApproverId &&
       (currentUser.dbId === job.assignedApproverId || currentUser.keycloakId === job.assignedApproverId || currentUser.id === job.assignedApproverId)
@@ -611,8 +611,7 @@ export default function JobDetailPage() {
 
     return (
       isAssigned ||
-      (permissions.includes("job:approve") && (!isJobCreator || isAdminOrDeliveryHead)) ||
-      isAdminOrDeliveryHead
+      (hasJobApprovePerm && (!isJobCreator || isSuperOrAdmin))
     );
   }, [currentUser, roles, job]);
 
@@ -1511,7 +1510,7 @@ export default function JobDetailPage() {
                           Interview Rounds
                         </th>
                         <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                          Final Status
+                          Current Status
                         </th>
                         <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
                           Remarks &amp; Date

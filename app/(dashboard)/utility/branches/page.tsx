@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Building2, MapPin, Plus, Edit2, Users, CheckCircle2, XCircle, 
   Search, ShieldAlert, Sparkles, X, Globe, UserPlus, Briefcase, Crown, Shield,
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
+import { useSession } from "next-auth/react";
 
 const SYSTEM_INTERNAL_ROLES = new Set([
   "default_roles_enfycon_ats",
@@ -42,6 +43,52 @@ function formatTime12(timeStr?: string) {
 }
 
 export default function BranchManagementPage() {
+  const { data: session } = useSession();
+  const sessionUser = (session as any)?.user;
+  
+  const [overrideRole, setOverrideRole] = useState<string | null>(null);
+  const [availableRoles, setAvailableRoles] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOverrideRole(localStorage.getItem("override_role"));
+      const handleStorage = () => {
+        setOverrideRole(localStorage.getItem("override_role"));
+      };
+      window.addEventListener("storage", handleStorage);
+      window.addEventListener("overrideRoleChanged", handleStorage);
+      return () => {
+        window.removeEventListener("storage", handleStorage);
+        window.removeEventListener("overrideRoleChanged", handleStorage);
+      };
+    }
+  }, []);
+
+  const userPermissions = useMemo(() => {
+    const directPerms = Array.isArray(sessionUser?.permissions) ? sessionUser.permissions : [];
+    const activeRoleKey = overrideRole || sessionUser?.systemRole || sessionUser?.roles?.[0];
+    if (activeRoleKey && availableRoles.length > 0) {
+      const activeRoleObj = availableRoles.find(
+        (r: any) =>
+          r.name?.toUpperCase() === activeRoleKey.toUpperCase() ||
+          r.systemRole?.toUpperCase() === activeRoleKey.toUpperCase() ||
+          r.id === activeRoleKey
+      );
+      if (activeRoleObj && Array.isArray(activeRoleObj.permissions)) {
+        return Array.from(new Set([...directPerms, ...activeRoleObj.permissions]));
+      }
+    }
+    return directPerms;
+  }, [sessionUser, overrideRole, availableRoles]);
+
+  // PURE GRANULAR PERMISSION-BASED CAPABILITIES
+  // Branch Admin has branch_admin:manage but is explicitly NOT allowed to create or delete branches
+  const canCreateBranch = userPermissions.includes('branch:create') || userPermissions.includes('tenant:settings');
+  const canEditBranch = userPermissions.includes('branch:edit') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('tenant:settings');
+  const canDeleteBranch = userPermissions.includes('branch:delete') || userPermissions.includes('tenant:settings');
+  const canAssignManager = userPermissions.includes('branch:assign_manager') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('user:manage') || userPermissions.includes('tenant:settings');
+  const canManageBranches = canCreateBranch || canDeleteBranch;
+
   const [branches, setBranches] = useState<any[]>([]);
   const [hierarchyData, setHierarchyData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -56,6 +103,7 @@ export default function BranchManagementPage() {
   const [isAssignUserOpen, setIsAssignUserOpen] = useState(false);
   const [isChangeManagerOpen, setIsChangeManagerOpen] = useState(false);
   const [managerSearchQuery, setManagerSearchQuery] = useState("");
+  const [showOnlyAdmins, setShowOnlyAdmins] = useState(true);
   const [savingManager, setSavingManager] = useState(false);
   const [branchToDelete, setBranchToDelete] = useState<any>(null);
   const [isDeletingBranch, setIsDeletingBranch] = useState(false);
@@ -125,6 +173,7 @@ export default function BranchManagementPage() {
       setBranches(listData || []);
       setHierarchyData(hierData);
       setTenantRoles(rolesData || []);
+      setAvailableRoles(rolesData || []);
     } catch (err: any) {
       console.error("Failed to load branches:", err);
     } finally {
@@ -550,15 +599,17 @@ export default function BranchManagementPage() {
             </button>
           </div>
 
-          <Button
-            onClick={() => {
-              resetForm();
-              setIsCreateOpen(true);
-            }}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
-          >
-            <Plus className="h-4 w-4" /> Add New Branch
-          </Button>
+          {canManageBranches && (
+            <Button
+              onClick={() => {
+                resetForm();
+                setIsCreateOpen(true);
+              }}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <Plus className="h-4 w-4" /> Add New Branch
+            </Button>
+          )}
         </div>
       </div>
 
@@ -579,21 +630,23 @@ export default function BranchManagementPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Button
-              onClick={() => openCreateWithPreset("INDIA")}
-              className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs h-9 px-4 rounded-lg flex items-center gap-2 shadow cursor-pointer"
-            >
-              <Building2 className="h-4 w-4" /> + Add Domestic India Branch <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              onClick={() => openCreateWithPreset("US")}
-              variant="outline"
-              className="border-indigo-400/50 text-indigo-100 hover:bg-indigo-800/50 font-bold text-xs h-9 px-4 rounded-lg flex items-center gap-2 cursor-pointer"
-            >
-              <Globe className="h-4 w-4" /> + Add US IT Staffing Branch
-            </Button>
-          </div>
+          {canManageBranches && (
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Button
+                onClick={() => openCreateWithPreset("INDIA")}
+                className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs h-9 px-4 rounded-lg flex items-center gap-2 shadow cursor-pointer"
+              >
+                <Building2 className="h-4 w-4" /> + Add Domestic India Branch <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                onClick={() => openCreateWithPreset("US")}
+                variant="outline"
+                className="border-indigo-400/50 text-indigo-100 hover:bg-indigo-800/50 font-bold text-xs h-9 px-4 rounded-lg flex items-center gap-2 cursor-pointer"
+              >
+                <Globe className="h-4 w-4" /> + Add US IT Staffing Branch
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -676,12 +729,18 @@ export default function BranchManagementPage() {
                       <tr key={b.id} className="hover:bg-neutral-50/50 dark:hover:bg-slate-800/20 transition-colors">
                         <td className="py-3.5 px-4 font-semibold text-neutral-900 dark:text-white">
                           <div>
-                            <button
-                              onClick={() => openEditModal(b)}
-                              className="font-bold text-xs text-neutral-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 text-left transition-colors cursor-pointer block"
-                            >
-                              {b.name}
-                            </button>
+                            {canEditBranch ? (
+                              <button
+                                onClick={() => openEditModal(b)}
+                                className="font-bold text-xs text-neutral-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 text-left transition-colors cursor-pointer block"
+                              >
+                                {b.name}
+                              </button>
+                            ) : (
+                              <span className="font-bold text-xs text-neutral-900 dark:text-white block">
+                                {b.name}
+                              </span>
+                            )}
                             <p className="text-[11px] text-neutral-500 font-normal mt-0.5">
                               {b.city || "City Unspecified"}, {b.country || "India"}
                             </p>
@@ -712,20 +771,26 @@ export default function BranchManagementPage() {
                               <span className="text-xs font-semibold text-neutral-900 dark:text-white">
                                 {b.managerName}
                               </span>
-                              <button
-                                onClick={() => openChangeManagerModal(b)}
-                                className="text-[10.5px] font-medium text-neutral-500 hover:text-indigo-600 hover:underline cursor-pointer ml-1"
-                              >
-                                (Change)
-                              </button>
+                              {canManageBranches && (
+                                <button
+                                  onClick={() => openChangeManagerModal(b)}
+                                  className="text-[10.5px] font-medium text-neutral-500 hover:text-indigo-600 hover:underline cursor-pointer ml-1"
+                                >
+                                  (Change)
+                                </button>
+                              )}
                             </div>
-                          ) : (
+                          ) : canManageBranches ? (
                             <button
                               onClick={() => openChangeManagerModal(b)}
                               className="text-xs font-medium text-neutral-400 hover:text-indigo-600 italic cursor-pointer"
                             >
                               Unassigned (Assign)
                             </button>
+                          ) : (
+                            <span className="text-xs font-medium text-neutral-400 italic">
+                              Unassigned
+                            </span>
                           )}
                         </td>
 
@@ -756,25 +821,29 @@ export default function BranchManagementPage() {
                               <MessageSquare className="h-3 w-3" /> Remarks
                             </Button>
 
-                            <Button
-                              onClick={() => openEditModal(b)}
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-[11px] font-semibold border-neutral-200 dark:border-slate-700 rounded-md flex items-center gap-1 cursor-pointer"
-                              title="Edit branch parameters & routing policy"
-                            >
-                              <Edit2 className="h-3 w-3" /> Edit
-                            </Button>
+                            {canEditBranch && (
+                              <Button
+                                onClick={() => openEditModal(b)}
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-[11px] font-semibold border-neutral-200 dark:border-slate-700 rounded-md flex items-center gap-1 cursor-pointer"
+                                title="Edit branch parameters & routing policy"
+                              >
+                                <Edit2 className="h-3 w-3" /> Edit
+                              </Button>
+                            )}
 
-                            <Button
-                              onClick={() => setBranchToDelete(b)}
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-[11px] font-semibold border-neutral-200 dark:border-slate-700 rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-1 cursor-pointer"
-                              title="Delete branch"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                            {canManageBranches && (
+                              <Button
+                                onClick={() => setBranchToDelete(b)}
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-[11px] font-semibold border-neutral-200 dark:border-slate-700 rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-1 cursor-pointer"
+                                title="Delete branch"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -846,14 +915,16 @@ export default function BranchManagementPage() {
                               <MessageSquare className="h-3 w-3 mr-1" /> Stage Remarks
                             </Button>
 
-                            <Button
-                              onClick={() => openEditModal(b)}
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer"
-                            >
-                              <Edit2 className="h-3 w-3 mr-1" /> Edit Branch
-                            </Button>
+                            {canEditBranch && (
+                              <Button
+                                onClick={() => openEditModal(b)}
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer"
+                              >
+                                <Edit2 className="h-3 w-3 mr-1" /> Edit Branch
+                              </Button>
+                            )}
 
                             <Button
                               onClick={() => openMembersModal(b)}
@@ -889,15 +960,17 @@ export default function BranchManagementPage() {
                           <div className="flex items-center gap-2">
                             <Crown className="h-4 w-4 text-amber-500" />
                             <span className="text-xs font-bold text-neutral-800 dark:text-white">
-                              Branch Head: {b.managerName ? b.managerName : <span className="text-neutral-400 font-normal italic">Unassigned (Click Assign)</span>}
+                              Branch Head: {b.managerName ? b.managerName : <span className="text-neutral-400 font-normal italic">Unassigned</span>}
                             </span>
                           </div>
-                          <button
-                            onClick={() => openChangeManagerModal(b)}
-                            className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer"
-                          >
-                            {b.managerName ? "Change Manager" : "Assign Manager"}
-                          </button>
+                          {canManageBranches && (
+                            <button
+                              onClick={() => openChangeManagerModal(b)}
+                              className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                            >
+                              {b.managerName ? "Change Manager" : "Assign Manager"}
+                            </button>
+                          )}
                         </div>
 
                         {/* MEMBERS NESTED NODES */}
@@ -925,17 +998,11 @@ export default function BranchManagementPage() {
                                       <p className="text-[10.5px] text-neutral-450 truncate">{m.email}</p>
                                     </div>
                                     <div className="shrink-0 flex flex-wrap gap-1">
-                                      {memberRoles.length === 0 ? (
-                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-neutral-300 border border-neutral-200 dark:border-slate-700">
-                                          Staff
+                                      {memberRoles.map((r: string) => (
+                                        <span key={r} className="px-1.5 py-0.5 rounded text-[9.5px] font-medium bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-slate-700">
+                                          {r}
                                         </span>
-                                      ) : (
-                                        memberRoles.slice(0, 2).map((r) => (
-                                          <span key={r} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-neutral-100 text-neutral-700 dark:bg-slate-800 dark:text-neutral-300 border border-neutral-200/80 dark:border-slate-700">
-                                            {r === "BRANCH_ADMIN" ? "Branch Admin" : r.replace(/_/g, " ")}
-                                          </span>
-                                        ))
-                                      )}
+                                      ))}
                                     </div>
                                   </div>
                                 );
@@ -984,12 +1051,14 @@ export default function BranchManagementPage() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => openChangeManagerModal(b)}
-                    className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
-                  >
-                    {b.managerName ? "Change" : "Assign"}
-                  </button>
+                  {canManageBranches && (
+                    <button
+                      onClick={() => openChangeManagerModal(b)}
+                      className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                    >
+                      {b.managerName ? "Change" : "Assign"}
+                    </button>
+                  )}
                 </div>
 
                 {/* OPERATING HOURS & SHIFT BADGE */}
@@ -1042,23 +1111,27 @@ export default function BranchManagementPage() {
                     <MessageSquare className="h-3 w-3 mr-1" /> Remarks
                   </Button>
 
-                  <Button
-                    onClick={() => openEditModal(b)}
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer"
-                  >
-                    <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
-                  </Button>
+                  {canEditBranch && (
+                    <Button
+                      onClick={() => openEditModal(b)}
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer"
+                    >
+                      <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
+                    </Button>
+                  )}
 
-                  <Button
-                    onClick={() => setBranchToDelete(b)}
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-1 cursor-pointer"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  {canManageBranches && (
+                    <Button
+                      onClick={() => setBranchToDelete(b)}
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1877,6 +1950,48 @@ export default function BranchManagementPage() {
                 />
               </div>
             </div>
+            {/* Granular Role Eligibility Filter Toggle */}
+            <div className="px-3.5 py-2 bg-neutral-50 dark:bg-slate-850/80 border-b border-neutral-100 dark:border-slate-800 flex items-center justify-between text-xs">
+              <span className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                {(() => {
+                  const belongsToBranch = (u: any) => {
+                    const perms: string[] = Array.isArray(u.permissions) ? u.permissions : [];
+                    const hasGlobalTenantManage = perms.includes('tenant:settings') || perms.includes('tenant:manage');
+                    if (hasGlobalTenantManage) return true;
+                    if (u.branchId && u.branchId === selectedBranch.id) return true;
+                    if (Array.isArray(u.assignedBranchIds) && u.assignedBranchIds.includes(selectedBranch.id)) return true;
+                    return false;
+                  };
+
+                  const isEligible = (u: any) => {
+                    const perms: string[] = Array.isArray(u.permissions) ? u.permissions : [];
+                    return (
+                      perms.includes('branch_admin:manage') ||
+                      perms.includes('user:manage') ||
+                      perms.includes('branch:assign_manager') ||
+                      perms.includes('tenant:settings')
+                    );
+                  };
+                  const count = allTenantUsers.filter((u) => {
+                    if (!belongsToBranch(u)) return false;
+                    if (showOnlyAdmins && !isEligible(u)) return false;
+                    if (!managerSearchQuery.trim()) return true;
+                    const q = managerSearchQuery.toLowerCase();
+                    return (u.fullName || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q);
+                  }).length;
+                  return showOnlyAdmins ? `Eligible Branch Admins (${count})` : `Branch Staff Members (${count})`;
+                })()}
+              </span>
+              <label className="flex items-center gap-1.5 cursor-pointer text-indigo-600 dark:text-indigo-400 font-bold select-none text-[11px]">
+                <input
+                  type="checkbox"
+                  checked={showOnlyAdmins}
+                  onChange={(e) => setShowOnlyAdmins(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-indigo-600 cursor-pointer rounded"
+                />
+                <span>Branch Admins Only</span>
+              </label>
+            </div>
 
             {/* User List */}
             <div className="p-3.5 space-y-2 max-h-[360px] overflow-y-auto">
@@ -1903,85 +2018,133 @@ export default function BranchManagementPage() {
 
               {membersLoading ? (
                 <div className="text-center py-8 text-xs text-neutral-400">Loading user list...</div>
-              ) : allTenantUsers.filter((u) => {
+              ) : (() => {
+                const belongsToBranch = (u: any) => {
+                  const perms: string[] = Array.isArray(u.permissions) ? u.permissions : [];
+                  const hasGlobalTenantManage = perms.includes('tenant:settings') || perms.includes('tenant:manage');
+                  if (hasGlobalTenantManage) return true;
+                  if (u.branchId && u.branchId === selectedBranch.id) return true;
+                  if (Array.isArray(u.assignedBranchIds) && u.assignedBranchIds.includes(selectedBranch.id)) return true;
+                  return false;
+                };
+
+                const isUserEligible = (u: any) => {
+                  const perms: string[] = Array.isArray(u.permissions) ? u.permissions : [];
+                  return (
+                    perms.includes('branch_admin:manage') ||
+                    perms.includes('user:manage') ||
+                    perms.includes('branch:assign_manager') ||
+                    perms.includes('tenant:settings')
+                  );
+                };
+
+                const eligibleList = allTenantUsers.filter((u) => {
+                  if (!belongsToBranch(u)) return false;
+                  if (showOnlyAdmins && !isUserEligible(u)) return false;
                   if (!managerSearchQuery.trim()) return true;
                   const q = managerSearchQuery.toLowerCase();
                   return (u.fullName || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q);
-                }).length === 0 ? (
-                <div className="text-center py-8 text-xs text-neutral-400 italic">No users found.</div>
-              ) : (
-                allTenantUsers
-                  .filter((u) => {
-                    if (!managerSearchQuery.trim()) return true;
-                    const q = managerSearchQuery.toLowerCase();
-                    return (u.fullName || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q);
-                  })
-                  .map((user) => {
-                    const isCurrentManager = selectedBranch.managerId === user.id;
-                    const initials = (user.fullName || user.email || "U")
-                      .split(" ")
-                      .map((n: string) => n[0])
-                      .slice(0, 2)
-                      .join("")
-                      .toUpperCase();
+                });
 
-                    return (
-                      <div
-                        key={user.id}
-                        onClick={() => !isCurrentManager && handleSelectManager(user.id)}
-                        className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${
+                if (eligibleList.length === 0) {
+                  return (
+                    <div className="text-center py-6 px-4 space-y-2 bg-neutral-50/50 dark:bg-slate-800/30 rounded-xl border border-dashed border-neutral-200 dark:border-slate-700">
+                      <ShieldAlert className="h-6 w-6 text-amber-500 mx-auto" />
+                      <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                        {showOnlyAdmins ? "No users with Branch Admin permissions found" : "No users found"}
+                      </p>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400 max-w-xs mx-auto">
+                        {showOnlyAdmins 
+                          ? "Assign the Branch Admin role in Role Management, or uncheck 'Branch Admins Only' to view all staff."
+                          : "No users matched your search query."}
+                      </p>
+                      {showOnlyAdmins && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowOnlyAdmins(false)}
+                          className="h-7 text-xs font-semibold text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:hover:bg-slate-800"
+                        >
+                          Show All Staff Members
+                        </Button>
+                      )}
+                    </div>
+                  );
+                }
+
+                return eligibleList.map((user) => {
+                  const isCurrentManager = selectedBranch.managerId === user.id;
+                  const initials = (user.fullName || user.email || "U")
+                    .split(" ")
+                    .map((n: string) => n[0])
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase();
+
+                  return (
+                    <div
+                      key={user.id}
+                      onClick={() => !isCurrentManager && handleSelectManager(user.id)}
+                      className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${
+                        isCurrentManager
+                          ? "bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 cursor-default"
+                          : "bg-white dark:bg-slate-850 border-neutral-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 cursor-pointer"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
                           isCurrentManager
-                            ? "bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 cursor-default"
-                            : "bg-white dark:bg-slate-850 border-neutral-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 cursor-pointer"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
-                            isCurrentManager
-                              ? "bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200"
-                              : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
-                          }`}>
-                            {initials}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <p className="text-xs font-bold text-neutral-900 dark:text-white truncate">
-                                {user.fullName || user.email}
-                              </p>
-                              {isCurrentManager && (
-                                <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700 shrink-0 flex items-center gap-0.5">
-                                  <Crown className="h-2.5 w-2.5" /> Current Head
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 truncate">{user.email}</p>
-                          </div>
+                            ? "bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200"
+                            : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                        }`}>
+                          {initials}
                         </div>
-
-                        <div className="shrink-0 ml-2">
-                          {isCurrentManager ? (
-                            <span className="text-[10.5px] font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1">
-                              <Check className="h-3.5 w-3.5" /> Selected
-                            </span>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={savingManager}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSelectManager(user.id);
-                              }}
-                              className="h-6 text-[10.5px] font-semibold border-neutral-300 hover:border-indigo-500 hover:text-indigo-650 px-2"
-                            >
-                              Set as Head
-                            </Button>
-                          )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs font-bold text-neutral-900 dark:text-white truncate">
+                              {user.fullName || user.email}
+                            </p>
+                            {isCurrentManager && (
+                              <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700 shrink-0 flex items-center gap-0.5">
+                                <Crown className="h-2.5 w-2.5" /> Current Head
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 truncate">{user.email}</p>
+                            {(user.roleName || user.primaryRole || user.systemRole) && (
+                              <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-slate-700">
+                                {user.roleName || user.primaryRole || user.systemRole}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    );
-                  })
-              )}
+
+                      <div className="shrink-0 ml-2">
+                        {isCurrentManager ? (
+                          <span className="text-[10.5px] font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                            <Check className="h-3.5 w-3.5" /> Selected
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={savingManager}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectManager(user.id);
+                            }}
+                            className="h-6 text-[10.5px] font-semibold border-neutral-300 hover:border-indigo-500 hover:text-indigo-650 px-2"
+                          >
+                            Set as Head
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
 
             {/* Footer */}

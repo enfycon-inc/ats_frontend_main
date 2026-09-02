@@ -310,6 +310,9 @@ export default function PodsPage() {
 
   // Recruiters for the pod checklist: Recruiters in the same branch
   const recruitersForModal = allUsers.filter((u) => {
+    // 1. Must be an active user
+    if (u.isActive === false || u.is_active === false) return false;
+
     const matchBranch =
       !podBranchId ||
       u.branchId === podBranchId ||
@@ -329,7 +332,11 @@ export default function PodsPage() {
       ""
     ).toUpperCase();
 
+    const perms: string[] = Array.isArray(u.permissions) ? u.permissions : [];
+    const hasSourcingPermission = perms.includes("submission:create") || perms.includes("candidate:create") || perms.includes("submission:view");
+
     const isRecruiterTemplate =
+      hasSourcingPermission ||
       baseArchetype === "RECRUITER" ||
       baseArchetype === "POD_LEAD" ||
       u.roles?.includes("RECRUITER") ||

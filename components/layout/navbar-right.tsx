@@ -82,10 +82,33 @@ function NavIconBtn({
   );
 }
 
+import { useNotifications } from "@/contexts/NotificationContext";
+import { useSocket } from "@/contexts/SocketContext";
+import { formatDistanceToNow, parseISO } from "date-fns";
+import {
+  Volume2,
+  VolumeX,
+  CheckCheck,
+  Megaphone,
+  Briefcase,
+  UserCheck,
+} from "lucide-react";
+
 // ─── Notification dropdown ────────────────────────────────────────────────────
 function NotificationDropdownNav() {
   const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"ALL" | "UNREAD" | "JOBS" | "REVIEWS">("ALL");
   const ref = useRef<HTMLDivElement>(null);
+
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    settings,
+    setSoundEnabled,
+  } = useNotifications();
+  const { isConnected } = useSocket();
 
   useEffect(() => {
     const handle = (e: MouseEvent) => {
@@ -95,48 +118,41 @@ function NotificationDropdownNav() {
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
-  const notifications = [
-    {
-      id: 1,
-      type: "success",
-      title: "Application Received",
-      desc: "John Smith applied for Senior Developer",
-      time: "5 min ago",
-    },
-    {
-      id: 2,
-      type: "info",
-      title: "Interview Scheduled",
-      desc: "Interview with Sarah Lee at 3:00 PM today",
-      time: "1 hr ago",
-    },
-    {
-      id: 3,
-      type: "warning",
-      title: "Offer Pending",
-      desc: "Offer letter for Alex Brown awaiting signature",
-      time: "2 hrs ago",
-    },
-    {
-      id: 4,
-      type: "success",
-      title: "Placement Confirmed",
-      desc: "Michael Davis placed at Acme Corp",
-      time: "Yesterday",
-    },
-    {
-      id: 5,
-      type: "info",
-      title: "New Job Requisition",
-      desc: "Tech Lead position opened by Client Solutions",
-      time: "Yesterday",
-    },
-  ];
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter((n) => {
+      if (activeTab === "UNREAD") return !n.isRead;
+      if (activeTab === "JOBS") return n.type.includes("JOB") || n.type === "NEW_JOB";
+      if (activeTab === "REVIEWS") return n.type === "JOB_PENDING_APPROVAL" || n.type === "REVIEWER_ASSIGNED";
+      return true;
+    });
+  }, [notifications, activeTab]);
 
-  const typeColors: Record<string, string> = {
-    success: "bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400",
-    info: "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400",
-    warning: "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400",
+  const getIcon = (type: string) => {
+    switch (type) {
+      case "JOB_PENDING_APPROVAL":
+        return <Briefcase className="w-4 h-4 text-amber-500" />;
+      case "JOB_APPROVED":
+        return <CircleCheck className="w-4 h-4 text-green-500" />;
+      case "JOB_REJECTED":
+        return <X className="w-4 h-4 text-red-500" />;
+      case "JOB_NEW":
+        return <Briefcase className="w-4 h-4 text-blue-500" />;
+      case "ANNOUNCEMENT":
+        return <Megaphone className="w-4 h-4 text-purple-500" />;
+      case "REVIEWER_ASSIGNED":
+        return <UserCheck className="w-4 h-4 text-teal-500" />;
+      default:
+        return <Bell className="w-4 h-4 text-primary" />;
+    }
+  };
+
+  const formatTime = (dateStr?: string) => {
+    if (!dateStr) return "Just now";
+    try {
+      return formatDistanceToNow(parseISO(dateStr), { addSuffix: true });
+    } catch {
+      return "Recently";
+    }
   };
 
   return (
@@ -145,7 +161,7 @@ function NotificationDropdownNav() {
         id="navbar-notifications"
         aria-label="Notifications"
         aria-expanded={open}
-        badge={5}
+        badge={unreadCount > 0 ? unreadCount : undefined}
         onClick={() => setOpen((v) => !v)}
       >
         <Bell className="w-4 h-4" />
@@ -157,80 +173,179 @@ function NotificationDropdownNav() {
           aria-label="Notifications panel"
           className="
             absolute top-full right-0 mt-1 z-[300]
-            w-[360px]
-            bg-white dark:bg-[#1e2d50]
+            w-[380px]
+            bg-white dark:bg-[#1a233a]
             border border-neutral-200 dark:border-white/10
-            rounded shadow-xl shadow-black/25
+            rounded-lg shadow-2xl shadow-black/25
             overflow-hidden
             animate-in fade-in-0 slide-in-from-top-2
           "
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-[#1a4fa0] dark:bg-[#122f70]">
-            <h3 className="text-[13px] font-semibold text-white">Notifications</h3>
             <div className="flex items-center gap-2">
-              <span className="
-                min-w-[20px] h-5 px-1.5 rounded-full
-                bg-white/20 text-white text-[11px] font-bold
-                flex items-center justify-center
-              ">
-                5
-              </span>
+              <h3 className="text-[13px] font-semibold text-white">Notifications</h3>
+              {unreadCount > 0 && (
+                <span className="
+                  min-w-[20px] h-5 px-1.5 rounded-full
+                  bg-amber-400 text-neutral-950 text-[10.5px] font-bold
+                  flex items-center justify-center
+                ">
+                  {unreadCount} new
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {/* Quick Sound Mute Toggle */}
+              <button
+                type="button"
+                onClick={() => setSoundEnabled(!settings.soundEnabled)}
+                title={settings.soundEnabled ? "Mute notification sounds" : "Enable notification sounds"}
+                className="p-1 rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                {settings.soundEnabled ? (
+                  <Volume2 className="w-3.5 h-3.5 text-amber-300" />
+                ) : (
+                  <VolumeX className="w-3.5 h-3.5 text-white/50" />
+                )}
+              </button>
+
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => markAllAsRead()}
+                  title="Mark all as read"
+                  className="p-1 rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <CheckCheck className="w-3.5 h-3.5 text-white" />
+                </button>
+              )}
+
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close notifications"
-                className="text-white/70 hover:text-white cursor-pointer transition-colors"
+                className="text-white/70 hover:text-white p-1 rounded hover:bg-white/10 cursor-pointer transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
+          {/* Filter Tabs */}
+          <div className="flex items-center border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/50 px-2 py-1 gap-1 text-[11.5px]">
+            <button
+              onClick={() => setActiveTab("ALL")}
+              className={`px-2.5 py-1 rounded font-medium transition-colors ${
+                activeTab === "ALL"
+                  ? "bg-white dark:bg-neutral-800 text-[#1a4fa0] dark:text-blue-400 font-semibold shadow-xs"
+                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
+              }`}
+            >
+              All ({notifications.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("UNREAD")}
+              className={`px-2.5 py-1 rounded font-medium transition-colors ${
+                activeTab === "UNREAD"
+                  ? "bg-white dark:bg-neutral-800 text-[#1a4fa0] dark:text-blue-400 font-semibold shadow-xs"
+                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
+              }`}
+            >
+              Unread ({unreadCount})
+            </button>
+            <button
+              onClick={() => setActiveTab("REVIEWS")}
+              className={`px-2.5 py-1 rounded font-medium transition-colors ${
+                activeTab === "REVIEWS"
+                  ? "bg-white dark:bg-neutral-800 text-[#1a4fa0] dark:text-blue-400 font-semibold shadow-xs"
+                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
+              }`}
+            >
+              Reviews
+            </button>
+            <button
+              onClick={() => setActiveTab("JOBS")}
+              className={`px-2.5 py-1 rounded font-medium transition-colors ${
+                activeTab === "JOBS"
+                  ? "bg-white dark:bg-neutral-800 text-[#1a4fa0] dark:text-blue-400 font-semibold shadow-xs"
+                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
+              }`}
+            >
+              Jobs
+            </button>
+          </div>
+
           {/* List */}
-          <div className="max-h-[340px] overflow-y-auto divide-y divide-neutral-100 dark:divide-white/5">
-            {notifications.map((n) => (
-              <Link
-                key={n.id}
-                href="#"
-                onClick={() => setOpen(false)}
-                className="
-                  flex items-start gap-3 px-4 py-3
-                  hover:bg-blue-50/70 dark:hover:bg-white/5
-                  transition-colors duration-100
-                "
-              >
+          <div className="max-h-[340px] overflow-y-auto divide-y divide-neutral-100 dark:divide-neutral-800/60">
+            {filteredNotifications.length === 0 ? (
+              <div className="py-12 text-center text-neutral-400 text-xs">
+                <Bell className="w-7 h-7 mx-auto mb-2 opacity-30 text-neutral-400" />
+                No {activeTab.toLowerCase()} notifications
+              </div>
+            ) : (
+              filteredNotifications.map((n) => (
                 <div
+                  key={n.id}
+                  onClick={() => {
+                    if (!n.isRead) markAsRead(n.id);
+                  }}
                   className={`
-                    flex-shrink-0 w-8 h-8 rounded-full
-                    flex items-center justify-center mt-0.5
-                    ${typeColors[n.type]}
+                    flex items-start gap-3 px-4 py-3 cursor-pointer
+                    transition-colors duration-100
+                    ${
+                      !n.isRead
+                        ? "bg-blue-50/40 dark:bg-blue-900/10 hover:bg-blue-50/70 dark:hover:bg-blue-900/20"
+                        : "hover:bg-neutral-50 dark:hover:bg-neutral-800/40"
+                    }
                   `}
                 >
-                  <CircleCheck className="w-4 h-4" />
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mt-0.5 shadow-xs">
+                    {getIcon(n.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="text-[12.5px] font-semibold text-neutral-800 dark:text-white truncate">
+                        {n.title}
+                      </p>
+                      {!n.isRead && (
+                        <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+                      )}
+                    </div>
+                    <p className="text-[11.5px] text-neutral-600 dark:text-neutral-300 line-clamp-2 mt-0.5 leading-relaxed">
+                      {n.message}
+                    </p>
+                    <div className="mt-1 flex items-center justify-between text-[10.5px] text-neutral-400 dark:text-neutral-400">
+                      <span>{formatTime(n.createdAt || n.timestamp)}</span>
+                      {n.data?.jobCode && (
+                        <span className="font-semibold text-[#1a4fa0] dark:text-blue-400">
+                          {n.data.jobCode}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12.5px] font-semibold text-neutral-800 dark:text-white truncate">
-                    {n.title}
-                  </p>
-                  <p className="text-[11.5px] text-neutral-500 dark:text-white/50 truncate">
-                    {n.desc}
-                  </p>
-                </div>
-                <span className="flex-shrink-0 text-[10.5px] text-neutral-400 dark:text-white/30 mt-0.5 whitespace-nowrap">
-                  {n.time}
-                </span>
-              </Link>
-            ))}
+              ))
+            )}
           </div>
 
           {/* Footer */}
-          <div className="border-t border-neutral-100 dark:border-white/8 px-4 py-2 text-center">
+          <div className="border-t border-neutral-200 dark:border-neutral-800 px-4 py-2 bg-neutral-50/50 dark:bg-neutral-900/30 flex items-center justify-between text-[11.5px]">
             <Link
-              href="#"
+              href="/utility/settings-notifications"
               onClick={() => setOpen(false)}
-              className="text-[12px] text-blue-600 dark:text-blue-400 font-medium hover:underline"
+              className="text-neutral-600 dark:text-neutral-300 font-medium hover:text-[#1a4fa0] dark:hover:text-blue-400 flex items-center gap-1"
             >
-              View all notifications
+              <Settings className="w-3.5 h-3.5" />
+              <span>Sound & Tone Settings</span>
+            </Link>
+
+            <Link
+              href="/utility/notifications"
+              onClick={() => setOpen(false)}
+              className="text-[#1a4fa0] dark:text-blue-400 font-semibold hover:underline"
+            >
+              Admin Hub
             </Link>
           </div>
         </div>
@@ -460,6 +575,7 @@ function ProfileDropdownNav() {
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<any[]>([]);
   const [rolesLoaded, setRolesLoaded] = useState(false);
+  const [liveUserLoaded, setLiveUserLoaded] = useState(false);
 
   const [liveUser, setLiveUser] = useState<any>(null);
   const currentUser = liveUser || (typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null);
@@ -472,7 +588,9 @@ function ProfileDropdownNav() {
           localStorage.setItem("ats_current_user", JSON.stringify(profile));
         }
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      setLiveUserLoaded(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -637,24 +755,33 @@ const isTechnicalKeycloakRole = (r: string): boolean => {
     return options;
   }, [userAssignedRoles, availableRoles, activeBranchId, systemRoleLabels]);
 
-  // Auto-clear invalid override_role from localStorage ONLY AFTER availableRoles has finished loading
+  // Auto-clear invalid override_role ONLY after BOTH live user profile AND roles list have fully loaded.
+  // Critical: if we run this before liveUser resolves, userAssignedRoles only contains the cached
+  // localStorage roles (e.g. ["RECRUITER"]) and will incorrectly clear a valid Branch Admin override.
   useEffect(() => {
-    if (rolesLoaded && overrideRole && assignedRoleOptions.length > 0) {
-      const overrideUpper = overrideRole.toUpperCase();
-      const isValidOverride = assignedRoleOptions.some(
+    if (!rolesLoaded || !liveUserLoaded || !overrideRole) return;
+    // Also skip clearing if the user has no assigned roles yet (roles are still resolving)
+    if (userAssignedRoles.length === 0 && assignedRoleOptions.length === 0) return;
+
+    const overrideNorm = overrideRole.toUpperCase().replace(/[\s\-_]/g, "");
+    const isValidOverride =
+      assignedRoleOptions.some(
         (opt: { key: string; name: string; replacesSystemRole?: string }) =>
-          opt.key.toUpperCase() === overrideUpper ||
-          opt.name.toUpperCase() === overrideUpper ||
-          (opt.replacesSystemRole && opt.replacesSystemRole.toUpperCase() === overrideUpper)
+          opt.key.toUpperCase().replace(/[\s\-_]/g, "") === overrideNorm ||
+          opt.name.toUpperCase().replace(/[\s\-_]/g, "") === overrideNorm ||
+          (opt.replacesSystemRole &&
+            opt.replacesSystemRole.toUpperCase().replace(/[\s\-_]/g, "") === overrideNorm)
+      ) ||
+      userAssignedRoles.some(
+        (r: string) => r.toUpperCase().replace(/[\s\-_]/g, "") === overrideNorm
       );
-      if (!isValidOverride) {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("override_role");
-        }
-        setOverrideRole(null);
+    if (!isValidOverride) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("override_role");
       }
+      setOverrideRole(null);
     }
-  }, [rolesLoaded, overrideRole, assignedRoleOptions]);
+  }, [rolesLoaded, liveUserLoaded, overrideRole, assignedRoleOptions, userAssignedRoles]);
 
   const handleSwitchRole = (roleName: string | null) => {
     if (typeof window !== "undefined") {

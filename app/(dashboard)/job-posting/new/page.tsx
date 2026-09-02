@@ -273,6 +273,8 @@ export default function NewJobPostingPage() {
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const [endClientDropdownOpen, setEndClientDropdownOpen] = useState(false);
   const [addClientModalOpen, setAddClientModalOpen] = useState(false);
+  const [prefilledClientName, setPrefilledClientName] = useState("");
+  const [clientModalTarget, setClientModalTarget] = useState<"client" | "endClientName">("client");
   const [clientList, setClientList] = useState<any[]>([]);
   const [clientSearchText, setClientSearchText] = useState("");
   const [endClientSearchText, setEndClientSearchText] = useState("");
@@ -356,6 +358,7 @@ const getInitialActiveBranchContext = () => {
   // Pod & User selection and approver routing
   const [podsList, setPodsList] = useState<any[]>([]);
   const [branchUsers, setBranchUsers] = useState<any[]>([]);
+  const [rolesList, setRolesList] = useState<any[]>([]);
   const [selectedPodId, setSelectedPodId] = useState("");
   const [selectedApproverRole, setSelectedApproverRole] = useState<string>("POD_LEAD");
   const [selectedApproverId, setSelectedApproverId] = useState<string>("");
@@ -410,17 +413,90 @@ const getInitialActiveBranchContext = () => {
   const recruitersList = useMemo(() => {
     const seen = new Set<string>();
     const list: any[] = [];
+    const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
+
     for (const u of branchUsers) {
       const uid = u.id || u.email;
       if (!uid || seen.has(uid)) continue;
-      const r = (u.roles || []).map((x: string) => x.toUpperCase());
-      if (r.includes("RECRUITER") || r.length === 0) {
+
+      // 1. Must be an active user
+      if (u.isActive === false || u.is_active === false) continue;
+
+      // 2. Branch isolation check if activeBranchId is set
+      if (activeBranchId) {
+        const userBranchId = u.branchId || u.branch_id;
+        const assignedBranches = Array.isArray(u.assignedBranchIds) ? u.assignedBranchIds : (Array.isArray(u.assigned_branch_ids) ? u.assigned_branch_ids : []);
+        const belongsToBranch = userBranchId === activeBranchId || assignedBranches.includes(activeBranchId) || !userBranchId;
+        if (!belongsToBranch) continue;
+      }
+
+      // 3. Granular permission capability check: user must have candidate submission / sourcing permission
+      const perms: string[] = Array.isArray(u.permissions) ? u.permissions : [];
+      const hasSourcingPermission = 
+        perms.includes("submission:create") || 
+        perms.includes("candidate:create") || 
+        perms.includes("submission:edit") || 
+        perms.includes("submission:view") || 
+        perms.includes("job:view");
+
+      // Backward compatibility check for role tokens
+      const r = (u.roles || []).map((x: string) => x.toUpperCase().replace(/[\s-_]+/g, ''));
+      const isSourcingStaff = hasSourcingPermission || r.includes("RECRUITER") || r.includes("BRANCHADMIN") || r.includes("PODLEAD") || r.length === 0;
+
+      if (isSourcingStaff) {
         seen.add(uid);
         list.push(u);
       }
     }
     return list;
   }, [branchUsers]);
+
+  const getUserRoleLabel = useCallback((u: any): string => {
+    const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
+    
+    // 1. Check branch-specific custom roles in active branch
+    if (activeBranchId && u.branchRoles && u.branchRoles[activeBranchId] && Array.isArray(u.branchRoles[activeBranchId]) && u.branchRoles[activeBranchId].length > 0) {
+      const branchRoleIdOrName = u.branchRoles[activeBranchId][0];
+      const matchedRole = (rolesList || []).find((cr: any) => cr.id === branchRoleIdOrName || cr.name?.toUpperCase() === String(branchRoleIdOrName).toUpperCase());
+      if (matchedRole?.name) return matchedRole.name;
+      if (typeof branchRoleIdOrName === 'string' && !branchRoleIdOrName.includes('-')) return branchRoleIdOrName;
+    }
+
+    // 2. Check any branch roles if user has branch assignments
+    if (u.branchRoles && typeof u.branchRoles === 'object') {
+      for (const bRoleArray of Object.values(u.branchRoles) as any[]) {
+        if (Array.isArray(bRoleArray) && bRoleArray.length > 0) {
+          const rItem = bRoleArray[0];
+          const matchedRole = (rolesList || []).find((cr: any) => cr.id === rItem || cr.name?.toUpperCase() === String(rItem).toUpperCase());
+          if (matchedRole?.name) return matchedRole.name;
+          if (typeof rItem === 'string' && !rItem.includes('-')) return rItem;
+        }
+      }
+    }
+
+    // 3. Check customRoleName or roleName
+    if (u.customRoleName) return u.customRoleName;
+    if (u.roleName) {
+      const matchedRole = (rolesList || []).find((cr: any) => cr.id === u.roleName || cr.name?.toUpperCase() === String(u.roleName).toUpperCase());
+      if (matchedRole?.name) return matchedRole.name;
+      return u.roleName;
+    }
+
+    // 4. System role
+    if (u.systemRole) {
+      return u.systemRole.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+    }
+
+    // 5. Roles array
+    if (Array.isArray(u.roles) && u.roles.length > 0) {
+      const rItem = u.roles[0];
+      const matchedRole = (rolesList || []).find((cr: any) => cr.id === rItem || cr.name?.toUpperCase() === String(rItem).toUpperCase());
+      if (matchedRole?.name) return matchedRole.name;
+      return rItem;
+    }
+
+    return "Staff";
+  }, [rolesList]);
 
   const branchPods = useMemo(() => {
     const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
@@ -444,6 +520,11 @@ const getInitialActiveBranchContext = () => {
   const [payRateMin, setPayRateMin] = useState("");
   const [payRateMax, setPayRateMax] = useState("");
 
+  // Job Assignment Dropdown states
+  const [isAssignmentOpen, setIsAssignmentOpen] = useState(false);
+  const [assignmentSearch, setAssignmentSearch] = useState("");
+  const assignmentDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -451,6 +532,12 @@ const getInitialActiveBranchContext = () => {
         !workAuthDropdownRef.current.contains(event.target as Node)
       ) {
         setIsWorkAuthOpen(false);
+      }
+      if (
+        assignmentDropdownRef.current &&
+        !assignmentDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsAssignmentOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -584,23 +671,27 @@ const getInitialActiveBranchContext = () => {
           setTenantName(displayBusinessUnit);
           setValue("businessUnit", displayBusinessUnit);
 
-          // Fetch branches, pods, and users list
+          // Fetch branches, pods, users, and roles list
           let branchesList: any[] = [];
           let fetchedPods: any[] = [];
           let fetchedUsers: any[] = [];
+          let fetchedRoles: any[] = [];
           try {
-            const [bList, pList, uList] = await Promise.all([
+            const [bList, pList, uList, rList] = await Promise.all([
               atsApi.branches.list().catch(() => []),
               atsApi.pods.list().catch(() => []),
               atsApi.auth.listUsers().catch(() => []),
+              atsApi.auth.listRoles(undefined, true).catch(() => []),
             ]);
             branchesList = bList || [];
             fetchedPods = pList || [];
             fetchedUsers = uList || [];
+            fetchedRoles = rList || [];
             setPodsList(fetchedPods);
             setBranchUsers(fetchedUsers);
+            setRolesList(fetchedRoles);
           } catch (e) {
-            console.warn("Failed to load branches/pods/users:", e);
+            console.warn("Failed to load branches/pods/users/roles:", e);
           }
 
           let activeBranchObj = null;
@@ -611,40 +702,6 @@ const getInitialActiveBranchContext = () => {
             activeBranchObj = branchesList.find((b: any) => b.name?.toLowerCase() === activeBranchName.toLowerCase());
           }
           setActiveBranch(activeBranchObj || null);
-          if (activeBranchObj) {
-            const allowPods = (activeBranchObj.allowPods ?? activeBranchObj.allow_pods) !== false;
-            const allowAll = (activeBranchObj.allowAll ?? activeBranchObj.allow_all) !== false;
-            const allowUnassigned = (activeBranchObj.allowUnassigned ?? activeBranchObj.allow_unassigned) !== false;
-            const isDirectOnly = !!(activeBranchObj.allowNone ?? activeBranchObj.allow_none);
-
-            if (!isDirectOnly && allowAll) {
-              setSelectedPodId("all");
-              setSelectedApproverRole("BRANCH_ADMIN");
-              setSelectedApproverId("");
-            } else if (!isDirectOnly && allowPods && fetchedPods.length > 0) {
-              setSelectedPodId(`pod:${fetchedPods[0].id}`);
-              setSelectedApproverRole("POD_LEAD");
-              setSelectedApproverId(fetchedPods[0].podHeadId || "");
-            } else if (fetchedUsers.length > 0) {
-              const rec = fetchedUsers.find((u: any) => u.roles?.includes("RECRUITER")) || fetchedUsers[0];
-              setSelectedPodId(`rec:${rec.id}`);
-              setSelectedApproverRole("PRIMARY_RECRUITER");
-              setSelectedApproverId(rec.id);
-            } else if (!isDirectOnly && allowUnassigned) {
-              setSelectedPodId("none");
-              setSelectedApproverRole("BRANCH_ADMIN");
-              setSelectedApproverId("");
-            }
-          } else if (fetchedPods.length > 0) {
-            setSelectedPodId(`pod:${fetchedPods[0].id}`);
-            setSelectedApproverRole("POD_LEAD");
-            setSelectedApproverId(fetchedPods[0].podHeadId || "");
-          } else {
-            setSelectedPodId("all");
-            setSelectedApproverRole("BRANCH_ADMIN");
-            setSelectedApproverId("");
-          }
-
           let branchMarketStr = activeBranchObj?.market || activeBranchMarket || "";
 
           let isUsBranch = false;
@@ -893,13 +950,20 @@ const getInitialActiveBranchContext = () => {
           setValue("workAuthorization", market === "IN" ? "Indian Citizen" : "US Authorized");
         }
 
-        // Pre-fill location fields if returned
+        // Pre-fill location fields if returned (preserving active branch market)
         if (res.location) {
-          if (res.location.country) {
-            setValue("country", res.location.country);
-          }
-          if (res.location.state) {
-            setValue("states", res.location.state);
+          if (market === "IN") {
+            setValue("country", "India");
+            if (res.location.state && !["Texas", "California", "New York", "Florida", "Illinois", "Washington", "Virginia", "New Jersey", "Georgia", "North Carolina"].includes(res.location.state)) {
+              setValue("states", res.location.state);
+            }
+          } else {
+            if (res.location.country) {
+              setValue("country", res.location.country);
+            }
+            if (res.location.state) {
+              setValue("states", res.location.state);
+            }
           }
           if (res.location.city) {
             setValue("city", res.location.city);
@@ -1046,6 +1110,10 @@ const getInitialActiveBranchContext = () => {
     }
   };
   const onSubmit = async (data: FormValues) => {
+    if (!selectedPodId) {
+      toast.error("Job Assignment is mandatory. Please select a Staff member, Pod, or Allocation Pool.");
+      return;
+    }
     try {
       if (!atsApi.auth.isAuthenticated()) {
         await atsApi.auth.login("recruiter@enfycon.com", "enfycon123");
@@ -1119,12 +1187,12 @@ const getInitialActiveBranchContext = () => {
         resolvedApproverRole = "BRANCH_ADMIN";
       }
 
-      // Determine initial approval status based on creator's permissions and designated reviewer
+      // Determine initial approval status based on creator's permissions
       const hasDirectPublish = currentUserProfile?.permissions?.includes("job:publish_direct") || 
         currentUserProfile?.roles?.some((r: string) => ["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
       const hasDesignatedReviewer = Boolean(currentUserProfile?.jobReviewerId || currentUserProfile?.jobReviewerName || currentUserProfile?.job_reviewer_id);
 
-      const shouldRequireApproval = !hasDirectPublish || hasDesignatedReviewer;
+      const shouldRequireApproval = !hasDirectPublish;
       const initialApprovalStatus = shouldRequireApproval ? "PENDING_APPROVAL" : "APPROVED";
       const initialJobStatus = shouldRequireApproval ? "Pending Approval" : (data.jobStatus || "Active");
       const finalApproverId = hasDesignatedReviewer ? (currentUserProfile?.jobReviewerId || currentUserProfile?.job_reviewer_id || resolvedApproverId) : resolvedApproverId;
@@ -1450,8 +1518,7 @@ const getInitialActiveBranchContext = () => {
               {(() => {
                 const hasDirectPublish = currentUserProfile?.permissions?.includes("job:publish_direct") || 
                   currentUserProfile?.roles?.some((r: string) => ["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
-                const hasDesignatedReviewer = Boolean(currentUserProfile?.jobReviewerId || currentUserProfile?.jobReviewerName || currentUserProfile?.job_reviewer_id);
-                const requiresApproval = !hasDirectPublish || hasDesignatedReviewer;
+                const requiresApproval = !hasDirectPublish;
 
                 return (
                   <Button
@@ -2132,6 +2199,29 @@ const getInitialActiveBranchContext = () => {
                               className="h-9 text-xs"
                               value={clientSearchText}
                               onValueChange={setClientSearchText}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const query = clientSearchText.trim();
+                                  if (query) {
+                                    const exactMatch = clientList.find((cl: any) => {
+                                      const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                      return cName === query.toLowerCase();
+                                    });
+                                    if (exactMatch) {
+                                      const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
+                                      setValue("client", clientNameStr, { shouldValidate: true });
+                                      setClientDropdownOpen(false);
+                                      setClientSearchText("");
+                                    } else {
+                                      setClientModalTarget("client");
+                                      setPrefilledClientName(query);
+                                      setClientDropdownOpen(false);
+                                      setAddClientModalOpen(true);
+                                    }
+                                    e.preventDefault();
+                                  }
+                                }
+                              }}
                             />
                             <CommandList className="max-h-[240px] overflow-y-auto">
                               {(() => {
@@ -2150,9 +2240,10 @@ const getInitialActiveBranchContext = () => {
                                           <button
                                             type="button"
                                             onClick={() => {
-                                              setValue("client", clientSearchText.trim(), { shouldValidate: true });
+                                              setClientModalTarget("client");
+                                              setPrefilledClientName(clientSearchText.trim());
                                               setClientDropdownOpen(false);
-                                              setClientSearchText("");
+                                              setAddClientModalOpen(true);
                                             }}
                                             className="px-3 py-1 bg-primary text-white text-xs font-semibold rounded hover:bg-primary/90 transition-colors cursor-pointer"
                                           >
@@ -2201,9 +2292,22 @@ const getInitialActiveBranchContext = () => {
                                   type="button"
                                   className="text-primary font-bold text-xs hover:underline bg-transparent border-0 cursor-pointer"
                                   onClick={() => {
-                                    setValue("client", clientSearchText.trim(), { shouldValidate: true });
-                                    setClientDropdownOpen(false);
-                                    setClientSearchText("");
+                                    const query = clientSearchText.trim();
+                                    const exactMatch = clientList.find((cl: any) => {
+                                      const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                      return cName === query.toLowerCase();
+                                    });
+                                    if (exactMatch) {
+                                      const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
+                                      setValue("client", clientNameStr, { shouldValidate: true });
+                                      setClientDropdownOpen(false);
+                                      setClientSearchText("");
+                                    } else {
+                                      setClientModalTarget("client");
+                                      setPrefilledClientName(query);
+                                      setClientDropdownOpen(false);
+                                      setAddClientModalOpen(true);
+                                    }
                                   }}
                                 >
                                   ✔ Select "{clientSearchText.trim()}"
@@ -2213,6 +2317,8 @@ const getInitialActiveBranchContext = () => {
                                 type="button"
                                 className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer text-xs ml-auto"
                                 onClick={() => {
+                                  setClientModalTarget("client");
+                                  setPrefilledClientName(clientSearchText.trim());
                                   setClientDropdownOpen(false);
                                   setAddClientModalOpen(true);
                                 }}
@@ -2258,6 +2364,29 @@ const getInitialActiveBranchContext = () => {
                               className="h-9 text-xs"
                               value={endClientSearchText}
                               onValueChange={setEndClientSearchText}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const query = endClientSearchText.trim();
+                                  if (query) {
+                                    const exactMatch = clientList.find((cl: any) => {
+                                      const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                      return cName === query.toLowerCase();
+                                    });
+                                    if (exactMatch) {
+                                      const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
+                                      setValue("endClientName", clientNameStr, { shouldValidate: true });
+                                      setEndClientDropdownOpen(false);
+                                      setEndClientSearchText("");
+                                    } else {
+                                      setClientModalTarget("endClientName");
+                                      setPrefilledClientName(query);
+                                      setEndClientDropdownOpen(false);
+                                      setAddClientModalOpen(true);
+                                    }
+                                    e.preventDefault();
+                                  }
+                                }
+                              }}
                             />
                             <CommandList className="max-h-[240px] overflow-y-auto">
                               {(() => {
@@ -2276,9 +2405,10 @@ const getInitialActiveBranchContext = () => {
                                           <button
                                             type="button"
                                             onClick={() => {
-                                              setValue("endClientName", endClientSearchText.trim(), { shouldValidate: true });
+                                              setClientModalTarget("endClientName");
+                                              setPrefilledClientName(endClientSearchText.trim());
                                               setEndClientDropdownOpen(false);
-                                              setEndClientSearchText("");
+                                              setAddClientModalOpen(true);
                                             }}
                                             className="px-3 py-1 bg-primary text-white text-xs font-semibold rounded hover:bg-primary/90 transition-colors cursor-pointer"
                                           >
@@ -2327,9 +2457,22 @@ const getInitialActiveBranchContext = () => {
                                   type="button"
                                   className="text-primary font-bold text-xs hover:underline bg-transparent border-0 cursor-pointer"
                                   onClick={() => {
-                                    setValue("endClientName", endClientSearchText.trim(), { shouldValidate: true });
-                                    setEndClientDropdownOpen(false);
-                                    setEndClientSearchText("");
+                                    const query = endClientSearchText.trim();
+                                    const exactMatch = clientList.find((cl: any) => {
+                                      const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                      return cName === query.toLowerCase();
+                                    });
+                                    if (exactMatch) {
+                                      const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
+                                      setValue("endClientName", clientNameStr, { shouldValidate: true });
+                                      setEndClientDropdownOpen(false);
+                                      setEndClientSearchText("");
+                                    } else {
+                                      setClientModalTarget("endClientName");
+                                      setPrefilledClientName(query);
+                                      setEndClientDropdownOpen(false);
+                                      setAddClientModalOpen(true);
+                                    }
                                   }}
                                 >
                                   ✔ Select "{endClientSearchText.trim()}"
@@ -2339,6 +2482,8 @@ const getInitialActiveBranchContext = () => {
                                 type="button"
                                 className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer text-xs ml-auto"
                                 onClick={() => {
+                                  setClientModalTarget("endClientName");
+                                  setPrefilledClientName(endClientSearchText.trim());
                                   setEndClientDropdownOpen(false);
                                   setAddClientModalOpen(true);
                                 }}
@@ -2786,80 +2931,245 @@ const getInitialActiveBranchContext = () => {
                         />
                       </div>
 
-                      {/* Job Assignment */}
-                      <div className="space-y-1.5">
+                      {/* Job Assignment Custom Dropdown */}
+                      <div className="space-y-1.5 relative" ref={assignmentDropdownRef}>
                         <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center justify-between h-5">
                           <span className="flex items-center gap-1.5">
                             <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
                               <User className="h-2.5 w-2.5" />
                             </span>
-                            Job Assignment
+                            Job Assignment <span className="text-red-500 ml-0.5">*</span>
                           </span>
                         </label>
-                        <select
-                          value={selectedPodId}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setSelectedPodId(val);
-                            if (val.startsWith("pod:")) {
-                              const pid = val.replace("pod:", "");
-                              const pod = (branchPods || podsList).find((p: any) => p.id === pid);
-                              setSelectedApproverRole("POD_LEAD");
-                              setSelectedApproverId(pod?.podHeadId || "");
-                            } else if (val.startsWith("rec:")) {
-                              setSelectedApproverRole("PRIMARY_RECRUITER");
-                              setSelectedApproverId(val.replace("rec:", ""));
-                            } else if (val === "all") {
-                              setSelectedApproverRole("BRANCH_ADMIN");
-                              setSelectedApproverId("");
-                            } else if (val === "none") {
-                              setSelectedApproverRole("BRANCH_ADMIN");
-                              setSelectedApproverId("");
-                            } else {
-                              setSelectedApproverRole("BRANCH_ADMIN");
-                              setSelectedApproverId("");
-                            }
-                          }}
-                          className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-medium"
+
+                        {/* Dropdown Trigger */}
+                        <button
+                          type="button"
+                          onClick={() => setIsAssignmentOpen(!isAssignmentOpen)}
+                          className={cn(
+                            "w-full min-h-[38px] bg-white dark:bg-slate-950 border rounded-md px-3 py-1.5 text-left text-xs outline-none transition-all flex items-center justify-between gap-2 shadow-xs cursor-pointer",
+                            isSubmitted && !selectedPodId
+                              ? "border-red-500 ring-1 ring-red-500/20 bg-red-50/10 focus:border-red-500 focus:ring-red-500/20"
+                              : "border-neutral-300 dark:border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                          )}
                         >
-                          {/* 1. Recruitment Pods (if allowed by branch policy) */}
-                          {(!activeBranch || ((activeBranch.allowPods ?? activeBranch.allow_pods) !== false)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
-                            <optgroup label="Recruitment Pods">
-                              {branchPods && branchPods.length > 0 ? (
-                                branchPods.map((pod: any) => (
-                                  <option key={`pod:${pod.id}`} value={`pod:${pod.id}`}>
-                                    Pod: {pod.name} {pod.podHeadName ? `(Lead: ${pod.podHeadName})` : ""}
-                                  </option>
-                                ))
-                              ) : (
-                                <option value="auto_pod">Recruitment Pod System (Auto Broadcast)</option>
-                              )}
-                            </optgroup>
-                          )}
+                          <div className="flex-1 min-w-0">
+                            {(() => {
+                              if (selectedPodId.startsWith("pod:")) {
+                                const pid = selectedPodId.replace("pod:", "");
+                                const pod = (branchPods || podsList).find((p: any) => p.id === pid);
+                                return (
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <span className="font-semibold text-neutral-900 dark:text-white">Pod: {pod?.name || "Recruitment Pod"}</span>
+                                    {pod?.podHeadName && (
+                                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-400">
+                                        Lead: {pod.podHeadName}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              } else if (selectedPodId.startsWith("rec:")) {
+                                const recId = selectedPodId.replace("rec:", "");
+                                const rec = (recruitersList || branchUsers || []).find((u: any) => u.id === recId);
+                                if (rec) {
+                                  const roleLabel = getUserRoleLabel(rec);
+                                  return (
+                                    <div className="flex flex-col text-left py-0.5">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-semibold text-neutral-900 dark:text-white">{rec.fullName || rec.name}</span>
+                                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800">
+                                          [{roleLabel}]
+                                        </span>
+                                      </div>
+                                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal">
+                                        {rec.email}
+                                      </span>
+                                    </div>
+                                  );
+                                }
+                                return <span className="text-neutral-400">Select Staff, Pod, or Pool...</span>;
+                              } else if (selectedPodId === "all") {
+                                return <span className="font-semibold text-neutral-900 dark:text-white">All Branch Recruiters (Pool Broadcast)</span>;
+                              } else if (selectedPodId === "none") {
+                                return <span className="font-semibold text-neutral-900 dark:text-white">Unassigned Allocation (Hold for Manager Assignment)</span>;
+                              } else if (selectedPodId === "auto_pod") {
+                                return <span className="font-semibold text-neutral-900 dark:text-white">Recruitment Pod System (Auto Broadcast)</span>;
+                              }
+                              return <span className="text-neutral-400">Select Staff, Pod, or Pool...</span>;
+                            })()}
+                          </div>
+                          <ChevronDown className={cn("h-4 w-4 text-neutral-400 transition-transform shrink-0", isAssignmentOpen && "rotate-180")} />
+                        </button>
+                        {isSubmitted && !selectedPodId && (
+                          <p className="text-[11px] text-red-500 font-medium mt-1">
+                            Job Assignment is required. Please select a Staff member, Pod, or Pool.
+                          </p>
+                        )}
 
-                          {/* 2. Direct Recruiter Assignment (only if branch policy allows Direct Assignment) */}
-                          {(!activeBranch || !!(activeBranch.allowNone ?? activeBranch.allow_none)) && recruitersList && recruitersList.length > 0 && (
-                            <optgroup label="Direct Recruiter Assignment">
-                              {recruitersList.map((rec: any) => (
-                                <option key={`rec:${rec.id}`} value={`rec:${rec.id}`}>
-                                  Recruiter: {rec.fullName || rec.name || rec.email}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
+                        {/* Dropdown Overlay Menu */}
+                        {isAssignmentOpen && (
+                          <div className="absolute left-0 right-0 top-full z-50 mt-1 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xl overflow-hidden p-2 space-y-2">
+                            {/* Search Input */}
+                            <div className="relative flex items-center">
+                              <input
+                                type="text"
+                                placeholder="Search staff, role, email, or pod..."
+                                value={assignmentSearch}
+                                onChange={(e) => setAssignmentSearch(e.target.value)}
+                                className="w-full h-8 bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded pl-7 pr-2 text-xs text-neutral-800 dark:text-neutral-200 outline-none focus:border-indigo-500"
+                                autoFocus
+                              />
+                              <Search className="absolute left-2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
+                            </div>
 
-                          {/* 3. Branch Pool & Allocation (if allowed by branch policy) */}
-                          {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true) || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) === true)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
-                            <optgroup label="Branch Pool & Allocation">
-                              {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true)) && (
-                                <option value="all">All Branch Recruiters (Pool Broadcast)</option>
+                            <div className="max-h-64 overflow-y-auto space-y-2 pr-1 scrollbar-thin select-none">
+                              {/* 1. Recruitment Pods */}
+                              {(!activeBranch || ((activeBranch.allowPods ?? activeBranch.allow_pods) !== false)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
+                                <div className="space-y-1">
+                                  <div className="px-2 py-1 text-[10.5px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 bg-neutral-50/80 dark:bg-slate-800/50 rounded">
+                                    Recruitment Pods
+                                  </div>
+                                  {branchPods && branchPods.length > 0 ? (
+                                    branchPods
+                                      .filter((pod: any) => !assignmentSearch.trim() || pod.name.toLowerCase().includes(assignmentSearch.toLowerCase()) || (pod.podHeadName && pod.podHeadName.toLowerCase().includes(assignmentSearch.toLowerCase())))
+                                      .map((pod: any) => {
+                                        const isSelected = selectedPodId === `pod:${pod.id}`;
+                                        return (
+                                          <div
+                                            key={`pod:${pod.id}`}
+                                            onClick={() => {
+                                              setSelectedPodId(`pod:${pod.id}`);
+                                              setSelectedApproverRole("POD_LEAD");
+                                              setSelectedApproverId(pod?.podHeadId || "");
+                                              setIsAssignmentOpen(false);
+                                            }}
+                                            className={cn(
+                                              "px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800/70 transition-colors flex items-center justify-between text-xs",
+                                              isSelected && "bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60"
+                                            )}
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-semibold text-neutral-800 dark:text-neutral-200">Pod: {pod.name}</span>
+                                              {pod.podHeadName && (
+                                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-400">
+                                                  Lead: {pod.podHeadName}
+                                                </span>
+                                              )}
+                                            </div>
+                                            {isSelected && <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />}
+                                          </div>
+                                        );
+                                      })
+                                  ) : (
+                                    <div
+                                      onClick={() => {
+                                        setSelectedPodId("auto_pod");
+                                        setIsAssignmentOpen(false);
+                                      }}
+                                      className="px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800/70 text-xs font-semibold text-neutral-700 dark:text-neutral-300"
+                                    >
+                                      Recruitment Pod System (Auto Broadcast)
+                                    </div>
+                                  )}
+                                </div>
                               )}
-                              {(!activeBranch || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) === true)) && (
-                                <option value="none">Unassigned Allocation (Hold for Manager Assignment)</option>
+
+                              {/* 2. Direct Staff Assignment */}
+                              {(!activeBranch || !!(activeBranch.allowNone ?? activeBranch.allow_none)) && recruitersList && recruitersList.length > 0 && (
+                                <div className="space-y-1">
+                                  <div className="px-2 py-1 text-[10.5px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 bg-neutral-50/80 dark:bg-slate-800/50 rounded">
+                                    Direct Staff Assignment
+                                  </div>
+                                  {recruitersList
+                                    .filter((rec: any) => {
+                                      if (!assignmentSearch.trim()) return true;
+                                      const q = assignmentSearch.toLowerCase();
+                                      const name = (rec.fullName || rec.name || "").toLowerCase();
+                                      const email = (rec.email || "").toLowerCase();
+                                      const role = getUserRoleLabel(rec).toLowerCase();
+                                      return name.includes(q) || email.includes(q) || role.includes(q);
+                                    })
+                                    .map((rec: any) => {
+                                      const name = rec.fullName || rec.name || "User";
+                                      const roleLabel = getUserRoleLabel(rec);
+                                      const isSelected = selectedPodId === `rec:${rec.id}`;
+                                      return (
+                                        <div
+                                          key={`rec:${rec.id}`}
+                                          onClick={() => {
+                                            setSelectedPodId(`rec:${rec.id}`);
+                                            setSelectedApproverRole("PRIMARY_RECRUITER");
+                                            setSelectedApproverId(rec.id);
+                                            setIsAssignmentOpen(false);
+                                          }}
+                                          className={cn(
+                                            "px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800/70 transition-colors flex items-center justify-between text-xs",
+                                            isSelected && "bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60"
+                                          )}
+                                        >
+                                          <div className="flex flex-col text-left">
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="font-semibold text-neutral-900 dark:text-white">{name}</span>
+                                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800">
+                                                [{roleLabel}]
+                                              </span>
+                                            </div>
+                                            <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal mt-0.5">
+                                              {rec.email}
+                                            </span>
+                                          </div>
+                                          {isSelected && <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
+                                        </div>
+                                      );
+                                    })}
+                                </div>
                               )}
-                            </optgroup>
-                          )}
-                        </select>
+
+                              {/* 3. Branch Pool & Allocation */}
+                              {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true) || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) === true)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
+                                <div className="space-y-1">
+                                  <div className="px-2 py-1 text-[10.5px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 bg-neutral-50/80 dark:bg-slate-800/50 rounded">
+                                    Branch Pool & Allocation
+                                  </div>
+                                  {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true)) && (
+                                    <div
+                                      onClick={() => {
+                                        setSelectedPodId("all");
+                                        setSelectedApproverRole("BRANCH_ADMIN");
+                                        setSelectedApproverId("");
+                                        setIsAssignmentOpen(false);
+                                      }}
+                                      className={cn(
+                                        "px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800/70 transition-colors flex items-center justify-between text-xs",
+                                        selectedPodId === "all" && "bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60"
+                                      )}
+                                    >
+                                      <span className="font-semibold text-neutral-800 dark:text-neutral-200">All Branch Recruiters (Pool Broadcast)</span>
+                                      {selectedPodId === "all" && <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />}
+                                    </div>
+                                  )}
+                                  {(!activeBranch || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) === true)) && (
+                                    <div
+                                      onClick={() => {
+                                        setSelectedPodId("none");
+                                        setSelectedApproverRole("BRANCH_ADMIN");
+                                        setSelectedApproverId("");
+                                        setIsAssignmentOpen(false);
+                                      }}
+                                      className={cn(
+                                        "px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800/70 transition-colors flex items-center justify-between text-xs",
+                                        selectedPodId === "none" && "bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60"
+                                      )}
+                                    >
+                                      <span className="font-semibold text-neutral-800 dark:text-neutral-200">Unassigned Allocation (Hold for Manager Assignment)</span>
+                                      {selectedPodId === "none" && <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Department (US Market Only) */}
@@ -3022,13 +3332,24 @@ const getInitialActiveBranchContext = () => {
 
       <AddClientModal
         open={addClientModalOpen}
-        onOpenChange={setAddClientModalOpen}
+        onOpenChange={(open) => {
+          setAddClientModalOpen(open);
+          if (!open) {
+            setPrefilledClientName("");
+          }
+        }}
+        initialClientName={prefilledClientName}
         onClientAdded={(clientName) => {
           fetchClients();
-          if (!getValues("client")) {
+          if (clientModalTarget === "client") {
             setValue("client", clientName, { shouldValidate: true });
+            if (!getValues("endClientName")) {
+              setValue("endClientName", clientName, { shouldValidate: true });
+            }
+          } else {
+            setValue("endClientName", clientName, { shouldValidate: true });
           }
-          setValue("endClientName", clientName, { shouldValidate: true });
+          setPrefilledClientName("");
         }}
         market={market}
       />

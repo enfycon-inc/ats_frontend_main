@@ -1162,7 +1162,6 @@ const clients = {
     return apiFetch<any[]>(`/api/clients${query}`);
   },
 
-
   async get(id: string): Promise<any> {
     return apiFetch<any>(`/api/clients/${id}`);
   },
@@ -1178,6 +1177,19 @@ const clients = {
     return apiFetch<any>(`/api/clients/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+  },
+
+  async approve(id: string): Promise<any> {
+    return apiFetch<any>(`/api/clients/${id}/approve`, {
+      method: 'PATCH',
+    });
+  },
+
+  async reject(id: string, reason?: string): Promise<any> {
+    return apiFetch<any>(`/api/clients/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
     });
   },
 

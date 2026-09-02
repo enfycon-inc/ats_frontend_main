@@ -27,9 +27,19 @@ import {
   Globe,
   MessageSquare,
   Save,
+  Check,
   X,
   Edit,
+  Trash2,
+  Eye,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
 
 // Extend with any client specific fields if needed
@@ -91,19 +101,35 @@ const DEFAULT_CLIENT_COLUMNS = [
 export default function ClientDashboard() {
   const router = useRouter();
   
+  // Current user permissions state
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    atsApi.auth.me().then(u => setCurrentUser(u)).catch(() => {});
+  }, []);
+
+  const userRoles = (currentUser?.roles || []).map((r: string) => String(r).toUpperCase().replace(/[\s-_]+/g, ''));
+  const userPermissions = currentUser?.permissions || [];
+  const isSuperOrAdmin = userRoles.includes('ADMIN') || userRoles.includes('SUPERADMIN') || userRoles.includes('SUPER_ADMIN');
+  const canApproveRejectClient = 
+    userPermissions.includes('client:approve') || 
+    userPermissions.includes('client:reject') ||
+    (userPermissions.length === 0 && isSuperOrAdmin);
+
   // Drawer States
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isColumnOpen, setIsColumnOpen] = useState(false);
 
   // Table Configuration States (User Persistent)
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() =>
-    getUserColumnPreferences("clients", DEFAULT_CLIENT_COLUMNS)
+    getUserColumnPreferences("clients", DEFAULT_CLIENT_COLUMNS).filter((c) => c !== "actions")
   );
 
   // Saved Views State
   const [savedViews, setSavedViews] = useState<string[]>([
-    "My Clients",
+    "All Clients",
     "Active Clients",
+    "Pending Approval",
     "VIP Clients",
   ]);
   const [activeView, setActiveView] = useState("All Clients");
@@ -118,6 +144,11 @@ export default function ClientDashboard() {
   const [clientsData, setClientsData] = useState<ClientData[]>([]);
   const [allClients, setAllClients] = useState<ClientData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Reject Modal State
+  const [clientToReject, setClientToReject] = useState<ClientData | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [isRejecting, setIsRejecting] = useState(false);
 
   // Delete Warning Modal State
   const [clientToDelete, setClientToDelete] = useState<ClientData | null>(null);
@@ -315,6 +346,7 @@ export default function ClientDashboard() {
     { id: "activeJobsCount", label: "Active Jobs" },
     { id: "contactPerson", label: "POC Contact Name" },
     { id: "contactDesignation", label: "POC Title" },
+    { id: "status", label: "Approval / Status" },
     { id: "market", label: "Market" },
     { id: "tierRating", label: "Tier Rating" },
     { id: "onboardingStatus", label: "Onboarding" },
@@ -323,7 +355,6 @@ export default function ClientDashboard() {
     { id: "industry", label: "Industry" },
     { id: "state", label: "State" },
     { id: "city", label: "City" },
-    { id: "status", label: "Status" },
     { id: "category", label: "Category" },
     { id: "primaryOwner", label: "Primary Owner" },
     { id: "businessUnit", label: "Business Unit" },
@@ -345,8 +376,9 @@ export default function ClientDashboard() {
     if (filters.predefined.length > 0) {
       filtered = filtered.filter((client) => {
         return filters.predefined.some((pref) => {
-          if (pref === "Active Clients") return client.status === "Active";
+          if (pref === "Active Clients") return client.status === "Active" && client.approval_status !== "PENDING_APPROVAL";
           if (pref === "Inactive Clients") return client.status === "Inactive";
+          if (pref === "Pending Approval") return client.status === "Pending Approval" || client.approval_status === "PENDING_APPROVAL";
           return true;
         });
       });
@@ -368,7 +400,39 @@ export default function ClientDashboard() {
       setClientsData(baseData);
       setCurrentFilters({ primary: "All selected", predefined: [] });
     } else if (viewName === "Active Clients") {
-      setClientsData(baseData.filter((c) => c.status === "Active"));
+      setClientsData(baseData.filter((c) => c.status === "Active" && c.approval_status !== "PENDING_APPROVAL"));
+    } else if (viewName === "Pending Approval") {
+      setClientsData(baseData.filter((c) => c.status === "Pending Approval" || c.approval_status === "PENDING_APPROVAL"));
+    } else if (viewName === "VIP Clients") {
+      setClientsData(baseData.filter((c) => (c.tierRating || "").includes("TIER_1") || (c.tierRating || "").includes("TIER 1")));
+    }
+  };
+
+  const handleApproveClient = async (client: ClientData) => {
+    const loadingToast = toast.loading(`Approving client "${client.clientName}"...`);
+    try {
+      await atsApi.clients.approve(client.id);
+      toast.success(`Client "${client.clientName}" approved & activated successfully!`, { id: loadingToast });
+      fetchClients();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to approve client.", { id: loadingToast });
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!clientToReject) return;
+    setIsRejecting(true);
+    const loadingToast = toast.loading(`Rejecting client "${clientToReject.clientName}"...`);
+    try {
+      await atsApi.clients.reject(clientToReject.id, rejectReason || "Rejected by Reviewer");
+      toast.success(`Client "${clientToReject.clientName}" rejected.`, { id: loadingToast });
+      setClientToReject(null);
+      setRejectReason("");
+      fetchClients();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to reject client.", { id: loadingToast });
+    } finally {
+      setIsRejecting(false);
     }
   };
 
@@ -453,16 +517,70 @@ export default function ClientDashboard() {
     }
 
     if (colId === "status") {
+      const isPending = row.approval_status === "PENDING_APPROVAL" || row.status === "Pending Approval";
+      const isRejected = row.approval_status === "REJECTED" || row.status === "Rejected";
+
+      if (isPending) {
+        return (
+          <div className="flex items-center gap-1.5">
+            <Badge className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 flex items-center gap-1 shadow-none">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" /> Pending Approval
+            </Badge>
+            {canApproveRejectClient && (
+              <div className="inline-flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleApproveClient(row);
+                  }}
+                  title="Approve Client"
+                  className="inline-flex items-center justify-center h-5 w-5 rounded bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-colors cursor-pointer"
+                >
+                  <Check className="h-3 w-3 stroke-[3]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setClientToReject(row);
+                  }}
+                  title="Reject Client"
+                  className="inline-flex items-center justify-center h-5 w-5 rounded bg-red-600 hover:bg-red-700 text-white shadow-2xs transition-colors cursor-pointer"
+                >
+                  <X className="h-3 w-3 stroke-[3]" />
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      if (isRejected) {
+        return (
+          <div className="flex flex-col gap-0.5 items-start">
+            <Badge className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-50 text-red-700 border-red-300 dark:bg-red-950/40 dark:text-red-300 shadow-none">
+              Rejected
+            </Badge>
+            {row.rejection_reason && (
+              <span className="text-[9px] text-red-500 italic max-w-[130px] truncate" title={row.rejection_reason}>
+                {row.rejection_reason}
+              </span>
+            )}
+          </div>
+        );
+      }
+
       return (
         <Badge
           className={cn(
-            "text-[10px] font-semibold px-1.5 py-0.2 rounded-xs border shadow-none",
+            "text-[10px] font-semibold px-2 py-0.5 rounded-full border shadow-none",
             row.status === "Active"
-              ? "bg-green-50 text-green-700 border-green-200"
-              : "bg-red-50 text-red-700 border-red-200"
+              ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300"
+              : "bg-neutral-100 text-neutral-600 border-neutral-300"
           )}
         >
-          {row.status || "Unknown"}
+          {row.status || "Active"}
         </Badge>
       );
     }
@@ -478,7 +596,6 @@ export default function ClientDashboard() {
       );
     }
 
-
     if (colId === "website") {
       return (
         <a href={row.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
@@ -487,6 +604,55 @@ export default function ClientDashboard() {
       );
     }
     return null;
+  };
+
+  const renderRowActions = (row: ClientData) => {
+    const isPending = row.approval_status === "PENDING_APPROVAL" || row.status === "Pending Approval";
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="p-1 hover:bg-neutral-200 dark:hover:bg-slate-800 rounded text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer">
+            <MoreHorizontal className="h-3.5 w-3.5" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-40 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 py-1 font-sans shadow-lg z-50">
+          <DropdownMenuItem
+            onClick={() => router.push(`/clients/${row.id}`)}
+            className="cursor-pointer text-xs py-1.5 px-2.5 font-medium flex items-center gap-2"
+          >
+            <Eye className="h-3.5 w-3.5 text-neutral-500" /> View Details
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => handleOpenEditModal(row)}
+            className="cursor-pointer text-xs py-1.5 px-2.5 font-medium flex items-center gap-2"
+          >
+            <Edit className="h-3.5 w-3.5 text-blue-500" /> Edit Client
+          </DropdownMenuItem>
+          {isPending && canApproveRejectClient && (
+            <>
+              <DropdownMenuItem
+                onClick={() => handleApproveClient(row)}
+                className="cursor-pointer text-xs py-1.5 px-2.5 font-medium flex items-center gap-2 text-emerald-600 focus:text-emerald-700 focus:bg-emerald-50 dark:focus:bg-emerald-950/40"
+              >
+                <Check className="h-3.5 w-3.5" /> Approve Client
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setClientToReject(row)}
+                className="cursor-pointer text-xs py-1.5 px-2.5 font-medium flex items-center gap-2 text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950/40"
+              >
+                <X className="h-3.5 w-3.5" /> Reject Client
+              </DropdownMenuItem>
+            </>
+          )}
+          <DropdownMenuItem
+            onClick={() => setClientToDelete(row)}
+            className="cursor-pointer text-xs py-1.5 px-2.5 font-medium flex items-center gap-2 text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950/40"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
   };
 
   const topRightActions = (
@@ -536,6 +702,7 @@ export default function ClientDashboard() {
               { label: "Client Name", value: "clientName" },
             ]}
             customCellRenderer={customCellRenderer}
+            actionsRenderer={renderRowActions}
             topRightActions={topRightActions}
           />
         </div>
@@ -858,6 +1025,62 @@ export default function ClientDashboard() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* REJECT CLIENT MODAL */}
+      {clientToReject && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center text-red-600 shrink-0">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                  Reject Client Account
+                </h3>
+                <p className="text-xs text-neutral-500">
+                  Reject <strong className="text-neutral-900 dark:text-white">{clientToReject.clientName}</strong> ({clientToReject.clientId}).
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                Reason / Feedback for Rejection <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                rows={3}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Specify reason for rejecting this client (e.g. Duplicate account, unverified domain, missing billing agreements)..."
+                className="w-full p-2.5 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-lg outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setClientToReject(null);
+                  setRejectReason("");
+                }}
+                disabled={isRejecting}
+                className="text-xs font-semibold"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmReject}
+                disabled={isRejecting || !rejectReason.trim()}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-1.5"
+              >
+                {isRejecting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Confirm Rejection
+              </Button>
+            </div>
           </div>
         </div>
       )}

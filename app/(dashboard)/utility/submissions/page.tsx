@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card } from "@/components/ui/card";
@@ -112,6 +112,242 @@ interface Submission {
   accountManagerName?: string;
   submittedRate?: string | null;
   market?: string;
+  branchId?: string | null;
+  branch?: any;
+}
+
+interface RemarkSuggestTextareaProps {
+  value: string;
+  onChange: (val: string) => void;
+  stage: string;
+  typeFilter?: "ACCEPT" | "REJECT" | "ALL";
+  placeholder?: string;
+  rows?: number;
+  disabled?: boolean;
+  className?: string;
+  customRemarks?: any[];
+  autoFocus?: boolean;
+}
+
+function RemarkSuggestTextarea({
+  value,
+  onChange,
+  stage,
+  typeFilter,
+  placeholder,
+  rows = 3,
+  disabled = false,
+  className = "",
+  customRemarks = [],
+  autoFocus = false,
+}: RemarkSuggestTextareaProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Deduplicate unique remarks for this stage & type filter
+  const uniqueRemarks = useMemo(() => {
+    const stageKey = stage.toLowerCase();
+    const stageItems = (customRemarks || []).filter(
+      r => r.stage?.toLowerCase() === stageKey || (stageKey === "review" && r.stage?.toLowerCase() === "internal_review")
+    );
+    let filtered = stageItems;
+    if (typeFilter === "ACCEPT") {
+      filtered = stageItems.filter(r => r.remarkType === "ACCEPT");
+    } else if (typeFilter === "REJECT") {
+      filtered = stageItems.filter(r => r.remarkType === "REJECT");
+    }
+
+    const seen = new Set<string>();
+    const list: any[] = [];
+    for (const item of filtered) {
+      const text = (item.remarkText || "").trim();
+      const norm = text.toLowerCase();
+      if (text && !seen.has(norm)) {
+        seen.add(norm);
+        list.push(item);
+      }
+    }
+    return list;
+  }, [customRemarks, stage, typeFilter]);
+
+  // Real-time suggestions based on current typed text, ranked by relevance
+  const suggestions = useMemo(() => {
+    if (!value || !value.trim()) {
+      return uniqueRemarks.slice(0, 10);
+    }
+    const q = value.toLowerCase().trim();
+    const lines = value.split("\n");
+    const lastLine = (lines[lines.length - 1] || "").toLowerCase().replace(/^[•\-\*\s]+/, "").trim();
+    const activeSearch = (lastLine.length > 0 ? lastLine : q).trim();
+
+    const matches = uniqueRemarks.filter(r => {
+      const text = (r.remarkText || "").toLowerCase();
+      return text.includes(activeSearch) || text.includes(q);
+    });
+
+    // Score and rank matches by relevance:
+    // 1. Exact match (highest priority: score 1000)
+    // 2. Starts with search query (score 500 - length)
+    // 3. Word starts with search query (e.g. "Screening NA..." for "na") (score 250 - length)
+    // 4. Substring match (e.g. "Internal" for "na") (score 50 - length)
+    const scored = matches.map(item => {
+      const text = (item.remarkText || "").toLowerCase().trim();
+      let score = 0;
+      if (text === activeSearch || text === q) {
+        score = 1000;
+      } else if (text.startsWith(activeSearch) || text.startsWith(q)) {
+        score = 500 - text.length;
+      } else {
+        const escaped = activeSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const wordRegex = new RegExp(`\\b${escaped}`, "i");
+        if (wordRegex.test(text)) {
+          score = 250 - text.length;
+        } else {
+          score = 50 - text.length;
+        }
+      }
+      return { item, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+
+    return scored.map(s => s.item).slice(0, 10);
+  }, [uniqueRemarks, value]);
+
+  // Dismiss on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelect = (text: string) => {
+    if (!value || !value.trim()) {
+      onChange(text);
+    } else {
+      const lines = value.split("\n");
+      if (lines.length > 1) {
+        lines[lines.length - 1] = `• ${text}`;
+        onChange(lines.join("\n"));
+      } else {
+        onChange(text);
+      }
+    }
+    setIsOpen(false);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!isOpen || suggestions.length === 0) {
+      if (e.key === "ArrowDown" && !e.shiftKey) {
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+    } else if (e.key === "Enter" && !e.shiftKey && highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
+      e.preventDefault();
+      handleSelect(suggestions[highlightedIndex].remarkText);
+    } else if (e.key === "Tab" && highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
+      e.preventDefault();
+      handleSelect(suggestions[highlightedIndex].remarkText);
+    } else if (e.key === "Escape") {
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <Textarea
+        ref={textareaRef}
+        rows={rows}
+        disabled={disabled}
+        placeholder={placeholder}
+        value={value}
+        autoFocus={autoFocus}
+        onFocus={() => {
+          if (uniqueRemarks.length > 0) {
+            setIsOpen(true);
+            setHighlightedIndex(0);
+          }
+        }}
+        onChange={(e) => {
+          onChange(e.target.value);
+          if (!isOpen && uniqueRemarks.length > 0) {
+            setIsOpen(true);
+            setHighlightedIndex(0);
+          }
+        }}
+        onKeyDown={handleKeyDown}
+        className={cn("w-full text-xs font-sans resize-none", className)}
+      />
+
+      {isOpen && suggestions.length > 0 && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xl py-1 text-xs divide-y divide-neutral-100 dark:divide-slate-800/60 animate-in fade-in zoom-in-95 duration-100">
+          <div className="px-2.5 py-1 text-[10px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider flex items-center justify-between bg-neutral-50/80 dark:bg-slate-850/80">
+            <span className="flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-indigo-500" />
+              Suggested Remarks ({suggestions.length})
+            </span>
+            <span className="text-[9px] text-neutral-400 font-normal">Press Tab / Enter / Click to insert</span>
+          </div>
+          <div className="py-0.5">
+            {suggestions.map((item, idx) => {
+              const isSelected = idx === highlightedIndex;
+              const isAccept = item.remarkType === "ACCEPT";
+              const isReject = item.remarkType === "REJECT";
+              return (
+                <button
+                  key={item.id || idx}
+                  type="button"
+                  onMouseEnter={() => setHighlightedIndex(idx)}
+                  onClick={() => handleSelect(item.remarkText)}
+                  className={cn(
+                    "w-full text-left px-3 py-1.5 flex items-start gap-2 transition-colors cursor-pointer text-xs",
+                    isSelected
+                      ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-950 dark:text-indigo-200 font-medium"
+                      : "hover:bg-neutral-50 dark:hover:bg-slate-800/60 text-neutral-800 dark:text-neutral-200"
+                  )}
+                >
+                  <span className="mt-0.5 shrink-0">
+                    {isAccept ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    ) : isReject ? (
+                      <XCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                    ) : (
+                      <MessageSquare className="w-3.5 h-3.5 text-indigo-500" />
+                    )}
+                  </span>
+                  <span className="flex-1 leading-snug break-words">
+                    {item.remarkText}
+                  </span>
+                  {isSelected && (
+                    <span className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-400 shrink-0 self-center">
+                      ↵ Insert
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function renderPipelineProgress(sub: Submission) {
@@ -658,27 +894,65 @@ export default function SubmissionsPage() {
     setTimeout(() => loadData(), 50);
   };
 
-  // Helper function to render categorized dropdown options (Accept / Reject / General)
-  const renderCategorizedRemarkOptions = (stage: string) => {
+  // Helper function to render categorized dropdown options (Accept / Reject / General) with deduplication
+  const renderCategorizedRemarkOptions = (stage: string, typeFilter?: "ACCEPT" | "REJECT" | "ALL") => {
     const stageKey = stage.toLowerCase();
     const stageItems = customRemarks.filter(
       r => r.stage?.toLowerCase() === stageKey || (stageKey === "review" && r.stage?.toLowerCase() === "internal_review")
     );
-    const acceptItems = stageItems.filter(r => r.remarkType === "ACCEPT");
-    const rejectItems = stageItems.filter(r => r.remarkType === "REJECT");
-    const generalItems = stageItems.filter(r => r.remarkType === "GENERAL" || !r.remarkType);
+
+    // Deduplicate identical templates
+    const seen = new Set<string>();
+    const uniqueItems: typeof customRemarks = [];
+    for (const r of stageItems) {
+      const norm = (r.remarkText || "").trim().toLowerCase();
+      if (norm && !seen.has(norm)) {
+        seen.add(norm);
+        uniqueItems.push(r);
+      }
+    }
+
+    const acceptItems = uniqueItems.filter(r => r.remarkType === "ACCEPT");
+    const rejectItems = uniqueItems.filter(r => r.remarkType === "REJECT");
+    const generalItems = uniqueItems.filter(r => r.remarkType === "GENERAL" || !r.remarkType);
+
+    if (typeFilter === "ACCEPT") {
+      if (acceptItems.length === 0) {
+        return <option disabled value="">No approval templates configured</option>;
+      }
+      return (
+        <optgroup label="✓ Approval Templates">
+          {acceptItems.map(r => (
+            <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
+          ))}
+        </optgroup>
+      );
+    }
+
+    if (typeFilter === "REJECT") {
+      if (rejectItems.length === 0) {
+        return <option disabled value="">No rejection templates configured</option>;
+      }
+      return (
+        <optgroup label="✕ Rejection Reasons">
+          {rejectItems.map(r => (
+            <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
+          ))}
+        </optgroup>
+      );
+    }
 
     return (
       <>
         {acceptItems.length > 0 && (
-          <optgroup label="✓ Accept / Cleared">
+          <optgroup label="✓ Approval / Cleared">
             {acceptItems.map(r => (
               <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
             ))}
           </optgroup>
         )}
         {rejectItems.length > 0 && (
-          <optgroup label="✕ Reject / Issue">
+          <optgroup label="✕ Rejection / Issue">
             {rejectItems.map(r => (
               <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
             ))}
@@ -695,7 +969,25 @@ export default function SubmissionsPage() {
     );
   };
 
-  const openEditPanel = (sub: Submission) => {
+  const openQuickReview = async (sub: Submission, action: "APPROVE" | "REJECT") => {
+    setQuickReviewSub(sub);
+    setQuickReviewAction(action);
+    setQuickReviewRemark("");
+    setQuickReviewModalOpen(true);
+
+    const currentUser = atsApi.auth.getCurrentUser();
+    const effectiveBranchId = sub.branchId || currentUser?.branchId;
+    try {
+      const remarks = await atsApi.submissions.getCustomRemarks(effectiveBranchId || undefined, true);
+      if (remarks && Array.isArray(remarks) && remarks.length > 0) {
+        setCustomRemarks(remarks);
+      }
+    } catch {
+      // fallback
+    }
+  };
+
+  const openEditPanel = async (sub: Submission) => {
     setSelectedSubmission(sub);
     setL1Status(sub.l1Status || "");
     setL1Date(sub.l1Date || "");
@@ -899,7 +1191,7 @@ export default function SubmissionsPage() {
       toast.error("No submissions available to export.");
       return;
     }
-    const headers = ["ID", "Candidate Name", "Candidate Email", "Job Code", "Job Title", "Client", "Recruiter", "Recruitment Manager / Pod Head", "Submitted Rate", "Recruiter Comment", "L1 Status", "L2 Status", "L3 Status", "Final Status", "Remarks", "Submission Date"];
+    const headers = ["ID", "Candidate Name", "Candidate Email", "Job Code", "Job Title", "Client", "Recruiter", "Recruitment Manager / Pod Head", "Submitted Rate", "Recruiter Comment", "L1 Status", "L2 Status", "L3 Status", "Current Status", "Remarks", "Submission Date"];
     const rows = submissions.map((s) => [
       s.id,
       s.candidateName || "",
@@ -1191,7 +1483,7 @@ export default function SubmissionsPage() {
                       Interview Rounds
                     </th>
                     <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                      Final Status
+                      Current Status
                     </th>
                     <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
                       Remarks &amp; Date
@@ -1284,10 +1576,7 @@ export default function SubmissionsPage() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setQuickReviewSub(sub);
-                                    setQuickReviewAction("APPROVE");
-                                    setQuickReviewRemark("");
-                                    setQuickReviewModalOpen(true);
+                                    openQuickReview(sub, "APPROVE");
                                   }}
                                   className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded shadow-xs cursor-pointer"
                                 >
@@ -1296,10 +1585,7 @@ export default function SubmissionsPage() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setQuickReviewSub(sub);
-                                    setQuickReviewAction("REJECT");
-                                    setQuickReviewRemark("");
-                                    setQuickReviewModalOpen(true);
+                                    openQuickReview(sub, "REJECT");
                                   }}
                                   className="px-1.5 py-0.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 dark:bg-slate-900 dark:border-rose-900 font-semibold text-[10px] rounded cursor-pointer"
                                 >
@@ -1317,7 +1603,7 @@ export default function SubmissionsPage() {
                           </div>
                         </td>
 
-                        {/* 7. Final Status (Pure clean text, no dots) */}
+                        {/* 7. Current Status (Pure clean text, no dots) */}
                         <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
                           {sub.finalStatus === "PENDING_APPROVAL" ? (
                             <span className="text-xs text-neutral-400 italic select-none">In Review</span>
@@ -1509,7 +1795,7 @@ export default function SubmissionsPage() {
       )}
 
       <div
-        className={`fixed top-0 right-0 h-full w-[440px] bg-card border-l border-border shadow-xl z-40 flex flex-col transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-full sm:w-[560px] md:w-[600px] max-w-[95vw] bg-card border-l border-border shadow-2xl z-40 flex flex-col transition-transform duration-300 ease-in-out ${
           panelOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -1639,12 +1925,15 @@ export default function SubmissionsPage() {
                             </select>
                           )}
                         </div>
-                        <Textarea
+                        <RemarkSuggestTextarea
                           rows={2}
                           disabled={!canAuditL1}
-                          placeholder={canAuditL1 ? "Screening feedback or evaluation notes..." : "No remarks recorded."}
+                          placeholder={canAuditL1 ? "Type or select L1 screening notes..." : "No remarks recorded."}
                           value={l1Remarks}
-                          onChange={(e) => setL1Remarks(e.target.value)}
+                          onChange={setL1Remarks}
+                          stage="l1"
+                          typeFilter={l1Status === "PASSED" || l1Status === "CLEARED" ? "ACCEPT" : l1Status === "REJECTED" ? "REJECT" : undefined}
+                          customRemarks={customRemarks}
                           className="text-xs min-h-[52px] resize-none bg-background shadow-none"
                         />
                       </div>
@@ -1699,12 +1988,15 @@ export default function SubmissionsPage() {
                             </select>
                           )}
                         </div>
-                        <Textarea
+                        <RemarkSuggestTextarea
                           rows={2}
                           disabled={!canAccessL2}
-                          placeholder={canAccessL2 ? "Technical evaluation notes..." : "Awaiting Round 1 (L1) clearance."}
+                          placeholder={canAccessL2 ? "Type or select L2 technical evaluation notes..." : "Awaiting Round 1 (L1) clearance."}
                           value={l2Remarks}
-                          onChange={(e) => setL2Remarks(e.target.value)}
+                          onChange={setL2Remarks}
+                          stage="l2"
+                          typeFilter={l2Status === "PASSED" || l2Status === "CLEARED" ? "ACCEPT" : l2Status === "REJECTED" ? "REJECT" : undefined}
+                          customRemarks={customRemarks}
                           className="text-xs min-h-[52px] resize-none bg-background shadow-none"
                         />
                       </div>
@@ -1759,12 +2051,15 @@ export default function SubmissionsPage() {
                             </select>
                           )}
                         </div>
-                        <Textarea
+                        <RemarkSuggestTextarea
                           rows={2}
                           disabled={!canAccessL3}
-                          placeholder={canAccessL3 ? "Commercial remarks..." : "Awaiting Round 2 (L2) clearance."}
+                          placeholder={canAccessL3 ? "Type or select L3 commercial remarks..." : "Awaiting Round 2 (L2) clearance."}
                           value={l3Remarks}
-                          onChange={(e) => setL3Remarks(e.target.value)}
+                          onChange={setL3Remarks}
+                          stage="l3"
+                          typeFilter={l3Status === "PASSED" || l3Status === "CLEARED" ? "ACCEPT" : l3Status === "REJECTED" ? "REJECT" : undefined}
+                          customRemarks={customRemarks}
                           className="text-xs min-h-[52px] resize-none bg-background shadow-none"
                         />
                       </div>
@@ -1774,7 +2069,7 @@ export default function SubmissionsPage() {
                     <div className="rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850/40 p-3.5 space-y-3">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-semibold text-foreground">
-                          Final Client Status
+                          Current Status
                         </Label>
                         <Badge variant="outline" className="text-[10px] font-medium py-0">
                           {finalStatus}
@@ -1810,11 +2105,14 @@ export default function SubmissionsPage() {
                             </select>
                           )}
                         </div>
-                        <Textarea
-                          placeholder={canFinalStatus ? "Client feedback, placement confirmation..." : "No final remarks recorded."}
+                        <RemarkSuggestTextarea
+                          placeholder={canFinalStatus ? "Type or select client feedback, placement notes..." : "No final remarks recorded."}
                           value={remarks}
                           disabled={!canFinalStatus}
-                          onChange={(e) => setRemarks(e.target.value)}
+                          onChange={setRemarks}
+                          stage="final"
+                          typeFilter={finalStatus === "SELECTED" || finalStatus === "JOIN" || finalStatus === "OFFER" ? "ACCEPT" : finalStatus === "REJECTED" ? "REJECT" : undefined}
+                          customRemarks={customRemarks}
                           className="text-xs min-h-[52px] resize-none bg-background shadow-none"
                           rows={2}
                         />
@@ -1843,26 +2141,44 @@ export default function SubmissionsPage() {
                         <div className="flex items-center justify-between">
                           <Label className="text-[11px] text-muted-foreground font-normal">Reviewer Feedback &amp; Notes</Label>
                           {canInternalScreen && (
-                            <select
-                              defaultValue=""
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  setReviewFeedback((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
-                                  e.target.value = "";
-                                }
-                              }}
-                              className="text-[10px] border border-border rounded px-1.5 py-0.5 bg-background text-muted-foreground hover:text-foreground font-medium cursor-pointer"
-                            >
-                              <option value="" disabled>+ Template</option>
-                              {renderCategorizedRemarkOptions("review")}
-                            </select>
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                defaultValue=""
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    setReviewFeedback((prev) => (prev ? `${prev}\n• ${e.target.value}` : e.target.value));
+                                    e.target.value = "";
+                                  }
+                                }}
+                                className="text-[10px] border border-emerald-300 dark:border-emerald-800 rounded px-1.5 py-0.5 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-medium cursor-pointer"
+                              >
+                                <option value="" disabled>+ Approve Template</option>
+                                {renderCategorizedRemarkOptions("review", "ACCEPT")}
+                              </select>
+                              <select
+                                defaultValue=""
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    setReviewFeedback((prev) => (prev ? `${prev}\n• ${e.target.value}` : e.target.value));
+                                    e.target.value = "";
+                                  }
+                                }}
+                                className="text-[10px] border border-rose-300 dark:border-rose-800 rounded px-1.5 py-0.5 bg-rose-50/60 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 font-medium cursor-pointer"
+                              >
+                                <option value="" disabled>+ Reject Template</option>
+                                {renderCategorizedRemarkOptions("review", "REJECT")}
+                              </select>
+                            </div>
                           )}
                         </div>
                         {canInternalScreen ? (
-                          <Textarea
-                            placeholder="Evaluation notes, rate justification, validation remarks..."
+                          <RemarkSuggestTextarea
+                            placeholder="Type to search or write review evaluation notes..."
                             value={reviewFeedback}
-                            onChange={(e) => setReviewFeedback(e.target.value)}
+                            onChange={setReviewFeedback}
+                            stage="review"
+                            typeFilter="ALL"
+                            customRemarks={customRemarks}
                             className="text-xs min-h-[70px] resize-none"
                             rows={3}
                           />
@@ -2163,12 +2479,12 @@ export default function SubmissionsPage() {
                           </div>
                         )}
 
-                        {/* Final Status */}
+                        {/* Current Status */}
                         {selectedSubmission.finalStatus && selectedSubmission.finalStatus !== 'PENDING_APPROVAL' && (
                           <div className="relative">
                             <div className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-foreground" />
                             <div className="font-medium text-foreground flex items-center gap-1.5">
-                              <span>Client Milestone:</span>
+                              <span>Current Status:</span>
                               <Badge variant="outline" className="text-[10px] py-0 font-normal">{selectedSubmission.finalStatus}</Badge>
                             </div>
                             {selectedSubmission.remarks && (
@@ -2536,28 +2852,38 @@ export default function SubmissionsPage() {
             <div className="space-y-1.5">
               <div className="flex justify-between items-center">
                 <label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
-                  Review Remarks &amp; Feedback
+                  {quickReviewAction === "APPROVE" ? "Approval Remarks" : "Rejection Reason & Feedback"}
                 </label>
                 <select
                   defaultValue=""
                   onChange={(e) => {
                     if (e.target.value) {
-                      setQuickReviewRemark((prev) => (prev ? `${prev} | ${e.target.value}` : e.target.value));
+                      setQuickReviewRemark((prev) => (prev ? `${prev}\n• ${e.target.value}` : e.target.value));
                       e.target.value = "";
                     }
                   }}
-                  className="text-[10px] border border-amber-300 dark:border-amber-900 rounded px-2 py-0.5 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-semibold cursor-pointer"
+                  className={`text-[10px] border rounded px-2 py-0.5 font-medium cursor-pointer transition-colors ${
+                    quickReviewAction === "APPROVE"
+                      ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300"
+                      : "border-rose-300 dark:border-rose-800 bg-rose-50/80 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300"
+                  }`}
                 >
-                  <option value="" disabled>+ Quick Pick Pre-Defined Remark</option>
-                  {renderCategorizedRemarkOptions("review")}
+                  <option value="" disabled>
+                    {quickReviewAction === "APPROVE" ? "+ Select Approval Template" : "+ Select Rejection Template"}
+                  </option>
+                  {renderCategorizedRemarkOptions("review", quickReviewAction === "APPROVE" ? "ACCEPT" : "REJECT")}
                 </select>
               </div>
-              <textarea
+              <RemarkSuggestTextarea
                 rows={3}
-                placeholder={quickReviewAction === "APPROVE" ? "e.g. ✓ Resume screened & profile approved for client submission" : "e.g. ✕ Rejected: Expected CTC is too high for this budget..."}
+                placeholder={quickReviewAction === "APPROVE" ? "Type to search or select approval remarks..." : "Type to search or select rejection reasons..."}
                 value={quickReviewRemark}
-                onChange={(e) => setQuickReviewRemark(e.target.value)}
-                className="w-full p-2.5 border border-neutral-300 dark:border-slate-700 rounded-lg bg-transparent text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 resize-none font-sans"
+                onChange={setQuickReviewRemark}
+                stage="review"
+                typeFilter={quickReviewAction === "APPROVE" ? "ACCEPT" : "REJECT"}
+                customRemarks={customRemarks}
+                autoFocus={true}
+                className="w-full p-2.5 border border-neutral-300 dark:border-slate-700 rounded-lg bg-transparent text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 resize-none font-sans placeholder:text-neutral-400"
               />
             </div>
           </div>

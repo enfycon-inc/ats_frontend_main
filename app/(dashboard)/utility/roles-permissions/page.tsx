@@ -66,19 +66,20 @@ const SYSTEM_ARCHETYPES = [
     perms: [
       "candidate:create", "candidate:view",
       "submission:create", "submission:view", "submission:edit",
-      "job:view", "pod:view"
+      "job:view", "client:view", "pod:view"
     ]
   },
   {
     key: "ACCOUNT_MANAGER",
     label: "Account Manager (BDM) Template",
     badge: "Business Development",
-    desc: "Client relations, job requisition authoring, client approvals, interview scheduling, and placements.",
+    desc: "Client relations, direct client creation (no approval needed), job requisition authoring, interview scheduling, and placements.",
     perms: [
-      "job:create", "job:edit", "job:view", "job:approve",
+      "job:create", "job:edit", "job:view", "job:publish_direct", "job:approve", "job:reject",
+      "job:assign_recruiter",
       "candidate:view", "candidate:create",
       "submission:view", "submission:create", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
-      "pod:view", "client:view", "client:create", "client:edit",
+      "pod:view", "client:view", "client:create", "client:direct_add", "client:edit",
       "placement:view", "placement:create", "report:view"
     ]
   },
@@ -91,52 +92,55 @@ const SYSTEM_ARCHETYPES = [
       "job:view", "job:edit", "job:approve", "job:reject",
       "candidate:view", "candidate:create",
       "submission:view", "submission:create", "submission:internal_screening", "submission:schedule_interview", "submission:edit",
-      "pod:view", "pod:edit", "report:view"
+      "client:view", "pod:view", "pod:edit", "report:view"
     ]
   },
   {
     key: "DELIVERY_HEAD",
     label: "Delivery Head Template",
     badge: "Delivery Governance",
-    desc: "Branch delivery orchestration, recruiter & pod allocation, requisition activation, and audit gates.",
+    desc: "Branch delivery orchestration, client approvals & rejections, recruiter & pod allocation, requisition activation, and audit gates.",
     perms: [
       "job:view", "job:edit", "job:approve", "job:reject",
       "job:assign", "job:assign_recruiter", "job:assign_pod",
       "candidate:view", "candidate:create",
       "submission:view", "submission:create", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+      "client:view", "client:create", "client:edit", "client:approve", "client:reject",
       "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
       "candidate:search_all_branches", "job:view_all_branches", "candidate:search_all_markets",
-      "client:view", "placement:view", "report:view"
+      "placement:view", "report:view"
     ]
   },
   {
     key: "BRANCH_ADMIN",
     label: "Branch Admin Template",
     badge: "Branch Governance",
-    desc: "Branch administrative authority, staff role configuration, and branch recruitment oversight.",
+    desc: "Branch administrative authority, client approval & management, staff role configuration, and branch recruitment oversight.",
     perms: [
       "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
       "job:assign", "job:assign_recruiter", "job:assign_pod",
       "candidate:create", "candidate:view",
       "submission:create", "submission:view", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+      "client:view", "client:create", "client:direct_add", "client:edit", "client:approve", "client:reject",
       "branch_admin:manage", "user:manage", "pod:view", "pod:edit",
-      "client:view", "placement:view", "report:view"
+      "placement:view", "placement:create", "report:view"
     ]
   },
   {
     key: "ADMIN",
     label: "Admin / Workspace Director Template",
     badge: "Full Admin",
-    desc: "Full company administration privileges across jobs, clients, candidates, pods, users, and branch offices.",
+    desc: "Full company administration privileges across jobs, clients (create, direct add, approve, reject, delete), candidates, pods, users, and branch offices.",
     perms: [
       "job:create", "job:edit", "job:view", "job:publish_direct", "job:approve", "job:reject",
       "job:assign", "job:assign_recruiter", "job:assign_pod",
       "candidate:create", "candidate:view",
       "submission:view", "submission:create", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+      "client:view", "client:create", "client:direct_add", "client:edit", "client:approve", "client:reject", "client:delete",
       "tenant:settings", "user:manage",
       "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
       "branch_admin:manage", "candidate:search_all_branches", "job:view_all_branches", "candidate:search_all_markets",
-      "client:view", "placement:view", "report:view"
+      "placement:view", "placement:create", "report:view"
     ]
   }
 ];
@@ -298,6 +302,40 @@ export default function RolesPermissionsPage() {
     });
   };
 
+  // Helper to resolve the allowed permissions ceiling for any base system role archetype
+  const getSystemRoleAllowedPermissions = (systemRoleKey?: string | null, baseRoleId?: string | null): string[] => {
+    if (!systemRoleKey && !baseRoleId) return [];
+    const keyUpper = (systemRoleKey || "").toUpperCase();
+
+    // 1. Canonical ceiling from SYSTEM_ARCHETYPES
+    const arch = SYSTEM_ARCHETYPES.find((a) => a.key.toUpperCase() === keyUpper);
+    const archPerms = arch ? arch.perms : [];
+
+    // 2. Include any active DB system role permissions
+    const dbSysRole = roles.find(
+      (r) =>
+        r.isSystem &&
+        ((baseRoleId && r.id === baseRoleId) ||
+          (r.name && keyUpper && r.name.toUpperCase() === keyUpper) ||
+          (r.systemRole && keyUpper && r.systemRole.toUpperCase() === keyUpper))
+    );
+    const dbPerms = dbSysRole && Array.isArray(dbSysRole.permissions) ? dbSysRole.permissions : [];
+
+    return Array.from(new Set([...archPerms, ...dbPerms]));
+  };
+
+  const matrixAllowedPerms = useMemo(() => {
+    return getSystemRoleAllowedPermissions(matrixEditingRole?.systemRole, matrixEditingRole?.baseRoleId);
+  }, [matrixEditingRole, roles]);
+
+  const createAllowedPerms = useMemo(() => {
+    return getSystemRoleAllowedPermissions(newRoleSystemRole);
+  }, [newRoleSystemRole, roles]);
+
+  const editAllowedPerms = useMemo(() => {
+    return getSystemRoleAllowedPermissions(editRoleSystemRole, editingRole?.baseRoleId);
+  }, [editRoleSystemRole, editingRole, roles]);
+
   // Custom roles filtered for the view (strictly excluding system roles)
   const customRolesList = useMemo(() => {
     return roles.filter((r) => !r.isSystem);
@@ -382,13 +420,14 @@ export default function RolesPermissionsPage() {
     try {
       setSubmitting(true);
       const baseSystemRoleObj = roles.find(r => r.isSystem && r.name.toUpperCase() === newRoleSystemRole.toUpperCase());
+      const sanitizedPerms = newRolePermissions.filter(p => createAllowedPerms.includes(p));
       const newRole = await atsApi.auth.createCustomRole({
         name: newRoleName.trim(),
         description: newRoleDesc.trim(),
         systemRole: newRoleSystemRole,
         baseRoleId: baseSystemRoleObj?.id,
         branchId: newRoleBranchId || undefined,
-        permissions: newRolePermissions,
+        permissions: sanitizedPerms,
       });
 
       toast.success(`Custom role "${newRole.name}" created successfully!`);
@@ -408,7 +447,8 @@ export default function RolesPermissionsPage() {
     setEditRoleDesc(role.description || "");
     setEditRoleBranchId(role.branchId || branches[0]?.id || "");
     setEditRoleSystemRole(role.systemRole || "RECRUITER");
-    setEditRolePermissions(role.permissions || []);
+    const allowed = getSystemRoleAllowedPermissions(role.systemRole, role.baseRoleId);
+    setEditRolePermissions((role.permissions || []).filter(p => allowed.includes(p)));
     setShowEditMatrix(false);
     setExpandedEditGroups({});
   };
@@ -421,13 +461,14 @@ export default function RolesPermissionsPage() {
     try {
       setSubmitting(true);
       const baseSystemRoleObj = roles.find(r => r.isSystem && r.name.toUpperCase() === editRoleSystemRole.toUpperCase());
+      const sanitizedPerms = editRolePermissions.filter(p => editAllowedPerms.includes(p));
       await atsApi.auth.updateCustomRole(editingRole.id, {
         name: editRoleName.trim(),
         description: editRoleDesc.trim(),
         systemRole: editRoleSystemRole,
         baseRoleId: baseSystemRoleObj?.id,
         branchId: editRoleBranchId || undefined,
-        permissions: editRolePermissions,
+        permissions: sanitizedPerms,
       });
 
       toast.success(`Role "${editRoleName}" updated successfully!`);
@@ -443,23 +484,26 @@ export default function RolesPermissionsPage() {
   // ─── DIRECT PERMISSIONS MATRIX MODAL HANDLERS ───────────────────
   const openPermissionsModal = (role: CustomRole) => {
     setMatrixEditingRole(role);
-    setMatrixPermissions(role.permissions || []);
+    const allowed = getSystemRoleAllowedPermissions(role.systemRole, role.baseRoleId);
+    setMatrixPermissions((role.permissions || []).filter(p => allowed.includes(p)));
     setExpandedMatrixGroups({});
   };
 
   const handleToggleMatrixPermission = (permId: string) => {
+    if (!matrixAllowedPerms.includes(permId)) return;
     setMatrixPermissions((prev) =>
       prev.includes(permId) ? prev.filter((p) => p !== permId) : [...prev, permId]
     );
   };
 
   const handleToggleMatrixGroup = (groupPerms: Permission[]) => {
-    const groupPermIds = groupPerms.map((p) => p.id);
-    const allEnabled = groupPermIds.every((id) => matrixPermissions.includes(id));
+    const allowedGroupPermIds = groupPerms.filter((p) => matrixAllowedPerms.includes(p.id)).map((p) => p.id);
+    if (allowedGroupPermIds.length === 0) return;
+    const allEnabled = allowedGroupPermIds.every((id) => matrixPermissions.includes(id));
     if (allEnabled) {
-      setMatrixPermissions((prev) => prev.filter((id) => !groupPermIds.includes(id)));
+      setMatrixPermissions((prev) => prev.filter((id) => !allowedGroupPermIds.includes(id)));
     } else {
-      setMatrixPermissions((prev) => Array.from(new Set([...prev, ...groupPermIds])));
+      setMatrixPermissions((prev) => Array.from(new Set([...prev, ...allowedGroupPermIds])));
     }
   };
 
@@ -467,7 +511,8 @@ export default function RolesPermissionsPage() {
     if (!matrixEditingRole) return;
     try {
       setSubmitting(true);
-      await atsApi.auth.updateRolePermissions(matrixEditingRole.id, matrixPermissions);
+      const sanitizedPerms = matrixPermissions.filter(p => matrixAllowedPerms.includes(p));
+      await atsApi.auth.updateRolePermissions(matrixEditingRole.id, sanitizedPerms);
       toast.success(`Permissions updated for role "${matrixEditingRole.name}"`);
       setMatrixEditingRole(null);
       await loadData();
@@ -1067,7 +1112,7 @@ export default function RolesPermissionsPage() {
                   <div className="p-4 space-y-3 bg-neutral-50/30 dark:bg-slate-900/40 border-t border-neutral-200 dark:border-slate-800 animate-in fade-in-0 slide-in-from-top-1 duration-150">
                     <div className="flex items-center justify-between border-b border-neutral-200 dark:border-slate-800 pb-2.5">
                       <div className="text-[11px] text-neutral-500">
-                        Toggle granular security tokens:
+                        Toggle granular security tokens (ceiling enforced by archetype):
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -1090,10 +1135,10 @@ export default function RolesPermissionsPage() {
                         <span className="text-neutral-300 dark:text-slate-700">|</span>
                         <button
                           type="button"
-                          onClick={() => setNewRolePermissions(permissions.map(p => p.id))}
+                          onClick={() => setNewRolePermissions(permissions.filter(p => createAllowedPerms.includes(p.id)).map(p => p.id))}
                           className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
                         >
-                          Select All
+                          Select All Allowed
                         </button>
                         <span className="text-neutral-300 dark:text-slate-700">|</span>
                         <button
@@ -1109,8 +1154,10 @@ export default function RolesPermissionsPage() {
                     <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                       {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
                         const isExpanded = !!expandedCreateGroups[groupName];
-                        const enabledInGroup = groupPerms.filter(p => newRolePermissions.includes(p.id)).length;
-                        const totalInGroup = groupPerms.length;
+                        const allowedInGroup = groupPerms.filter(p => createAllowedPerms.includes(p.id));
+                        const enabledInGroup = allowedInGroup.filter(p => newRolePermissions.includes(p.id)).length;
+                        const totalAllowed = allowedInGroup.length;
+                        const isGroupDisabled = totalAllowed === 0;
 
                         return (
                           <div
@@ -1131,59 +1178,76 @@ export default function RolesPermissionsPage() {
                                 </span>
                                 <span
                                   className={`text-[9.5px] px-2 py-0.5 rounded-full font-semibold ${
-                                    enabledInGroup > 0
-                                      ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
-                                      : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
+                                    isGroupDisabled
+                                      ? "bg-neutral-100 dark:bg-slate-800 text-neutral-400 dark:text-neutral-500"
+                                      : enabledInGroup > 0
+                                        ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
+                                        : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
                                   }`}
                                 >
-                                  {enabledInGroup} / {totalInGroup} enabled
+                                  {isGroupDisabled ? `0 / ${groupPerms.length} available` : `${enabledInGroup} / ${totalAllowed} enabled`}
                                 </span>
                               </div>
 
                               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const ids = groupPerms.map(p => p.id);
-                                    const all = ids.every(id => newRolePermissions.includes(id));
-                                    if (all) {
-                                      setNewRolePermissions(prev => prev.filter(id => !ids.includes(id)));
-                                    } else {
-                                      setNewRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
-                                    }
-                                  }}
-                                  className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                                >
-                                  {groupPerms.every(p => newRolePermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
-                                </button>
+                                {!isGroupDisabled && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const ids = allowedInGroup.map(p => p.id);
+                                      const all = ids.every(id => newRolePermissions.includes(id));
+                                      if (all) {
+                                        setNewRolePermissions(prev => prev.filter(id => !ids.includes(id)));
+                                      } else {
+                                        setNewRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
+                                      }
+                                    }}
+                                    className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                  >
+                                    {allowedInGroup.every(p => newRolePermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
+                                  </button>
+                                )}
                               </div>
                             </div>
 
                             {isExpanded && (
                               <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50/20 dark:bg-slate-900/30">
                                 {groupPerms.map((perm) => {
-                                  const isChecked = newRolePermissions.includes(perm.id);
+                                  const isAllowed = createAllowedPerms.includes(perm.id);
+                                  const isChecked = isAllowed && newRolePermissions.includes(perm.id);
                                   return (
                                     <label
                                       key={perm.id}
-                                      className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
-                                        isChecked
-                                          ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs"
-                                          : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300"
+                                      className={`flex items-start gap-2 p-2 rounded-lg border transition select-none text-xs ${
+                                        !isAllowed
+                                          ? "opacity-45 bg-neutral-100/60 dark:bg-slate-850/40 border-dashed border-neutral-250 dark:border-slate-800 cursor-not-allowed text-neutral-400 dark:text-neutral-500"
+                                          : isChecked
+                                            ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs cursor-pointer"
+                                            : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300 cursor-pointer"
                                       }`}
                                     >
                                       <input
                                         type="checkbox"
+                                        disabled={!isAllowed}
                                         checked={isChecked}
                                         onChange={() => {
+                                          if (!isAllowed) return;
                                           setNewRolePermissions(prev =>
                                             prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
                                           );
                                         }}
-                                        className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                                        className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 disabled:opacity-40 disabled:cursor-not-allowed"
                                       />
                                       <div className="min-w-0 flex-1">
-                                        <span className="font-semibold text-neutral-800 dark:text-neutral-200 block text-[11px]">{perm.name}</span>
+                                        <div className="flex items-center justify-between gap-1">
+                                          <span className={`font-semibold block text-[11px] ${isAllowed ? "text-neutral-800 dark:text-neutral-200" : "text-neutral-400 dark:text-neutral-500"}`}>{perm.name}</span>
+                                          {!isAllowed && (
+                                            <span className="text-[8.5px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-1 py-0.2 rounded border border-amber-200/60 dark:border-amber-900/50 flex items-center gap-0.5 shrink-0">
+                                              <Icon icon="heroicons:lock-closed" className="h-2.5 w-2.5" />
+                                              Locked
+                                            </span>
+                                          )}
+                                        </div>
                                         {perm.description && (
                                           <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
                                         )}
@@ -1304,7 +1368,12 @@ export default function RolesPermissionsPage() {
                 </label>
                 <select
                   value={editRoleSystemRole}
-                  onChange={(e) => setEditRoleSystemRole(e.target.value)}
+                  onChange={(e) => {
+                    const archKey = e.target.value;
+                    setEditRoleSystemRole(archKey);
+                    const newAllowed = getSystemRoleAllowedPermissions(archKey, editingRole?.baseRoleId);
+                    setEditRolePermissions((prev) => prev.filter((p) => newAllowed.includes(p)));
+                  }}
                   className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
                   {SYSTEM_ARCHETYPES.map((arch) => (
@@ -1358,7 +1427,7 @@ export default function RolesPermissionsPage() {
                   <div className="p-4 space-y-3 bg-neutral-50/30 dark:bg-slate-900/40 border-t border-neutral-200 dark:border-slate-800 animate-in fade-in-0 slide-in-from-top-1 duration-150">
                     <div className="flex items-center justify-between border-b border-neutral-200 dark:border-slate-800 pb-2.5">
                       <div className="text-[11px] text-neutral-500">
-                        Configure access tokens for this role:
+                        Configure access tokens for this role (ceiling enforced by archetype):
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -1381,10 +1450,10 @@ export default function RolesPermissionsPage() {
                         <span className="text-neutral-300 dark:text-slate-700">|</span>
                         <button
                           type="button"
-                          onClick={() => setEditRolePermissions(permissions.map(p => p.id))}
+                          onClick={() => setEditRolePermissions(permissions.filter(p => editAllowedPerms.includes(p.id)).map(p => p.id))}
                           className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
                         >
-                          Select All
+                          Select All Allowed
                         </button>
                         <span className="text-neutral-300 dark:text-slate-700">|</span>
                         <button
@@ -1400,8 +1469,10 @@ export default function RolesPermissionsPage() {
                     <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                       {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
                         const isExpanded = !!expandedEditGroups[groupName];
-                        const enabledInGroup = groupPerms.filter(p => editRolePermissions.includes(p.id)).length;
-                        const totalInGroup = groupPerms.length;
+                        const allowedInGroup = groupPerms.filter(p => editAllowedPerms.includes(p.id));
+                        const enabledInGroup = allowedInGroup.filter(p => editRolePermissions.includes(p.id)).length;
+                        const totalAllowed = allowedInGroup.length;
+                        const isGroupDisabled = totalAllowed === 0;
 
                         return (
                           <div
@@ -1422,59 +1493,76 @@ export default function RolesPermissionsPage() {
                                 </span>
                                 <span
                                   className={`text-[9.5px] px-2 py-0.5 rounded-full font-semibold ${
-                                    enabledInGroup > 0
-                                      ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
-                                      : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
+                                    isGroupDisabled
+                                      ? "bg-neutral-100 dark:bg-slate-800 text-neutral-400 dark:text-neutral-500"
+                                      : enabledInGroup > 0
+                                        ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
+                                        : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
                                   }`}
                                 >
-                                  {enabledInGroup} / {totalInGroup} enabled
+                                  {isGroupDisabled ? `0 / ${groupPerms.length} available` : `${enabledInGroup} / ${totalAllowed} enabled`}
                                 </span>
                               </div>
 
                               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const ids = groupPerms.map(p => p.id);
-                                    const all = ids.every(id => editRolePermissions.includes(id));
-                                    if (all) {
-                                      setEditRolePermissions(prev => prev.filter(id => !ids.includes(id)));
-                                    } else {
-                                      setEditRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
-                                    }
-                                  }}
-                                  className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                                >
-                                  {groupPerms.every(p => editRolePermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
-                                </button>
+                                {!isGroupDisabled && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const ids = allowedInGroup.map(p => p.id);
+                                      const all = ids.every(id => editRolePermissions.includes(id));
+                                      if (all) {
+                                        setEditRolePermissions(prev => prev.filter(id => !ids.includes(id)));
+                                      } else {
+                                        setEditRolePermissions(prev => Array.from(new Set([...prev, ...ids])));
+                                      }
+                                    }}
+                                    className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                  >
+                                    {allowedInGroup.every(p => editRolePermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
+                                  </button>
+                                )}
                               </div>
                             </div>
 
                             {isExpanded && (
                               <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50/20 dark:bg-slate-900/30">
                                 {groupPerms.map((perm) => {
-                                  const isChecked = editRolePermissions.includes(perm.id);
+                                  const isAllowed = editAllowedPerms.includes(perm.id);
+                                  const isChecked = isAllowed && editRolePermissions.includes(perm.id);
                                   return (
                                     <label
                                       key={perm.id}
-                                      className={`flex items-start gap-2 p-2 rounded-lg border transition cursor-pointer select-none text-xs ${
-                                        isChecked
-                                          ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs"
-                                          : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300"
+                                      className={`flex items-start gap-2 p-2 rounded-lg border transition select-none text-xs ${
+                                        !isAllowed
+                                          ? "opacity-45 bg-neutral-100/60 dark:bg-slate-850/40 border-dashed border-neutral-250 dark:border-slate-800 cursor-not-allowed text-neutral-400 dark:text-neutral-500"
+                                          : isChecked
+                                            ? "border-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs cursor-pointer"
+                                            : "border-neutral-200 dark:border-slate-800 text-neutral-500 hover:border-neutral-300 cursor-pointer"
                                       }`}
                                     >
                                       <input
                                         type="checkbox"
+                                        disabled={!isAllowed}
                                         checked={isChecked}
                                         onChange={() => {
+                                          if (!isAllowed) return;
                                           setEditRolePermissions(prev =>
                                             prev.includes(perm.id) ? prev.filter(p => p !== perm.id) : [...prev, perm.id]
                                           );
                                         }}
-                                        className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                                        className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 disabled:opacity-40 disabled:cursor-not-allowed"
                                       />
                                       <div className="min-w-0 flex-1">
-                                        <span className="font-semibold text-neutral-800 dark:text-neutral-200 block text-[11px]">{perm.name}</span>
+                                        <div className="flex items-center justify-between gap-1">
+                                          <span className={`font-semibold block text-[11px] ${isAllowed ? "text-neutral-800 dark:text-neutral-200" : "text-neutral-400 dark:text-neutral-500"}`}>{perm.name}</span>
+                                          {!isAllowed && (
+                                            <span className="text-[8.5px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-1 py-0.2 rounded border border-amber-200/60 dark:border-amber-900/50 flex items-center gap-0.5 shrink-0">
+                                              <Icon icon="heroicons:lock-closed" className="h-2.5 w-2.5" />
+                                              Locked
+                                            </span>
+                                          )}
+                                        </div>
                                         {perm.description && (
                                           <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
                                         )}
@@ -1832,7 +1920,7 @@ export default function RolesPermissionsPage() {
                     Permissions Matrix: {matrixEditingRole.name}
                   </h3>
                   <p className="text-[11px] text-neutral-400">
-                    Base Archetype: {matrixEditingRole.systemRole || "RECRUITER"} • {matrixPermissions.length} enabled permissions
+                    Base Archetype: <span className="font-semibold text-neutral-700 dark:text-neutral-200">{matrixEditingRole.systemRole || "RECRUITER"}</span> • {matrixPermissions.filter(p => matrixAllowedPerms.includes(p)).length} / {matrixAllowedPerms.length} enabled permissions {permissions.length > matrixAllowedPerms.length && `(${permissions.length - matrixAllowedPerms.length} locked by archetype)`}
                   </p>
                 </div>
               </div>
@@ -1847,7 +1935,7 @@ export default function RolesPermissionsPage() {
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
               <div className="flex items-center justify-between bg-neutral-50 dark:bg-slate-800/50 p-3 rounded-xl border border-neutral-200 dark:border-slate-700">
                 <div className="text-xs text-neutral-700 dark:text-neutral-300">
-                  Select and configure granular operation access tokens for staff holding this role.
+                  Select and configure granular operation access tokens (only permissions supported by base archetype are available).
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -1870,10 +1958,10 @@ export default function RolesPermissionsPage() {
                   <span className="text-neutral-300 dark:text-slate-700">|</span>
                   <button
                     type="button"
-                    onClick={() => setMatrixPermissions(permissions.map(p => p.id))}
+                    onClick={() => setMatrixPermissions(permissions.filter(p => matrixAllowedPerms.includes(p.id)).map(p => p.id))}
                     className="text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
                   >
-                    Select All
+                    Select All Allowed
                   </button>
                   <span className="text-neutral-300 dark:text-slate-700">|</span>
                   <button
@@ -1889,8 +1977,10 @@ export default function RolesPermissionsPage() {
               <div className="space-y-3">
                 {Object.entries(permissionGroups).map(([groupName, groupPerms]) => {
                   const isExpanded = !!expandedMatrixGroups[groupName];
-                  const enabledInGroup = groupPerms.filter(p => matrixPermissions.includes(p.id)).length;
-                  const totalInGroup = groupPerms.length;
+                  const allowedInGroup = groupPerms.filter(p => matrixAllowedPerms.includes(p.id));
+                  const enabledInGroup = allowedInGroup.filter(p => matrixPermissions.includes(p.id)).length;
+                  const totalAllowed = allowedInGroup.length;
+                  const isGroupDisabled = totalAllowed === 0;
 
                   return (
                     <div
@@ -1911,47 +2001,63 @@ export default function RolesPermissionsPage() {
                           </h4>
                           <span
                             className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold ${
-                              enabledInGroup > 0
-                                ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
-                                : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
+                              isGroupDisabled
+                                ? "bg-neutral-100 dark:bg-slate-800 text-neutral-400 dark:text-neutral-500"
+                                : enabledInGroup > 0
+                                  ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50"
+                                  : "bg-neutral-100 dark:bg-slate-800 text-neutral-500 dark:text-neutral-400"
                             }`}
                           >
-                            {enabledInGroup} / {totalInGroup} enabled
+                            {isGroupDisabled ? `0 / ${groupPerms.length} available` : `${enabledInGroup} / ${totalAllowed} enabled`}
                           </span>
                         </div>
 
                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleMatrixGroup(groupPerms)}
-                            className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                          >
-                            {groupPerms.every(p => matrixPermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
-                          </button>
+                          {!isGroupDisabled && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleMatrixGroup(groupPerms)}
+                              className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                            >
+                              {allowedInGroup.every(p => matrixPermissions.includes(p.id)) ? "Deselect Group" : "Select Group"}
+                            </button>
+                          )}
                         </div>
                       </div>
 
                       {isExpanded && (
                         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50/20 dark:bg-slate-900/30">
                           {groupPerms.map((perm) => {
-                            const isChecked = matrixPermissions.includes(perm.id);
+                            const isAllowed = matrixAllowedPerms.includes(perm.id);
+                            const isChecked = isAllowed && matrixPermissions.includes(perm.id);
                             return (
                               <label
                                 key={perm.id}
-                                className={`flex items-start gap-2.5 p-3 rounded-lg border transition cursor-pointer select-none ${
-                                  isChecked
-                                    ? "border-indigo-300 dark:border-indigo-800 bg-indigo-50/20 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs"
-                                    : "border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300"
+                                className={`flex items-start gap-2.5 p-3 rounded-lg border transition select-none ${
+                                  !isAllowed
+                                    ? "opacity-45 bg-neutral-100/60 dark:bg-slate-850/40 border-dashed border-neutral-250 dark:border-slate-800 cursor-not-allowed text-neutral-400 dark:text-neutral-500"
+                                    : isChecked
+                                      ? "border-indigo-300 dark:border-indigo-800 bg-indigo-50/20 dark:bg-indigo-950/20 text-neutral-900 dark:text-white shadow-2xs cursor-pointer"
+                                      : "border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300 cursor-pointer"
                                 }`}
                               >
                                 <input
                                   type="checkbox"
+                                  disabled={!isAllowed}
                                   checked={isChecked}
                                   onChange={() => handleToggleMatrixPermission(perm.id)}
-                                  className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                  className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                                 />
                                 <div className="min-w-0 flex-1">
-                                  <div className="text-xs font-bold text-neutral-900 dark:text-white">{perm.name}</div>
+                                  <div className="flex items-center justify-between gap-1">
+                                    <div className={`text-xs font-bold ${isAllowed ? "text-neutral-900 dark:text-white" : "text-neutral-400 dark:text-neutral-500"}`}>{perm.name}</div>
+                                    {!isAllowed && (
+                                      <span className="text-[9px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 rounded border border-amber-200/60 dark:border-amber-900/50 flex items-center gap-1 shrink-0">
+                                        <Icon icon="heroicons:lock-closed" className="h-3 w-3" />
+                                        Not in system role
+                                      </span>
+                                    )}
+                                  </div>
                                   <div className="text-[10px] text-neutral-400 font-mono mt-0.5">Token: &apos;{perm.id}&apos;</div>
                                   {perm.description && (
                                     <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-1 leading-snug">{perm.description}</p>

@@ -89,30 +89,25 @@ function ReviewerSelect({
   const selectedUser = candidates.find((u) => u.id === value);
 
   const getRoleBadgeStyle = (roleName: string = "") => {
-    const norm = roleName.toUpperCase().replace(/[\s-_]+/g, "");
-    if (norm.includes("DELIVERYHEAD")) {
-      return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800";
+    const BADGE_PALETTES = [
+      "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800",
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+      "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800",
+      "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+      "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+      "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800",
+      "bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border-teal-200 dark:border-teal-800",
+    ];
+    let hash = 0;
+    for (let i = 0; i < roleName.length; i++) {
+      hash = roleName.charCodeAt(i) + ((hash << 5) - hash);
     }
-    if (norm.includes("ADMIN")) {
-      return "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800";
-    }
-    if (norm.includes("ACCOUNTMANAGER") || norm.includes("BDM")) {
-      return "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800";
-    }
-    if (norm.includes("BRANCHADMIN")) {
-      return "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800";
-    }
-    if (norm.includes("PODLEAD")) {
-      return "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800";
-    }
-    return "bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+    const idx = Math.abs(hash) % BADGE_PALETTES.length;
+    return BADGE_PALETTES[idx];
   };
 
   const getDisplayRole = (u: UserItem) => {
-    if (u.roleName && u.roleName.toUpperCase() !== "RECRUITER") return u.roleName;
-    const nonRecruiter = u.roles?.find((r) => r.toUpperCase().replace(/[\s-_]+/g, "") !== "RECRUITER");
-    if (nonRecruiter) return nonRecruiter;
-    return u.roleName || u.roles?.[0] || "Reviewer";
+    return u.roleName || (u.roles && u.roles.length > 0 ? u.roles[0] : "Team Member");
   };
 
   return (
@@ -296,6 +291,38 @@ export default function UserManagementPage() {
   const [profile, setProfile] = useState<any>(null);
 
   const currentUser = typeof window !== 'undefined' ? atsApi.auth.getCurrentUser() : null;
+  const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
+  const [overrideRole, setOverrideRole] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('override_role');
+    return null;
+  });
+
+  // Granular permission-based access flags for the logged-in user
+  const sessionPerms: string[] = useMemo(() => {
+    if (Array.isArray(profile?.permissions) && profile.permissions.length > 0) {
+      return profile.permissions;
+    }
+    if (Array.isArray(currentUser?.permissions) && currentUser.permissions.length > 0) {
+      return currentUser.permissions;
+    }
+    return [];
+  }, [profile, currentUser]);
+
+  // Branch Admin: has branch_admin:manage but NOT tenant:settings (tenant-level admin)
+  const isBranchAdmin = useMemo(() => {
+    if (overrideRole) {
+      const norm = overrideRole.toUpperCase().replace(/[\s-_]/g, "");
+      if (norm === "BRANCHADMIN") return true;
+      if (norm === "ADMIN" || norm === "SUPERADMIN" || norm === "TENANTADMIN") return false;
+    }
+    if (sessionPerms.length > 0) {
+      return sessionPerms.includes('branch_admin:manage') && !sessionPerms.includes('tenant:settings');
+    }
+    const userRole = (currentUser?.systemRole || currentUser?.roles?.[0] || "").toUpperCase().replace(/[\s-_]/g, "");
+    return userRole === "BRANCHADMIN";
+  }, [overrideRole, sessionPerms, currentUser]);
+
+  const isTenantAdmin = sessionPerms.includes('tenant:settings') || (!isBranchAdmin && (overrideRole === 'ADMIN' || overrideRole === 'Tenant Admin'));
 
   const getDomainSuffix = () => {
     const userEmail = profile?.email || currentUser?.email;
@@ -307,46 +334,100 @@ export default function UserManagementPage() {
   const tenantDomain = getDomainSuffix();
   const userLimit = profile?.userLimit || 10;
 
-  // Filter reviewers who have internal screening & review permissions enabled
+  // Filter reviewers who have internal screening & review permissions enabled (pure granular permission check)
   const eligibleReviewers = useMemo(() => {
     return users.filter((u) => {
       if (!u.isActive) return false;
       if (u.canReview) return true;
       const perms = u.permissions || [];
-      if (
+      return (
         perms.includes("submission:internal_screening") ||
         perms.includes("job:approve") ||
         perms.includes("job:reject") ||
-        perms.includes("job:publish_direct")
-      ) {
-        return true;
-      }
-      const allRoles: string[] = [
-        ...(u.roles || []),
-        u.roleName || "",
-        ...(u.branchRoles ? Object.values(u.branchRoles).flat() : []),
-      ].filter(Boolean);
-
-      return allRoles.some((r) => {
-        const norm = (r || "").toUpperCase().replace(/[\s-_]+/g, "");
-        return (
-          norm === "ADMIN" ||
-          norm === "SUPERADMIN" ||
-          norm === "TENANTADMIN" ||
-          norm === "DELIVERYHEAD" ||
-          norm === "BRANCHADMIN" ||
-          norm === "PODLEAD" ||
-          norm === "ACCOUNTMANAGER"
-        );
-      });
+        perms.includes("job:publish_direct") ||
+        perms.includes("branch_admin:manage") ||
+        perms.includes("tenant:settings")
+      );
     });
   }, [users]);
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
+  // Branch Admins see only their own branch (backend-scoped), so lock the branch filter
   const [branchFilter, setBranchFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
+
+  // Pure dynamic role options from database (without any hardcoded role names or archetype if/else ladders)
+  const roleFilterOptions = useMemo(() => {
+    const effectiveBranch = isBranchAdmin
+      ? (profile?.branchId || currentUser?.branchId || activeBranchId)
+      : (branchFilter !== "ALL" && branchFilter !== "UNASSIGNED" ? branchFilter : null);
+
+    // 1. Identify custom roles for the effective branch
+    const branchCustomRoles = effectiveBranch
+      ? rolesList.filter(
+          (r) =>
+            !r.isSystem &&
+            r.branchId &&
+            String(r.branchId).toLowerCase() === String(effectiveBranch).toLowerCase()
+        )
+      : [];
+
+    const coveredArchetypes = new Set<string>();
+    branchCustomRoles.forEach((cr) => {
+      if (cr.systemRole) coveredArchetypes.add(cr.systemRole.toUpperCase().replace(/[\s-_]/g, ""));
+      if (cr.baseRoleName) coveredArchetypes.add(cr.baseRoleName.toUpperCase().replace(/[\s-_]/g, ""));
+      if (cr.name) coveredArchetypes.add(cr.name.toUpperCase().replace(/[\s-_]/g, ""));
+    });
+
+    // 2. Filter candidate roles
+    const scopedRoles = rolesList.filter((r) => {
+      if (effectiveBranch) {
+        // If it's a custom role of this branch, keep it
+        if (!r.isSystem && r.branchId && String(r.branchId).toLowerCase() === String(effectiveBranch).toLowerCase()) {
+          return true;
+        }
+        // If it's a system role, check if covered by custom roles in this branch
+        if (r.isSystem) {
+          const sysNorm = (r.systemRole || "").toUpperCase().replace(/[\s-_]/g, "");
+          const nameNorm = (r.name || "").toUpperCase().replace(/[\s-_]/g, "");
+          if (coveredArchetypes.has(sysNorm) || coveredArchetypes.has(nameNorm)) return false;
+          if (nameNorm === "ADMIN" || nameNorm === "SUPERADMIN" || nameNorm === "TENANTADMIN") return false;
+          return true;
+        }
+        return false;
+      }
+
+      if (branchFilter === "UNASSIGNED") {
+        return !r.branchId;
+      }
+
+      return true;
+    });
+
+    const seen = new Set<string>();
+    const options: { value: string; label: string }[] = [];
+
+    for (const r of scopedRoles) {
+      if (!r.name) continue;
+      const rawName = r.name.trim();
+      const norm = rawName.toUpperCase().replace(/[\s-_]/g, "");
+      if (norm.startsWith("DEFAULTROLES") || norm === "OFFLINEACCESS" || norm === "UMAAUTHORIZATION" || norm === "SUPERADMIN") continue;
+
+      let label = rawName;
+      if (r.branchName && !effectiveBranch && branchFilter === "ALL") {
+        label = `${rawName} (${r.branchName})`;
+      }
+
+      if (!seen.has(norm)) {
+        seen.add(norm);
+        options.push({ value: rawName, label });
+      }
+    }
+
+    return options;
+  }, [rolesList, isBranchAdmin, branchFilter, profile?.branchId, currentUser?.branchId, activeBranchId]);
 
   // Multi-select bulk action state
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -375,7 +456,7 @@ export default function UserManagementPage() {
     email: "",
     password: "",
     confirmPassword: "",
-    roles: ["RECRUITER"],
+    roles: [] as string[],
     branchId: "",
     assignedBranchIds: [] as string[],
     branchRoles: {} as Record<string, string[]>,
@@ -429,7 +510,7 @@ export default function UserManagementPage() {
     assignedBranchIds: [] as string[],
     branchRoles: {} as Record<string, string[]>,
     jobReviewerId: "",
-    roles: ["RECRUITER"],
+    roles: [] as string[],
   });
 
   // Password Reset Form
@@ -497,13 +578,15 @@ export default function UserManagementPage() {
       setSubmitting(true);
       const tenantId = profile?.tenantId || currentUser?.tenantId || "";
       const primaryBranchId = addForm.branchId || (branches.length > 0 ? branches[0].id : "");
-      const selectedRoles = Array.isArray(addForm.roles) && addForm.roles.length > 0 ? addForm.roles : ["RECRUITER"];
+      const selectedRoles = Array.isArray(addForm.roles) && addForm.roles.length > 0 
+        ? addForm.roles 
+        : (rolesList.length > 0 ? [rolesList[0].name] : []);
 
       await atsApi.auth.registerUser({
         email: fullEmail,
         fullName: trimmedName,
         password: password,
-        role: selectedRoles[0] || "RECRUITER",
+        role: selectedRoles[0] || undefined,
         tenantId: tenantId,
         isApproved: true,
         sendEmailInvite: true,
@@ -529,7 +612,7 @@ export default function UserManagementPage() {
         email: "",
         password: "",
         confirmPassword: "",
-        roles: ["RECRUITER"],
+        roles: [],
         branchId: branches[0]?.id || "",
         assignedBranchIds: [],
         branchRoles: {},
@@ -564,7 +647,7 @@ export default function UserManagementPage() {
           cleanBranchRoles[bId] = editForm.branchRoles[bId];
         }
       });
-      const finalRoles = Array.isArray(editForm.roles) && editForm.roles.length > 0 ? editForm.roles : ["RECRUITER"];
+      const finalRoles = Array.isArray(editForm.roles) ? editForm.roles : [];
 
       await atsApi.auth.updateUserDetail(selectedUser.id, {
         fullName: trimmedName,
@@ -786,7 +869,7 @@ export default function UserManagementPage() {
     try {
       setLoading(true);
       await atsApi.auth.bulkSetJobReviewer(selectedUserIds, targetBulkReviewerId || null);
-      toast.success(`Updated Job Reviewer for ${selectedUserIds.length} user(s)!`);
+      toast.success(`Updated Internal Screening Reviewer for ${selectedUserIds.length} user(s)!`);
       setIsBulkReviewerModalOpen(false);
       setSelectedUserIds([]);
       setTargetBulkReviewerId("");
@@ -853,37 +936,29 @@ export default function UserManagementPage() {
     return res;
   };
 
-  // Unified helper to resolve human-readable labels from dynamic custom roles or standard archetypes
+  // Unified helper to resolve human-readable labels from dynamic custom roles
   const formatRoleLabel = (r: string, bId?: string): string => {
-    if (!r || typeof r !== "string") return "Recruiter";
+    if (!r || typeof r !== "string") return "";
     const upper = r.trim().toUpperCase();
 
-    // 1. Dynamic custom role lookup from rolesList
+    // 1. Dynamic lookup from database rolesList
     const customRole = (rolesList || []).find(
       (cr) =>
-        !cr.isSystem &&
-        ((!bId || !cr.branchId || cr.branchId === bId) &&
-          (cr.name.toUpperCase() === upper ||
-            cr.id === r ||
-            (cr.systemRole && cr.systemRole.toUpperCase() === upper)))
+        (!bId || !cr.branchId || cr.branchId === bId) &&
+        (cr.id === r || cr.name?.toUpperCase() === upper || (cr.systemRole && cr.systemRole.toUpperCase() === upper))
     ) || (rolesList || []).find(
       (cr) =>
-        !cr.isSystem &&
-        (cr.name.toUpperCase() === upper ||
-          cr.id === r ||
-          (cr.systemRole && cr.systemRole.toUpperCase() === upper))
+        cr.id === r || cr.name?.toUpperCase() === upper || (cr.systemRole && cr.systemRole.toUpperCase() === upper)
     );
 
     if (customRole) {
       return customRole.name;
     }
 
-    if (upper === "ACCOUNT_MANAGER" || upper === "ACCOUNT MANAGER" || upper === "BDM" || upper === "BD_MANAGER" || upper === "BD MANAGER") return "Account Manager";
-    if (upper === "POD_LEAD" || upper === "POD LEAD") return "Pod Lead";
-    if (upper === "BRANCH_ADMIN" || upper === "BRANCH ADMIN") return "Branch Admin";
-    if (upper === "DELIVERY_HEAD" || upper === "DELIVERY HEAD") return "Delivery Head";
-    if (upper === "RECRUITER") return "Recruiter";
-    if (upper === "ADMIN" || upper === "SUPER_ADMIN" || upper === "SUPER ADMIN" || upper === "TENANT_ADMIN" || upper === "TENANT ADMIN") return "Tenant Admin";
+    if (upper === "ADMIN" || upper === "TENANT_ADMIN" || upper === "SUPER_ADMIN" || upper === "TENANT ADMIN") {
+      return "Tenant Admin";
+    }
+
     return r.replace(/_/g, " ");
   };
 
@@ -1024,7 +1099,14 @@ export default function UserManagementPage() {
 
     const matchesRole =
       roleFilter === "ALL" ||
-      userRolesList.some(r => typeof r === "string" && r.toUpperCase() === roleFilter.toUpperCase());
+      userRolesList.some((r) => {
+        if (typeof r !== "string") return false;
+        const rNorm = r.toUpperCase().replace(/[\s-_]/g, "");
+        const filterNorm = roleFilter.toUpperCase().replace(/[\s-_]/g, "");
+        if (rNorm === filterNorm || r.toUpperCase() === roleFilter.toUpperCase()) return true;
+        if ((filterNorm === "TENANTADMIN" || filterNorm === "ADMIN") && (rNorm === "TENANTADMIN" || rNorm === "ADMIN")) return true;
+        return false;
+      });
 
     const matchesBranch =
       branchFilter === "ALL" ||
@@ -1087,10 +1169,10 @@ export default function UserManagementPage() {
 
       {/* STANDARD FILTER & SEARCH TOOLBAR */}
       <div className="bg-white dark:bg-slate-900 border border-default-200 dark:border-slate-800 rounded-lg p-3 shadow-xs space-y-3">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           
-          {/* SEARCH INPUT */}
-          <div className="relative flex-1 w-full">
+          {/* SEARCH BOX */}
+          <div className="relative flex-1 min-w-[240px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-default-400" />
             <Input
               value={searchQuery}
@@ -1109,30 +1191,29 @@ export default function UserManagementPage() {
               className="h-9 text-xs rounded-md border border-default-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-medium text-default-700 dark:text-neutral-200 outline-none hover:border-indigo-500"
             >
               <option value="ALL">All Roles</option>
-              {(branchFilter === "ALL" || branchFilter === "UNASSIGNED"
-                ? rolesList
-                : rolesList.filter((r) => !r.branchId || r.branchId === branchFilter)
-              ).map((r) => (
-                <option key={r.id || r.name} value={r.name}>
-                  {r.name}{r.branchName && branchFilter === "ALL" ? ` (${r.branchName})` : ""}
+              {roleFilterOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>
 
-            {/* BRANCH FILTER */}
-            <select
-              value={branchFilter}
-              onChange={(e) => setBranchFilter(e.target.value)}
-              className="h-9 text-xs rounded-md border border-default-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-medium text-default-700 dark:text-neutral-200 outline-none hover:border-indigo-500"
-            >
-              <option value="ALL">All Branch Offices</option>
-              <option value="UNASSIGNED">Unassigned (HQ Shared)</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+            {/* BRANCH FILTER — hidden for Branch Admins (backend already scopes to their branch) */}
+            {!isBranchAdmin && (
+              <select
+                value={branchFilter}
+                onChange={(e) => setBranchFilter(e.target.value)}
+                className="h-9 text-xs rounded-md border border-default-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-medium text-default-700 dark:text-neutral-200 outline-none hover:border-indigo-500"
+              >
+                <option value="ALL">All Branch Offices</option>
+                <option value="UNASSIGNED">Unassigned (HQ Shared)</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            )}
 
             {/* STATUS FILTER */}
             <select
@@ -1191,7 +1272,7 @@ export default function UserManagementPage() {
 
                     <DropdownMenuItem
                       onClick={() => {
-                        setBulkSelectedRoleIds(["RECRUITER"]);
+                        setBulkSelectedRoleIds([]);
                         setIsBulkRoleModalOpen(true);
                       }}
                       className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-semibold"
@@ -1216,7 +1297,7 @@ export default function UserManagementPage() {
                       }}
                       className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-semibold"
                     >
-                      <UserCheck className="h-3.5 w-3.5 text-indigo-600" /> Assign Job Reviewer...
+                      <UserCheck className="h-3.5 w-3.5 text-indigo-600" /> Assign Internal Screening Reviewer...
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
@@ -1334,7 +1415,7 @@ export default function UserManagementPage() {
                   <th className="py-3 px-4">Work Email</th>
                   <th className="py-3 px-4">Assigned Role(s)</th>
                   <th className="py-3 px-4">Branch Location</th>
-                  <th className="py-3 px-4">Job Reviewer</th>
+                  <th className="py-3 px-4">Internal Screening Reviewer</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -1387,39 +1468,6 @@ export default function UserManagementPage() {
                             const groups = getUserEffectiveRoleGroups(user, branchFilter);
                             const hasMultipleBranches = (user.assignedBranchIds && user.assignedBranchIds.length > 1) ||
                               (user.branchRoles && Object.keys(user.branchRoles).length > 1);
-
-                            const formatRoleLabel = (r: string, bId?: string) => {
-                              if (!r || typeof r !== "string") return "Recruiter";
-                              const upper = r.trim().toUpperCase();
-
-                              // 1. Dynamic custom role lookup from rolesList
-                              const customRole = (rolesList || []).find(
-                                (cr) =>
-                                  !cr.isSystem &&
-                                  ((!bId || !cr.branchId || cr.branchId === bId) &&
-                                    (cr.name.toUpperCase() === upper ||
-                                      cr.id === r ||
-                                      (cr.systemRole && cr.systemRole.toUpperCase() === upper)))
-                              ) || (rolesList || []).find(
-                                (cr) =>
-                                  !cr.isSystem &&
-                                  (cr.name.toUpperCase() === upper ||
-                                    cr.id === r ||
-                                    (cr.systemRole && cr.systemRole.toUpperCase() === upper))
-                              );
-
-                              if (customRole) {
-                                return customRole.name;
-                              }
-
-                              if (upper === "ACCOUNT_MANAGER" || upper === "BDM" || upper === "BD_MANAGER" || upper === "BD MANAGER") return "Account Manager";
-                              if (upper === "POD_LEAD") return "Pod Lead";
-                              if (upper === "BRANCH_ADMIN") return "Branch Admin";
-                              if (upper === "DELIVERY_HEAD") return "Delivery Head";
-                              if (upper === "RECRUITER") return "Recruiter";
-                              if (upper === "ADMIN" || upper === "SUPER_ADMIN") return "Tenant Admin";
-                              return r.replace(/_/g, " ");
-                            };
 
                             return groups.map((group, idx) => {
                               const roleLabels = dedupeCaseInsensitiveRoles(group.roles, group.branchId);
@@ -2022,14 +2070,14 @@ export default function UserManagementPage() {
                 </div>
               </div>
 
-              {/* DESIGNATED JOB REVIEWER / APPROVER */}
+              {/* DESIGNATED INTERNAL SCREENING REVIEWER */}
               <div className="space-y-2 pt-3 border-t border-neutral-100 dark:border-slate-800">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                    <UserCheck className="h-4 w-4 text-indigo-600" /> Designated Job Reviewer / Approver
+                    <UserCheck className="h-4 w-4 text-indigo-600" /> Designated Reviewer (Internal Screening Gate)
                   </label>
                   <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded">
-                    Approval Routing
+                    Internal Screening
                   </span>
                 </div>
                 <ReviewerSelect

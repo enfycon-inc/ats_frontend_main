@@ -10,6 +10,7 @@ import {
   BarChart3,
   Settings,
   Mail,
+  Bell,
   FileText,
   Calendar,
   Star,
@@ -193,6 +194,8 @@ export const MORE_NAV_ITEMS: NavItem[] = [
   { id: "role-management", label: "Role Management", href: "/utility/roles-permissions", icon: UserCheck },
   { id: "pod-management", label: "Recruitment Pods", href: "/utility/pods", icon: Users },
   { id: "dictionaries", label: "Master Dictionaries", href: "/utility/dictionaries", icon: Database },
+  { id: "notifications-hub", label: "Live Notification Hub", href: "/utility/notifications", icon: Bell },
+  { id: "notification-settings", label: "Notification Preferences", href: "/utility/settings-notifications", icon: Settings },
   { id: "settings", label: "Settings", href: "/company", icon: Settings },
   { id: "help", label: "Help & Support", href: "/help", icon: HelpCircle },
 ];

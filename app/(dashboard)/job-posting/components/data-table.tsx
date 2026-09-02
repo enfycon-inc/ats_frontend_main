@@ -94,13 +94,8 @@ export default function DataTable({
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
     const roles = (currentUser.roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
-    return (
-      permissions.includes("job:approve") ||
-      roles.includes("SUPERADMIN") ||
-      roles.includes("ADMIN") ||
-      roles.includes("DELIVERYHEAD") ||
-      roles.includes("BRANCHADMIN")
-    );
+    const isSuperOrAdmin = roles.includes("SUPERADMIN") || roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
+    return permissions.includes("job:approve") || (permissions.length === 0 && isSuperOrAdmin);
   }, [currentUser]);
 
   const activeSelectedColumns = useMemo(() => {
@@ -858,15 +853,12 @@ export default function DataTable({
                                 {clientSearchText.trim() !== "" && !availableClientNames.some(cn => cn.toLowerCase() === clientSearchText.trim().toLowerCase()) && (
                                   <div
                                     onClick={() => {
-                                      const customName = clientSearchText.trim();
-                                      if (onUpdateJob) onUpdateJob(job.id, { [colId]: customName });
-                                      handleCellCancel();
-                                      toast.success(`${colId === "endClientName" ? "End Client" : "Client"} set to ${customName}`);
+                                      setAddClientModalOpen(true);
                                     }}
                                     className="px-2.5 py-1.5 rounded-md cursor-pointer bg-blue-50 dark:bg-blue-950/40 text-[#1a4fa0] dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center justify-between text-xs font-semibold"
                                   >
                                     <span>Use "{clientSearchText.trim()}"</span>
-                                    <span className="text-[10px] uppercase tracking-wider font-bold">Select</span>
+                                    <span className="text-[10px] uppercase tracking-wider font-bold">+ Add New</span>
                                   </div>
                                 )}
 
@@ -2152,6 +2144,7 @@ export default function DataTable({
       <AddClientModal
         open={addClientModalOpen}
         onOpenChange={setAddClientModalOpen}
+        initialClientName={clientSearchText.trim()}
         onClientAdded={(newClientName) => {
           if (editingCell?.rowId && onUpdateJob) {
             onUpdateJob(editingCell.rowId, { client: newClientName });

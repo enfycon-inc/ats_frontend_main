@@ -38,12 +38,14 @@ interface AddClientModalProps {
   onOpenChange: (open: boolean) => void;
   onClientAdded: (clientName: string) => void;
   market?: "US" | "IN";
+  initialClientName?: string;
 }
 
-export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US" }: AddClientModalProps) {
+export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US", initialClientName = "" }: AddClientModalProps) {
   const { register, handleSubmit, formState: { errors, isSubmitting }, watch, setValue, reset } = useForm<AddClientFormValues>({
     resolver: zodResolver(addClientSchema),
     defaultValues: {
+      clientName: initialClientName || "",
       status: "Active",
       country: market === "IN" ? "IN" : "US",
     }
@@ -53,15 +55,30 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
   const countries = Country.getAllCountries();
   const states = countryIso ? State.getStatesOfCountry(countryIso) : [];
 
-  // Pre-fill ownership with current logged-in user details and business unit with active branch
+  const [hasDirectAddClearance, setHasDirectAddClearance] = React.useState<boolean>(true);
+
+  // Pre-fill ownership with current logged-in user details, initial client name and business unit
   useEffect(() => {
     if (open) {
+      if (initialClientName) {
+        setValue("clientName", initialClientName);
+      }
       const fetchProfile = async () => {
         try {
           const prof = await atsApi.auth.me();
           if (prof) {
             const onboardingUser = prof.fullName || prof.full_name || prof.name || prof.email || "";
             setValue("ownership", onboardingUser);
+
+            const userRoles = (prof.roles || []).map((r: string) => String(r).toUpperCase().replace(/[\s-_]+/g, ''));
+            const userPermissions = prof.permissions || [];
+            const isSuperOrAdmin = userRoles.includes('ADMIN') || userRoles.includes('SUPERADMIN');
+            const directAdd = 
+              userPermissions.includes('client:direct_add') || 
+              userPermissions.includes('client:approve') || 
+              (userPermissions.length === 0 && isSuperOrAdmin);
+            
+            setHasDirectAddClearance(directAdd);
           }
         } catch (e) {
           console.error("Failed to load user profile in modal", e);
@@ -95,13 +112,17 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
         stop_notifications: false,
       };
 
-      await atsApi.clients.create(payload);
-      toast.success("Client added successfully!");
+      const res = await atsApi.clients.create(payload);
+      if (res?.approval_status === 'PENDING_APPROVAL' || res?.status === 'Pending Approval') {
+        toast.success("Client submitted for Manager / Delivery Head approval.");
+      } else {
+        toast.success("Client added and approved directly!");
+      }
       onClientAdded(data.clientName);
       reset();
       onOpenChange(false);
     } catch (e: any) {
-      toast.error(e.response?.data?.message || "Failed to add client");
+      toast.error(e.response?.data?.message || e.message || "Failed to add client");
     }
   };
 
@@ -225,12 +246,18 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
 
           </div>
 
+          {!hasDirectAddClearance && (
+            <div className="p-2.5 rounded bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-[11px] text-amber-800 dark:text-amber-300">
+              <span className="font-bold">Approval Gate Notice:</span> You do not have direct client approval permission. This client account will be created under <strong>Pending Approval</strong> and must be reviewed by a Delivery Head or Admin before associated job requisitions can go live.
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 border-t pt-4 mt-6">
             <Button type="button" variant="outline" className="h-8 text-xs" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting} className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-              Save
+              {hasDirectAddClearance ? "Add Client" : "Submit for Approval"}
             </Button>
           </div>
         </form>

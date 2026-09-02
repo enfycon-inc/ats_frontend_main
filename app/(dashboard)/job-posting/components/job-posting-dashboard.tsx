@@ -208,17 +208,13 @@ export default function JobPostingDashboard({
         setAllJobs(jobsToDisplay);
         setJobsData(filteredByRoute);
       } else {
-        const fallbackJobs = market === "IN" ? mockJobsIN : mockJobs;
-        const filteredByRoute = fallbackJobs.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
-        setAllJobs(fallbackJobs);
-        setJobsData(filteredByRoute);
+        setAllJobs([]);
+        setJobsData([]);
       }
     } catch (err) {
-      console.warn("[Jobs] API fetch failed, using fallback data:", err);
-      const fallbackJobs = market === "IN" ? mockJobsIN : mockJobs;
-      const filteredByRoute = fallbackJobs.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
-      setAllJobs(fallbackJobs);
-      setJobsData(filteredByRoute);
+      console.warn("[Jobs] API fetch failed:", err);
+      setAllJobs([]);
+      setJobsData([]);
     } finally {
       setIsLoading(false);
     }

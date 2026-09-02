@@ -38,6 +38,22 @@ export default function ClientDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "tax" | "qualifier" | "jobs">("overview");
   const [clientData, setClientData] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [clientToReject, setClientToReject] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [isProcessingApproval, setIsProcessingApproval] = useState(false);
+
+  useEffect(() => {
+    atsApi.auth.me().then(u => setCurrentUser(u)).catch(() => {});
+  }, []);
+
+  const userRoles = (currentUser?.roles || []).map((r: string) => String(r).toUpperCase().replace(/[\s-_]+/g, ''));
+  const userPermissions = currentUser?.permissions || [];
+  const isSuperOrAdmin = userRoles.includes('ADMIN') || userRoles.includes('SUPERADMIN') || userRoles.includes('SUPER_ADMIN');
+  const canApproveRejectClient = 
+    userPermissions.includes('client:approve') || 
+    userPermissions.includes('client:reject') ||
+    (userPermissions.length === 0 && isSuperOrAdmin);
 
   // Editable Form State
   const [formData, setFormData] = useState<any>({
@@ -102,14 +118,14 @@ export default function ClientDetailPage() {
         fillability_score: data?.fillability_score || "HIGH",
         vetting_notes: data?.vetting_notes || "",
         onboarding_status: data?.onboarding_status || "ACTIVE",
-        msa_signed: !!data?.msa_signed,
-        sow_executed: !!data?.sow_executed,
-        coi_received: !!data?.coi_received,
-        vendor_portal_created: !!data?.vendor_portal_created,
+        msa_signed: data?.msa_signed === true,
+        sow_executed: data?.sow_executed === true,
+        coi_received: data?.coi_received === true,
+        vendor_portal_created: data?.vendor_portal_created === true,
       });
-    } catch (err) {
-      console.error("Failed to load client details:", err);
-      toast.error("Failed to load client details.");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to load client details.");
     } finally {
       setIsLoading(false);
     }
@@ -151,6 +167,40 @@ export default function ClientDetailPage() {
     }
   };
 
+  const handleApprove = async () => {
+    setIsProcessingApproval(true);
+    const toastId = toast.loading("Approving client account...");
+    try {
+      await atsApi.clients.approve(clientId);
+      toast.success("Client account approved & activated successfully!", { id: toastId });
+      fetchClientDetails();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to approve client.", { id: toastId });
+    } finally {
+      setIsProcessingApproval(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!rejectReason.trim()) {
+      toast.error("Please provide a reason for rejection.");
+      return;
+    }
+    setIsProcessingApproval(true);
+    const toastId = toast.loading("Rejecting client account...");
+    try {
+      await atsApi.clients.reject(clientId, rejectReason);
+      toast.success("Client account rejected.", { id: toastId });
+      setClientToReject(false);
+      setRejectReason("");
+      fetchClientDetails();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reject client.", { id: toastId });
+    } finally {
+      setIsProcessingApproval(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] gap-3">
@@ -172,10 +222,74 @@ export default function ClientDetailPage() {
   }
 
   const isIndiaMarket = clientData?.market === "INDIA" || (clientData?.business_unit || "").toLowerCase().includes("domestic") || (clientData?.business_unit || "").toLowerCase().includes("bbsr");
+  const isPendingApproval = clientData?.status === "Pending Approval" || clientData?.approval_status === "PENDING_APPROVAL";
+  const isRejected = clientData?.status === "Rejected" || clientData?.approval_status === "REJECTED";
 
   return (
     <div className="h-full flex flex-col min-h-0 bg-neutral-50 dark:bg-slate-950 font-sans p-6 overflow-auto">
       <div className="max-w-6xl w-full mx-auto space-y-6 pb-12">
+        {/* APPROVAL STATUS NOTICES */}
+        {isPendingApproval && (
+          <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className="h-3 w-3 rounded-full bg-amber-500 animate-pulse shrink-0" />
+              <div>
+                <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                  Client Account is Pending Approval
+                </h4>
+                <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5">
+                  Job requisitions mapped to this client cannot go Live / Active until an authorized Delivery Head, Tenant Admin, or Branch Admin approves this account.
+                </p>
+              </div>
+            </div>
+
+            {canApproveRejectClient && (
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  onClick={handleApprove}
+                  disabled={isProcessingApproval}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-8"
+                >
+                  Approve Client
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setClientToReject(true)}
+                  disabled={isProcessingApproval}
+                  className="border-red-300 text-red-700 hover:bg-red-50 text-xs font-bold h-8"
+                >
+                  Reject Client
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isRejected && (
+          <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-900 flex items-start justify-between gap-3 shadow-xs">
+            <div>
+              <h4 className="text-xs font-bold text-red-900 dark:text-red-200 flex items-center gap-2">
+                Client Account Rejected
+              </h4>
+              <p className="text-[11px] text-red-800 dark:text-red-300 mt-0.5">
+                Feedback: {clientData.rejection_reason || "Rejected by Reviewer"}. Jobs under this client cannot be activated.
+              </p>
+            </div>
+            {canApproveRejectClient && (
+              <Button
+                size="sm"
+                onClick={handleApprove}
+                disabled={isProcessingApproval}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-8 shrink-0"
+              >
+                Re-approve & Activate
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* HEADER BAR */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 p-6 rounded-xl shadow-xs">
           <div className="flex items-start gap-4">
@@ -190,8 +304,16 @@ export default function ClientDetailPage() {
                 <Badge className={isIndiaMarket ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-blue-50 text-blue-700 border-blue-200"}>
                   {isIndiaMarket ? "🇮🇳 India Domestic (₹)" : "🇺🇸 USA IT ($)"}
                 </Badge>
-                <Badge className={clientData.status === "Active" ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"}>
-                  {clientData.status}
+                <Badge className={
+                  isPendingApproval 
+                    ? "bg-amber-50 text-amber-800 border-amber-300"
+                    : isRejected
+                    ? "bg-red-50 text-red-700 border-red-300"
+                    : clientData.status === "Active" 
+                    ? "bg-green-50 text-green-700 border-green-200" 
+                    : "bg-neutral-100 text-neutral-700 border-neutral-300"
+                }>
+                  {isPendingApproval ? "Pending Approval" : isRejected ? "Rejected" : clientData.status}
                 </Badge>
               </div>
 
@@ -222,6 +344,16 @@ export default function ClientDetailPage() {
               </>
             ) : (
               <>
+                {isPendingApproval && canApproveRejectClient && (
+                  <Button
+                    onClick={handleApprove}
+                    disabled={isProcessingApproval}
+                    className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Approve Account
+                  </Button>
+                )}
+
                 <Button onClick={() => router.push(`/clients/${clientId}/edit`)} variant="outline" className="text-xs font-bold flex items-center gap-1.5 border-neutral-300">
                   <Edit className="h-3.5 w-3.5 text-indigo-600" /> Edit CRM Profile
                 </Button>
@@ -246,8 +378,48 @@ export default function ClientDetailPage() {
               </>
             )}
           </div>
-
         </div>
+
+        {/* REJECT CLIENT MODAL */}
+        {clientToReject && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+              <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                Reject Client Account
+              </h3>
+              <p className="text-xs text-neutral-500">
+                Please provide rejection feedback for <strong>{clientData.client_name}</strong>.
+              </p>
+              <textarea
+                rows={3}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Reason for rejection (e.g. Duplicate account, incomplete company details)..."
+                className="w-full p-2.5 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-lg outline-none focus:ring-2 focus:ring-red-500"
+              />
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setClientToReject(false);
+                    setRejectReason("");
+                  }}
+                  disabled={isProcessingApproval}
+                  className="text-xs font-semibold"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleReject}
+                  disabled={isProcessingApproval || !rejectReason.trim()}
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+                >
+                  Confirm Rejection
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* TABS NAVIGATION */}
         <div className="flex items-center gap-2 border-b border-neutral-200 dark:border-slate-800">

@@ -14,6 +14,9 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { NavbarRight } from "@/components/layout/navbar-right";
 import { TopNavbar } from "@/components/layout/top-navbar";
 import { GlobalErrorModal } from "@/components/shared/global-error-modal";
+import { SocketProvider } from "@/contexts/SocketContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import NotificationListener from "@/components/notifications/NotificationListener";
 
 export function ClientRoot({
   children,
@@ -118,23 +121,28 @@ export function ClientRoot({
       enableSystem
       disableTransitionOnChange
     >
-      <SidebarProvider defaultOpen={defaultOpen}>
-        <AppSidebar />
-        <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-y-auto max-h-screen h-screen">
-          <header className="sticky top-0 z-40 flex h-[46px] min-h-[46px] shrink-0 items-center gap-2 border-b border-[#1a4fa0] dark:border-[#0f2d6b] bg-[#1a4fa0] dark:bg-[#0f2d6b] px-4 shadow-sm">
-            <SidebarTrigger className="-ml-1 text-white hover:bg-white/10 hover:text-white" />
-            <div className="flex-1" />
-            <div className="flex items-center gap-2">
-              <NavbarRight />
-            </div>
-          </header>
-          {MainContent}
-        </SidebarInset>
-      </SidebarProvider>
+      <SocketProvider>
+        <NotificationProvider>
+          <NotificationListener />
+          <SidebarProvider defaultOpen={defaultOpen}>
+            <AppSidebar />
+            <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-y-auto max-h-screen h-screen">
+              <header className="sticky top-0 z-40 flex h-[46px] min-h-[46px] shrink-0 items-center gap-2 border-b border-[#1a4fa0] dark:border-[#0f2d6b] bg-[#1a4fa0] dark:bg-[#0f2d6b] px-4 shadow-sm">
+                <SidebarTrigger className="-ml-1 text-white hover:bg-white/10 hover:text-white" />
+                <div className="flex-1" />
+                <div className="flex items-center gap-2">
+                  <NavbarRight />
+                </div>
+              </header>
+              {MainContent}
+            </SidebarInset>
+          </SidebarProvider>
 
-      {/* <ThemeCustomizer /> */}
-      <Toaster position="top-center" reverseOrder={false} />
-      <GlobalErrorModal />
+          {/* <ThemeCustomizer /> */}
+          <Toaster position="top-center" reverseOrder={false} />
+          <GlobalErrorModal />
+        </NotificationProvider>
+      </SocketProvider>
     </ThemeProvider>
   );
 }
