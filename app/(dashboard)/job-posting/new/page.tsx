@@ -1730,8 +1730,61 @@ const getInitialActiveBranchContext = () => {
                       )}
                     </div>
 
-                                     {/* Client Bill Rate / Commission */}
-                    <div className={cn("space-y-1", market === "IN" && watch("taxTerms") === "Permanent" ? "md:col-span-1" : "md:col-span-2")}>
+                    {/* Job Start Date */}
+                    {market !== "IN" ? (
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Start Date</label>
+                        <input
+                          type="date"
+                          {...register("startDate")}
+                          className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Shift Timings</label>
+                        <select
+                          {...register("shiftTiming")}
+                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                        >
+                          <option value="General Shift">General Shift (Day)</option>
+                          <option value="Night Shift">Night Shift</option>
+                          <option value="Rotational Shift">Rotational Shift</option>
+                          <option value="UK/EMEA Shift">UK/EMEA Shift</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Job End Date */}
+                    {watch("jobType") !== "Full Time" ? (
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Job End Date</label>
+                        <input
+                          type="date"
+                          {...register("endDate")}
+                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200"
+                        />
+                      </div>
+                    ) : (
+                      <div className="hidden md:block"></div>
+                    )}
+
+                    {/* Shift Timings (India) or Required Hours/Week (US) */}
+                    {market !== "IN" ? (
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Required Hours/Week</label>
+                        <input
+                          type="number"
+                          {...register("hoursPerWeek", { valueAsNumber: true })}
+                          className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
+                        />
+                      </div>
+                    ) : (
+                      <div className="hidden md:block"></div>
+                    )}
+
+                    {/* Client Bill Rate / Commission (Row 3, Left Span 2) */}
+                    <div className="space-y-1 md:col-span-2">
                       {market === "IN" && watch("taxTerms") === "Permanent" ? (
                         <>
                           <div className="flex items-center gap-1">
@@ -1860,7 +1913,7 @@ const getInitialActiveBranchContext = () => {
                       )}
                     </div>
 
-                    {/* Pay Rate / Budget Min & Max (LPA) */}
+                    {/* Pay Rate / Budget Min & Max (Row 3, Right Span 2 -> Same Row as Client Bill Rate!) */}
                     <div className="space-y-1 md:col-span-2">
                       {market === "IN" ? (
                         <>
@@ -1957,276 +2010,6 @@ const getInitialActiveBranchContext = () => {
                       )}
                     </div>
 
-                    {/* Job Start Date (US Market Only) */}
-                    {market !== "IN" && (
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Start Date</label>
-                        <input
-                          type="date"
-                          {...register("startDate")}
-                          className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200"
-                        />
-                      </div>
-                    )}
-
-                    {/* Job End Date */}
-                    {watch("jobType") !== "Full Time" ? (
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Job End Date</label>
-                        <input
-                          type="date"
-                          {...register("endDate")}
-                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200"
-                        />
-                      </div>
-                    ) : (
-                      <div className="hidden md:block"></div>
-                    )}
-
-                    {/* Country, State, City (Single Row) */}
-                    <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Country */}
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Country</label>
-                        <Popover open={countryOpen} onOpenChange={(open) => {
-                          setCountryOpen(open);
-                          if (!open) setCountrySearchText("");
-                        }}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              role="combobox"
-                              className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800 text-neutral-900 dark:text-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100"
-                            >
-                              <span className={cn("truncate", watch("country") ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-400 dark:text-slate-400 font-medium")}>
-                                {watch("country") || "Select Country..."}
-                              </span>
-                              <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-neutral-500" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[280px] p-0" align="start">
-                            <Command>
-                              <CommandInput
-                                placeholder="Search country..."
-                                className="h-9 text-xs"
-                                value={countrySearchText}
-                                onValueChange={setCountrySearchText}
-                              />
-                              <CommandList ref={countryListRef} className="max-h-[220px]">
-                                <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No country found.</CommandEmpty>
-                                <CommandGroup>
-                                  {sortedCountries
-                                    .filter(co => co.name.toLowerCase().includes(countrySearchText.toLowerCase()))
-                                    .map((co) => (
-                                      <CommandItem
-                                        key={co.isoCode}
-                                        value={co.name}
-                                        onSelect={() => {
-                                          setValue("country", co.name, { shouldValidate: true });
-                                          setValue("states", "");
-                                          setValue("city", "");
-                                          setCountryOpen(false);
-                                          setCountrySearchText("");
-                                        }}
-                                        className="text-xs cursor-pointer"
-                                      >
-                                        <Check className={cn("mr-2 h-3 w-3", watch("country") === co.name ? "opacity-100" : "opacity-0")} />
-                                        <ReactCountryFlag countryCode={co.isoCode} svg className="mr-1.5" style={{ width: "1.1em", height: "1.1em" }} />
-                                        {co.name}
-                                      </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        {errors.country && <p className="text-[10px] text-red-655 font-bold">{errors.country.message}</p>}
-                      </div>
-
-                      {/* States */}
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">State</label>
-                        <Popover open={stateOpen} onOpenChange={(open) => {
-                          setStateOpen(open);
-                          if (!open) setStateSearchText("");
-                        }}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              role="combobox"
-                              disabled={!watch("country")}
-                              className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800 text-neutral-900 dark:text-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-50"
-                            >
-                              <span className={cn("truncate", watch("states") ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-400 dark:text-slate-400 font-medium")}>
-                                {watch("states") || "Select State..."}
-                              </span>
-                              <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-neutral-500" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[280px] p-0" align="start">
-                            <Command>
-                              <CommandInput
-                                placeholder="Search state..."
-                                className="h-9 text-xs"
-                                value={stateSearchText}
-                                onValueChange={setStateSearchText}
-                              />
-                              <CommandList ref={stateListRef} className="max-h-[220px]">
-                                <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No state found.</CommandEmpty>
-                                <CommandGroup>
-                                  {(() => {
-                                    const countryObj = Country.getAllCountries().find(co => co.name === watch("country"));
-                                    if (!countryObj) return null;
-                                    return State.getStatesOfCountry(countryObj.isoCode)
-                                      .filter(st => st.name.toLowerCase().includes(stateSearchText.toLowerCase()))
-                                      .map((st) => (
-                                        <CommandItem
-                                          key={st.isoCode}
-                                          value={st.name}
-                                          onSelect={() => {
-                                            setValue("states", st.name, { shouldValidate: true });
-                                            setValue("city", "");
-                                            setStateOpen(false);
-                                            setStateSearchText("");
-                                          }}
-                                          className="text-xs cursor-pointer"
-                                        >
-                                          <Check className={cn("mr-2 h-3 w-3", watch("states") === st.name ? "opacity-100" : "opacity-0")} />
-                                          {st.name}
-                                        </CommandItem>
-                                      ));
-                                  })()}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        {errors.states && <p className="text-[10px] text-red-655 font-bold">{errors.states.message}</p>}
-                      </div>
-
-                      {/* City */}
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">City</label>
-                        <Popover open={cityOpen} onOpenChange={(open) => {
-                          setCityOpen(open);
-                          if (!open) setCitySearchText("");
-                        }}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              role="combobox"
-                              disabled={!watch("states")}
-                              className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800 text-neutral-900 dark:text-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-50"
-                            >
-                              <span className={cn("truncate", watch("city") ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-400 dark:text-slate-400 font-medium")}>
-                                {watch("city") || "Select City..."}
-                              </span>
-                              <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-neutral-500" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[280px] p-0" align="start">
-                            <Command>
-                              <CommandInput
-                                placeholder="Search city..."
-                                className="h-9 text-xs"
-                                value={citySearchText}
-                                onValueChange={setCitySearchText}
-                              />
-                              <CommandList ref={cityListRef} className="max-h-[220px]">
-                                <CommandEmpty className="py-4 text-center text-xs text-neutral-500">No city found.</CommandEmpty>
-                                <CommandGroup>
-                                  {(() => {
-                                    const countryObj = Country.getAllCountries().find(co => co.name === watch("country"));
-                                    if (!countryObj) return null;
-                                    const stateObj = State.getStatesOfCountry(countryObj.isoCode).find(st => st.name === watch("states"));
-                                    if (!stateObj) return null;
-                                    return City.getCitiesOfState(countryObj.isoCode, stateObj.isoCode)
-                                      .filter(ct => ct.name.toLowerCase().includes(citySearchText.toLowerCase()))
-                                      .map((city) => (
-                                        <CommandItem
-                                          key={city.name}
-                                          value={city.name}
-                                          onSelect={() => {
-                                            setValue("city", city.name, { shouldValidate: true });
-                                            setCityOpen(false);
-                                            setCitySearchText("");
-                                          }}
-                                          className="text-xs cursor-pointer"
-                                        >
-                                          <Check className={cn("mr-2 h-3 w-3", watch("city") === city.name ? "opacity-100" : "opacity-0")} />
-                                          {city.name}
-                                        </CommandItem>
-                                      ));
-                                  })()}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
-
-                    {/* Work Mode */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Work Mode <span className="text-red-500">*</span></label>
-                      <div className="flex items-center gap-4 h-8 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="radio"
-                            value="Onsite"
-                            {...register("remoteJob")}
-                            className="w-3.5 h-3.5 text-primary focus:ring-primary border-neutral-300 dark:border-slate-700 cursor-pointer"
-                          />
-                          Onsite
-                        </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="radio"
-                            value="Remote"
-                            {...register("remoteJob")}
-                            className="w-3.5 h-3.5 text-primary focus:ring-primary border-neutral-300 dark:border-slate-700 cursor-pointer"
-                          />
-                          Remote
-                        </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="radio"
-                            value="Hybrid"
-                            {...register("remoteJob")}
-                            className="w-3.5 h-3.5 text-primary focus:ring-primary border-neutral-300 dark:border-slate-700 cursor-pointer"
-                          />
-                          Hybrid
-                        </label>
-                      </div>
-                    </div>
-
-                    {/* Shift Timings (India) or Required Hours/Week (US) */}
-                    {market === "IN" ? (
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Shift Timings</label>
-                        <select
-                          {...register("shiftTiming")}
-                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                        >
-                          <option value="General Shift">General Shift (Day)</option>
-                          <option value="Night Shift">Night Shift</option>
-                          <option value="Rotational Shift">Rotational Shift</option>
-                          <option value="UK/EMEA Shift">UK/EMEA Shift</option>
-                        </select>
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Required Hours/Week</label>
-                        <input
-                          type="number"
-                          {...register("hoursPerWeek", { valueAsNumber: true })}
-                          className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
-                        />
-                      </div>
-                    )}
                     {/* Job Status (Hidden, Defaults to Active) */}
                     <input type="hidden" {...register("jobStatus")} value="Active" />
 
@@ -2789,33 +2572,22 @@ const getInitialActiveBranchContext = () => {
                       </div>
                     )}
 
-                    {/* Notice Period */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Notice Period</label>
-                      <select
-                        {...register("noticePeriod")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                      >
-                        <option value="">Select Notice Period</option>
-                        <option value="Immediate">Immediate</option>
-                        <option value="15 Days">15 Days</option>
-                        <option value="30 Days">30 Days</option>
-                        <option value="45 Days">45 Days</option>
-                        <option value="60 Days">60 Days</option>
-                        <option value="90 Days">90 Days</option>
-                      </select>
-                    </div>
-
-                    {/* Display Location (US Market Only) */}
-                    {market !== "IN" && (
+                    {/* Notice Period (Domestic IN Market Only) */}
+                    {market === "IN" && (
                       <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Display Location (External)</label>
-                        <input
-                          type="text"
-                          {...register("locationAutocomplete")}
-                          className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200"
-                          placeholder="e.g. Plano, TX (Shown on job boards)"
-                        />
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Notice Period</label>
+                        <select
+                          {...register("noticePeriod")}
+                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                        >
+                          <option value="">Select Notice Period</option>
+                          <option value="Immediate">Immediate</option>
+                          <option value="15 Days">15 Days</option>
+                          <option value="30 Days">30 Days</option>
+                          <option value="45 Days">45 Days</option>
+                          <option value="60 Days">60 Days</option>
+                          <option value="90 Days">90 Days</option>
+                        </select>
                       </div>
                     )}
                   </div>
@@ -3232,61 +3004,6 @@ const getInitialActiveBranchContext = () => {
                           </div>
                         )}
                       </div>
-
-                      {/* Department (US Market Only) */}
-                      {market !== "IN" && (
-                        <div className="space-y-1.5">
-                          <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center h-5">Department</label>
-                          <select
-                            {...register("department")}
-                            className="w-full h-9 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                          >
-                            <option value="">Select Department</option>
-                            <option value="IT Services">IT Services</option>
-                            <option value="Operations">Operations</option>
-                            <option value="Sales">Sales</option>
-                          </select>
-                        </div>
-                      )}
-
-                      {/* Sales Manager (US Market Only) */}
-                      {market !== "IN" && (
-                        <div className="space-y-1.5">
-                          <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center h-5">Sales Manager</label>
-                          <input
-                            type="text"
-                            {...register("salesManager")}
-                            className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200"
-                            placeholder="e.g. Sanjay Kumar"
-                          />
-                        </div>
-                      )}
-
-                      {/* Account Manager (US Market Only) */}
-                      {market !== "IN" && (
-                        <div className="space-y-1.5">
-                          <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center h-5">Account Manager</label>
-                          <input
-                            type="text"
-                            {...register("accountManager")}
-                            className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200"
-                            placeholder="e.g. John Doe"
-                          />
-                        </div>
-                      )}
-
-                      {/* Primary Recruiter (US Market Only) */}
-                      {market !== "IN" && (
-                        <div className="space-y-1.5">
-                          <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center h-5">Primary Recruiter</label>
-                          <input
-                            type="text"
-                            {...register("primaryRecruiter")}
-                            className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200"
-                            placeholder="e.g. Jane Smith"
-                          />
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}

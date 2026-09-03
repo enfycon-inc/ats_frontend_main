@@ -2546,33 +2546,24 @@ export default function EditJobPostingPage() {
                       </select>
                     </div>
 
-                    {/* Notice Period */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Notice Period</label>
-                      <select
-                        {...register("noticePeriod")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                      >
-                        <option value="">Select Notice Period</option>
-                        <option value="Immediate">Immediate</option>
-                        <option value="15 Days">15 Days</option>
-                        <option value="30 Days">30 Days</option>
-                        <option value="45 Days">45 Days</option>
-                        <option value="60 Days">60 Days</option>
-                        <option value="90 Days">90 Days</option>
-                      </select>
-                    </div>
-
-                    {/* Location Autocomplete */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Location Autocomplete</label>
-                      <input
-                        type="text"
-                        {...register("locationAutocomplete")}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-850 dark:text-neutral-200"
-                        placeholder="e.g. Plano, TX"
-                      />
-                    </div>
+                    {/* Notice Period (Domestic IN Market Only) */}
+                    {market === "IN" && (
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Notice Period</label>
+                        <select
+                          {...register("noticePeriod")}
+                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                        >
+                          <option value="">Select Notice Period</option>
+                          <option value="Immediate">Immediate</option>
+                          <option value="15 Days">15 Days</option>
+                          <option value="30 Days">30 Days</option>
+                          <option value="45 Days">45 Days</option>
+                          <option value="60 Days">60 Days</option>
+                          <option value="90 Days">90 Days</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2979,35 +2970,6 @@ export default function EditJobPostingPage() {
                           </div>
                         )}
                       </div>
-
-                      {/* Department (US Market Only) */}
-                      {market !== "IN" && (
-                        <div className="space-y-1.5">
-                          <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center h-5">Department</label>
-                          <select
-                            {...register("department")}
-                            className="w-full h-9 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                          >
-                            <option value="IT Services">IT Services</option>
-                            <option value="Operations">Operations</option>
-                            <option value="Sales">Sales</option>
-                          </select>
-                        </div>
-                      )}
-
-                      {/* Sales Manager (US Market Only) */}
-                      {market !== "IN" && (
-                        <div className="space-y-1.5">
-                          <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center h-5">Sales Manager</label>
-                          <select
-                            {...register("salesManager")}
-                            className="w-full h-9 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                          >
-                            <option value="Sanjay Kumar">Sanjay Kumar</option>
-                            <option value="Kunal Sharma">Kunal Sharma</option>
-                          </select>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
