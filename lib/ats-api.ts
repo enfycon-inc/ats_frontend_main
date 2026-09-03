@@ -420,10 +420,14 @@ const auth = {
     email: string;
     fullName: string;
     password: string;
-    role: string;
+    role?: string;
+    roles?: string[];
     tenantId: string;
     isApproved: boolean;
     sendEmailInvite?: boolean;
+    branchId?: string;
+    assignedBranchIds?: string[];
+    branchRoles?: Record<string, string[]>;
   }): Promise<any> {
     return apiFetch<any>('/api/auth/register', {
       method: 'POST',
@@ -443,6 +447,12 @@ const auth = {
     return apiFetch<any>(`/api/auth/users/${userId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ isActive }),
+    });
+  },
+
+  async deleteUser(userId: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/users/${userId}`, {
+      method: 'DELETE',
     });
   },
 

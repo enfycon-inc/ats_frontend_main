@@ -334,20 +334,26 @@ export default function UserManagementPage() {
   const tenantDomain = getDomainSuffix();
   const userLimit = profile?.userLimit || 10;
 
-  // Filter reviewers who have internal screening & review permissions enabled (pure granular permission check)
+  // Filter reviewers who have internal screening & review permissions enabled or managerial roles
   const eligibleReviewers = useMemo(() => {
     return users.filter((u) => {
-      if (!u.isActive) return false;
+      if (!u || !u.isActive) return false;
       if (u.canReview) return true;
       const perms = u.permissions || [];
-      return (
+      if (
         perms.includes("submission:internal_screening") ||
         perms.includes("job:approve") ||
         perms.includes("job:reject") ||
         perms.includes("job:publish_direct") ||
         perms.includes("branch_admin:manage") ||
         perms.includes("tenant:settings")
-      );
+      ) {
+        return true;
+      }
+      const rawRoles = Array.isArray(u.roles) && u.roles.length > 0 ? u.roles : [u.roleName || ""];
+      const upperRoles = rawRoles.map((r) => String(r).toUpperCase().replace(/[\s-_]/g, ""));
+      const managerRoles = ["ADMIN", "TENANTADMIN", "SUPERADMIN", "BRANCHADMIN", "DELIVERYHEAD", "ACCOUNTMANAGER", "PODLEAD", "BDM"];
+      return upperRoles.some((r) => managerRoles.includes(r));
     });
   }, [users]);
 
@@ -437,6 +443,12 @@ export default function UserManagementPage() {
   const [targetMoveBranchId, setTargetMoveBranchId] = useState("");
   const [isBulkReviewerModalOpen, setIsBulkReviewerModalOpen] = useState(false);
   const [targetBulkReviewerId, setTargetBulkReviewerId] = useState("");
+
+  // Dedicated Single Reviewer Assignment Modal State
+  const [isReviewerModalOpen, setIsReviewerModalOpen] = useState(false);
+  const [reviewerTargetUser, setReviewerTargetUser] = useState<UserItem | null>(null);
+  const [selectedReviewerId, setSelectedReviewerId] = useState<string>("");
+  const [reviewerSearch, setReviewerSearch] = useState<string>("");
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -587,21 +599,29 @@ export default function UserManagementPage() {
         fullName: trimmedName,
         password: password,
         role: selectedRoles[0] || undefined,
+        roles: selectedRoles,
+        branchId: primaryBranchId || undefined,
+        assignedBranchIds: primaryBranchId ? [primaryBranchId] : [],
+        branchRoles: primaryBranchId ? { [primaryBranchId]: selectedRoles } : {},
         tenantId: tenantId,
         isApproved: true,
         sendEmailInvite: true,
       });
 
-      // Update full roles and branch location after creation
-      const freshUsers = await atsApi.auth.listUsers();
-      const createdUser = freshUsers.find((u: any) => u.email === fullEmail);
-      if (createdUser) {
-        await atsApi.auth.updateUserDetail(createdUser.id, {
-          branchId: primaryBranchId || undefined,
-          assignedBranchIds: primaryBranchId ? [primaryBranchId] : [],
-          branchRoles: primaryBranchId ? { [primaryBranchId]: selectedRoles } : {},
-          roles: selectedRoles,
-        });
+      // Synchronize full profile & branch roles
+      try {
+        const freshUsers = await atsApi.auth.listUsers();
+        const createdUser = freshUsers.find((u: any) => u.email === fullEmail);
+        if (createdUser) {
+          await atsApi.auth.updateUserDetail(createdUser.id, {
+            branchId: primaryBranchId || undefined,
+            assignedBranchIds: primaryBranchId ? [primaryBranchId] : [],
+            branchRoles: primaryBranchId ? { [primaryBranchId]: selectedRoles } : {},
+            roles: selectedRoles,
+          });
+        }
+      } catch (syncErr) {
+        console.warn("Follow-up user details sync warning:", syncErr);
       }
 
       toast.success(`Successfully added ${trimmedName} (${fullEmail})!`);
@@ -738,17 +758,17 @@ export default function UserManagementPage() {
       return toast.error("You cannot delete your own account.");
     }
     const confirmDelete = window.confirm(
-      `Are you sure you want to deactivate and remove ${user.fullName} (${user.email}) from active team access?`
+      `Are you sure you want to permanently delete ${user.fullName} (${user.email})? This will remove all their access and credentials. This action cannot be undone.`
     );
     if (!confirmDelete) return;
 
     try {
       setSubmittingId(user.id);
-      await atsApi.auth.setUserStatus(user.id, false);
-      toast.success(`User ${user.fullName} deactivated successfully.`);
+      await atsApi.auth.deleteUser(user.id);
+      toast.success(`User ${user.fullName} deleted successfully.`);
       loadData();
     } catch (err: any) {
-      toast.error(err.message || "Failed to deactivate user.");
+      toast.error(err.message || "Failed to delete user.");
     } finally {
       setSubmittingId(null);
     }
@@ -816,7 +836,7 @@ export default function UserManagementPage() {
   const handleBulkDelete = async () => {
     if (selectedUserIds.length === 0) return;
     const confirmDelete = window.confirm(
-      `Are you sure you want to de-register and deactivate ${selectedUserIds.length} selected team member(s)?`
+      `Are you sure you want to permanently delete ${selectedUserIds.length} selected team member(s)? This action cannot be undone.`
     );
     if (!confirmDelete) return;
 
@@ -825,10 +845,10 @@ export default function UserManagementPage() {
       await Promise.all(
         selectedUserIds.map((id) => {
           if (profile?.id === id) return Promise.resolve();
-          return atsApi.auth.setUserStatus(id, false).catch(() => null);
+          return atsApi.auth.deleteUser(id).catch(() => null);
         })
       );
-      toast.success(`Successfully deactivated ${selectedUserIds.length} user(s)!`);
+      toast.success(`Successfully deleted ${selectedUserIds.length} user(s)!`);
       setSelectedUserIds([]);
       loadData();
     } catch (err: any) {
@@ -958,6 +978,17 @@ export default function UserManagementPage() {
     if (upper === "ADMIN" || upper === "TENANT_ADMIN" || upper === "SUPER_ADMIN" || upper === "TENANT ADMIN") {
       return "Tenant Admin";
     }
+    if (upper === "RECRUITER") return "Recruiter";
+    if (upper === "ACCOUNT_MANAGER" || upper === "ACCOUNT MANAGER") return "Account Manager";
+    if (upper === "DELIVERY_HEAD" || upper === "DELIVERY HEAD") return "Delivery Head";
+    if (upper === "BRANCH_ADMIN" || upper === "BRANCH ADMIN") return "Branch Admin";
+    if (upper === "POD_LEAD" || upper === "POD LEAD") return "Pod Lead";
+
+    // If string is a raw UUID and not yet matched
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(r)) {
+      return "Recruiter";
+    }
 
     return r.replace(/_/g, " ");
   };
@@ -1015,6 +1046,52 @@ export default function UserManagementPage() {
     if (!u) return [];
     const groups = getUserEffectiveRoleGroups(u, selectedBranchFilter);
     return dedupeCaseInsensitiveRoles(groups.flatMap((g) => g.roles || []));
+  };
+
+  const modalFilteredReviewers = useMemo(() => {
+    const list = eligibleReviewers.filter(
+      (u) => reviewerTargetUser && u.id !== reviewerTargetUser.id
+    );
+    if (!reviewerSearch.trim()) return list;
+    const q = reviewerSearch.toLowerCase().trim();
+    return list.filter(
+      (u) =>
+        u.fullName?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.roleName?.toLowerCase().includes(q) ||
+        (u.roles && u.roles.some((r) => r.toLowerCase().includes(q))) ||
+        (u.branchName && u.branchName.toLowerCase().includes(q))
+    );
+  }, [eligibleReviewers, reviewerTargetUser, reviewerSearch]);
+
+  const openReviewerModal = (user: UserItem) => {
+    if (!user) return;
+    setReviewerTargetUser(user);
+    setSelectedReviewerId(user.jobReviewerId || (user as any).job_reviewer_id || "");
+    setReviewerSearch("");
+    setIsReviewerModalOpen(true);
+  };
+
+  const handleSaveSingleReviewer = async () => {
+    if (!reviewerTargetUser) return;
+    try {
+      setSubmitting(true);
+      await atsApi.auth.updateUserDetail(reviewerTargetUser.id, {
+        jobReviewerId: selectedReviewerId || null,
+      });
+      toast.success(
+        selectedReviewerId
+          ? `Designated reviewer updated for ${reviewerTargetUser.fullName}!`
+          : `Reviewer reset to Pod/Branch default for ${reviewerTargetUser.fullName}!`
+      );
+      setIsReviewerModalOpen(false);
+      setReviewerTargetUser(null);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update designated reviewer.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const openAddModal = async () => {
@@ -1523,9 +1600,9 @@ export default function UserManagementPage() {
                             return (
                               <button
                                 type="button"
-                                onClick={() => openEditModal(user)}
+                                onClick={() => openReviewerModal(user)}
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer"
-                                title="Click to change designated Job Reviewer"
+                                title="Click to change designated Internal Screening Reviewer"
                               >
                                 <UserCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                                 <span>{reviewerName}</span>
@@ -1536,9 +1613,9 @@ export default function UserManagementPage() {
                           return (
                             <button
                               type="button"
-                              onClick={() => openEditModal(user)}
+                              onClick={() => openReviewerModal(user)}
                               className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800/60 transition-colors cursor-pointer"
-                              title="Assign a designated Job Reviewer"
+                              title="Assign an Internal Screening Reviewer"
                             >
                               + Assign
                             </button>
@@ -1567,18 +1644,25 @@ export default function UserManagementPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-8 w-8 p-0 rounded-full hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-500 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
+                              className="h-8 w-8 p-0 rounded-full hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-500 hover:text-neutral-900 dark:hover:white cursor-pointer"
                               title="User Actions Menu"
                             >
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-xl rounded-lg p-1 text-xs">
+                          <DropdownMenuContent align="end" className="w-52 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-xl rounded-lg p-1 text-xs">
                             <DropdownMenuItem
                               onClick={() => openEditModal(user)}
                               className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
                             >
                               <Edit2 className="h-3.5 w-3.5 text-indigo-600" /> Edit Profile & Roles
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={() => openReviewerModal(user)}
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
+                            >
+                              <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> Assign Screening Reviewer
                             </DropdownMenuItem>
 
                             <DropdownMenuItem
@@ -1606,6 +1690,16 @@ export default function UserManagementPage() {
                                 <UserCheck className="h-3.5 w-3.5" /> Reactivate Account
                               </DropdownMenuItem>
                             )}
+
+                            <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
+
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteUser(user)}
+                              disabled={isCurrent}
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/50 text-rose-600 dark:text-rose-400 font-medium"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" /> Delete Team Member
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </td>
@@ -2314,6 +2408,181 @@ export default function UserManagementPage() {
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs"
               >
                 {loading ? "Updating..." : `Set Reviewer for ${selectedUserIds.length} Users`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DEDICATED SINGLE USER ASSIGN INTERNAL SCREENING REVIEWER MODAL */}
+      {isReviewerModalOpen && reviewerTargetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in-0">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-in zoom-in-95">
+            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-100 dark:border-indigo-900 shrink-0">
+                  <UserCheck className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Internal Screening Reviewer
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 truncate max-w-[260px]">
+                    For <span className="font-semibold text-neutral-800 dark:text-neutral-200">{reviewerTargetUser.fullName}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsReviewerModalOpen(false);
+                  setReviewerTargetUser(null);
+                }}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer p-1 rounded-md transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Search Input Bar */}
+            <div className="px-5 pt-3.5 pb-2 shrink-0 space-y-2">
+              <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                Choose who will review and approve submissions by <strong className="text-neutral-800 dark:text-neutral-200">{reviewerTargetUser.fullName}</strong>:
+              </p>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+                <input
+                  type="text"
+                  value={reviewerSearch}
+                  onChange={(e) => setReviewerSearch(e.target.value)}
+                  placeholder="Search reviewer by name, role, or email..."
+                  className="w-full h-8.5 pl-8.5 pr-8 text-xs rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                  autoFocus
+                />
+                {reviewerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setReviewerSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-0.5"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Scrollable Reviewers List */}
+            <div className="px-5 py-2 flex-1 overflow-y-auto space-y-2 min-h-[220px] max-h-[45vh]">
+              {/* Option 1: Inherit from Default */}
+              <div
+                onClick={() => setSelectedReviewerId("")}
+                className={`flex items-center justify-between gap-2.5 p-2.5 rounded-xl cursor-pointer transition select-none border ${
+                  !selectedReviewerId
+                    ? "bg-indigo-50/70 dark:bg-indigo-950/60 border-indigo-500 ring-2 ring-indigo-500/20 shadow-2xs"
+                    : "border-neutral-200 dark:border-slate-800 bg-neutral-50/40 dark:bg-slate-850/40 hover:bg-neutral-100/70 dark:hover:bg-slate-800/70"
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="h-7 w-7 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+                    ⚡
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-neutral-900 dark:text-white">
+                        Inherit from Pod / Branch Default
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        Recommended
+                      </span>
+                    </div>
+                    <span className="text-[10.5px] text-neutral-500 block truncate">
+                      Auto-routes based on Pod Lead or Branch Delivery Head hierarchy
+                    </span>
+                  </div>
+                </div>
+                {!selectedReviewerId && (
+                  <div className="h-4.5 w-4.5 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                    <Check className="h-3 w-3" />
+                  </div>
+                )}
+              </div>
+
+              {/* Option 2: List of Eligible Reviewers */}
+              {modalFilteredReviewers.length === 0 ? (
+                <div className="py-8 text-center text-xs text-neutral-400 space-y-1">
+                  <p>No matching reviewers found for &quot;{reviewerSearch}&quot;.</p>
+                  <p className="text-[10px] text-neutral-500">Only team members with screening permissions or management roles appear here.</p>
+                </div>
+              ) : (
+                modalFilteredReviewers.map((u) => {
+                  const isSelected = selectedReviewerId === u.id;
+                  const displayRole = u.roleName || (u.roles && u.roles.length > 0 ? u.roles[0] : "Reviewer");
+
+                  return (
+                    <div
+                      key={u.id}
+                      onClick={() => setSelectedReviewerId(u.id)}
+                      className={`flex items-center justify-between gap-2.5 p-2.5 rounded-xl cursor-pointer transition select-none border ${
+                        isSelected
+                          ? "bg-indigo-50/70 dark:bg-indigo-950/60 border-indigo-500 ring-2 ring-indigo-500/20 shadow-2xs"
+                          : "border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-850 hover:bg-neutral-50 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="h-7 w-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                          {u.fullName ? u.fullName.charAt(0).toUpperCase() : "U"}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-bold text-neutral-900 dark:text-white truncate">
+                              {u.fullName}
+                            </span>
+                            <span className="text-[9.5px] px-1.5 py-0.2 rounded font-semibold bg-indigo-50 text-indigo-700 dark:bg-slate-800 dark:text-indigo-300 border border-indigo-200 dark:border-slate-700">
+                              {displayRole}
+                            </span>
+                          </div>
+                          <span className="text-[10.5px] text-neutral-500 font-mono block truncate">
+                            {u.email}
+                          </span>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <div className="h-4.5 w-4.5 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                          <Check className="h-3 w-3" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Helper Tag */}
+            <div className="px-5 py-2 bg-neutral-50/70 dark:bg-slate-850/70 border-t border-neutral-100 dark:border-slate-800">
+              <p className="text-[10.5px] text-neutral-500 flex items-center gap-1.5">
+                <span>🛡️</span>
+                <span>Filtered: showing {modalFilteredReviewers.length} team members with screening permissions</span>
+              </p>
+            </div>
+
+            <div className="border-t border-neutral-100 dark:border-slate-800 p-4 bg-neutral-50 dark:bg-slate-850 flex justify-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                onClick={() => {
+                  setIsReviewerModalOpen(false);
+                  setReviewerTargetUser(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveSingleReviewer}
+                disabled={submitting}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs"
+              >
+                {submitting ? "Saving..." : "Save Reviewer"}
               </Button>
             </div>
           </div>

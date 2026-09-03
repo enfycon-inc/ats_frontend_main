@@ -47,6 +47,40 @@ import { Job } from "../data/mock-jobs";
 import AddCandidateModal from "@/components/dashboard/AddCandidateModal";
 import { AddClientModal } from "./add-client-modal";
 
+function isJobPostedToday(job: Job): boolean {
+  if (!job) return false;
+
+  // 1. Check createdOn or createdAt date string
+  const dateStr = (job as any).createdAt || job.createdOn;
+  if (dateStr) {
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        const today = new Date();
+        const isSameDay =
+          d.getDate() === today.getDate() &&
+          d.getMonth() === today.getMonth() &&
+          d.getFullYear() === today.getFullYear();
+        if (isSameDay) return true;
+      }
+    } catch {}
+  }
+
+  // 2. Check if job code date segment matches today's date (e.g. BBS-260903-D00001)
+  if (job.jobCode) {
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const todaySegment = `${yy}${mm}${dd}`;
+    if (job.jobCode.includes(`-${todaySegment}-`)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 interface DataTableProps {
   data: Job[];
   selectedColumns: string[];
@@ -923,11 +957,18 @@ export default function DataTable({
                               )}
                             </div>
                           ) : colId === "jobCode" ? (
-                            <Link href={`/job-posting/${job.id}`}>
-                              <span className="text-[#1a4fa0] dark:text-blue-400 font-semibold hover:underline cursor-pointer">
-                                {job.jobCode}
-                              </span>
-                            </Link>
+                            <div className="flex items-center gap-1.5 whitespace-nowrap">
+                              <Link href={`/job-posting/${job.id}`}>
+                                <span className="text-[#1a4fa0] dark:text-blue-400 font-semibold hover:underline cursor-pointer">
+                                  {job.jobCode}
+                                </span>
+                              </Link>
+                              {isJobPostedToday(job) && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide bg-emerald-500 text-white shadow-xs select-none">
+                                  NEW
+                                </span>
+                              )}
+                            </div>
                           ) : colId === "jobStatus" ? (
                             (() => {
                               const isPending = job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL";

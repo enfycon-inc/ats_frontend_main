@@ -7,18 +7,27 @@ import { useSession } from "next-auth/react";
 interface SocketContextType {
   socket: Socket | null;
   isConnected: boolean;
+  onlineUsers: string[];
+  isUserOnline: (userIdOrEmail?: string) => boolean;
 }
 
 const SocketContext = createContext<SocketContextType>({
   socket: null,
   isConnected: false,
+  onlineUsers: [],
+  isUserOnline: () => false,
 });
 
 export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const { data: session } = useSession();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const socketRef = useRef<Socket | null>(null);
+
+  const sessionUser = session?.user as any;
+  const currentUserId = sessionUser?.id || sessionUser?.dbId;
+  const currentUserEmail = sessionUser?.email;
 
   useEffect(() => {
     // Determine user identifiers from NextAuth session or localStorage
@@ -71,6 +80,13 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     newSocket.on("connect", () => {
       console.log(`[SocketContext] Connected to WebSocket gateway (id: ${newSocket.id})`);
       setIsConnected(true);
+      newSocket.emit("get_online_users");
+    });
+
+    newSocket.on("online_users_list", (users: string[]) => {
+      if (Array.isArray(users)) {
+        setOnlineUsers(users.map((u) => String(u).toLowerCase()));
+      }
     });
 
     newSocket.on("disconnect", (reason) => {
@@ -93,8 +109,19 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [session]);
 
+  const isUserOnline = (userIdOrEmail?: string): boolean => {
+    if (!userIdOrEmail) return false;
+    const target = String(userIdOrEmail).toLowerCase().trim();
+    
+    // If it's the currently logged in user in this browser session, they are online
+    if (currentUserId && String(currentUserId).toLowerCase() === target) return true;
+    if (currentUserEmail && String(currentUserEmail).toLowerCase() === target) return true;
+
+    return onlineUsers.includes(target);
+  };
+
   return (
-    <SocketContext.Provider value={{ socket, isConnected }}>
+    <SocketContext.Provider value={{ socket, isConnected, onlineUsers, isUserOnline }}>
       {children}
     </SocketContext.Provider>
   );

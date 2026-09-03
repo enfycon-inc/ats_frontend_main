@@ -11,12 +11,39 @@ export default function NotificationListener() {
   const { socket, isConnected } = useSocket();
   const { settings, markAsRead } = useNotifications();
   const router = useRouter();
+  const seenIds = React.useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!socket || !isConnected) return;
 
     const handleToastNotification = (notif: NotificationItem) => {
       if (!settings.toastEnabled) return;
+
+      // 1. Deduplicate by notification ID
+      if (notif.id) {
+        if (seenIds.current.has(notif.id)) return;
+        seenIds.current.add(notif.id);
+        if (seenIds.current.size > 200) {
+          const firstKey = seenIds.current.values().next().value;
+          if (firstKey) seenIds.current.delete(firstKey);
+        }
+      }
+
+      // 2. Suppress floating toast if current user initiated the action
+      if (typeof window !== "undefined") {
+        try {
+          const userStr = localStorage.getItem("ats_current_user") || localStorage.getItem("ats_user");
+          if (userStr) {
+            const currentUser = JSON.parse(userStr);
+            const myId = String(currentUser?.id || currentUser?.dbId || "").toLowerCase();
+            const myEmail = String(currentUser?.email || "").toLowerCase();
+            const initiator = String(notif.initiatorId || "").toLowerCase();
+            if (initiator && (initiator === myId || initiator === myEmail)) {
+              return;
+            }
+          }
+        } catch {}
+      }
 
       const getIcon = () => {
         switch (notif.type) {

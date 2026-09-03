@@ -93,12 +93,20 @@ import {
   Briefcase,
   UserCheck,
   ChevronRight,
+  FileText,
+  ExternalLink,
+  Building2,
+  Tag,
+  Eye,
+  Clock,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 // ─── Notification dropdown ────────────────────────────────────────────────────
 function NotificationDropdownNav() {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"ALL" | "UNREAD" | "JOBS" | "REVIEWS">("ALL");
+  const [selectedNotification, setSelectedNotification] = useState<any | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const { data: session } = useSession();
 
@@ -129,6 +137,17 @@ function NotificationDropdownNav() {
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedNotification(null);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
+
   const filteredNotifications = useMemo(() => {
     return notifications.filter((n) => {
       if (activeTab === "UNREAD") return !n.isRead;
@@ -155,6 +174,67 @@ function NotificationDropdownNav() {
       default:
         return <Bell className="w-4 h-4 text-primary" />;
     }
+  };
+
+  const getEventBadge = (type: string) => {
+    switch (type) {
+      case "JOB_PENDING_APPROVAL":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50">
+            <Briefcase className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            Pending Approval
+          </span>
+        );
+      case "JOB_APPROVED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50">
+            <CircleCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            Approved
+          </span>
+        );
+      case "JOB_REJECTED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50">
+            <X className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+            Rejected
+          </span>
+        );
+      case "JOB_NEW":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/50">
+            <Briefcase className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            New Job
+          </span>
+        );
+      case "ANNOUNCEMENT":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900/50">
+            <Megaphone className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+            Announcement
+          </span>
+        );
+      case "REVIEWER_ASSIGNED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-900/50">
+            <UserCheck className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            Reviewer Assigned
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+            <Bell className="w-3.5 h-3.5 text-slate-500" />
+            {type.replace(/_/g, " ")}
+          </span>
+        );
+    }
+  };
+
+  const handleNotificationClick = (n: any) => {
+    if (!n.isRead) {
+      markAsRead(n.id);
+    }
+    setSelectedNotification({ ...n, isRead: true });
   };
 
   return (
@@ -266,18 +346,16 @@ function NotificationDropdownNav() {
               filteredNotifications.map((n) => (
                 <div
                   key={n.id}
-                  onClick={() => {
-                    if (!n.isRead) markAsRead(n.id);
-                  }}
+                  onClick={() => handleNotificationClick(n)}
                   className={`
-                    px-4 py-3 transition-colors cursor-pointer flex gap-3 items-start
+                    px-4 py-3 transition-colors cursor-pointer flex gap-3 items-start group
                     ${!n.isRead
                       ? "bg-blue-50/40 dark:bg-blue-950/20 hover:bg-blue-50/70 dark:hover:bg-blue-950/30"
                       : "hover:bg-neutral-50 dark:hover:bg-neutral-800/40"
                     }
                   `}
                 >
-                  <div className="mt-0.5 p-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 flex-shrink-0">
+                  <div className="mt-0.5 p-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 flex-shrink-0 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors">
                     {getIcon(n.type)}
                   </div>
                   <div className="flex-1 min-w-0 space-y-0.5">
@@ -285,8 +363,10 @@ function NotificationDropdownNav() {
                       <p className={`text-[12.5px] leading-tight truncate ${!n.isRead ? "font-semibold text-neutral-900 dark:text-white" : "font-medium text-neutral-700 dark:text-neutral-300"}`}>
                         {n.title}
                       </p>
-                      {!n.isRead && (
+                      {!n.isRead ? (
                         <span className="w-1.5 h-1.5 rounded-full bg-[#1a4fa0] dark:bg-blue-400 flex-shrink-0" />
+                      ) : (
+                        <Eye className="w-3 h-3 text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                       )}
                     </div>
                     <p className="text-[11.5px] text-neutral-500 dark:text-neutral-400 leading-snug line-clamp-2">
@@ -327,6 +407,191 @@ function NotificationDropdownNav() {
                 <ChevronRight className="w-3 h-3" />
               </Link>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── FULL NOTIFICATION DETAILS MODAL ────────────────────────────── */}
+      {selectedNotification && (
+        <div
+          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in-0"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedNotification(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notification-detail-title"
+            className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150"
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-neutral-50 dark:bg-neutral-800/80 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-[#1a4fa0] dark:text-blue-400 flex items-center justify-center border border-blue-200 dark:border-blue-900/50 shrink-0">
+                  <Bell className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 id="notification-detail-title" className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Notification Details
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    ID: <span className="font-mono">{selectedNotification.id}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedNotification(null)}
+                className="w-8 h-8 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 overflow-y-auto">
+              {/* Subject Banner */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg bg-neutral-50/80 dark:bg-neutral-800/40 border border-neutral-200/80 dark:border-neutral-700/60">
+                <div className="space-y-1">
+                  <span className="text-[10.5px] font-semibold text-neutral-500 uppercase tracking-wider">Subject</span>
+                  <h4 className="text-sm font-bold text-neutral-900 dark:text-white leading-snug">
+                    {selectedNotification.title}
+                  </h4>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {getEventBadge(selectedNotification.type)}
+                </div>
+              </div>
+
+              {/* Message Content Box */}
+              <div className="space-y-1.5">
+                <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-[#1a4fa0] dark:text-blue-400" /> Full Message Content
+                </span>
+                <div className="p-4 rounded-lg bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-[13px] text-neutral-800 dark:text-neutral-200 whitespace-pre-wrap leading-relaxed shadow-2xs font-sans">
+                  {selectedNotification.message}
+                </div>
+              </div>
+
+              {/* Metadata Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Time Received */}
+                <div className="p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-800/20 space-y-1">
+                  <span className="text-[10.5px] font-semibold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-[#1a4fa0] dark:text-blue-400" /> Received At
+                  </span>
+                  <p className="text-xs font-bold text-neutral-900 dark:text-white">
+                    {selectedNotification.createdAt || selectedNotification.timestamp
+                      ? formatDistanceToNow(parseISO(selectedNotification.createdAt || selectedNotification.timestamp), { addSuffix: true })
+                      : "Just now"}
+                  </p>
+                  {(selectedNotification.createdAt || selectedNotification.timestamp) && (
+                    <p className="text-[10.5px] text-neutral-500 font-mono">
+                      {new Date(selectedNotification.createdAt || selectedNotification.timestamp).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
+                {/* Sender / Initiator */}
+                <div className="p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-800/20 space-y-1">
+                  <span className="text-[10.5px] font-semibold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                    <User className="w-3 h-3 text-[#1a4fa0] dark:text-blue-400" /> Initiator / Source
+                  </span>
+                  <p className="text-xs font-bold text-neutral-900 dark:text-white truncate">
+                    {selectedNotification.initiatorName || selectedNotification.data?.initiatorName || selectedNotification.data?.sender || "System Notification"}
+                  </p>
+                  {selectedNotification.initiatorEmail && (
+                    <p className="text-[10.5px] text-neutral-500 font-mono truncate">
+                      {selectedNotification.initiatorEmail}
+                    </p>
+                  )}
+                </div>
+
+                {/* Job Requisition Reference (if available) */}
+                {(selectedNotification.data?.jobCode || selectedNotification.data?.jobTitle) && (
+                  <div className="p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-800/20 space-y-1 sm:col-span-2">
+                    <span className="text-[10.5px] font-semibold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                      <Briefcase className="w-3 h-3 text-[#1a4fa0] dark:text-blue-400" /> Associated Requisition
+                    </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        {selectedNotification.data?.jobCode && (
+                          <span className="font-mono text-xs font-bold text-[#1a4fa0] dark:text-blue-400 mr-2">
+                            {selectedNotification.data.jobCode}
+                          </span>
+                        )}
+                        {selectedNotification.data?.jobTitle && (
+                          <span className="text-xs text-neutral-800 dark:text-neutral-200 font-medium">
+                            {selectedNotification.data.jobTitle}
+                          </span>
+                        )}
+                      </div>
+                      {selectedNotification.data?.clientName && (
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-neutral-200/70 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium">
+                          {selectedNotification.data.clientName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 bg-neutral-50 dark:bg-neutral-800/80 border-t border-neutral-200 dark:border-neutral-700 flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedNotification(null)}
+                className="h-8 px-4 text-xs font-semibold"
+              >
+                Close
+              </Button>
+
+              <div className="flex items-center gap-2">
+                {(selectedNotification.data?.jobId || selectedNotification.data?.jobCode) && (
+                  <Link
+                    href={`/job-posting/${selectedNotification.data.jobId || selectedNotification.data.jobCode}`}
+                    onClick={() => {
+                      setSelectedNotification(null);
+                      setOpen(false);
+                    }}
+                  >
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 px-4 text-xs font-semibold bg-[#1a4fa0] hover:bg-[#153f80] text-white"
+                    >
+                      <Briefcase className="w-3.5 h-3.5 mr-1.5" />
+                      View Job Requisition
+                      <ExternalLink className="w-3 h-3 ml-1.5" />
+                    </Button>
+                  </Link>
+                )}
+
+                {selectedNotification.data?.submissionId && (
+                  <Link
+                    href="/utility/submissions"
+                    onClick={() => {
+                      setSelectedNotification(null);
+                      setOpen(false);
+                    }}
+                  >
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 px-4 text-xs font-semibold bg-[#1a4fa0] hover:bg-[#153f80] text-white"
+                    >
+                      <UserCheck className="w-3.5 h-3.5 mr-1.5" />
+                      View Submissions
+                      <ExternalLink className="w-3 h-3 ml-1.5" />
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

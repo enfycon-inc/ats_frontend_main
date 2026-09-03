@@ -5,7 +5,7 @@ import {
   Building2, MapPin, Plus, Edit2, Users, CheckCircle2, XCircle, 
   Search, ShieldAlert, Sparkles, X, Globe, UserPlus, Briefcase, Crown, Shield,
   GitFork, ChevronRight, ChevronDown, Layers, Rocket, ArrowRight, MessageSquare, ListChecks, Trash2,
-  Clock, Calendar, Sun, Moon, Check, Loader2, Table as TableIcon
+  Clock, Calendar, Sun, Moon, Check, Loader2, Table as TableIcon, Mail
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
 import { useSession } from "next-auth/react";
+import { useSocket } from "@/contexts/SocketContext";
 
 const SYSTEM_INTERNAL_ROLES = new Set([
   "default_roles_enfycon_ats",
@@ -27,6 +28,57 @@ const SYSTEM_INTERNAL_ROLES = new Set([
 function getDisplayRoles(roles: any): string[] {
   const arr = Array.isArray(roles) ? roles : typeof roles === "string" ? [roles] : [];
   return arr.filter((r) => !SYSTEM_INTERNAL_ROLES.has(String(r).toLowerCase().replace(/-/g, "_").trim()));
+}
+
+function getInitials(name?: string, email?: string): string {
+  if (name && name.trim()) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  if (email) {
+    return email.slice(0, 2).toUpperCase();
+  }
+  return "U";
+}
+
+function getRoleBadge(role: string) {
+  const norm = role.toUpperCase().replace(/[\s-]/g, "_");
+  if (norm.includes("ADMIN") || norm.includes("SUPER_ADMIN")) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
+        {role === "BRANCH_ADMIN" ? "Branch Admin" : role.replace(/_/g, " ")}
+      </span>
+    );
+  }
+  if (norm.includes("DELIVERY_HEAD")) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-teal-100 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+        Delivery Head
+      </span>
+    );
+  }
+  if (norm.includes("BDM") || norm.includes("ACCOUNT_MANAGER")) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+        BDM
+      </span>
+    );
+  }
+  if (norm.includes("RECRUITER")) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+        Recruiter
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+      {role.replace(/_/g, " ")}
+    </span>
+  );
 }
 
 function formatTime12(timeStr?: string) {
@@ -45,6 +97,7 @@ function formatTime12(timeStr?: string) {
 export default function BranchManagementPage() {
   const { data: session } = useSession();
   const sessionUser = (session as any)?.user;
+  const { isUserOnline } = useSocket();
   
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<any[]>([]);
@@ -87,6 +140,7 @@ export default function BranchManagementPage() {
   const canEditBranch = userPermissions.includes('branch:edit') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('tenant:settings');
   const canDeleteBranch = userPermissions.includes('branch:delete') || userPermissions.includes('tenant:settings');
   const canAssignManager = userPermissions.includes('branch:assign_manager') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('user:manage') || userPermissions.includes('tenant:settings');
+  const canAssignUserRoles = userPermissions.includes('branch:assign_user') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('user:manage') || userPermissions.includes('tenant:settings');
   const canManageBranches = canCreateBranch || canDeleteBranch;
 
   const [branches, setBranches] = useState<any[]>([]);
@@ -771,7 +825,7 @@ export default function BranchManagementPage() {
                               <span className="text-xs font-semibold text-neutral-900 dark:text-white">
                                 {b.managerName}
                               </span>
-                              {canManageBranches && (
+                              {canAssignManager && (
                                 <button
                                   onClick={() => openChangeManagerModal(b)}
                                   className="text-[10.5px] font-medium text-neutral-500 hover:text-indigo-600 hover:underline cursor-pointer ml-1"
@@ -780,7 +834,7 @@ export default function BranchManagementPage() {
                                 </button>
                               )}
                             </div>
-                          ) : canManageBranches ? (
+                          ) : canAssignManager ? (
                             <button
                               onClick={() => openChangeManagerModal(b)}
                               className="text-xs font-medium text-neutral-400 hover:text-indigo-600 italic cursor-pointer"
@@ -1051,7 +1105,7 @@ export default function BranchManagementPage() {
                       </p>
                     </div>
                   </div>
-                  {canManageBranches && (
+                  {canAssignManager && (
                     <button
                       onClick={() => openChangeManagerModal(b)}
                       className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
@@ -1783,131 +1837,171 @@ export default function BranchManagementPage() {
 
       {/* MEMBER ROSTER & MULTI-ROLE MODAL */}
       {isMembersOpen && selectedBranch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-xl overflow-hidden animate-in fade-in-0 zoom-in-95">
-            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
-              <div>
-                <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                  <Users className="h-4 w-4 text-indigo-650" /> Branch Team: {selectedBranch.name}
-                </h3>
-                <p className="text-[11px] text-neutral-400">Staff members & custom multi-role assignments</p>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in-0"
+          onClick={(e) => { if (e.target === e.currentTarget) setIsMembersOpen(false); }}
+        >
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200/90 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150">
+            {/* MODAL HEADER */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-200/80 dark:border-slate-800 bg-neutral-50/80 dark:bg-slate-850/80">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-[#1a4fa0] dark:text-blue-400 flex items-center justify-center border border-blue-200/70 dark:border-blue-900/50 shadow-2xs shrink-0">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                      Branch Team Roster
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-[#1a4fa0]/10 text-[#1a4fa0] dark:bg-blue-400/10 dark:text-blue-300 border border-[#1a4fa0]/20">
+                      {selectedBranch.name}
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                    {branchMembers.filter((u: any) => u.isActive !== false && u.is_active !== false).length} active staff members assigned to this location
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setIsMembersOpen(false)} className="text-neutral-400 hover:text-neutral-600">
+
+              <button
+                type="button"
+                onClick={() => setIsMembersOpen(false)}
+                className="w-8 h-8 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="p-5 space-y-4 max-h-[460px] overflow-y-auto">
-              {/* ASSIGN TEAM MEMBER STRIP */}
-              <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/30 rounded-lg border border-indigo-100 dark:border-indigo-900/50 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
-                    <UserPlus className="h-3.5 w-3.5 text-indigo-650" /> Add / Assign Staff Member to Branch
-                  </span>
-                  <a
-                    href="/utility/users"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10.5px] font-bold text-indigo-650 hover:underline"
-                  >
-                    Manage All Users →
-                  </a>
-                </div>
-
-                <div className="flex gap-2">
-                  <select
-                    value={selectedUserToAssign}
-                    onChange={(e) => setSelectedUserToAssign(e.target.value)}
-                    className="flex-1 h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 font-semibold text-neutral-800 dark:text-neutral-200 outline-none"
-                  >
-                    <option value="">-- Select Recruiter / Staff Member --</option>
-                    {allTenantUsers
-                      .filter((u) => u.branchId !== selectedBranch.id)
-                      .map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.fullName} ({u.email}) {u.branchName ? `[Currently in ${u.branchName}]` : "[Unassigned]"}
-                        </option>
-                      ))}
-                  </select>
-                  <Button
-                    size="sm"
-                    disabled={!selectedUserToAssign}
-                    onClick={() => handleAssignUserToBranch(selectedUserToAssign)}
-                    className="h-8 text-xs bg-indigo-650 hover:bg-indigo-700 text-white font-bold px-3"
-                  >
-                    Assign
-                  </Button>
-                </div>
-              </div>
-
+            {/* MODAL BODY */}
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
               {membersLoading ? (
-                <div className="text-center py-6 text-xs text-neutral-450">Loading staff members...</div>
-              ) : branchMembers.length === 0 ? (
-                <div className="text-center py-6 text-xs text-neutral-450 italic">
-                  No recruiters currently assigned to this branch.
+                <div className="flex flex-col items-center justify-center py-12 text-neutral-400 gap-2">
+                  <Loader2 className="h-6 w-6 animate-spin text-[#1a4fa0]" />
+                  <span className="text-xs font-medium">Loading staff members...</span>
+                </div>
+              ) : branchMembers.filter((u: any) => u.isActive !== false && u.is_active !== false).length === 0 ? (
+                <div className="text-center py-12 border border-dashed border-neutral-200 dark:border-slate-800 rounded-xl bg-neutral-50/50 dark:bg-slate-850/40 p-6 space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-slate-800 text-neutral-400 mx-auto flex items-center justify-center">
+                    <Users className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                    No active staff members currently assigned to this branch.
+                  </p>
+                  <p className="text-[11px] text-neutral-400">
+                    Assign users from the Users & Roles management screen to see them listed here.
+                  </p>
                 </div>
               ) : (
-                branchMembers.map((user) => {
-                  const isManager = selectedBranch.managerId === user.id;
-                  const rolesArray: string[] = getDisplayRoles(user.roles);
+                <div className="divide-y divide-neutral-100 dark:divide-slate-800/80 rounded-xl border border-neutral-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
+                  {branchMembers
+                    .filter((u: any) => u.isActive !== false && u.is_active !== false)
+                    .map((user) => {
+                      const isManager = selectedBranch.managerId === user.id;
+                      const rolesArray: string[] = getDisplayRoles(user.roles);
+                      const initials = getInitials(user.fullName, user.email);
+                      const online = isUserOnline(user.id) || isUserOnline(user.email);
 
-                  return (
-                    <div key={user.id} className="flex items-center justify-between p-3.5 rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs font-bold text-neutral-800 dark:text-white">{user.fullName || user.email}</p>
-                          {isManager && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
-                              <Crown className="h-3 w-3" /> Branch Head
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-neutral-500">{user.email}</p>
-                        
-                        {/* ROLES BADGES - CLEAN BUSINESS ROLES ONLY */}
-                        <div className="flex flex-wrap gap-1 pt-1">
-                          {rolesArray.length === 0 ? (
-                            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-medium bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-neutral-300 border border-neutral-200 dark:border-slate-700">
-                              Staff Member
-                            </span>
-                          ) : (
-                            rolesArray.map((r) => (
-                              <span key={r} className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200">
-                                {r === "BRANCH_ADMIN" ? "Branch Admin" : r.replace(/_/g, " ")}
-                              </span>
-                            ))
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {!isManager && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAssignManager(user.id)}
-                            className="h-7 text-[10px] font-bold border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100"
-                          >
-                            Set as Branch Head
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openEditMemberRolesModal(user)}
-                          className="h-7 text-[10px] font-bold border-neutral-300"
+                      return (
+                        <div
+                          key={user.id}
+                          className="flex items-center justify-between p-3.5 hover:bg-neutral-50/80 dark:hover:bg-slate-850/60 transition-colors gap-4"
                         >
-                          <Shield className="h-3 w-3 mr-1 text-indigo-650" /> Configure Roles
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })
+                          {/* Left: User Avatar & Info */}
+                          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                            <div className="relative shrink-0">
+                              <div className="w-8.5 h-8.5 rounded-full bg-gradient-to-br from-[#1a4fa0] to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-2xs">
+                                {initials}
+                              </div>
+                              {/* Real-time online/offline indicator */}
+                              <span
+                                title={online ? "Online" : "Offline"}
+                                className={`w-2 h-2 rounded-full ring-1.5 ring-white dark:ring-slate-900 absolute -bottom-0.5 -right-0.5 ${
+                                  online ? "bg-emerald-500" : "bg-neutral-300 dark:bg-neutral-600"
+                                }`}
+                              />
+                            </div>
+
+                            <div className="min-w-0 space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs font-bold text-neutral-900 dark:text-white truncate">
+                                  {user.fullName || user.email}
+                                </p>
+                                {isManager && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 shrink-0">
+                                    <Crown className="h-3 w-3 text-amber-600 dark:text-amber-400" /> Branch Head
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-[11.5px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5">
+                                <Mail className="h-3 w-3 text-neutral-400 shrink-0" />
+                                <span className="truncate">{user.email}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Center: Roles */}
+                          <div className="flex items-center justify-center shrink-0 px-2 min-w-[120px]">
+                            {rolesArray.length === 0 ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10.5px] font-medium bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-neutral-300">
+                                Staff Member
+                              </span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5 items-center justify-center">
+                                {rolesArray.map((r) => (
+                                  <React.Fragment key={r}>
+                                    {getRoleBadge(r)}
+                                  </React.Fragment>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Right: Admin Action Buttons (if permitted) */}
+                          {(canAssignManager || canAssignUserRoles) ? (
+                            <div className="flex items-center gap-1.5 shrink-0 sm:pl-3 justify-end min-w-[130px]">
+                              {!isManager && canAssignManager && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleAssignManager(user.id)}
+                                  className="h-7 px-2.5 text-[10.5px] font-bold border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800"
+                                >
+                                  Set as Branch Head
+                                </Button>
+                              )}
+                              {canAssignUserRoles && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openEditMemberRolesModal(user)}
+                                  className="h-7 px-2.5 text-[10.5px] font-bold border-neutral-300 dark:border-slate-700 hover:border-[#1a4fa0] text-neutral-700 dark:text-neutral-200"
+                                >
+                                  <Shield className="h-3 w-3 mr-1 text-[#1a4fa0] dark:text-blue-400" /> Configure Roles
+                                </Button>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="w-8 shrink-0 hidden sm:block" />
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
               )}
             </div>
 
-            <div className="p-4 bg-neutral-50 dark:bg-slate-850 border-t border-neutral-100 dark:border-slate-800 text-right">
-              <Button size="sm" variant="outline" onClick={() => setIsMembersOpen(false)} className="h-8 text-xs font-bold">
+            {/* MODAL FOOTER */}
+            <div className="px-6 py-3.5 bg-neutral-50 dark:bg-slate-850 border-t border-neutral-200/80 dark:border-slate-800 flex items-center justify-between">
+              <div className="text-[11.5px] text-neutral-500 dark:text-neutral-400 font-medium">
+                Total Team: <span className="font-bold text-neutral-900 dark:text-white">{branchMembers.filter((u: any) => u.isActive !== false && u.is_active !== false).length} active staff</span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsMembersOpen(false)}
+                className="h-8 px-4 text-xs font-bold"
+              >
                 Close
               </Button>
             </div>

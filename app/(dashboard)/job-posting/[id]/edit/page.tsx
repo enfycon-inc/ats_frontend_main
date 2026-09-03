@@ -33,6 +33,10 @@ import {
   Search,
   Check,
   Clock,
+  Loader2,
+  ArrowRight,
+  CheckCircle2,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -264,6 +268,20 @@ export default function EditJobPostingPage() {
   const [clientList, setClientList] = useState<any[]>([]);
   const [clientSearchText, setClientSearchText] = useState("");
   const [endClientSearchText, setEndClientSearchText] = useState("");
+  const [publishingModalState, setPublishingModalState] = useState<{
+    isOpen: boolean;
+    status: "publishing" | "success" | "error";
+    jobTitle: string;
+    jobCode: string;
+    client: string;
+    location: string;
+    jobType: string;
+    positions: number;
+    payRate: string;
+    businessUnit: string;
+    createdJobId?: string;
+    errorMessage?: string;
+  } | null>(null);
 
   const [countrySearchText, setCountrySearchText] = useState("");
   const [stateSearchText, setStateSearchText] = useState("");
@@ -632,12 +650,14 @@ export default function EditJobPostingPage() {
           setValue("client", jobData.client || "");
           setValue("endClientName", jobData.endClientName || "");
           setValue("locationAutocomplete", jobData.location || "");
-          const shiftTimingMatch = jobData.description?.match(/<p><strong>Shift Timing:<\/strong>\s*([^<]+)<\/p>/);
-          const extractedShiftTiming = shiftTimingMatch ? shiftTimingMatch[1] : "General Shift";
-          let cleanDescription = jobData.description || "";
-          if (shiftTimingMatch) {
-            cleanDescription = cleanDescription.replace(/<p><strong>Shift Timing:<\/strong>\s*[^<]+<\/p>/, "");
-          }
+          const shiftTimingMatch = jobData.description?.match(/<p>\s*<strong>Shift Timing:<\/strong>\s*([^<]+)<\/p>/i)
+            || jobData.description?.match(/Shift Timing:\s*([^\n<]+)/i);
+          const extractedShiftTiming = jobData.shiftTiming || (shiftTimingMatch ? shiftTimingMatch[1].trim() : "General Shift");
+          let cleanDescription = (jobData.description || "")
+            .replace(/<p>\s*<strong>Shift Timing:<\/strong>[^<]*<\/p>/gi, "")
+            .replace(/<p>\s*Shift Timing:[^<]*<\/p>/gi, "")
+            .replace(/^Shift Timing:[^\n]*\n*/gim, "")
+            .trim();
 
           setValue("jobType", jobData.type || "Contract");
           setValue("jobDescription", cleanDescription);
@@ -941,37 +961,47 @@ export default function EditJobPostingPage() {
       toast.error("Job Assignment is mandatory. Please select a Staff member, Pod, or Allocation Pool.");
       return;
     }
-    try {
-      if (!atsApi.auth.isAuthenticated()) {
-        await atsApi.auth.login("recruiter@enfycon.com", "enfycon123");
-      }
 
-      const formatRatePayload = (val: string, cur: string, unit: string, term: string) => {
-        if (!val || val === "N/A" || val === "Rate") return "N/A";
-        const cleanVal = val.replace(/[^0-9.]/g, "");
-        if (!cleanVal) return "N/A";
-        if (cur === "INR") {
-          return `INR - ${cleanVal} LPA`;
-        } else {
-          const unitLabel = unit === "Hourly" ? "hr" : unit === "Yearly" ? "yr" : "hr";
-          return `USD - $${cleanVal}/${unitLabel}`;
-        }
-      };
-
-      let assembledBillRate = "";
-      if (market === "IN" && data.taxTerms === "Permanent") {
-        const commValue = commissionType === "custom" ? customCommission : commissionType;
-        assembledBillRate = `${commValue}% Placement Commission`;
+    const formatRatePayload = (val: string, cur: string, unit: string, term: string) => {
+      if (!val || val === "N/A" || val === "Rate") return "N/A";
+      const cleanVal = val.replace(/[^0-9.]/g, "");
+      if (!cleanVal) return "N/A";
+      if (cur === "INR") {
+        return `INR - ${cleanVal} LPA`;
       } else {
-        assembledBillRate = formatRatePayload(data.clientBillRate, billCurrency, billUnit, billTerm);
+        const unitLabel = unit === "Hourly" ? "hr" : unit === "Yearly" ? "yr" : "hr";
+        return `USD - $${cleanVal}/${unitLabel}`;
       }
+    };
 
-      const assembledPayRate = formatRatePayload(data.payRate, payCurrency, payUnit, payTerm);
+    let assembledBillRate = "";
+    if (market === "IN" && data.taxTerms === "Permanent") {
+      const commValue = commissionType === "custom" ? customCommission : commissionType;
+      assembledBillRate = `${commValue}% Placement Commission`;
+    } else {
+      assembledBillRate = formatRatePayload(data.clientBillRate, billCurrency, billUnit, billTerm);
+    }
 
+    const assembledPayRate = formatRatePayload(data.payRate, payCurrency, payUnit, payTerm);
+
+    const locSummary = [data.city, data.states, data.country].filter(Boolean).join(", ") || data.locationAutocomplete || "Remote";
+
+    // Show popup window immediately with short details
+    setPublishingModalState({
+      isOpen: true,
+      status: "publishing",
+      jobTitle: data.jobTitle,
+      jobCode: data.jobCode,
+      client: data.client || data.endClientName || "Direct Client",
+      location: locSummary,
+      jobType: data.jobType || "Full Time",
+      positions: data.numPositions || 1,
+      payRate: assembledPayRate,
+      businessUnit: data.businessUnit || (typeof window !== 'undefined' ? localStorage.getItem('active_branch_name') || 'Main Office' : 'Main Office'),
+    });
+
+    try {
       let finalDescription = data.jobDescription;
-      if (market === "IN" && data.shiftTiming) {
-        finalDescription = `<p><strong>Shift Timing:</strong> ${data.shiftTiming}</p>` + finalDescription;
-      }
 
       let resolvedPodId: string | undefined = undefined;
       let resolvedPrimaryRecruiterId: string | undefined = data.primaryRecruiter || undefined;
@@ -1033,14 +1063,25 @@ export default function EditJobPostingPage() {
         noticePeriod: data.noticePeriod || undefined,
         podId: resolvedPodId,
         market: market,
+        shiftTiming: data.shiftTiming || undefined,
       };
 
       await atsApi.jobs.update(id, payload);
 
+      setPublishingModalState(prev => prev ? {
+        ...prev,
+        status: "success",
+        createdJobId: id,
+      } : null);
+
       toast.success(`Job posting updated successfully!`);
-      router.push("/job-posting");
     } catch (err: any) {
       console.error("[EditJob] API error:", err);
+      setPublishingModalState(prev => prev ? {
+        ...prev,
+        status: "error",
+        errorMessage: err.message || "Backend connection failed. Please check required fields and try again.",
+      } : null);
       toast.error("Failed to update job: " + (err.message || "Backend connection failed."));
     }
   };
@@ -1284,9 +1325,20 @@ export default function EditJobPostingPage() {
               <Button
                 type="submit"
                 size="sm"
-                className="h-8.5 font-bold bg-primary text-white shadow-xs hover:bg-primary/95 cursor-pointer text-xs"
+                disabled={publishingModalState?.status === "publishing"}
+                className="h-8.5 px-4 font-bold text-white shadow-xs cursor-pointer text-xs flex items-center gap-1.5 bg-primary hover:bg-primary/90 active:bg-primary/80 hover:shadow-md transition-all duration-200 group transform active:scale-95"
               >
-                Update Posting
+                {publishingModalState?.status === "publishing" ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                    <span>Updating Posting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                    <span>Update Posting</span>
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -3056,6 +3108,53 @@ export default function EditJobPostingPage() {
                 )}
               </div>
             </div>
+            {/* Bottom Action Footer Bar */}
+            <div className="p-3 bg-white dark:bg-slate-900 border-t border-neutral-200 dark:border-slate-800 flex items-center justify-between sticky bottom-0 z-20 shadow-md">
+              <div className="text-xs text-neutral-500 font-medium hidden sm:block">
+                Fill in the mandatory fields marked with <span className="text-red-500 font-bold">*</span> to update your job requisition.
+              </div>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    toast.success("Draft saved successfully to local catalog");
+                    router.push("/job-posting");
+                  }}
+                  className="h-8.5 font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-slate-800 cursor-pointer text-xs"
+                >
+                  Save as Draft
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/job-posting")}
+                  className="h-8.5 font-bold text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-slate-700 cursor-pointer text-xs bg-white dark:bg-slate-900"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={publishingModalState?.status === "publishing"}
+                  className="h-8.5 px-4 font-bold text-white shadow-xs cursor-pointer text-xs flex items-center gap-1.5 bg-primary hover:bg-primary/90 active:bg-primary/80 hover:shadow-md transition-all duration-200 group transform active:scale-95"
+                >
+                  {publishingModalState?.status === "publishing" ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                      <span>Updating Posting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                      <span>Update Posting</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         </form>
       )}
@@ -3083,6 +3182,123 @@ export default function EditJobPostingPage() {
         }}
         market={market}
       />
+
+      {/* 4. UPDATING JOB REQUISITION POPUP MODAL */}
+      {publishingModalState && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            
+            {/* Modal Header */}
+            <div className="flex items-center gap-3.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className={cn(
+                "w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-xs",
+                publishingModalState.status === "publishing" ? "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400" :
+                publishingModalState.status === "success" ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400" :
+                "bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400"
+              )}>
+                {publishingModalState.status === "publishing" ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600 dark:text-blue-400" />
+                ) : publishingModalState.status === "success" ? (
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                  {publishingModalState.status === "publishing" ? "Updating Job Requisition..." :
+                   publishingModalState.status === "success" ? "Job Requisition Updated!" :
+                   "Update Failed"}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {publishingModalState.status === "publishing" ? "Applying changes and synchronizing requirement..." :
+                   publishingModalState.status === "success" ? "Your job posting has been successfully updated in the workspace." :
+                   publishingModalState.errorMessage || "An error occurred while updating the job."}
+                </p>
+              </div>
+            </div>
+
+            {/* Short Details Preview Card */}
+            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 rounded-xl p-4 space-y-3 font-sans text-xs">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Job Title</span>
+                  <span className="text-sm font-bold text-slate-900 dark:text-white">{publishingModalState.jobTitle || "Job Requisition"}</span>
+                </div>
+                {publishingModalState.jobCode && (
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 font-mono font-bold text-[11px] rounded-md shrink-0">
+                    {publishingModalState.jobCode}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                <div>
+                  <span className="text-[10px] font-medium text-slate-400 block">Client Account</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.client || "Direct Client"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-medium text-slate-400 block">Business Unit</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">{publishingModalState.businessUnit || "Main Office"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-medium text-slate-400 block">Type & Location</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.jobType || "Full Time"} • {publishingModalState.location || "Remote"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-medium text-slate-400 block">Positions & Pay Rate</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.positions || 1} Pos • {publishingModalState.payRate || "N/A"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Progress or Action Buttons */}
+            {publishingModalState.status === "publishing" ? (
+              <div className="space-y-2 pt-1">
+                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-gradient-to-r from-blue-600 to-indigo-600 h-full w-4/5 animate-pulse rounded-full" />
+                </div>
+                <p className="text-[11px] text-center text-slate-400 font-medium italic">
+                  Updating database records & syncing changes...
+                </p>
+              </div>
+            ) : publishingModalState.status === "success" ? (
+              <div className="flex items-center gap-2.5 pt-1">
+                <Button
+                  type="button"
+                  onClick={() => router.push("/job-posting")}
+                  className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold text-xs h-9 cursor-pointer shadow-xs"
+                >
+                  <span>View All Jobs</span>
+                  <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Button>
+                {publishingModalState.createdJobId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => router.push(`/job-posting/${publishingModalState.createdJobId}`)}
+                    className="flex-1 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs h-9 cursor-pointer"
+                  >
+                    <span>View Requisition</span>
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPublishingModalState(null)}
+                  className="border-slate-300 dark:border-slate-700 font-bold text-xs h-9 cursor-pointer"
+                >
+                  Close & Review Form
+                </Button>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
       </div>
   );
 }

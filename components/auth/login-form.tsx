@@ -31,6 +31,24 @@ const LoginForm = () => {
 
   const [isAuthorizingSso, setIsAuthorizingSso] = useState(false);
 
+  const togglePasswordType = () => {
+    setPasswordType((prev) => (prev === "password" ? "text" : "password"));
+  };
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
+    mode: "all",
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
   React.useEffect(() => {
     const isExpired = searchParams.get("expired");
     if (isExpired === "true") {
@@ -46,6 +64,26 @@ const LoginForm = () => {
         "Access Denied: You have not been invited to this workspace. Please contact your administrator for an invite.",
         { duration: 6000 }
       );
+    }
+
+    const emailParam = searchParams.get("email");
+    const passwordParam = searchParams.get("password");
+
+    if (emailParam) {
+      setValue("email", emailParam);
+    }
+    if (passwordParam) {
+      setValue("password", passwordParam);
+    }
+
+    // Immediately clean plain-text credentials from the browser address bar for security
+    if (typeof window !== "undefined" && (searchParams.has("password") || searchParams.has("email"))) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("password");
+      url.searchParams.delete("email");
+      const cleanQuery = url.searchParams.toString();
+      const cleanUrl = url.pathname + (cleanQuery ? `?${cleanQuery}` : "");
+      window.history.replaceState({}, "", cleanUrl);
     }
 
     const ssoToken = searchParams.get("sso_token") || searchParams.get("token");
@@ -69,24 +107,7 @@ const LoginForm = () => {
         toast.error("SSO handoff failed.");
       });
     }
-  }, [searchParams]);
-
-  const togglePasswordType = () => {
-    setPasswordType((prev) => (prev === "password" ? "text" : "password"));
-  };
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<z.infer<typeof schema>>({
-    resolver: zodResolver(schema),
-    mode: "all",
-    defaultValues: {
-      email: "recruiter@enfycon.com",
-      password: "enfycon123",
-    },
-  });
+  }, [searchParams, setValue]);
 
   const onSubmit = (data: z.infer<typeof schema>) => {
     startTransition(async () => {
@@ -166,7 +187,7 @@ const LoginForm = () => {
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
+    <form ref={formRef} method="POST" onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
       
       {/* Email Field */}
       <div className="space-y-1.5">
