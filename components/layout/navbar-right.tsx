@@ -17,8 +17,14 @@ import {
   X,
   ShieldCheck,
   MapPin,
+  Home,
+  CreditCard,
+  Sparkles,
+  LogOut,
+  Loader2,
+  Award,
 } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -152,7 +158,14 @@ function NotificationDropdownNav() {
     return notifications.filter((n) => {
       if (activeTab === "UNREAD") return !n.isRead;
       if (activeTab === "JOBS") return n.type.includes("JOB") || n.type === "NEW_JOB";
-      if (activeTab === "REVIEWS") return n.type === "JOB_PENDING_APPROVAL" || n.type === "REVIEWER_ASSIGNED";
+      if (activeTab === "REVIEWS")
+        return (
+          n.type.includes("REVIEW") ||
+          n.type.includes("SUBMISSION") ||
+          n.type.includes("INTERVIEW") ||
+          n.type === "JOB_PENDING_APPROVAL" ||
+          n.type === "REVIEWER_ASSIGNED"
+        );
       return true;
     });
   }, [notifications, activeTab]);
@@ -160,13 +173,22 @@ function NotificationDropdownNav() {
   const getIcon = (type: string) => {
     switch (type) {
       case "JOB_PENDING_APPROVAL":
+      case "SUBMISSION_PENDING_APPROVAL":
         return <Briefcase className="w-4 h-4 text-amber-500" />;
       case "JOB_APPROVED":
+      case "SUBMISSION_APPROVED":
+      case "SUBMISSION_PLACED":
         return <CircleCheck className="w-4 h-4 text-green-500" />;
       case "JOB_REJECTED":
+      case "SUBMISSION_REJECTED":
         return <X className="w-4 h-4 text-red-500" />;
       case "JOB_NEW":
         return <Briefcase className="w-4 h-4 text-blue-500" />;
+      case "INTERVIEW_SCHEDULED":
+      case "INTERVIEW_CLEARED":
+        return <Calendar className="w-4 h-4 text-cyan-500" />;
+      case "SUBMISSION_OFFER":
+        return <Award className="w-4 h-4 text-emerald-500" />;
       case "ANNOUNCEMENT":
         return <Megaphone className="w-4 h-4 text-purple-500" />;
       case "REVIEWER_ASSIGNED":
@@ -185,6 +207,13 @@ function NotificationDropdownNav() {
             Pending Approval
           </span>
         );
+      case "SUBMISSION_PENDING_APPROVAL":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50">
+            <Briefcase className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            Pending Review
+          </span>
+        );
       case "JOB_APPROVED":
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50">
@@ -192,11 +221,46 @@ function NotificationDropdownNav() {
             Approved
           </span>
         );
+      case "SUBMISSION_APPROVED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50">
+            <CircleCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            Submission Approved
+          </span>
+        );
       case "JOB_REJECTED":
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50">
             <X className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
             Rejected
+          </span>
+        );
+      case "SUBMISSION_REJECTED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50">
+            <X className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+            Submission Rejected
+          </span>
+        );
+      case "INTERVIEW_SCHEDULED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-900/50">
+            <Calendar className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+            Interview Scheduled
+          </span>
+        );
+      case "SUBMISSION_OFFER":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-900/50">
+            <Award className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            Offer Extended
+          </span>
+        );
+      case "SUBMISSION_PLACED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50">
+            <CircleCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            Placed / Joined
           </span>
         );
       case "JOB_NEW":
@@ -535,6 +599,25 @@ function NotificationDropdownNav() {
                     </div>
                   </div>
                 )}
+
+                {/* Candidate Reference (if available) */}
+                {selectedNotification.data?.candidateName && (
+                  <div className="p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-800/20 space-y-1 sm:col-span-2">
+                    <span className="text-[10.5px] font-semibold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                      <UserCheck className="w-3 h-3 text-[#1a4fa0] dark:text-blue-400" /> Candidate Profile
+                    </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold text-neutral-900 dark:text-white">
+                        {selectedNotification.data.candidateName}
+                      </p>
+                      {selectedNotification.data?.status && (
+                        <span className="text-[10.5px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-200 dark:border-emerald-900/40">
+                          {selectedNotification.data.status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -811,8 +894,7 @@ function AppsLauncherDropdown() {
   );
 }
 
-// ─── Profile dropdown ─────────────────────────────────────────────────────────
-// ─── Profile dropdown ─────────────────────────────────────────────────────────
+// ─── Profile dropdown (Enfysync Styled) ───────────────────────────────────────
 function ProfileDropdownNav() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -821,6 +903,7 @@ function ProfileDropdownNav() {
   const [availableRoles, setAvailableRoles] = useState<any[]>([]);
   const [rolesLoaded, setRolesLoaded] = useState(false);
   const [liveUserLoaded, setLiveUserLoaded] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
 
   const [liveUser, setLiveUser] = useState<any>(null);
   const currentUser = liveUser || (typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null);
@@ -845,7 +928,11 @@ function ProfileDropdownNav() {
         setOverrideRole(localStorage.getItem("override_role"));
       };
       window.addEventListener("storage", handleStorage);
-      return () => window.removeEventListener("storage", handleStorage);
+      window.addEventListener("overrideRoleChanged", handleStorage);
+      return () => {
+        window.removeEventListener("storage", handleStorage);
+        window.removeEventListener("overrideRoleChanged", handleStorage);
+      };
     }
   }, []);
 
@@ -867,53 +954,66 @@ function ProfileDropdownNav() {
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
-  const userName = currentUser?.fullName || session?.user?.name || "Sahadeb";
+  const userName = currentUser?.fullName || (session as any)?.user?.name || "Mrutyunjay Rout";
+  const userAvatar = currentUser?.avatar || (session as any)?.user?.image || null;
   const userRoles = currentUser?.roles || (session as any)?.user?.roles || [];
   const systemRole = (session as any)?.user?.systemRole || userRoles[0];
 
-const IGNORED_KEYCLOAK_ROLES = new Set([
-  "DEFAULT_ROLES_ENFYCON_ATS",
-  "DEFAULT_ROLES_ATS",
-  "DEFAULT_ROLES",
-  "OFFLINE_ACCESS",
-  "UMA_AUTHORIZATION",
-  "MANAGE_ACCOUNT",
-  "MANAGE_ACCOUNT_LINKS",
-  "VIEW_PROFILE",
-  "ACCOUNT",
-  "ADMIN_CLI",
-  "BROKER",
-  "REALM_ADMIN",
-  "CREATE_CLIENT",
-  "MANAGE_USERS",
-  "MANAGE_REALM",
-  "MANAGE_EVENTS",
-  "MANAGE_CLIENTS",
-  "MANAGE_AUTHORIZATION",
-  "VIEW_USERS",
-  "VIEW_REALM",
-  "VIEW_EVENTS",
-  "VIEW_CLIENTS",
-  "VIEW_AUTHORIZATION",
-  "IMPERSONATION",
-  "USER",
-]);
+  const userInitials = useMemo(() => {
+    if (!userName) return "U";
+    const parts = userName.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return userName.slice(0, 2).toUpperCase();
+  }, [userName]);
 
-const isTechnicalKeycloakRole = (r: string): boolean => {
-  if (!r || typeof r !== "string") return true;
-  const upper = r.trim().toUpperCase().replace(/[-\s]/g, "_");
-  if (upper.startsWith("DEFAULT_ROLES_") || upper.startsWith("DEFAULT_ROLES")) return true;
-  return IGNORED_KEYCLOAK_ROLES.has(upper);
-};
+  const IGNORED_KEYCLOAK_ROLES = new Set([
+    "DEFAULT_ROLES_ENFYCON_ATS",
+    "DEFAULT_ROLES_ATS",
+    "DEFAULT_ROLES",
+    "OFFLINE_ACCESS",
+    "UMA_AUTHORIZATION",
+    "MANAGE_ACCOUNT",
+    "MANAGE_ACCOUNT_LINKS",
+    "VIEW_PROFILE",
+    "ACCOUNT",
+    "ADMIN_CLI",
+    "BROKER",
+    "REALM_ADMIN",
+    "CREATE_CLIENT",
+    "MANAGE_USERS",
+    "MANAGE_REALM",
+    "MANAGE_EVENTS",
+    "MANAGE_CLIENTS",
+    "MANAGE_AUTHORIZATION",
+    "VIEW_USERS",
+    "VIEW_REALM",
+    "VIEW_EVENTS",
+    "VIEW_CLIENTS",
+    "VIEW_AUTHORIZATION",
+    "IMPERSONATION",
+    "USER",
+  ]);
+
+  const isTechnicalKeycloakRole = (r: string): boolean => {
+    if (!r || typeof r !== "string") return true;
+    const upper = r.trim().toUpperCase().replace(/[-\s]/g, "_");
+    if (upper.startsWith("DEFAULT_ROLES_") || upper.startsWith("DEFAULT_ROLES")) return true;
+    return IGNORED_KEYCLOAK_ROLES.has(upper);
+  };
 
   const systemRoleLabels: Record<string, string> = {
     SUPER_ADMIN: "Global Admin",
-    ADMIN: "Tenant Admin",
+    ADMIN: "Admin",
+    TENANT_ADMIN: "Admin",
     BRANCH_ADMIN: "Branch Admin",
     ACCOUNT_MANAGER: "Account Manager",
     POD_LEAD: "Pod Lead",
     DELIVERY_HEAD: "Delivery Head",
     RECRUITER: "Recruiter",
+    SENSE: "Sense",
+    FINANCE_ADMIN: "Finance Admin",
   };
 
   // Dynamically resolve display label for any system role or tenant custom role alias
@@ -949,77 +1049,202 @@ const isTechnicalKeycloakRole = (r: string): boolean => {
         ? (session as any).user.roles.filter((r: string) => !isTechnicalKeycloakRole(r))
         : (systemRole && !isTechnicalKeycloakRole(systemRole) ? [systemRole] : []));
 
-  const assignedRoleOptions = useMemo(() => {
+  const isUserAdmin = useMemo(() => {
+    const sRole = (systemRole || "").toUpperCase();
+    if (sRole === "ADMIN" || sRole === "SUPER_ADMIN" || sRole === "TENANT_ADMIN") return true;
+    return userAssignedRoles.some((r) => {
+      const u = r.toUpperCase();
+      return u === "ADMIN" || u === "SUPER_ADMIN" || u === "TENANT_ADMIN";
+    });
+  }, [systemRole, userAssignedRoles]);
+
+  const currentActiveRole = overrideRole || (isUserAdmin ? "ADMIN" : (userAssignedRoles[0] || "RECRUITER"));
+  const displayRole = getDynamicRoleLabel(currentActiveRole);
+
+  // Format subtitle showing ONLY actual assigned roles (e.g. "BDM" or "Admin + Recruiter")
+  const rolesSubtitle = useMemo(() => {
+    const cleanRoles = userAssignedRoles
+      .map((r) => getDynamicRoleLabel(r))
+      .filter((v, i, a) => a.indexOf(v) === i);
+
+    if (cleanRoles.length > 0) {
+      return cleanRoles.join(" + ");
+    }
+    return displayRole || "User";
+  }, [userAssignedRoles, displayRole, getDynamicRoleLabel]);
+
+  // Role icon and color styling resolver
+  const getRoleIconAndColor = (roleStr: string) => {
+    const u = (roleStr || "").toUpperCase().replace(/[\s\-_]/g, "");
+
+    // Recruiter / TA / Sourcing
+    if (u === "RECRUITER" || u.includes("RECRUIT") || u.includes("SOURC") || u === "TA") {
+      return {
+        Icon: Home,
+        colorClass:
+          "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/40",
+      };
+    }
+    // Delivery Head / Operations
+    if (u === "DELIVERYHEAD" || u.includes("DELIVERY") || u.includes("OPERATION")) {
+      return {
+        Icon: Home,
+        colorClass:
+          "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/40",
+      };
+    }
+    // Sense
+    if (u === "SENSE") {
+      return {
+        Icon: Home,
+        colorClass:
+          "bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 border border-sky-200/80 dark:border-sky-800/40",
+      };
+    }
+    // Account Manager / BDM / Business Development / Sales / Client
+    if (
+      u === "ACCOUNTMANAGER" ||
+      u === "BDM" ||
+      u.includes("ACCOUNT") ||
+      u.includes("BUSINESSDEVELOPMENT") ||
+      u.includes("SALES")
+    ) {
+      return {
+        Icon: Briefcase,
+        colorClass:
+          "bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-200/80 dark:border-teal-800/40",
+      };
+    }
+    // Finance / Payroll
+    if (u === "FINANCEADMIN" || u.includes("FINANCE") || u.includes("PAYROLL")) {
+      return {
+        Icon: CreditCard,
+        colorClass:
+          "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/40",
+      };
+    }
+    // Pod Lead / Team Lead
+    if (u === "PODLEAD" || u.includes("POD") || u.includes("LEAD")) {
+      return {
+        Icon: Home,
+        colorClass:
+          "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200/80 dark:border-purple-800/40",
+      };
+    }
+    // Admin / Super Admin
+    if (
+      u === "ADMIN" ||
+      u === "SUPERADMIN" ||
+      u === "GLOBALADMIN" ||
+      u === "TENANTADMIN" ||
+      u.includes("ADMIN")
+    ) {
+      return {
+        Icon: ShieldCheck,
+        colorClass:
+          "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/40",
+      };
+    }
+    // Fallback custom
+    return {
+      Icon: Home,
+      colorClass:
+        "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80",
+    };
+  };
+
+  // Build the list of dashboard perspectives showing ONLY actual assigned roles (no dummy roles)
+  const dashboardRoleOptions = useMemo(() => {
     const seen = new Set<string>();
-    const options: { key: string; name: string; icon: string; replacesSystemRole?: string }[] = [];
+    const options: {
+      key: string;
+      name: string;
+      Icon: any;
+      colorClass: string;
+      replacesSystemRole?: string;
+    }[] = [];
 
     for (const uRole of userAssignedRoles) {
       if (!uRole || typeof uRole !== "string") continue;
       if (isTechnicalKeycloakRole(uRole)) continue;
+
       const uUpper = uRole.trim().toUpperCase();
 
-      // 1. Check for matching custom role (prefer active branch if set)
-      const customRole = availableRoles.find(
-        (r) => !r.isSystem && (
-          (!activeBranchId || !r.branchId || r.branchId === activeBranchId) &&
-          (r.name.toUpperCase() === uUpper || r.id === uRole || (r.systemRole && r.systemRole.toUpperCase() === uUpper))
-        )
-      ) || availableRoles.find(
-        (r) => !r.isSystem && (
-          r.name.toUpperCase() === uUpper || r.id === uRole || (r.systemRole && r.systemRole.toUpperCase() === uUpper)
-        )
-      );
+      // Find matching custom role definition if any
+      const customRole =
+        availableRoles.find(
+          (r) =>
+            !r.isSystem &&
+            ((!activeBranchId || !r.branchId || r.branchId === activeBranchId) &&
+              (r.name?.toUpperCase() === uUpper ||
+                r.id === uRole ||
+                (r.systemRole && r.systemRole.toUpperCase() === uUpper)))
+        ) ||
+        availableRoles.find(
+          (r) =>
+            !r.isSystem &&
+            (r.name?.toUpperCase() === uUpper ||
+              r.id === uRole ||
+              (r.systemRole && r.systemRole.toUpperCase() === uUpper))
+        );
 
-      let key = uRole;
-      let name = uRole;
-      let icon = "👤";
-      let replacesSystemRole: string | undefined = undefined;
-
-      if (customRole) {
-        key = customRole.name;
-        name = customRole.name;
-        icon = "🎨";
-        replacesSystemRole = customRole.systemRole || customRole.replacesSystemRole;
-      } else if (uUpper === "BDM") {
-        key = "BDM";
-        name = "BDM";
-        icon = "💼";
-        replacesSystemRole = "ACCOUNT_MANAGER";
-      } else if (uUpper === "ACCOUNT_MANAGER" || uUpper === "BD_MANAGER" || uUpper === "BD MANAGER") {
-        key = "Account Manager";
-        name = "Account Manager";
-        icon = "💼";
-      } else if (systemRoleLabels[uUpper]) {
-        key = uUpper;
-        name = systemRoleLabels[uUpper];
-        icon = uUpper === "ADMIN" || uUpper === "SUPER_ADMIN" ? "⚙️" : (uUpper === "ACCOUNT_MANAGER" ? "💼" : "👤");
-      } else {
-        key = uRole;
-        name = uRole.replace(/_/g, " ");
-      }
-
+      const name = getDynamicRoleLabel(uRole);
+      const key = customRole?.name || uRole;
       const dedupeKey = name.trim().toUpperCase();
+
       if (!seen.has(dedupeKey)) {
         seen.add(dedupeKey);
-        options.push({ key, name, icon, replacesSystemRole });
+        const { Icon, colorClass } = getRoleIconAndColor(name);
+        options.push({
+          key,
+          name,
+          Icon,
+          colorClass,
+          replacesSystemRole: customRole?.systemRole || customRole?.replacesSystemRole || undefined,
+        });
       }
     }
 
-    return options;
-  }, [userAssignedRoles, availableRoles, activeBranchId, systemRoleLabels]);
+    // If user has no roles in array but systemRole is set, show that
+    if (options.length === 0 && systemRole && !isTechnicalKeycloakRole(systemRole)) {
+      const name = getDynamicRoleLabel(systemRole);
+      const { Icon, colorClass } = getRoleIconAndColor(name);
+      options.push({
+        key: systemRole,
+        name,
+        Icon,
+        colorClass,
+      });
+    }
 
-  // Auto-clear invalid override_role ONLY after BOTH live user profile AND roles list have fully loaded.
-  // Critical: if we run this before liveUser resolves, userAssignedRoles only contains the cached
-  // localStorage roles (e.g. ["RECRUITER"]) and will incorrectly clear a valid Branch Admin override.
+    return options;
+  }, [userAssignedRoles, availableRoles, activeBranchId, getDynamicRoleLabel, systemRole]);
+
+  const STANDARD_PERSPECTIVES = useMemo(() => new Set([
+    "RECRUITER",
+    "DELIVERYHEAD",
+    "SENSE",
+    "ACCOUNTMANAGER",
+    "FINANCEADMIN",
+    "ADMIN",
+    "SUPERADMIN",
+    "BRANCHADMIN",
+    "PODLEAD",
+  ]), []);
+
+  // Auto-clear invalid override_role only if it's completely unrecognized
   useEffect(() => {
     if (!rolesLoaded || !liveUserLoaded || !overrideRole) return;
-    // Also skip clearing if the user has no assigned roles yet (roles are still resolving)
-    if (userAssignedRoles.length === 0 && assignedRoleOptions.length === 0) return;
+    if (userAssignedRoles.length === 0 && dashboardRoleOptions.length === 0) return;
 
     const overrideNorm = overrideRole.toUpperCase().replace(/[\s\-_]/g, "");
+    if (STANDARD_PERSPECTIVES.has(overrideNorm)) {
+      return;
+    }
+
     const isValidOverride =
-      assignedRoleOptions.some(
-        (opt: { key: string; name: string; replacesSystemRole?: string }) =>
+      dashboardRoleOptions.some(
+        (opt) =>
           opt.key.toUpperCase().replace(/[\s\-_]/g, "") === overrideNorm ||
           opt.name.toUpperCase().replace(/[\s\-_]/g, "") === overrideNorm ||
           (opt.replacesSystemRole &&
@@ -1028,13 +1253,14 @@ const isTechnicalKeycloakRole = (r: string): boolean => {
       userAssignedRoles.some(
         (r: string) => r.toUpperCase().replace(/[\s\-_]/g, "") === overrideNorm
       );
+
     if (!isValidOverride) {
       if (typeof window !== "undefined") {
         localStorage.removeItem("override_role");
       }
       setOverrideRole(null);
     }
-  }, [rolesLoaded, liveUserLoaded, overrideRole, assignedRoleOptions, userAssignedRoles]);
+  }, [rolesLoaded, liveUserLoaded, overrideRole, dashboardRoleOptions, userAssignedRoles, STANDARD_PERSPECTIVES]);
 
   const handleSwitchRole = (roleName: string | null) => {
     if (typeof window !== "undefined") {
@@ -1050,12 +1276,49 @@ const isTechnicalKeycloakRole = (r: string): boolean => {
     setOpen(false);
   };
 
-  const currentActiveRole = overrideRole || (assignedRoleOptions.length > 0 ? assignedRoleOptions[0].key : (userAssignedRoles[0] || "RECRUITER"));
-  const displayRole = getDynamicRoleLabel(currentActiveRole);
-  const isAdminActive = isRoleAdmin(currentActiveRole, availableRoles, currentUser);
+  const handleLogout = async () => {
+    try {
+      setLogoutLoading(true);
+      try {
+        atsApi.auth.logout();
+      } catch (logoutErr) {
+        console.error("Local token clear failed:", logoutErr);
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("ats_access_token");
+        localStorage.removeItem("ats_current_user");
+        localStorage.removeItem("active_branch_id");
+        localStorage.removeItem("override_role");
+      }
+
+      await signOut({ redirect: false });
+
+      if (typeof window !== "undefined") {
+        window.location.href = "/auth/login";
+      }
+    } catch (error) {
+      console.error("Logout error:", error);
+      if (typeof window !== "undefined") {
+        window.location.href = "/auth/login";
+      }
+    } finally {
+      setLogoutLoading(false);
+    }
+  };
+
+  const isItemActive = (key: string) => {
+    const currentNorm = (overrideRole || (isUserAdmin ? "ADMIN" : (systemRole || "RECRUITER"))).toUpperCase().replace(/[\s\-_]/g, "");
+    const keyNorm = key.toUpperCase().replace(/[\s\-_]/g, "");
+    if (currentNorm === keyNorm) return true;
+    if (keyNorm === "ADMIN" && (currentNorm === "SUPERADMIN" || currentNorm === "TENANTADMIN")) return true;
+    if (keyNorm === "RECRUITER" && (!overrideRole && systemRole === "RECRUITER")) return true;
+    return false;
+  };
 
   return (
     <div ref={ref} className="relative">
+      {/* ── Navbar Trigger ── */}
       <button
         id="navbar-profile"
         type="button"
@@ -1064,141 +1327,176 @@ const isTechnicalKeycloakRole = (r: string): boolean => {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className={`
-          flex items-center gap-2 px-2 h-8 rounded
-          cursor-pointer
-          transition-colors duration-150
-          ${open ? "bg-white/14" : "hover:bg-white/10"}
+          flex items-center gap-2 pl-1.5 pr-2 py-1 h-9 rounded-full
+          cursor-pointer transition-all duration-150 select-none
+          ${open ? "bg-white/20 shadow-xs" : "hover:bg-white/10"}
         `}
       >
-        {/* Avatar */}
-        <div className="relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-white/30 bg-white/20 text-white flex items-center justify-center font-bold text-xs">
-          {userName.charAt(0).toUpperCase()}
+        {/* Avatar with status dot */}
+        <div className="relative w-7 h-7 rounded-full flex-shrink-0 ring-1.5 ring-white/50 bg-white/20 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+          {userAvatar ? (
+            <Image
+              src={userAvatar}
+              alt={userName}
+              width={28}
+              height={28}
+              className="w-full h-full rounded-full object-cover"
+            />
+          ) : (
+            <span className="text-[11px] font-bold text-white tracking-tighter">
+              {userInitials}
+            </span>
+          )}
+          {/* Active online green dot */}
+          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[#1a4fa0] dark:ring-[#0f2d6b]" />
         </div>
 
-        <div className="hidden xl:flex flex-col items-start leading-none min-w-0">
-          <span className="text-[12px] font-semibold text-white truncate max-w-[100px]">
-            {userName.split(" ")[0]}
+        {/* User name + Role badge */}
+        <div className="hidden lg:flex flex-col items-start leading-none min-w-0 text-left">
+          <span className="text-[12.5px] font-bold text-white truncate max-w-[120px] tracking-tight">
+            {userName}
           </span>
-          <span className="text-[9.5px] text-blue-100/90 font-medium truncate max-w-[100px]">
-            {displayRole}
+          <span className="text-[10px] font-semibold text-fuchsia-300 dark:text-fuchsia-300 flex items-center gap-1 leading-none mt-0.5">
+            <Sparkles className="w-2.5 h-2.5 text-fuchsia-300 flex-shrink-0" />
+            <span className="truncate max-w-[95px]">{displayRole || "Admin"}</span>
           </span>
         </div>
+
         <ChevronDown
           className={`
-            w-3 h-3 text-white/60
+            w-3.5 h-3.5 text-white/70 ml-0.5
             transition-transform duration-200
-            ${open ? "rotate-180" : ""}
+            ${open ? "rotate-180 text-white" : ""}
           `}
         />
       </button>
 
+      {/* ── Dropdown Panel ── */}
       {open && (
         <div
           role="menu"
           aria-label="User profile menu"
           className="
-            absolute top-full right-0 mt-1 z-[300]
-            w-[260px]
-            bg-white dark:bg-[#182542]
-            border border-neutral-200 dark:border-white/10
-            rounded-lg shadow-xl shadow-black/20
+            absolute top-full right-0 mt-2 z-[300]
+            w-[285px] sm:w-[300px]
+            bg-white dark:bg-[#182338]
+            border border-slate-100 dark:border-slate-800
+            rounded-[22px] shadow-2xl shadow-black/20
+            p-3
             overflow-hidden
-            animate-in fade-in-0 slide-in-from-top-2
+            animate-in fade-in-0 zoom-in-95 duration-150
           "
         >
-          {/* User header */}
-          <div className="px-4 py-3 bg-[#1a4fa0] dark:bg-[#0f2d6b] border-b border-[#143e80] dark:border-[#091d45]">
-            <p className="text-[13px] font-semibold text-white">{userName}</p>
-            <p className="text-[11px] text-blue-100/90 font-medium flex items-center gap-1.5 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-              <span>{displayRole}</span>
-            </p>
+          {/* 1. Header user card */}
+          <div className="p-3 bg-gradient-to-r from-purple-50/70 to-pink-50/40 dark:from-slate-800/90 dark:to-slate-800/60 rounded-2xl flex items-center gap-3 border border-purple-100/50 dark:border-slate-700/60">
+            <div className="relative w-11 h-11 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-slate-700 shadow-xs bg-slate-200 dark:bg-slate-700">
+              {userAvatar ? (
+                <Image
+                  src={userAvatar}
+                  alt={userName}
+                  width={44}
+                  height={44}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center font-bold text-sm text-white bg-gradient-to-br from-indigo-500 to-purple-600">
+                  {userInitials}
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <h4 className="text-[14px] font-bold text-slate-900 dark:text-slate-100 leading-snug truncate">
+                {userName}
+              </h4>
+              <p
+                className="text-[11px] font-medium text-slate-400 dark:text-slate-400 truncate leading-tight mt-0.5"
+                title={rolesSubtitle}
+              >
+                {rolesSubtitle}
+              </p>
+            </div>
           </div>
 
-          {/* DYNAMIC ASSIGNED ROLE SWITCHER SECTION */}
-          {assignedRoleOptions.length > 1 && (
-            <div className="p-2 border-b border-neutral-100 dark:border-white/10 bg-neutral-50/90 dark:bg-[#14223d]">
-              <div className="px-2 pb-1.5 text-[9.5px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-white/40">
-                Switch Active Perspective
-              </div>
-              <div className="space-y-0.5 max-h-[160px] overflow-y-auto">
-                {assignedRoleOptions.map((r: { key: string; name: string; icon: string }) => {
-                  const isActive = currentActiveRole.toUpperCase() === r.key.toUpperCase() ||
-                                   currentActiveRole.toUpperCase() === r.name.toUpperCase();
-                  return (
-                    <button
-                      key={r.key}
-                      onClick={() => handleSwitchRole(r.key)}
-                      className={`w-full text-left px-2.5 py-1.5 rounded text-[11.5px] transition-colors cursor-pointer flex justify-between items-center ${
-                        isActive
-                          ? "bg-[#1a4fa0] dark:bg-[#1f5bc0] text-white font-semibold shadow-xs"
-                          : "text-neutral-700 dark:text-white/85 hover:bg-neutral-200/60 dark:hover:bg-white/10 font-normal"
-                      }`}
-                    >
-                      <span className="truncate">{r.name}</span>
-                      {isActive && <CircleCheck className="w-3.5 h-3.5 flex-shrink-0 text-white" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* 2. SWITCH DASHBOARD Section */}
+          <div className="px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none">
+            SWITCH DASHBOARD
+          </div>
 
-          {/* Menu items */}
-          <div className="py-1">
+          <div className="max-h-[220px] overflow-y-auto space-y-0.5 pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+            {dashboardRoleOptions.map((opt) => {
+              const isActive = isItemActive(opt.key);
+              const OptionIcon = opt.Icon;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => handleSwitchRole(opt.key)}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] transition-all duration-150 cursor-pointer text-left group ${
+                    isActive
+                      ? "bg-slate-100/90 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold"
+                      : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 font-medium"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105 shadow-2xs ${opt.colorClass}`}
+                    >
+                      <OptionIcon className="w-3.5 h-3.5 stroke-[2.2]" />
+                    </div>
+                    <span className="truncate">{opt.name}</span>
+                  </div>
+                  {isActive && (
+                    <span className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-400 flex-shrink-0 mr-1" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 3. Divider */}
+          <div className="h-px bg-slate-100 dark:bg-slate-800 my-1.5 mx-1" />
+
+          {/* 4. Bottom Menu Items */}
+          <div className="space-y-0.5">
             <Link
               href="/view-profile"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="
-                flex items-center gap-2.5 px-4 py-2
-                text-[12.5px] text-neutral-700 dark:text-white/80
-                hover:bg-blue-50 dark:hover:bg-white/8
-                hover:text-blue-700 dark:hover:text-white
-                transition-colors duration-100 font-medium
-              "
+              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors group"
             >
-              <User className="w-3.5 h-3.5 flex-shrink-0 text-blue-500 dark:text-blue-400" />
-              My Profile
+              <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-50 group-hover:text-blue-600 dark:group-hover:bg-blue-950/40 dark:group-hover:text-blue-400 transition-colors shadow-2xs">
+                <User className="w-3.5 h-3.5 stroke-[2]" />
+              </div>
+              <span>My Profile</span>
             </Link>
 
             <Link
-              href="/email"
+              href="/utility/roles-permissions"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="
-                flex items-center gap-2.5 px-4 py-2
-                text-[12.5px] text-neutral-700 dark:text-white/80
-                hover:bg-blue-50 dark:hover:bg-white/8
-                hover:text-blue-700 dark:hover:text-white
-                transition-colors duration-100 font-medium
-              "
+              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors group"
             >
-              <Mail className="w-3.5 h-3.5 flex-shrink-0 text-blue-500 dark:text-blue-400" />
-              Inbox
+              <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-50 group-hover:text-blue-600 dark:group-hover:bg-blue-950/40 dark:group-hover:text-blue-400 transition-colors shadow-2xs">
+                <Settings className="w-3.5 h-3.5 stroke-[2]" />
+              </div>
+              <span>Settings</span>
             </Link>
 
-            {isAdminActive && (
-              <Link
-                href="/utility/roles-permissions"
-                role="menuitem"
-                onClick={() => setOpen(false)}
-                className="
-                  flex items-center gap-2.5 px-4 py-2
-                  text-[12.5px] text-neutral-700 dark:text-white/80
-                  hover:bg-blue-50 dark:hover:bg-white/8
-                  hover:text-blue-700 dark:hover:text-white
-                  transition-colors duration-100 font-medium
-                "
-              >
-                <Settings className="w-3.5 h-3.5 flex-shrink-0 text-blue-500 dark:text-blue-400" />
-                Workspace Settings & RBAC
-              </Link>
-            )}
-
-            <div className="border-t border-neutral-100 dark:border-white/8 mt-1 pt-1 px-4 pb-2">
-              <Logout />
-            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={logoutLoading}
+              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors group cursor-pointer text-left"
+            >
+              <div className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40 flex items-center justify-center flex-shrink-0 group-hover:bg-rose-100 dark:group-hover:bg-rose-900/60 transition-colors shadow-2xs">
+                {logoutLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <LogOut className="w-3.5 h-3.5 stroke-[2]" />
+                )}
+              </div>
+              <span>{logoutLoading ? "Logging out..." : "Logout"}</span>
+            </button>
           </div>
         </div>
       )}
@@ -1436,6 +1734,7 @@ function BranchSwitcher() {
             localStorage.setItem("active_branch_timezone", match.timezone || (match.market === "US" ? "America/New_York" : "Asia/Kolkata"));
             localStorage.setItem("active_branch_start_time", match.workStartTime || match.work_start_time || (match.market === "US" ? "09:00 AM" : "09:30 AM"));
             localStorage.setItem("active_branch_end_time", match.workEndTime || match.work_end_time || (match.market === "US" ? "06:00 PM" : "06:30 PM"));
+            localStorage.setItem("active_branch_allow_pods", String(match.allowPods ?? (match.podsCount > 0 && match.allowPods !== false)));
             window.dispatchEvent(new Event("branchChanged"));
           }
         }
@@ -1471,6 +1770,7 @@ function BranchSwitcher() {
       localStorage.setItem("active_branch_timezone", b.timezone || (b.market === "US" ? "America/New_York" : "Asia/Kolkata"));
       localStorage.setItem("active_branch_start_time", b.workStartTime || b.work_start_time || (b.market === "US" ? "09:00 AM" : "09:30 AM"));
       localStorage.setItem("active_branch_end_time", b.workEndTime || b.work_end_time || (b.market === "US" ? "06:00 PM" : "06:30 PM"));
+      localStorage.setItem("active_branch_allow_pods", String(b.allowPods ?? (b.podsCount > 0 && b.allowPods !== false)));
       window.dispatchEvent(new Event("branchChanged"));
       setActiveBranch(b.name);
       window.location.reload();

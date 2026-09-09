@@ -333,8 +333,11 @@ export default function RolesPermissionsPage() {
   }, [newRoleSystemRole, roles]);
 
   const editAllowedPerms = useMemo(() => {
-    return getSystemRoleAllowedPermissions(editRoleSystemRole, editingRole?.baseRoleId);
-  }, [editRoleSystemRole, editingRole, roles]);
+    const baseSystemRoleObj = roles.find(
+      (r) => r.isSystem && r.name.toUpperCase() === editRoleSystemRole.toUpperCase()
+    );
+    return getSystemRoleAllowedPermissions(editRoleSystemRole, baseSystemRoleObj?.id);
+  }, [editRoleSystemRole, roles]);
 
   // Custom roles filtered for the view (strictly excluding system roles)
   const customRolesList = useMemo(() => {
@@ -446,11 +449,21 @@ export default function RolesPermissionsPage() {
     setEditRoleName(role.name);
     setEditRoleDesc(role.description || "");
     setEditRoleBranchId(role.branchId || branches[0]?.id || "");
-    setEditRoleSystemRole(role.systemRole || "RECRUITER");
-    const allowed = getSystemRoleAllowedPermissions(role.systemRole, role.baseRoleId);
+    const sysRole = role.systemRole || "RECRUITER";
+    setEditRoleSystemRole(sysRole);
+    const allowed = getSystemRoleAllowedPermissions(sysRole);
     setEditRolePermissions((role.permissions || []).filter(p => allowed.includes(p)));
     setShowEditMatrix(false);
     setExpandedEditGroups({});
+  };
+
+  const handleEditArchetypeChange = (archKey: string) => {
+    setEditRoleSystemRole(archKey);
+    const archetype = SYSTEM_ARCHETYPES.find((a) => a.key === archKey);
+    if (archetype) {
+      setEditRolePermissions(archetype.perms);
+      toast.success(`Applied ${archetype.label} defaults (${archetype.perms.length} permissions)`);
+    }
   };
 
   const handleEditRoleSave = async (e: React.FormEvent) => {
@@ -1363,17 +1376,22 @@ export default function RolesPermissionsPage() {
 
               {/* Base Archetype */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                  Base System Archetype Template
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Base System Archetype Template
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleEditArchetypeChange(editRoleSystemRole)}
+                    className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <Icon icon="heroicons:arrow-path" className="h-3 w-3" />
+                    Reset to Template Defaults
+                  </button>
+                </div>
                 <select
                   value={editRoleSystemRole}
-                  onChange={(e) => {
-                    const archKey = e.target.value;
-                    setEditRoleSystemRole(archKey);
-                    const newAllowed = getSystemRoleAllowedPermissions(archKey, editingRole?.baseRoleId);
-                    setEditRolePermissions((prev) => prev.filter((p) => newAllowed.includes(p)));
-                  }}
+                  onChange={(e) => handleEditArchetypeChange(e.target.value)}
                   className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
                   {SYSTEM_ARCHETYPES.map((arch) => (

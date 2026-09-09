@@ -15,7 +15,7 @@ export interface Job {
   recruitmentManager: string;
   recruitmentManagerId?: string;
   primaryRecruiter: string;
-  primaryRecruiterId?: string;
+  primaryRecruiterId?: string | null;
   assignedTo: string;
   createdBy: string;
   createdOn: string;
@@ -28,8 +28,8 @@ export interface Job {
   };
   agingDays: number;
   /** Recruitment pod assigned via round-robin on job creation */
-  podId?: string;
-  podName?: string;
+  podId?: string | null;
+  podName?: string | null;
   branchId?: string;
   branchName?: string;
   respondBy?: string;

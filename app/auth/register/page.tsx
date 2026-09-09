@@ -1,11 +1,24 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import RegForm from "@/components/auth/register-form";
 import Social from "@/components/auth/social";
+
+// Main platform domains where registration is allowed
+const MAIN_DOMAINS = [
+  "localhost",
+  "enfyjobs.com",
+  "www.enfyjobs.com",
+  "enfycon.com",
+  "www.enfycon.com",
+];
+
+const MAIN_REGISTER_URL =
+  process.env.NEXT_PUBLIC_MAIN_DOMAIN_URL || "https://enfyjobs.com";
+
 
 function Logo() {
   const { theme } = useTheme();
@@ -33,6 +46,34 @@ function Copyright() {
 }
 
 const Register = () => {
+  const [isSubdomain, setIsSubdomain] = React.useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hostname = window.location.hostname.toLowerCase();
+
+    // isMain = true for bare localhost or known apex domains
+    const isMain =
+      hostname === "localhost" ||
+      MAIN_DOMAINS.includes(hostname);
+
+    if (!isMain) {
+      setIsSubdomain(true);
+
+      // Localhost subdomain (e.g. deb.localhost) → redirect to local dev server
+      if (hostname.endsWith(".localhost")) {
+        const port = window.location.port || "3000";
+        window.location.replace(`http://localhost:${port}/auth/register`);
+      } else {
+        // Production tenant subdomain → redirect to main domain
+        window.location.replace(`${MAIN_REGISTER_URL}/auth/register`);
+      }
+    }
+  }, []);
+
+  // Don't flash the form while redirecting away
+  if (isSubdomain) return null;
+
   return (
     <>
       <div className="flex w-full items-center overflow-hidden min-h-screen h-screen basis-full">

@@ -42,15 +42,20 @@ export default async function DashboardLayout({
         redirect(`${protocol}://${baseDomain}/dashboard`);
       }
     } else {
-      const userSub = (user as any).tenantDomain;
+      const rawUserSub = (user as any).tenantDomain || "";
+      const userSub = rawUserSub.split(".")[0].toLowerCase().trim();
       const isMasterTenant = !userSub || userSub === "enfy" || userSub === "www" || userSub === "localhost";
 
       if (userSub && !isMasterTenant) {
-        // If current subdomain doesn't match user's tenant subdomain, direct to login on current host
-        if (currentSub && currentSub !== userSub) {
+        // A tenant user can ONLY access the dashboard on their own tenant subdomain (e.g. deb.localhost:3000).
+        // If accessed from root domain (localhost:3000) or another tenant's subdomain:
+        // Do NOT allow access to this host's dashboard — direct to /auth/login on the CURRENT host.
+        // It remains in the same domain and does NOT redirect to another subdomain.
+        if (currentSub !== userSub) {
           redirect("/auth/login");
         }
-      } else if (isMasterTenant && currentSub === "enfy") {
+      } else if (isMasterTenant && currentSub && currentSub !== "enfy") {
+        // Master tenant operates on the base root domain
         redirect(`${protocol}://${baseDomain}/dashboard`);
       }
     }

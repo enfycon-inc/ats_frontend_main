@@ -174,9 +174,9 @@ const formSchema = zod.object({
   // Job Description
   jobDescription: zod.string().min(10, "Job Description must be at least 10 characters"),
 
-  // Portal Settings
-  postToPortal: zod.boolean(),
-  displayContactOnPortal: zod.boolean(),
+  // Portal Settings (Legacy/Optional)
+  postToPortal: zod.boolean().optional(),
+  displayContactOnPortal: zod.boolean().optional(),
 });
 
 type FormValues = zod.infer<typeof formSchema>;
@@ -244,7 +244,6 @@ export default function EditJobPostingPage() {
     skills: false,
     orgInfo: false,
     jobDescription: false,
-    portalSettings: false,
     documents: false,
   });
 
@@ -509,7 +508,7 @@ export default function EditJobPostingPage() {
       country: "",
       states: "",
       city: "",
-      remoteJob: "Hybrid",
+      remoteJob: "In Office",
       hoursPerWeek: undefined,
       jobStatus: "Active",
       priority: "Warm",
@@ -731,7 +730,11 @@ export default function EditJobPostingPage() {
           setValue("maxSubmissions", jobData.submissionRequired || 5);
           setValue("priority", (jobData.priority || "Warm") as any);
           setValue("taxTerms", jobData.taxTerms || "C2C");
-          setValue("remoteJob", (jobData.remoteJob || "Hybrid") as any);
+          const rLower = (jobData.remoteJob || "").toLowerCase();
+          let mappedRemote = "In Office";
+          if (rLower.includes("remote") || rLower === "yes") mappedRemote = "Remote";
+          else if (rLower.includes("hybrid")) mappedRemote = "Hybrid";
+          setValue("remoteJob", mappedRemote);
           setValue("startDate", jobData.startDate ? jobData.startDate.split("T")[0] : "");
           setValue("endDate", jobData.endDate ? jobData.endDate.split("T")[0] : "");
           setValue("hoursPerWeek", jobData.hoursPerWeek || 40);
@@ -1104,22 +1107,21 @@ export default function EditJobPostingPage() {
           })
         }
         className={cn(
-          "flex items-center justify-between bg-neutral-100 dark:bg-slate-800/80 px-4 py-2 cursor-pointer select-none hover:bg-neutral-200 dark:hover:bg-slate-700/80 border-y border-neutral-200 dark:border-slate-800 first:border-t-0 first:rounded-t-lg font-sans transition-colors",
+          "flex items-center justify-between bg-blue-50/80 hover:bg-blue-100/70 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 px-4 py-2.5 cursor-pointer select-none border-b border-blue-100 dark:border-blue-900/40 first:rounded-t-lg font-sans transition-colors group",
           isCollapsed && "rounded-b-lg border-b-0"
         )}
       >
-        <span className="text-[10px] font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
+        <span className="text-[11px] font-bold text-blue-950 dark:text-blue-100 uppercase tracking-wider">
           {title}
         </span>
         {isCollapsed ? (
-          <ChevronDown className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+          <ChevronDown className="h-4 w-4 text-blue-600 dark:text-blue-400 transition-transform group-hover:translate-y-0.5" />
         ) : (
-          <ChevronUp className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+          <ChevronUp className="h-4 w-4 text-blue-600 dark:text-blue-400 transition-transform group-hover:-translate-y-0.5" />
         )}
-  
       </div>
-  );
-};
+    );
+  };
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-neutral-50/50 dark:bg-slate-900/10 font-sans">
@@ -1364,6 +1366,7 @@ export default function EditJobPostingPage() {
                         jobTitle: "Requisition Designation (Job Title)",
                         jobCode: "Requisition Job Code",
                         jobType: "Employment Engagement Type",
+                        remoteJob: "Work Mode",
                         taxTerms: "Billing & Tax Classification",
                         workAuthorization: "Work Authorization & Visa Eligibility",
                         numPositions: "Target Headcount Requisition",
@@ -1907,36 +1910,20 @@ export default function EditJobPostingPage() {
 
                     {/* Work Mode */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Work Mode <span className="text-red-500">*</span></label>
-                      <div className="flex items-center gap-4 h-8 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="radio"
-                            value="Onsite"
-                            {...register("remoteJob")}
-                            className="w-3.5 h-3.5 text-primary focus:ring-primary border-neutral-300 dark:border-slate-700 cursor-pointer"
-                          />
-                          Onsite
-                        </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="radio"
-                            value="Remote"
-                            {...register("remoteJob")}
-                            className="w-3.5 h-3.5 text-primary focus:ring-primary border-neutral-300 dark:border-slate-700 cursor-pointer"
-                          />
-                          Remote
-                        </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="radio"
-                            value="Hybrid"
-                            {...register("remoteJob")}
-                            className="w-3.5 h-3.5 text-primary focus:ring-primary border-neutral-300 dark:border-slate-700 cursor-pointer"
-                          />
-                          Hybrid
-                        </label>
-                      </div>
+                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">
+                        Work Mode <span className="text-red-500">*</span>
+                      </Label>
+                      <select
+                        {...register("remoteJob")}
+                        className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
+                      >
+                        <option value="In Office">In Office</option>
+                        <option value="Remote">Remote</option>
+                        <option value="Hybrid">Hybrid</option>
+                      </select>
+                      {errors.remoteJob && (
+                        <p className="text-[10px] text-red-655 font-bold">{errors.remoteJob.message}</p>
+                      )}
                     </div>
 
                     {/* Shift Timings (India) or Required Hours/Week (US) */}
@@ -2796,7 +2783,7 @@ export default function EditJobPostingPage() {
                                 }
                                 return <span className="text-neutral-400">Select Staff, Pod, or Pool...</span>;
                               } else if (selectedPodId === "all") {
-                                return <span className="font-semibold text-neutral-900 dark:text-white">All Branch Recruiters (Pool Broadcast)</span>;
+                                return <span className="font-semibold text-neutral-900 dark:text-white">All recruiters</span>;
                               } else if (selectedPodId === "none") {
                                 return <span className="font-semibold text-neutral-900 dark:text-white">Unassigned Allocation (Hold for Manager Assignment)</span>;
                               } else if (selectedPodId === "auto_pod") {
@@ -2928,11 +2915,11 @@ export default function EditJobPostingPage() {
                                 </div>
                               )}
 
-                              {/* 3. Branch Pool & Allocation */}
+                              {/* 3. Assign to */}
                               {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true) || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) === true)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
                                 <div className="space-y-1">
                                   <div className="px-2 py-1 text-[10.5px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 bg-neutral-50/80 dark:bg-slate-800/50 rounded">
-                                    Branch Pool & Allocation
+                                    Assign to
                                   </div>
                                   {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true)) && (
                                     <div
@@ -2945,7 +2932,7 @@ export default function EditJobPostingPage() {
                                         selectedPodId === "all" && "bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60"
                                       )}
                                     >
-                                      <span className="font-semibold text-neutral-800 dark:text-neutral-200">All Branch Recruiters (Pool Broadcast)</span>
+                                      <span className="font-semibold text-neutral-800 dark:text-neutral-200">All recruiters</span>
                                       {selectedPodId === "all" && <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />}
                                     </div>
                                   )}
@@ -2992,31 +2979,6 @@ export default function EditJobPostingPage() {
                 )}
               </div>
 
-              {/* -------------------- CAREER PORTAL SETTINGS -------------------- */}
-              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
-                <SectionHeader title="Career Portal Settings" sectionKey="portalSettings" />
-                {!collapsedSections.portalSettings && (
-                  <div className="p-4 space-y-3 text-xs select-none">
-                    <label className="flex items-center gap-2.5 cursor-pointer font-bold text-neutral-800 dark:text-neutral-250">
-                      <input
-                        type="checkbox"
-                        {...register("postToPortal")}
-                        className="h-4 w-4 accent-primary rounded"
-                      />
-                      <span>Post Job on Career Portal</span>
-                    </label>
-
-                    <label className="flex items-center gap-2.5 cursor-pointer font-bold text-neutral-800 dark:text-neutral-250">
-                      <input
-                        type="checkbox"
-                        {...register("displayContactOnPortal")}
-                        className="h-4 w-4 accent-primary rounded"
-                      />
-                      <span>Display Contact Details on Career Portal</span>
-                    </label>
-                  </div>
-                )}
-              </div>
 
               {/* -------------------- DOCUMENTS -------------------- */}
               <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">

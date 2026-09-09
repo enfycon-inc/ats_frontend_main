@@ -10,7 +10,7 @@ export function getBaseDomain(host?: string): string {
   // strip port
   const hostname = activeHost.split(':')[0];
   
-  if (hostname.includes('localhost')) {
+  if (hostname.includes('localhost') || hostname === '127.0.0.1' || hostname.startsWith('127.')) {
     // Preserve the actual dev-server port so this works off port 3000 too.
     const port = activeHost.split(':')[1];
     return port ? `localhost:${port}` : 'localhost:3000';
@@ -35,6 +35,10 @@ export function getCurrentSubdomain(host?: string): string {
     }
     return '';
   }
+
+  if (hostname === '127.0.0.1' || hostname.startsWith('127.')) {
+    return '';
+  }
   
   if (parts.length > 2 && parts[0] !== 'www') {
     return parts[0];
@@ -55,7 +59,7 @@ export function getTenantIdentifier(host?: string): string {
   }
   
   // If we are on the base domain, return empty (root domain)
-  if (hostname === baseDomain || hostname === 'localhost' || hostname === 'www' || hostname === 'www.' + baseDomain) {
+  if (hostname === baseDomain || hostname === 'localhost' || hostname === '127.0.0.1' || hostname === 'www' || hostname === 'www.' + baseDomain) {
     return '';
   }
   

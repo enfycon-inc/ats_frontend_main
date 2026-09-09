@@ -1,4 +1,5 @@
 import JobPostingDashboard from "./components/job-posting-dashboard";
+import { Suspense } from "react";
 
 export const metadata = {
   title: "Job Postings - Enfysync ATS",
@@ -6,5 +7,9 @@ export const metadata = {
 };
 
 export default function JobPostingPage() {
-  return <JobPostingDashboard initialStatusFilter="All" />;
+  return (
+    <Suspense fallback={<div className="p-6 text-xs text-neutral-400">Loading Requisitions...</div>}>
+      <JobPostingDashboard initialStatusFilter="All" />
+    </Suspense>
+  );
 }

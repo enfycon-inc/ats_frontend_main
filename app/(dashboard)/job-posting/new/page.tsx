@@ -175,9 +175,9 @@ const formSchema = zod.object({
   // Job Description
   jobDescription: zod.string().min(10, "Job Description must be at least 10 characters"),
 
-  // Portal Settings
-  postToPortal: zod.boolean(),
-  displayContactOnPortal: zod.boolean(),
+  // Portal Settings (Legacy/Optional)
+  postToPortal: zod.boolean().optional(),
+  displayContactOnPortal: zod.boolean().optional(),
 });
 
 type FormValues = zod.infer<typeof formSchema>;
@@ -259,7 +259,6 @@ export default function NewJobPostingPage() {
     skills: false,
     orgInfo: false,
     jobDescription: false,
-    portalSettings: false,
     documents: false,
   });
 
@@ -581,7 +580,7 @@ const getInitialActiveBranchContext = () => {
       country: initialBranchContext.isUs ? "United States" : "India",
       states: "",
       city: "",
-      remoteJob: "",
+      remoteJob: "In Office",
       hoursPerWeek: undefined,
       jobStatus: "Active",
       priority: "Warm",
@@ -842,7 +841,16 @@ const getInitialActiveBranchContext = () => {
           const p = sourceJob.priority;
           setValue("priority", p === "Hot" || p === "High" || p === "Urgent" ? "Hot" : p === "Cold" || p === "Low" ? "Cold" : "Warm");
         }
-        if (sourceJob.remoteJob) setValue("remoteJob", sourceJob.remoteJob);
+        if (sourceJob.remoteJob) {
+          const rLower = (sourceJob.remoteJob || "").toLowerCase();
+          if (rLower.includes("remote") || rLower === "yes") {
+            setValue("remoteJob", "Remote");
+          } else if (rLower.includes("hybrid")) {
+            setValue("remoteJob", "Hybrid");
+          } else {
+            setValue("remoteJob", "In Office");
+          }
+        }
         if (sourceJob.duration) setValue("duration", sourceJob.duration);
         if (sourceJob.hoursPerWeek) setValue("hoursPerWeek", sourceJob.hoursPerWeek);
         if (sourceJob.noOfPositions) setValue("numPositions", sourceJob.noOfPositions);
@@ -1027,7 +1035,14 @@ const getInitialActiveBranchContext = () => {
           setValue("jobType", res.jobType);
         }
         if (res.remoteJob) {
-          setValue("remoteJob", res.remoteJob as "Yes" | "No" | "Hybrid");
+          const rLower = (res.remoteJob || "").toLowerCase();
+          if (rLower.includes("remote") || rLower === "yes") {
+            setValue("remoteJob", "Remote");
+          } else if (rLower.includes("hybrid")) {
+            setValue("remoteJob", "Hybrid");
+          } else {
+            setValue("remoteJob", "In Office");
+          }
         }
         
         // Pre-fill primary/secondary skills
@@ -1330,22 +1345,21 @@ const getInitialActiveBranchContext = () => {
           })
         }
         className={cn(
-          "flex items-center justify-between bg-neutral-100 dark:bg-slate-800/80 px-4 py-2 cursor-pointer select-none hover:bg-neutral-200 dark:hover:bg-slate-700/80 border-y border-neutral-200 dark:border-slate-800 first:border-t-0 first:rounded-t-lg font-sans transition-colors",
+          "flex items-center justify-between bg-blue-50/80 hover:bg-blue-100/70 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 px-4 py-2.5 cursor-pointer select-none border-b border-blue-100 dark:border-blue-900/40 first:rounded-t-lg font-sans transition-colors group",
           isCollapsed && "rounded-b-lg border-b-0"
         )}
       >
-        <span className="text-[10px] font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
+        <span className="text-[11px] font-bold text-blue-950 dark:text-blue-100 uppercase tracking-wider">
           {title}
         </span>
         {isCollapsed ? (
-          <ChevronDown className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+          <ChevronDown className="h-4 w-4 text-blue-600 dark:text-blue-400 transition-transform group-hover:translate-y-0.5" />
         ) : (
-          <ChevronUp className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+          <ChevronUp className="h-4 w-4 text-blue-600 dark:text-blue-400 transition-transform group-hover:-translate-y-0.5" />
         )}
-  
       </div>
-  );
-};
+    );
+  };
 
   if (isCloningLoading) {
     return (
@@ -1370,6 +1384,193 @@ const getInitialActiveBranchContext = () => {
       </div>
     );
   }
+
+  const renderWorkAuthBlock = (colSpanClass = "") => (
+    <div className={cn("space-y-1 relative", colSpanClass)} ref={workAuthDropdownRef}>
+      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Work Authorization <span className="text-red-500">*</span></Label>
+      
+      {/* Trigger Input (styled like standard select field) */}
+      <div
+        onClick={() => setIsWorkAuthOpen(!isWorkAuthOpen)}
+        className={cn(
+          "w-full bg-white dark:bg-slate-955 border rounded px-2.5 py-1 text-xs text-neutral-800 dark:text-neutral-200 flex items-center justify-between cursor-pointer select-none transition-colors min-h-[32px] h-8",
+          isWorkAuthOpen
+            ? "border-primary ring-1 ring-primary/20"
+            : "border-neutral-300 dark:border-slate-700 hover:border-neutral-400 dark:hover:border-slate-600"
+        )}
+      >
+        <div className="flex flex-wrap gap-1 items-center max-w-[88%] py-0.5 overflow-hidden">
+          {(() => {
+            const selected = watch("workAuthorization") || "";
+            const list = selected.split(", ").filter(Boolean);
+            if (list.length === 0) {
+              return <span className="text-neutral-400 dark:text-slate-500 font-medium truncate">Select Work Authorization...</span>;
+            }
+            if (list.length === currentWorkAuthOptions.length) {
+              return (
+                <span className="font-bold text-primary dark:text-blue-400 bg-primary/10 dark:bg-primary/20 px-1.5 py-0.5 rounded text-[10px]">
+                  All Selected
+                </span>
+              );
+            }
+            
+            const limit = 2;
+            const visibleItems = list.slice(0, limit);
+            const hiddenCount = list.length - limit;
+            
+            return (
+              <>
+                {visibleItems.map((opt) => (
+                  <span
+                    key={opt}
+                    className="bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors shrink-0"
+                  >
+                    <span className="truncate max-w-[90px]">{opt}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const newList = list.filter((item) => item !== opt).join(", ");
+                        setValue("workAuthorization", newList, { shouldDirty: true });
+                      }}
+                      className="text-blue-400 hover:text-red-500 dark:hover:text-red-400 font-bold ml-0.5 rounded-full p-0.5 hover:bg-blue-200/50 cursor-pointer"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </span>
+                ))}
+                {hiddenCount > 0 && (
+                  <span className="bg-primary/15 dark:bg-primary/25 text-primary dark:text-blue-400 border border-primary/20 text-[10px] font-extrabold px-1.5 py-0.5 rounded shrink-0">
+                    +{hiddenCount} more
+                  </span>
+                )}
+              </>
+            );
+          })()}
+        </div>
+        
+        <div className="flex items-center gap-1 text-neutral-400 dark:text-slate-500 shrink-0">
+          {((watch("workAuthorization") || "").split(", ").filter(Boolean).length > 0) && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setValue("workAuthorization", "", { shouldDirty: true });
+              }}
+              className="p-0.5 rounded-full hover:bg-neutral-100 dark:hover:bg-slate-800 hover:text-red-500 transition-colors cursor-pointer"
+              title="Clear all selections"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <ChevronDown className="h-3.5 w-3.5" />
+        </div>
+      </div>
+
+      {/* Dropdown Overlay Container */}
+      {isWorkAuthOpen && (
+        <div className="absolute left-0 right-0 z-30 mt-1 bg-white dark:bg-slate-900 border border-neutral-250 dark:border-slate-800 rounded-md shadow-xl p-2.5 space-y-2 min-w-[240px]">
+          <div className="relative flex items-center">
+            <input
+              type="text"
+              placeholder="Search Auth..."
+              value={workAuthSearch}
+              onChange={(e) => setWorkAuthSearch(e.target.value)}
+              className="w-full bg-neutral-50 dark:bg-slate-955 border border-neutral-200 dark:border-slate-800 rounded pl-7 pr-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-855 dark:text-neutral-200"
+              autoFocus
+            />
+            <Search className="absolute left-2.5 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
+          </div>
+          
+          <div className="w-full max-h-60 overflow-y-auto space-y-1.5 text-xs select-none pr-1 scrollbar-thin">
+            {/* Select All Checkbox */}
+            {workAuthSearch === "" && (
+              <label className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800/60 rounded-md cursor-pointer font-bold text-neutral-700 dark:text-neutral-300 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={
+                    (watch("workAuthorization") || "").split(", ").filter(Boolean).length === currentWorkAuthOptions.length
+                  }
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setValue("workAuthorization", currentWorkAuthOptions.join(", "), { shouldDirty: true });
+                    } else {
+                      setValue("workAuthorization", "", { shouldDirty: true });
+                    }
+                  }}
+                  className="sr-only"
+                />
+                <div className={cn(
+                  "h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0",
+                  (watch("workAuthorization") || "").split(", ").filter(Boolean).length === currentWorkAuthOptions.length
+                    ? "bg-primary border-primary text-white"
+                    : "border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-955"
+                )}>
+                  {((watch("workAuthorization") || "").split(", ").filter(Boolean).length === currentWorkAuthOptions.length) && (
+                    <Check className="h-3 w-3 stroke-[3]" />
+                  )}
+                </div>
+                <span>[Select all]</span>
+              </label>
+            )}
+            
+            {/* Option Checkboxes */}
+            {currentWorkAuthOptions.filter((opt) =>
+              opt.toLowerCase().includes(workAuthSearch.toLowerCase())
+            ).map((opt) => {
+              const selectedList = (watch("workAuthorization") || "").split(", ").filter(Boolean);
+              const isSelected = selectedList.includes(opt);
+              return (
+                <label
+                  key={opt}
+                  className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800/60 rounded-md cursor-pointer font-medium text-neutral-700 dark:text-neutral-300 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(e) => {
+                      let newList;
+                      if (e.target.checked) {
+                        newList = (current: string) => {
+                          const currentList = current ? current.split(", ").filter(Boolean) : [];
+                          return [...currentList.filter((x) => x !== opt), opt].join(", ");
+                        };
+                      } else {
+                        newList = (current: string) => {
+                          const currentList = current ? current.split(", ").filter(Boolean) : [];
+                          return currentList.filter((item) => item !== opt).join(", ");
+                        };
+                      }
+                      const currentVal = watch("workAuthorization") || "";
+                      setValue("workAuthorization", newList(currentVal), { shouldDirty: true });
+                    }}
+                    className="sr-only"
+                  />
+                  <div className={cn(
+                    "h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0",
+                    isSelected
+                      ? "bg-primary border-primary text-white"
+                      : "border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-955"
+                  )}>
+                    {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
+                  </div>
+                  <span className={cn(
+                    "truncate transition-colors text-xs",
+                    isSelected ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-700 dark:text-neutral-300"
+                  )}>
+                    {opt}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {errors.workAuthorization && (
+        <p className="text-[10px] text-red-655 font-bold">{errors.workAuthorization.message}</p>
+      )}
+    </div>
+  );
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-neutral-50/50 dark:bg-slate-900/10 font-sans">
@@ -1625,6 +1826,7 @@ const getInitialActiveBranchContext = () => {
                         jobTitle: "Requisition Designation (Job Title)",
                         jobCode: "Requisition Job Code",
                         jobType: "Employment Engagement Type",
+                        remoteJob: "Work Mode",
                         taxTerms: "Billing & Tax Classification",
                         workAuthorization: "Work Authorization & Visa Eligibility",
                         numPositions: "Target Headcount Requisition",
@@ -1701,217 +1903,297 @@ const getInitialActiveBranchContext = () => {
                       )}
                     </div>
 
-                    {/* Job Type */}
+                    {/* Row 2, Col 1: Job Type (with End Date subfield if not Full Time) */}
                     <div className="space-y-1">
-                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Type <span className="text-red-500">*</span></Label>
-                      <select
-                        {...register("jobType", {
-                          onChange: (e) => {
-                            const val = e.target.value;
-                            if (val === "Full Time") {
-                              setValue("taxTerms", "Permanent");
-                            } else if (val === "Contract") {
-                              setValue("taxTerms", market === "IN" ? "Contract (3rd Party)" : "C2C");
-                            }
-                          }
-                        })}
-                        className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
-                      >
-                        <option value="Full Time">Full Time</option>
-                        <option value="Part Time">Part Time</option>
-                        <option value="Contract">Contract</option>
-                        <option value="C2H">C2H</option>
-                        <option value="Intern">Intern</option>
-                        <option value="Seasonal">Seasonal</option>
-                        <option value="Freelance">Freelance</option>
-                      </select>
+                      {watch("jobType") !== "Full Time" ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Type <span className="text-red-500">*</span></Label>
+                            <select
+                              {...register("jobType", {
+                                onChange: (e) => {
+                                  const val = e.target.value;
+                                  if (val === "Full Time") {
+                                    setValue("taxTerms", "Permanent");
+                                  } else if (val === "Contract") {
+                                    setValue("taxTerms", market === "IN" ? "Contract (3rd Party)" : "C2C");
+                                  }
+                                }
+                              })}
+                              className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
+                            >
+                              <option value="Full Time">Full Time</option>
+                              <option value="Part Time">Part Time</option>
+                              <option value="Contract">Contract</option>
+                              <option value="C2H">C2H</option>
+                              <option value="Intern">Intern</option>
+                              <option value="Seasonal">Seasonal</option>
+                              <option value="Freelance">Freelance</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="font-bold text-neutral-700 dark:text-neutral-300">End Date</Label>
+                            <input
+                              type="date"
+                              {...register("endDate")}
+                              className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2 py-1 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Type <span className="text-red-500">*</span></Label>
+                          <select
+                            {...register("jobType", {
+                              onChange: (e) => {
+                                const val = e.target.value;
+                                if (val === "Full Time") {
+                                  setValue("taxTerms", "Permanent");
+                                } else if (val === "Contract") {
+                                  setValue("taxTerms", market === "IN" ? "Contract (3rd Party)" : "C2C");
+                                }
+                              }
+                            })}
+                            className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
+                          >
+                            <option value="Full Time">Full Time</option>
+                            <option value="Part Time">Part Time</option>
+                            <option value="Contract">Contract</option>
+                            <option value="C2H">C2H</option>
+                            <option value="Intern">Intern</option>
+                            <option value="Seasonal">Seasonal</option>
+                            <option value="Freelance">Freelance</option>
+                          </select>
+                        </>
+                      )}
                       {errors.jobType && (
                         <p className="text-[10px] text-red-655 font-bold">{errors.jobType.message}</p>
                       )}
                     </div>
 
-                    {/* Job Start Date */}
-                    {market !== "IN" ? (
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Job Start Date</label>
-                        <input
-                          type="date"
-                          {...register("startDate")}
-                          className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200"
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Shift Timings</label>
-                        <select
-                          {...register("shiftTiming")}
-                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                        >
-                          <option value="General Shift">General Shift (Day)</option>
-                          <option value="Night Shift">Night Shift</option>
-                          <option value="Rotational Shift">Rotational Shift</option>
-                          <option value="UK/EMEA Shift">UK/EMEA Shift</option>
-                        </select>
-                      </div>
-                    )}
+                    {/* Row 2, Col 2: Work Mode */}
+                    <div className="space-y-1">
+                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">
+                        Work Mode <span className="text-red-500">*</span>
+                      </Label>
+                      <select
+                        {...register("remoteJob")}
+                        className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
+                      >
+                        <option value="In Office">In Office</option>
+                        <option value="Remote">Remote</option>
+                        <option value="Hybrid">Hybrid</option>
+                      </select>
+                      {errors.remoteJob && (
+                        <p className="text-[10px] text-red-655 font-bold">{errors.remoteJob.message}</p>
+                      )}
+                    </div>
 
-                    {/* Job End Date */}
-                    {watch("jobType") !== "Full Time" ? (
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Job End Date</label>
-                        <input
-                          type="date"
-                          {...register("endDate")}
-                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200"
-                        />
-                      </div>
-                    ) : (
-                      <div className="hidden md:block"></div>
-                    )}
-
-                    {/* Shift Timings (India) or Required Hours/Week (US) */}
-                    {market !== "IN" ? (
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Required Hours/Week</label>
-                        <input
-                          type="number"
-                          {...register("hoursPerWeek", { valueAsNumber: true })}
-                          className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200"
-                        />
-                      </div>
-                    ) : (
-                      <div className="hidden md:block"></div>
-                    )}
-
-                    {/* Client Bill Rate / Commission (Row 3, Left Span 2) */}
-                    <div className="space-y-1 md:col-span-2">
-                      {market === "IN" && watch("taxTerms") === "Permanent" ? (
+                    {/* Row 2, Col 3: Shift Timings (India) or Job Start Date (US) */}
+                    <div className="space-y-1">
+                      {market === "IN" ? (
                         <>
-                          <div className="flex items-center gap-1">
-                            <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Commission (%) <span className="text-red-500">*</span></Label>
-                            <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Permanent placement agency commission percentage">?</span>
-                          </div>
-                          <div className="flex gap-2 items-center">
-                            <select
-                              value={commissionType}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setCommissionType(val);
-                                const commVal = val === "custom" ? customCommission : val;
-                                if (commVal) {
-                                  setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: true });
-                                }
-                              }}
-                              className="w-full md:w-56 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
-                            >
-                              <option value="8.33">8.33% (1 Month Salary)</option>
-                              <option value="10">10.0%</option>
-                              <option value="12.5">12.5%</option>
-                              <option value="15">15.0%</option>
-                              <option value="custom">Custom Percentage...</option>
-                            </select>
-                            {commissionType === "custom" && (
-                              <div className="flex items-center gap-1 shrink-0">
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  max="100"
-                                  value={customCommission}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setCustomCommission(val);
-                                    if (val) {
-                                      setValue("clientBillRate", `${val}% Placement Commission`, { shouldValidate: true });
-                                    }
-                                  }}
-                                  placeholder="e.g. 10.5"
-                                  className="h-8 w-24 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 rounded"
-                                />
-                                <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">%</span>
-                              </div>
-                            )}
-                          </div>
+                          <Label className="font-bold text-neutral-700 dark:text-neutral-300">Shift Timings</Label>
+                          <select
+                            {...register("shiftTiming")}
+                            className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
+                          >
+                            <option value="General Shift">General Shift (Day)</option>
+                            <option value="Night Shift">Night Shift</option>
+                            <option value="Rotational Shift">Rotational Shift</option>
+                            <option value="UK/EMEA Shift">UK/EMEA Shift</option>
+                          </select>
                         </>
                       ) : (
                         <>
-                          <div className="flex items-center gap-1">
-                            <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Bill Rate / Salary <span className="text-red-500">*</span></Label>
-                            <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Bill rate information">?</span>
-                          </div>
-                          <div className="flex gap-1 items-center">
-                            <select
-                              value={billCurrency}
-                              onChange={(e) => setBillCurrency(e.target.value)}
-                              className="w-16 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
-                            >
-                              {market === "IN" ? (
-                                <>
+                          <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Start Date</Label>
+                          <input
+                            type="date"
+                            {...register("startDate")}
+                            className="w-full h-8 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold"
+                          />
+                        </>
+                      )}
+                    </div>
+
+                    {/* Row 2, Col 4: Notice Period (India) or Required Hours/Week (US) */}
+                    <div className="space-y-1">
+                      {market === "IN" ? (
+                        <>
+                          <Label className="font-bold text-neutral-700 dark:text-neutral-300">Notice Period</Label>
+                          <select
+                            {...register("noticePeriod")}
+                            className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
+                          >
+                            <option value="">Select Notice Period</option>
+                            <option value="Immediate">Immediate</option>
+                            <option value="15 Days">15 Days</option>
+                            <option value="30 Days">30 Days</option>
+                            <option value="45 Days">45 Days</option>
+                            <option value="60 Days">60 Days</option>
+                            <option value="90 Days">90 Days</option>
+                          </select>
+                        </>
+                      ) : (
+                        <>
+                          <Label className="font-bold text-neutral-700 dark:text-neutral-300">Required Hours/Week</Label>
+                          <input
+                            type="number"
+                            {...register("hoursPerWeek", { valueAsNumber: true })}
+                            className="w-full h-8 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 font-semibold"
+                            placeholder="e.g. 40"
+                          />
+                        </>
+                      )}
+                    </div>
+
+                    {market === "IN" ? (
+                      <>
+                        {/* Row 3, Col 1: Client Commission (%) (India Permanent) or Client Bill Rate (India Contract) */}
+                        <div className="space-y-1">
+                          {watch("taxTerms") === "Permanent" ? (
+                            <>
+                              <div className="flex items-center gap-1">
+                                <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Commission (%) <span className="text-red-500">*</span></Label>
+                                <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Permanent placement agency commission percentage">?</span>
+                              </div>
+                              <div className="flex gap-2 items-center w-full">
+                                <select
+                                  value={commissionType}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCommissionType(val);
+                                    const commVal = val === "custom" ? customCommission : val;
+                                    if (commVal) {
+                                      setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: true });
+                                    }
+                                  }}
+                                  className={cn(
+                                    "h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold",
+                                    commissionType === "custom" ? "w-2/3" : "w-full"
+                                  )}
+                                >
+                                  <option value="8.33">8.33% (1 Month Salary)</option>
+                                  <option value="10">10.0%</option>
+                                  <option value="12.5">12.5%</option>
+                                  <option value="15">15.0%</option>
+                                  <option value="custom">Custom Percentage...</option>
+                                </select>
+                                {commissionType === "custom" && (
+                                  <div className="flex items-center gap-1 shrink-0 w-1/3">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      max="100"
+                                      value={customCommission}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setCustomCommission(val);
+                                        if (val) {
+                                          setValue("clientBillRate", `${val}% Placement Commission`, { shouldValidate: true });
+                                        }
+                                      }}
+                                      placeholder="e.g. 10.5"
+                                      className="h-8 w-full text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 rounded font-semibold"
+                                    />
+                                    <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">%</span>
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-1">
+                                <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Bill Rate <span className="text-red-500">*</span></Label>
+                                <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Bill rate information">?</span>
+                              </div>
+                              <div className="flex gap-1.5 items-center w-full">
+                                <select
+                                  value={billCurrency}
+                                  onChange={(e) => setBillCurrency(e.target.value)}
+                                  className="w-16 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                                >
                                   <option value="INR">INR</option>
                                   <option value="USD">USD</option>
-                                </>
-                              ) : (
-                                <>
-                                  <option value="USD">USD</option>
-                                  <option value="CAD">CAD</option>
-                                </>
-                              )}
-                            </select>
-                            <Input
-                              type="text"
-                              {...register("clientBillRate")}
-                              className="h-8 w-24 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 font-semibold"
-                              placeholder="Rate"
-                            />
-                            <select
-                              value={billUnit}
-                              onChange={(e) => setBillUnit(e.target.value)}
-                              className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
-                            >
-                              {market === "IN" ? (
-                                <>
+                                </select>
+                                <Input
+                                  type="text"
+                                  {...register("clientBillRate")}
+                                  className="h-8 flex-1 min-w-[70px] text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 font-semibold"
+                                  placeholder="Rate"
+                                />
+                                <select
+                                  value={billUnit}
+                                  onChange={(e) => setBillUnit(e.target.value)}
+                                  className="w-24 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                                >
                                   <option value="LPA">LPA</option>
                                   <option value="Monthly">Monthly</option>
                                   <option value="Hourly">Hourly</option>
-                                </>
-                              ) : (
-                                <>
-                                  <option value="Hourly">Hourly</option>
-                                  <option value="Daily">Daily</option>
-                                  <option value="Weekly">Weekly</option>
-                                  <option value="Bi-Weekly">Bi-Weekly</option>
-                                  <option value="Monthly">Monthly</option>
-                                  <option value="Yearly">Yearly</option>
-                                </>
-                              )}
-                            </select>
-                            <select
-                              value={billTerm}
-                              onChange={(e) => setBillTerm(e.target.value)}
-                              className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
-                            >
-                              {market === "IN" ? (
-                                <>
-                                  <option value="Permanent">Permanent</option>
-                                  <option value="Contract">Contract</option>
-                                </>
-                              ) : (
-                                <>
-                                  <option value="W-2">W-2</option>
-                                  <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
-                                  <option value="C2C">C2C</option>
-                                  <option value="1099">1099</option>
-                                  <option value="Other">Other</option>
-                                </>
-                              )}
-                            </select>
-                          </div>
-                        </>
-                      )}
-                      {errors.clientBillRate && (
-                        <p className="text-[10px] text-red-655 font-bold">{errors.clientBillRate.message}</p>
-                      )}
-                    </div>
+                                </select>
+                              </div>
+                            </>
+                          )}
+                          {errors.clientBillRate && (
+                            <p className="text-[10px] text-red-655 font-bold">{errors.clientBillRate.message}</p>
+                          )}
+                        </div>
+
+                        {/* Row 3, Col 2: Work Authorization (Fits into red-marked space next to Client Commission) */}
+                        {renderWorkAuthBlock()}
+                      </>
+                    ) : (
+                      /* For US Market: Client Bill Rate spans 2 cols */
+                      <div className="space-y-1 md:col-span-2">
+                        <div className="flex items-center gap-1">
+                          <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Bill Rate / Salary <span className="text-red-500">*</span></Label>
+                          <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Bill rate information">?</span>
+                        </div>
+                        <div className="flex gap-1.5 items-center w-full">
+                          <select
+                            value={billCurrency}
+                            onChange={(e) => setBillCurrency(e.target.value)}
+                            className="w-16 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                          >
+                            <option value="USD">USD</option>
+                            <option value="CAD">CAD</option>
+                          </select>
+                          <Input
+                            type="text"
+                            {...register("clientBillRate")}
+                            className="h-8 flex-1 min-w-[70px] text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 font-semibold"
+                            placeholder="Rate"
+                          />
+                          <select
+                            value={billUnit}
+                            onChange={(e) => setBillUnit(e.target.value)}
+                            className="w-24 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                          >
+                            <option value="Hourly">Hourly</option>
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Bi-Weekly">Bi-Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Yearly">Yearly</option>
+                          </select>
+                          <select
+                            value={billTerm}
+                            onChange={(e) => setBillTerm(e.target.value)}
+                            className="w-36 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                          >
+                            <option value="W-2">W-2</option>
+                            <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
+                            <option value="C2C">C2C</option>
+                            <option value="1099">1099</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        {errors.clientBillRate && (
+                          <p className="text-[10px] text-red-655 font-bold">{errors.clientBillRate.message}</p>
+                        )}
+                      </div>
+                    )}
 
                     {/* Pay Rate / Budget Min & Max (Row 3, Right Span 2 -> Same Row as Client Bill Rate!) */}
                     <div className="space-y-1 md:col-span-2">
@@ -1928,8 +2210,8 @@ const getInitialActiveBranchContext = () => {
                               ?
                             </span>
                           </div>
-                          <div className="flex gap-3 items-center">
-                            <div className="relative flex-1 max-w-[180px]">
+                          <div className="flex gap-2.5 items-center w-full">
+                            <div className="relative flex-1">
                               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">Min</span>
                               <input
                                 type="text"
@@ -1943,8 +2225,8 @@ const getInitialActiveBranchContext = () => {
                               />
                               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">LPA</span>
                             </div>
-                            <span className="text-xs font-bold text-neutral-400">to</span>
-                            <div className="relative flex-1 max-w-[180px]">
+                            <span className="text-xs font-bold text-neutral-400 shrink-0">to</span>
+                            <div className="relative flex-1">
                               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">Max</span>
                               <input
                                 type="text"
@@ -1963,11 +2245,11 @@ const getInitialActiveBranchContext = () => {
                             <label className="font-bold text-neutral-700 dark:text-neutral-300">Pay Rate / Salary <span className="text-red-500">*</span></label>
                             <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Pay rate information">?</span>
                           </div>
-                          <div className="flex gap-1 items-center">
+                          <div className="flex gap-1.5 items-center w-full">
                             <select
                               value={payCurrency}
                               onChange={(e) => setPayCurrency(e.target.value)}
-                              className="w-16 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 shrink-0 font-semibold"
+                              className="w-16 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 shrink-0 font-semibold"
                             >
                               <option value="USD">USD</option>
                               <option value="CAD">CAD</option>
@@ -1976,13 +2258,13 @@ const getInitialActiveBranchContext = () => {
                             <input
                               type="text"
                               {...register("payRate")}
-                              className="h-8 w-24 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold"
+                              className="h-8 flex-1 min-w-[70px] bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold"
                               placeholder="Pay Rate"
                             />
                             <select
                               value={payUnit}
                               onChange={(e) => setPayUnit(e.target.value)}
-                              className="w-28 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 shrink-0 font-semibold"
+                              className="w-24 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 shrink-0 font-semibold"
                             >
                               <option value="Hourly">Hourly</option>
                               <option value="Daily">Daily</option>
@@ -1994,7 +2276,7 @@ const getInitialActiveBranchContext = () => {
                             <select
                               value={payTerm}
                               onChange={(e) => setPayTerm(e.target.value)}
-                              className="w-40 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 shrink-0 font-semibold"
+                              className="w-36 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 shrink-0 font-semibold"
                             >
                               <option value="W-2">W-2</option>
                               <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
@@ -2343,252 +2625,56 @@ const getInitialActiveBranchContext = () => {
                       )}
                     </div>
 
-                    {/* Client Job ID */}
+                    {/* Row 4, Col 3: Client Job ID */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Client Job ID</label>
+                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Job ID</Label>
                       <input
                         type="text"
                         {...register("clientJobId")}
-                        className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200"
+                        className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200"
                         placeholder="e.g. REQ-9941"
                       />
                     </div>
 
-                    {/* Priority */}
+                    {/* Row 4, Col 4: Priority */}
                     <div className="space-y-1">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Priority <span className="text-red-500">*</span></label>
+                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Priority <span className="text-red-500">*</span></Label>
                       <select
                         {...register("priority")}
-                        className="w-full bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 cursor-pointer"
+                        className="w-full h-8 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 cursor-pointer font-semibold"
                       >
                         <option value="Hot">Hot</option>
                         <option value="Warm">Warm</option>
                         <option value="Cold">Cold</option>
                       </select>
-                    </div>
-
-                    {/* Work Auth */}
-                    <div className="space-y-1 relative" ref={workAuthDropdownRef}>
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Work Authorization <span className="text-red-500">*</span></label>
-                      
-                      {/* Trigger Input (styled like standard select field) */}
-                      <div
-                        onClick={() => setIsWorkAuthOpen(!isWorkAuthOpen)}
-                        className={cn(
-                          "w-full bg-white dark:bg-slate-955 border rounded px-2.5 py-1 text-xs text-neutral-800 dark:text-neutral-200 flex items-center justify-between cursor-pointer select-none transition-colors min-h-[32px]",
-                          isWorkAuthOpen
-                            ? "border-primary ring-1 ring-primary/20"
-                            : "border-neutral-300 dark:border-slate-700 hover:border-neutral-400 dark:hover:border-slate-600"
-                        )}
-                      >
-                        <div className="flex flex-wrap gap-1 items-center max-w-[88%] py-0.5">
-                          {(() => {
-                            const selected = watch("workAuthorization") || "";
-                            const list = selected.split(", ").filter(Boolean);
-                            if (list.length === 0) {
-                              return <span className="text-neutral-400 dark:text-slate-500 font-medium">Select Work Authorization...</span>;
-                            }
-                            if (list.length === currentWorkAuthOptions.length) {
-                              return (
-                                <span className="font-bold text-primary dark:text-blue-400 bg-primary/10 dark:bg-primary/20 px-1.5 py-0.5 rounded text-[10px]">
-                                  All Selected
-                                </span>
-                              );
-                            }
-                            
-                            const limit = 2;
-                            const visibleItems = list.slice(0, limit);
-                            const hiddenCount = list.length - limit;
-                            
-                            return (
-                              <>
-                                {visibleItems.map((opt) => (
-                                  <span
-                                    key={opt}
-                                    className="bg-neutral-100 dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 text-neutral-800 dark:text-neutral-200 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-neutral-200 dark:hover:bg-slate-700 transition-colors"
-                                  >
-                                    {opt}
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const newList = list.filter((item) => item !== opt).join(", ");
-                                        setValue("workAuthorization", newList, { shouldDirty: true });
-                                      }}
-                                      className="text-neutral-400 hover:text-red-500 dark:hover:text-red-400 font-bold ml-0.5 rounded-full p-0.5 hover:bg-neutral-300/35"
-                                    >
-                                      <X className="h-2.5 w-2.5" />
-                                    </button>
-                                  </span>
-                                ))}
-                                {hiddenCount > 0 && (
-                                  <span className="bg-primary/15 dark:bg-primary/25 text-primary dark:text-blue-400 border border-primary/20 text-[10px] font-extrabold px-1.5 py-0.5 rounded">
-                                    +{hiddenCount} more
-                                  </span>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                        
-                        <div className="flex items-center gap-1 text-neutral-400 dark:text-slate-500 shrink-0">
-                          {((watch("workAuthorization") || "").split(", ").filter(Boolean).length > 0) && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setValue("workAuthorization", "", { shouldDirty: true });
-                              }}
-                              className="p-0.5 rounded-full hover:bg-neutral-100 dark:hover:bg-slate-800 hover:text-red-500 transition-colors"
-                              title="Clear all selections"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                          <ChevronDown className="h-3.5 w-3.5" />
-                        </div>
-                      </div>
-
-                      {/* Dropdown Overlay Container */}
-                      {isWorkAuthOpen && (
-                        <div className="absolute left-0 right-0 z-30 mt-1 bg-white dark:bg-slate-900 border border-neutral-250 dark:border-slate-800 rounded-md shadow-xl p-2.5 space-y-2">
-                          <div className="relative flex items-center">
-                            <input
-                              type="text"
-                              placeholder="Search Auth..."
-                              value={workAuthSearch}
-                              onChange={(e) => setWorkAuthSearch(e.target.value)}
-                              className="w-full bg-neutral-50 dark:bg-slate-955 border border-neutral-200 dark:border-slate-800 rounded pl-7 pr-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-855 dark:text-neutral-200"
-                              autoFocus
-                            />
-                            <Search className="absolute left-2.5 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
-                          </div>
-                          
-                          <div className="w-full max-h-60 overflow-y-auto space-y-1.5 text-xs select-none pr-1 scrollbar-thin">
-                            {/* Select All Checkbox */}
-                            {workAuthSearch === "" && (
-                              <label className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800/60 rounded-md cursor-pointer font-bold text-neutral-700 dark:text-neutral-300 transition-colors">
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    (watch("workAuthorization") || "").split(", ").filter(Boolean).length === currentWorkAuthOptions.length
-                                  }
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setValue("workAuthorization", currentWorkAuthOptions.join(", "), { shouldDirty: true });
-                                    } else {
-                                      setValue("workAuthorization", "", { shouldDirty: true });
-                                    }
-                                  }}
-                                  className="sr-only"
-                                />
-                                <div className={cn(
-                                  "h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0",
-                                  (watch("workAuthorization") || "").split(", ").filter(Boolean).length === currentWorkAuthOptions.length
-                                    ? "bg-primary border-primary text-white"
-                                    : "border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-955"
-                                )}>
-                                  {((watch("workAuthorization") || "").split(", ").filter(Boolean).length === currentWorkAuthOptions.length) && (
-                                    <Check className="h-3 w-3 stroke-[3]" />
-                                  )}
-                                </div>
-                                <span>[Select all]</span>
-                              </label>
-                            )}
-                            
-                            {/* Option Checkboxes */}
-                            {currentWorkAuthOptions.filter((opt) =>
-                              opt.toLowerCase().includes(workAuthSearch.toLowerCase())
-                            ).map((opt) => {
-                              const selectedList = (watch("workAuthorization") || "").split(", ").filter(Boolean);
-                              const isSelected = selectedList.includes(opt);
-                              return (
-                                <label
-                                  key={opt}
-                                  className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800/60 rounded-md cursor-pointer font-medium text-neutral-700 dark:text-neutral-300 transition-colors"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={(e) => {
-                                      let newList;
-                                      if (e.target.checked) {
-                                        newList = (current: string) => {
-                                          const currentList = current ? current.split(", ").filter(Boolean) : [];
-                                          return [...currentList.filter((x) => x !== opt), opt].join(", ");
-                                        };
-                                      } else {
-                                        newList = (current: string) => {
-                                          const currentList = current ? current.split(", ").filter(Boolean) : [];
-                                          return currentList.filter((item) => item !== opt).join(", ");
-                                        };
-                                      }
-                                      const currentVal = watch("workAuthorization") || "";
-                                      setValue("workAuthorization", newList(currentVal), { shouldDirty: true });
-                                    }}
-                                    className="sr-only"
-                                  />
-                                  <div className={cn(
-                                    "h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0",
-                                    isSelected
-                                      ? "bg-primary border-primary text-white"
-                                      : "border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-955"
-                                  )}>
-                                    {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
-                                  </div>
-                                  <span className={cn(
-                                    "truncate transition-colors text-xs",
-                                    isSelected ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-700 dark:text-neutral-300"
-                                  )}>
-                                    {opt}
-                                  </span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                      {errors.workAuthorization && (
-                        <p className="text-[10px] text-red-655 font-bold">{errors.workAuthorization.message}</p>
+                      {errors.priority && (
+                        <p className="text-[10px] text-red-655 font-bold">{errors.priority.message}</p>
                       )}
                     </div>
 
-                    {/* Engagement Type / Tax Terms (US Market Only) */}
+                    {/* Row 5: Tax Terms (1 Col) & Work Authorization (3 Cols) for US Market */}
                     {market !== "IN" && (
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">
-                          Tax Terms <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          {...register("taxTerms")}
-                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                        >
-                          <option value="W-2">W-2</option>
-                          <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
-                          <option value="C2C">C2C</option>
-                          <option value="1099">1099</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-                    )}
-
-                    {/* Notice Period (Domestic IN Market Only) */}
-                    {market === "IN" && (
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-700 dark:text-neutral-300">Notice Period</label>
-                        <select
-                          {...register("noticePeriod")}
-                          className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                        >
-                          <option value="">Select Notice Period</option>
-                          <option value="Immediate">Immediate</option>
-                          <option value="15 Days">15 Days</option>
-                          <option value="30 Days">30 Days</option>
-                          <option value="45 Days">45 Days</option>
-                          <option value="60 Days">60 Days</option>
-                          <option value="90 Days">90 Days</option>
-                        </select>
-                      </div>
+                      <>
+                        <div className="space-y-1">
+                          <Label className="font-bold text-neutral-700 dark:text-neutral-300">
+                            Tax Terms <span className="text-red-500">*</span>
+                          </Label>
+                          <select
+                            {...register("taxTerms")}
+                            className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
+                          >
+                            <option value="W-2">W-2</option>
+                            <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
+                            <option value="C2C">C2C</option>
+                            <option value="1099">1099</option>
+                            <option value="Other">Other</option>
+                          </select>
+                          {errors.taxTerms && (
+                            <p className="text-[10px] text-red-655 font-bold">{errors.taxTerms.message}</p>
+                          )}
+                        </div>
+                        {renderWorkAuthBlock("md:col-span-3")}
+                      </>
                     )}
                   </div>
                 )}
@@ -2822,7 +2908,7 @@ const getInitialActiveBranchContext = () => {
                                 }
                                 return <span className="text-neutral-400">Select Staff, Pod, or Pool...</span>;
                               } else if (selectedPodId === "all") {
-                                return <span className="font-semibold text-neutral-900 dark:text-white">All Branch Recruiters (Pool Broadcast)</span>;
+                                return <span className="font-semibold text-neutral-900 dark:text-white">All recruiters</span>;
                               } else if (selectedPodId === "none") {
                                 return <span className="font-semibold text-neutral-900 dark:text-white">Unassigned Allocation (Hold for Manager Assignment)</span>;
                               } else if (selectedPodId === "auto_pod") {
@@ -2958,11 +3044,11 @@ const getInitialActiveBranchContext = () => {
                                 </div>
                               )}
 
-                              {/* 3. Branch Pool & Allocation */}
+                              {/* 3. Assign to */}
                               {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true) || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) === true)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
                                 <div className="space-y-1">
                                   <div className="px-2 py-1 text-[10.5px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 bg-neutral-50/80 dark:bg-slate-800/50 rounded">
-                                    Branch Pool & Allocation
+                                    Assign to
                                   </div>
                                   {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true)) && (
                                     <div
@@ -2977,7 +3063,7 @@ const getInitialActiveBranchContext = () => {
                                         selectedPodId === "all" && "bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60"
                                       )}
                                     >
-                                      <span className="font-semibold text-neutral-800 dark:text-neutral-200">All Branch Recruiters (Pool Broadcast)</span>
+                                      <span className="font-semibold text-neutral-800 dark:text-neutral-200">All recruiters</span>
                                       {selectedPodId === "all" && <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />}
                                     </div>
                                   )}
@@ -3026,31 +3112,6 @@ const getInitialActiveBranchContext = () => {
                 )}
               </div>
 
-              {/* -------------------- CAREER PORTAL SETTINGS -------------------- */}
-              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
-                <SectionHeader title="Career Portal Settings" sectionKey="portalSettings" />
-                {!collapsedSections.portalSettings && (
-                  <div className="p-4 space-y-3 text-xs select-none">
-                    <label className="flex items-center gap-2.5 cursor-pointer font-bold text-neutral-800 dark:text-neutral-250">
-                      <input
-                        type="checkbox"
-                        {...register("postToPortal")}
-                        className="h-4 w-4 accent-primary rounded"
-                      />
-                      <span>Post Job on Career Portal</span>
-                    </label>
-
-                    <label className="flex items-center gap-2.5 cursor-pointer font-bold text-neutral-800 dark:text-neutral-250">
-                      <input
-                        type="checkbox"
-                        {...register("displayContactOnPortal")}
-                        className="h-4 w-4 accent-primary rounded"
-                      />
-                      <span>Display Contact Details on Career Portal</span>
-                    </label>
-                  </div>
-                )}
-              </div>
 
               {/* -------------------- DOCUMENTS -------------------- */}
               <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">

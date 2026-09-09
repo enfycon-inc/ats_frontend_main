@@ -980,13 +980,13 @@ export default function JobDetailPage() {
             <Button
               size="sm"
               onClick={() => setUploadSubmitOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 text-xs"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 text-xs cursor-pointer"
             >
-              <Upload className="h-3.5 w-3.5" /> Upload & Submit CV
+              <Upload className="h-3.5 w-3.5" /> Submit New Candidate
             </Button>
             {hasEditPermission && (
               <Link href={`/job-posting/${job.id}/edit`}>
-                <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9">
+                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 cursor-pointer">
                   <Pencil className="h-3.5 w-3.5" /> Edit Job
                 </Button>
               </Link>
@@ -1148,7 +1148,7 @@ export default function JobDetailPage() {
                     onClick={() => setUploadSubmitOpen(true)}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1 text-xs h-8 shadow-xs rounded-lg cursor-pointer"
                   >
-                    <Upload className="h-3.5 w-3.5" /> Submit New CV
+                    <Upload className="h-3.5 w-3.5" /> Submit New Candidate
                   </Button>
                   {submissions.length > 0 && (
                     <Button
@@ -1176,7 +1176,7 @@ export default function JobDetailPage() {
                     <Button
                       size="sm"
                       onClick={() => setUploadSubmitOpen(true)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 text-xs h-8.5 rounded-lg shadow-sm"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 text-xs h-8.5 rounded-lg shadow-sm cursor-pointer"
                     >
                       <Upload className="h-3.5 w-3.5" /> Upload &amp; Submit Candidate CV
                     </Button>
@@ -1524,7 +1524,7 @@ export default function JobDetailPage() {
                       {submissions.length === 0 ? (
                         <tr>
                           <td colSpan={8} className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900">
-                            No candidate submissions yet. Click "+ Upload &amp; Submit CV" or add matches to begin screening.
+                            No candidate submissions yet. Click "+ Submit New Candidate" or add matches to begin screening.
                           </td>
                         </tr>
                       ) : (
@@ -1752,7 +1752,7 @@ export default function JobDetailPage() {
                       {col.subs.length === 0 && (
                         <div className="flex flex-col items-center justify-center text-[10px] text-neutral-400 font-medium text-center py-10 px-2 gap-1.5 border border-dashed border-neutral-200 dark:border-slate-800 rounded-lg my-2 bg-neutral-50/50 dark:bg-slate-850/20">
                           <span className="font-bold text-neutral-500">No candidates in {col.title}</span>
-                          <span className="text-[9px] text-neutral-400">Click [+ Upload & Submit CV] above to add candidates from Dice/LinkedIn</span>
+                          <span className="text-[9px] text-neutral-400">Click [+ Submit New Candidate] above to add candidates from Dice/LinkedIn</span>
                         </div>
                       )}
                     </div>
@@ -2156,7 +2156,7 @@ export default function JobDetailPage() {
               <Button type="button" variant="outline" size="sm" onClick={() => setReviewOpen(false)} className="text-xs h-8">
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting} className="bg-primary hover:bg-primary/90 text-white text-xs font-bold h-8">
+              <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold h-8 cursor-pointer">
                 {submitting ? "Updating..." : "Save Updates"}
               </Button>
             </DialogFooter>
@@ -2203,7 +2203,7 @@ export default function JobDetailPage() {
             <Button
               onClick={handleConfirmSubmitMatch}
               disabled={submitting}
-              className="bg-indigo-650 hover:bg-indigo-755 text-white text-xs font-bold"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer"
             >
               {submitting ? "Submitting..." : "Confirm Submission"}
             </Button>
@@ -2297,7 +2297,7 @@ export default function JobDetailPage() {
                 placeholder="Initial screening remarks (e.g. Available immediately, 10+ yrs Java exp)..."
                 value={uploadComment}
                 onChange={(e) => setUploadComment(e.target.value)}
-                className="w-full p-2.5 border border-neutral-300 dark:border-slate-700 rounded-lg bg-transparent text-xs focus:outline-none focus:border-emerald-500"
+                className="w-full p-2.5 border border-neutral-300 dark:border-slate-700 rounded-lg bg-transparent text-xs focus:outline-none focus:border-indigo-500"
               />
             </div>
 
@@ -2308,7 +2308,7 @@ export default function JobDetailPage() {
               <Button
                 type="submit"
                 disabled={uploadingCv || !uploadFile}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs h-9 shadow-sm"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs h-9 shadow-sm cursor-pointer"
               >
                 {uploadingCv ? "Parsing & Submitting..." : "Upload & Submit to Pipeline"}
               </Button>

@@ -5,7 +5,7 @@ import { useSocket } from "@/contexts/SocketContext";
 import { useNotifications, NotificationItem } from "@/contexts/NotificationContext";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
-import { Bell, Briefcase, CheckCircle2, XCircle, Megaphone, ArrowRight } from "lucide-react";
+import { Bell, Briefcase, CheckCircle2, XCircle, Megaphone, ArrowRight, Calendar, Award } from "lucide-react";
 
 export default function NotificationListener() {
   const { socket, isConnected } = useSocket();
@@ -48,11 +48,20 @@ export default function NotificationListener() {
       const getIcon = () => {
         switch (notif.type) {
           case "JOB_PENDING_APPROVAL":
+          case "SUBMISSION_PENDING_APPROVAL":
             return <Briefcase className="w-5 h-5 text-amber-500 shrink-0" />;
           case "JOB_APPROVED":
+          case "SUBMISSION_APPROVED":
+          case "SUBMISSION_PLACED":
             return <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />;
           case "JOB_REJECTED":
+          case "SUBMISSION_REJECTED":
             return <XCircle className="w-5 h-5 text-red-500 shrink-0" />;
+          case "INTERVIEW_SCHEDULED":
+          case "INTERVIEW_CLEARED":
+            return <Calendar className="w-5 h-5 text-cyan-500 shrink-0" />;
+          case "SUBMISSION_OFFER":
+            return <Award className="w-5 h-5 text-emerald-500 shrink-0" />;
           case "ANNOUNCEMENT":
             return <Megaphone className="w-5 h-5 text-blue-500 shrink-0" />;
           default:
@@ -61,13 +70,16 @@ export default function NotificationListener() {
       };
 
       const getActionUrl = () => {
+        if (notif.data?.submissionId || notif.type.includes("SUBMISSION") || notif.type.includes("INTERVIEW")) {
+          return `/utility/submissions`;
+        }
         if (notif.data?.jobId) {
           return `/job-posting`;
         }
         if (notif.type === "ANNOUNCEMENT") {
           return `/utility/notifications`;
         }
-        return `/job-posting`;
+        return `/utility/submissions`;
       };
 
       toast.custom(

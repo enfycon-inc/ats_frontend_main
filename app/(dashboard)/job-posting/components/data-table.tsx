@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -20,6 +20,7 @@ import {
   Eye,
   CheckSquare,
   Users,
+  User,
   Sparkles,
   ChevronLeft,
   ChevronRight,
@@ -30,6 +31,9 @@ import {
   Copy,
   CheckCircle,
   XCircle,
+  Check,
+  UserX,
+  Building2,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import {
@@ -46,6 +50,37 @@ import { atsApi } from "@/lib/ats-api";
 import { Job } from "../data/mock-jobs";
 import AddCandidateModal from "@/components/dashboard/AddCandidateModal";
 import { AddClientModal } from "./add-client-modal";
+
+export function getAssignedPersonDisplay(job: Job): {
+  label: string;
+  type: "all" | "pod" | "recruiter" | "unassigned";
+} {
+  const rawAssigned = (job.assignedTo || "").trim();
+  const rawUpper = rawAssigned.toUpperCase();
+
+  // 1. Check if assigned to ALL branch recruiters
+  if (rawUpper === "ALL" || rawUpper.startsWith("ALL ") || rawUpper === "ALL RECRUITERS") {
+    return { label: "All recruiters", type: "all" };
+  }
+
+  // 2. Check if assigned to a specific Recruitment Pod
+  if (job.podName && job.podName !== "N/A" && job.podName.toLowerCase() !== "unassigned") {
+    return { label: job.podName, type: "pod" };
+  }
+
+  // 3. Check if assigned to a Primary Recruiter
+  if (job.primaryRecruiter && job.primaryRecruiter !== "N/A" && job.primaryRecruiter.toLowerCase() !== "unassigned") {
+    return { label: job.primaryRecruiter, type: "recruiter" };
+  }
+
+  // 4. Check if assignedTo has an explicit recruiter name or custom string
+  if (rawAssigned && rawUpper !== "N/A" && rawUpper !== "UNASSIGNED" && rawUpper !== "NONE") {
+    return { label: rawAssigned, type: "recruiter" };
+  }
+
+  // 5. Truly unassigned (not assigned to anyone, pod, or all)
+  return { label: "Unassigned", type: "unassigned" };
+}
 
 function isJobPostedToday(job: Job): boolean {
   if (!job) return false;
@@ -91,6 +126,7 @@ interface DataTableProps {
   onSaveView: (viewName: string) => void;
   savedViews: string[];
   activeView: string;
+  defaultViewLabel?: string;
   onSelectView: (viewName: string) => void;
   onUpdateJob?: (jobId: string, updatedFields: Partial<Job>) => void;
 }
@@ -105,6 +141,7 @@ export default function DataTable({
   onSaveView,
   savedViews,
   activeView,
+  defaultViewLabel = "All Jobs",
   onSelectView,
   onUpdateJob,
 }: DataTableProps) {
@@ -344,44 +381,178 @@ export default function DataTable({
   const [assignModalJob, setAssignModalJob] = useState<Job | null>(null);
   const [assignModalType, setAssignModalType] = useState<"assignedTo" | "primaryRecruiter">("assignedTo");
   const [assignModalSearch, setAssignModalSearch] = useState("");
-  const [assignModalSelected, setAssignModalSelected] = useState<string[]>([]);
+  const [assignModalSelectedId, setAssignModalSelectedId] = useState<string>("");
   const [assignModalComment, setAssignModalComment] = useState("");
-  const [assignActiveTab, setAssignActiveTab] = useState<"users" | "teams">("users");
 
-  // Users List State
+  // Assignment Context Data
   const [usersList, setUsersList] = useState<any[]>([]);
+  const [podsList, setPodsList] = useState<any[]>([]);
+  const [branchesList, setBranchesList] = useState<any[]>([]);
+  const [rolesList, setRolesList] = useState<any[]>([]);
 
-  // Load users list for assignedTo selection on mount
+  // Load users, pods, branches, and custom roles on mount
   useEffect(() => {
-    async function loadUsers() {
+    async function loadAssignmentData() {
       try {
-        const users = await atsApi.auth.listUsers();
-        if (users && users.length > 0) {
-          setUsersList(users);
-        } else {
-          throw new Error("No users found");
-        }
-      } catch (err) {
-        console.warn("[DataTable] Failed to fetch users, using mock users:", err);
-        setUsersList([
-          { id: "u1", fullName: "Abhinav Mohanty", email: "abhinav.m@enfycon.com" },
-          { id: "u2", fullName: "Abhishek Bohidar", email: "abhishek@enfycon.com" },
-          { id: "u3", fullName: "Arijit Kar", email: "arijit.k@enfycon.com" },
-          { id: "u4", fullName: "Ashutosh Dash", email: "ashutosh@enfycon.com" },
-          { id: "u5", fullName: "Baljayanti Sahoo", email: "bj@enfycon.com" },
-          { id: "u6", fullName: "Bhavani Shankar", email: "bhavani@enfycon.com" },
-          { id: "u7", fullName: "Bighnesh Mohapatra", email: "bighnesh@enfycon.com" },
-          { id: "u8", fullName: "Debashish Samal", email: "debashish.s@enfycon.com" },
-          { id: "u9", fullName: "Debidutta Dash", email: "debidutta@enfycon.com" },
-          { id: "u10", fullName: "Deeptimeyee Nayak", email: "deeptimeyee@enfycon.com" },
-          { id: "u11", fullName: "Dibyaranjan Sahoo", email: "dibya@enfycon.com" },
-          { id: "u12", fullName: "Haraprasad Tripathy", email: "haraprasad@enfycon.com" },
-          { id: "u13", fullName: "Janaki Bhoi", email: "janaki@enfycon.com" }
+        const [users, pods, branches, roles] = await Promise.all([
+          atsApi.auth.listUsers().catch(() => []),
+          atsApi.pods.list().catch(() => []),
+          atsApi.branches.list().catch(() => []),
+          atsApi.auth.listRoles(undefined, true).catch(() => []),
         ]);
+        if (users && users.length > 0) setUsersList(users);
+        if (pods && pods.length > 0) setPodsList(pods);
+        if (branches && branches.length > 0) setBranchesList(branches);
+        if (roles && roles.length > 0) setRolesList(roles);
+      } catch (err) {
+        console.warn("[DataTable] Failed to fetch assignment context data:", err);
       }
     }
-    loadUsers();
+    loadAssignmentData();
   }, []);
+
+  const getUserRoleLabel = useCallback((u: any, branchId?: string): string => {
+    const activeBranchId = branchId || (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null);
+    
+    // 1. Check branch-specific custom roles in active branch
+    if (activeBranchId && u.branchRoles && u.branchRoles[activeBranchId] && Array.isArray(u.branchRoles[activeBranchId]) && u.branchRoles[activeBranchId].length > 0) {
+      const branchRoleIdOrName = u.branchRoles[activeBranchId][0];
+      const matchedRole = (rolesList || []).find((cr: any) => cr.id === branchRoleIdOrName || cr.name?.toUpperCase() === String(branchRoleIdOrName).toUpperCase());
+      if (matchedRole?.name) return matchedRole.name;
+      if (typeof branchRoleIdOrName === "string" && !branchRoleIdOrName.includes("-")) return branchRoleIdOrName;
+    }
+
+    // 2. Check any branch roles if user has branch assignments
+    if (u.branchRoles && typeof u.branchRoles === "object") {
+      for (const bRoleArray of Object.values(u.branchRoles) as any[]) {
+        if (Array.isArray(bRoleArray) && bRoleArray.length > 0) {
+          const rItem = bRoleArray[0];
+          const matchedRole = (rolesList || []).find((cr: any) => cr.id === rItem || cr.name?.toUpperCase() === String(rItem).toUpperCase());
+          if (matchedRole?.name) return matchedRole.name;
+          if (typeof rItem === "string" && !rItem.includes("-")) return rItem;
+        }
+      }
+    }
+
+    // 3. Check customRoleName or roleName
+    if (u.customRoleName) return u.customRoleName;
+    if (u.roleName) {
+      const matchedRole = (rolesList || []).find((cr: any) => cr.id === u.roleName || cr.name?.toUpperCase() === String(u.roleName).toUpperCase());
+      if (matchedRole?.name) return matchedRole.name;
+      return u.roleName;
+    }
+
+    // 4. System role
+    if (u.systemRole) {
+      return u.systemRole.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+    }
+
+    // 5. Roles array
+    if (Array.isArray(u.roles) && u.roles.length > 0) {
+      const rItem = u.roles[0];
+      const matchedRole = (rolesList || []).find((cr: any) => cr.id === rItem || cr.name?.toUpperCase() === String(rItem).toUpperCase());
+      if (matchedRole?.name) return matchedRole.name;
+      return rItem;
+    }
+
+    return "Staff";
+  }, [rolesList]);
+
+  // Target branch resolution for assignModalJob
+  const assignModalTargetBranch = useMemo(() => {
+    if (!assignModalJob) return null;
+    if (assignModalJob.branchId) {
+      const b = branchesList.find((x: any) => x.id === assignModalJob.branchId);
+      if (b) return b;
+    }
+    if (assignModalJob.businessUnit) {
+      const b = branchesList.find((x: any) => x.name?.toLowerCase() === assignModalJob.businessUnit.toLowerCase());
+      if (b) return b;
+    }
+    const activeId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+    if (activeId) {
+      const b = branchesList.find((x: any) => x.id === activeId);
+      if (b) return b;
+    }
+    return null;
+  }, [assignModalJob, branchesList]);
+
+  // Branch permission rules (identical to job-posting/new and job-posting/[id]/edit)
+  const branchAllowsPods = useMemo(() => {
+    if (!assignModalTargetBranch) return true;
+    return ((assignModalTargetBranch.allowPods ?? assignModalTargetBranch.allow_pods) !== false) && !(assignModalTargetBranch.allowNone ?? assignModalTargetBranch.allow_none);
+  }, [assignModalTargetBranch]);
+
+  const branchAllowsDirectStaff = useMemo(() => {
+    if (!assignModalTargetBranch) return true;
+    return Boolean(assignModalTargetBranch.allowNone ?? assignModalTargetBranch.allow_none);
+  }, [assignModalTargetBranch]);
+
+  const branchAllowsPool = useMemo(() => {
+    if (!assignModalTargetBranch) return true;
+    const allowsAll = (assignModalTargetBranch.allowAll ?? assignModalTargetBranch.allow_all) === true;
+    const allowsUnassigned = (assignModalTargetBranch.allowUnassigned ?? assignModalTargetBranch.allow_unassigned) === true;
+    const isNone = Boolean(assignModalTargetBranch.allowNone ?? assignModalTargetBranch.allow_none);
+    return (allowsAll || allowsUnassigned) && !isNone;
+  }, [assignModalTargetBranch]);
+
+  const branchAllowsAllBroadcast = useMemo(() => {
+    if (!assignModalTargetBranch) return true;
+    return (assignModalTargetBranch.allowAll ?? assignModalTargetBranch.allow_all) === true;
+  }, [assignModalTargetBranch]);
+
+  const branchAllowsUnassigned = useMemo(() => {
+    if (!assignModalTargetBranch) return true;
+    return (assignModalTargetBranch.allowUnassigned ?? assignModalTargetBranch.allow_unassigned) === true;
+  }, [assignModalTargetBranch]);
+
+  // Fallback if no rules were configured on branch
+  const hasAnyAssignmentEnabled = branchAllowsPool || branchAllowsPods || branchAllowsDirectStaff;
+  const showPoolSection = branchAllowsPool || !hasAnyAssignmentEnabled;
+  const showPodsSection = branchAllowsPods || !hasAnyAssignmentEnabled;
+  const showStaffSection = branchAllowsDirectStaff || !hasAnyAssignmentEnabled;
+
+  const targetBranchPods = useMemo(() => {
+    if (!assignModalTargetBranch) return podsList;
+    return podsList.filter((p: any) => !p.branchId || !p.branch_id || p.branchId === assignModalTargetBranch.id || p.branch_id === assignModalTargetBranch.id);
+  }, [podsList, assignModalTargetBranch]);
+
+  const targetRecruitersList = useMemo(() => {
+    const seen = new Set<string>();
+    const list: any[] = [];
+    const bId = assignModalTargetBranch?.id;
+
+    for (const u of usersList) {
+      const uid = u.id || u.email;
+      if (!uid || seen.has(uid)) continue;
+
+      if (u.isActive === false || u.is_active === false) continue;
+
+      if (bId) {
+        const userBranchId = u.branchId || u.branch_id;
+        const assignedBranches = Array.isArray(u.assignedBranchIds) ? u.assignedBranchIds : (Array.isArray(u.assigned_branch_ids) ? u.assigned_branch_ids : []);
+        const belongsToBranch = userBranchId === bId || assignedBranches.includes(bId) || !userBranchId;
+        if (!belongsToBranch) continue;
+      }
+
+      const perms: string[] = Array.isArray(u.permissions) ? u.permissions : [];
+      const hasSourcingPermission = 
+        perms.includes("submission:create") || 
+        perms.includes("candidate:create") || 
+        perms.includes("submission:edit") || 
+        perms.includes("submission:view") || 
+        perms.includes("job:view");
+
+      const r = (u.roles || []).map((x: string) => x.toUpperCase().replace(/[\s-_]+/g, ""));
+      const isSourcingStaff = hasSourcingPermission || r.includes("RECRUITER") || r.includes("BRANCHADMIN") || r.includes("PODLEAD") || r.includes("ACCOUNTMANAGER") || r.length === 0;
+
+      if (isSourcingStaff) {
+        seen.add(uid);
+        list.push(u);
+      }
+    }
+    return list;
+  }, [usersList, assignModalTargetBranch]);
 
   const openStatusModal = (job: Job) => {
     setStatusModalJob(job);
@@ -397,31 +568,116 @@ export default function DataTable({
     setStatusModalJob(null);
   };
 
-  const openAssignModal = (job: Job, type: "assignedTo" | "primaryRecruiter") => {
+  const openAssignModal = (job: Job, type: "assignedTo" | "primaryRecruiter" = "assignedTo") => {
     setAssignModalJob(job);
     setAssignModalType(type);
     setAssignModalSearch("");
     setAssignModalComment("");
-    setAssignActiveTab("users");
 
-    const currentValue = String(job[type] || "");
-    if (currentValue && currentValue !== "N/A") {
-      setAssignModalSelected(currentValue.split(", ").map(x => x.trim()));
-    } else {
-      setAssignModalSelected([]);
+    const rawAssigned = (job.assignedTo || "").trim();
+    const rawUpper = rawAssigned.toUpperCase();
+
+    // 1. ALL Recruiters
+    if (rawUpper === "ALL" || rawUpper.startsWith("ALL ") || rawUpper === "ALL RECRUITERS") {
+      setAssignModalSelectedId("all");
+      return;
     }
+
+    // 2. Pod assignment
+    if (job.podId) {
+      setAssignModalSelectedId(`pod:${job.podId}`);
+      return;
+    }
+    if (job.podName && job.podName !== "N/A" && job.podName.toLowerCase() !== "unassigned") {
+      const foundPod = podsList.find((p: any) => p.name?.toLowerCase() === job.podName?.toLowerCase());
+      if (foundPod) {
+        setAssignModalSelectedId(`pod:${foundPod.id}`);
+        return;
+      }
+    }
+
+    // 3. Primary Recruiter
+    if (job.primaryRecruiterId) {
+      setAssignModalSelectedId(`rec:${job.primaryRecruiterId}`);
+      return;
+    }
+    if (job.primaryRecruiter && job.primaryRecruiter !== "N/A" && job.primaryRecruiter.toLowerCase() !== "unassigned") {
+      const foundRec = usersList.find((u: any) => (u.fullName || u.name)?.toLowerCase() === job.primaryRecruiter.toLowerCase());
+      if (foundRec) {
+        setAssignModalSelectedId(`rec:${foundRec.id}`);
+        return;
+      }
+    }
+
+    // 4. Raw assigned string match
+    if (rawAssigned && rawUpper !== "N/A" && rawUpper !== "UNASSIGNED" && rawUpper !== "NONE") {
+      const foundRec = usersList.find((u: any) => (u.fullName || u.name)?.toLowerCase() === rawAssigned.toLowerCase());
+      if (foundRec) {
+        setAssignModalSelectedId(`rec:${foundRec.id}`);
+        return;
+      }
+      const foundPod = podsList.find((p: any) => p.name?.toLowerCase() === rawAssigned.toLowerCase());
+      if (foundPod) {
+        setAssignModalSelectedId(`pod:${foundPod.id}`);
+        return;
+      }
+    }
+
+    // 5. Default
+    setAssignModalSelectedId("none");
   };
 
   const handleAssignSave = () => {
-    if (assignModalJob && onUpdateJob) {
-      const newValue = assignModalSelected.length > 0 ? assignModalSelected.join(", ") : "N/A";
-      onUpdateJob(assignModalJob.id, { [assignModalType]: newValue });
+    if (!assignModalJob || !onUpdateJob) {
+      setAssignModalJob(null);
+      return;
+    }
+
+    if (assignModalSelectedId === "all") {
+      onUpdateJob(assignModalJob.id, {
+        assignedTo: "ALL",
+        primaryRecruiter: "N/A",
+        primaryRecruiterId: null,
+        podId: "all",
+        podName: "",
+      });
+    } else if (assignModalSelectedId === "none") {
+      onUpdateJob(assignModalJob.id, {
+        assignedTo: "N/A",
+        primaryRecruiter: "N/A",
+        primaryRecruiterId: null,
+        podId: "none",
+        podName: "",
+      });
+    } else if (assignModalSelectedId.startsWith("pod:")) {
+      const pid = assignModalSelectedId.replace("pod:", "");
+      const pod = targetBranchPods.find((p: any) => p.id === pid);
+      const podName = pod?.name || "Recruitment Pod";
+      onUpdateJob(assignModalJob.id, {
+        assignedTo: podName,
+        podId: pid,
+        podName: podName,
+        primaryRecruiter: "N/A",
+        primaryRecruiterId: null,
+      });
+    } else if (assignModalSelectedId.startsWith("rec:")) {
+      const rid = assignModalSelectedId.replace("rec:", "");
+      const rec = targetRecruitersList.find((u: any) => u.id === rid);
+      const recName = rec?.fullName || rec?.name || "Recruiter";
+      onUpdateJob(assignModalJob.id, {
+        assignedTo: recName,
+        primaryRecruiter: recName,
+        primaryRecruiterId: rid,
+        podId: "none",
+        podName: "",
+      });
+    }
+
+    if (assignModalComment) {
       console.log(`Assign comment for ${assignModalJob.jobCode}: ${assignModalComment}`);
     }
     setAssignModalJob(null);
   };
-
-  const mockTeams = ["Recruitment Team A", "Recruitment Team B", "Delivery Team", "Sourcing Team"];
 
   // Handle Sort
   const handleSort = (column: keyof Job) => {
@@ -445,13 +701,17 @@ export default function DataTable({
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter((job) => {
+        const assignedLabel = getAssignedPersonDisplay(job).label.toLowerCase();
         if (searchFilter === "All") {
           return (
             (job.jobTitle || "").toLowerCase().includes(q) ||
             (job.jobCode || "").toLowerCase().includes(q) ||
             (job.client || "").toLowerCase().includes(q) ||
-            (job.location || "").toLowerCase().includes(q)
+            (job.location || "").toLowerCase().includes(q) ||
+            assignedLabel.includes(q)
           );
+        } else if (searchFilter === "assignedTo") {
+          return assignedLabel.includes(q);
         } else {
           const val = job[searchFilter as keyof Job];
           return typeof val === "string" && val.toLowerCase().includes(q);
@@ -462,6 +722,14 @@ export default function DataTable({
     // Sort
     if (sortColumn) {
       result.sort((a, b) => {
+        if (sortColumn === "assignedTo") {
+          const strA = getAssignedPersonDisplay(a).label.toLowerCase();
+          const strB = getAssignedPersonDisplay(b).label.toLowerCase();
+          if (strA < strB) return sortDirection === "asc" ? -1 : 1;
+          if (strA > strB) return sortDirection === "asc" ? 1 : -1;
+          return 0;
+        }
+
         const valA = a[sortColumn];
         const valB = b[sortColumn];
 
@@ -604,7 +872,7 @@ export default function DataTable({
               onChange={(e) => onSelectView(e.target.value)}
               className="px-2 py-0.5 text-xs text-neutral-800 dark:text-neutral-200 bg-transparent outline-hidden cursor-pointer border-none font-bold"
             >
-              <option value="All Jobs">All Jobs</option>
+              <option value={defaultViewLabel}>{defaultViewLabel}</option>
               {savedViews.map((view) => (
                 <option key={view} value={view}>
                   {view}
@@ -1118,13 +1386,44 @@ export default function DataTable({
                               {String(job.primaryRecruiter || "N/A")}
                             </span>
                           ) : colId === "assignedTo" ? (
-                            <div className="flex items-center justify-between gap-1.5 w-full">
-                              <span>{String(job.assignedTo || "N/A")}</span>
+                            <div className="flex items-center justify-between gap-1.5 w-full min-w-0">
+                              {(() => {
+                                const assignInfo = getAssignedPersonDisplay(job);
+                                if (assignInfo.type === "all") {
+                                  return (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 tracking-tight shrink-0">
+                                      <Users className="h-3 w-3 text-slate-500 dark:text-slate-400 shrink-0" />
+                                      All recruiters
+                                    </span>
+                                  );
+                                }
+                                if (assignInfo.type === "pod") {
+                                  return (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 min-w-0" title={`Assigned Pod: ${assignInfo.label}`}>
+                                      <Users className="h-3 w-3 shrink-0 text-slate-500 dark:text-slate-400" />
+                                      <span className="truncate max-w-[130px]">{assignInfo.label}</span>
+                                    </span>
+                                  );
+                                }
+                                if (assignInfo.type === "recruiter") {
+                                  return (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 min-w-0" title={`Assigned Recruiter: ${assignInfo.label}`}>
+                                      <User className="h-3 w-3 shrink-0 text-slate-500 dark:text-slate-400" />
+                                      <span className="truncate max-w-[130px]">{assignInfo.label}</span>
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-normal text-neutral-400 dark:text-neutral-500 italic shrink-0">
+                                    Unassigned
+                                  </span>
+                                );
+                              })()}
                               {hasEditPermission && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); openAssignModal(job, "assignedTo"); }}
-                                  className="text-neutral-400 hover:text-blue-500 hover:bg-neutral-100 dark:hover:bg-slate-800 p-0.5 rounded transition-colors cursor-pointer"
-                                  title="Change Assigned To"
+                                  className="text-neutral-400 hover:text-blue-500 hover:bg-neutral-100 dark:hover:bg-slate-800 p-0.5 rounded transition-colors cursor-pointer shrink-0 ml-auto"
+                                  title="Change Assignment"
                                 >
                                   <Pencil className="h-3 w-3" />
                                 </button>
@@ -1603,256 +1902,329 @@ export default function DataTable({
 
       {/* Assigned To Modal Dialog */}
       {assignModalJob && (
-        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center font-sans">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 w-[620px] shadow-2xl rounded overflow-hidden">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 font-sans animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 w-full max-w-[560px] shadow-2xl rounded-lg overflow-hidden flex flex-col max-h-[90vh]">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 bg-neutral-100 dark:bg-slate-800 border-b border-neutral-200 dark:border-slate-700">
-              <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
-                {assignModalType === "assignedTo" ? "Assigned To" : "Primary Recruiter"}
-              </h3>
-              <button onClick={() => setAssignModalJob(null)} className="text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-250 font-bold text-lg select-none">×</button>
+            <div className="flex items-center justify-between px-5 py-3.5 bg-neutral-50 dark:bg-slate-800/80 border-b border-neutral-200 dark:border-slate-700/80">
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center h-5 w-5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                    <User className="h-3 w-3" />
+                  </span>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Job Assignment
+                  </h3>
+                </div>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 truncate max-w-[440px]">
+                  {assignModalJob.jobCode} • {assignModalJob.jobTitle}
+                  {assignModalTargetBranch?.name ? ` (${assignModalTargetBranch.name})` : ""}
+                </p>
+              </div>
+              <button
+                onClick={() => setAssignModalJob(null)}
+                className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 rounded-md hover:bg-neutral-200/50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                <XCircle className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Currently Selected Badge banner */}
+            <div className="px-5 py-2.5 bg-neutral-100/70 dark:bg-slate-800/40 border-b border-neutral-200/70 dark:border-slate-700/60 flex items-center justify-between gap-2 text-xs">
+              <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                Current Selection:
+              </span>
+              <div className="truncate text-right">
+                {(() => {
+                  if (assignModalSelectedId === "all") {
+                    return (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-200/80 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700">
+                        <Users className="h-3 w-3 text-slate-600 dark:text-slate-400" />
+                        All recruiters
+                      </span>
+                    );
+                  }
+                  if (assignModalSelectedId === "none") {
+                    return (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-200/70 text-neutral-700 dark:bg-slate-800 dark:text-neutral-300 border border-neutral-300 dark:border-slate-700 italic">
+                        Unassigned Allocation
+                      </span>
+                    );
+                  }
+                  if (assignModalSelectedId.startsWith("pod:")) {
+                    const pid = assignModalSelectedId.replace("pod:", "");
+                    const pod = targetBranchPods.find((p: any) => p.id === pid);
+                    return (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-200/80 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700">
+                        <Users className="h-3 w-3 text-slate-600 dark:text-slate-400" />
+                        Pod: {pod?.name || "Recruitment Pod"}
+                      </span>
+                    );
+                  }
+                  if (assignModalSelectedId.startsWith("rec:")) {
+                    const rid = assignModalSelectedId.replace("rec:", "");
+                    const rec = targetRecruitersList.find((u: any) => u.id === rid);
+                    const role = rec ? getUserRoleLabel(rec, assignModalTargetBranch?.id) : "";
+                    return (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-200/80 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700">
+                        <User className="h-3 w-3 text-slate-600 dark:text-slate-400" />
+                        {rec?.fullName || rec?.name || "Recruiter"} {role ? `[${role}]` : ""}
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="text-[11px] text-neutral-400 italic">None selected</span>
+                  );
+                })()}
+              </div>
             </div>
 
             {/* Content Body */}
-            <div className="p-4 space-y-4 text-xs">
-              <div className="grid grid-cols-12 border border-neutral-200 dark:border-slate-800 rounded min-h-[260px] max-h-[300px]">
-                {/* Left Tabs/Sidebar - 3 cols */}
-                <div className="col-span-3 border-r border-neutral-200 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-950/20 p-2 flex flex-col gap-1 select-none">
+            <div className="p-5 space-y-4 text-xs overflow-y-auto flex-1">
+              {/* Search Bar */}
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  placeholder="Search staff, role, email, or pod..."
+                  value={assignModalSearch}
+                  onChange={(e) => setAssignModalSearch(e.target.value)}
+                  className="w-full h-8 bg-neutral-50 dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded-md pl-8 pr-3 text-xs text-neutral-900 dark:text-neutral-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30"
+                  autoFocus
+                />
+                <Search className="absolute left-2.5 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
+                {assignModalSearch && (
                   <button
-                    onClick={() => setAssignActiveTab("users")}
-                    className={cn(
-                      "text-left px-2 py-1.5 rounded-sm font-semibold transition-colors cursor-pointer text-[11px]",
-                      assignActiveTab === "users"
-                        ? "text-blue-600 bg-blue-50/60 dark:text-blue-400 dark:bg-blue-950/20"
-                        : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-slate-850"
-                    )}
+                    onClick={() => setAssignModalSearch("")}
+                    className="absolute right-2 text-neutral-400 hover:text-neutral-600 text-xs font-bold cursor-pointer"
                   >
-                    All Users
+                    ×
                   </button>
-                  <button
-                    onClick={() => setAssignActiveTab("teams")}
-                    className={cn(
-                      "text-left px-2 py-1.5 rounded-sm font-semibold transition-colors cursor-pointer text-[11px]",
-                      assignActiveTab === "teams"
-                        ? "text-blue-600 bg-blue-50/60 dark:text-blue-400 dark:bg-blue-950/20"
-                        : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-slate-850"
-                    )}
-                  >
-                    Teams
-                  </button>
-                </div>
-
-                {/* Center Selection Pane - 5 cols */}
-                <div className="col-span-5 border-r border-neutral-200 dark:border-slate-800 p-2.5 flex flex-col min-h-0">
-                  {/* Search Input */}
-                  <div className="relative mb-2 shrink-0">
-                    <input
-                      type="text"
-                      placeholder="Search"
-                      value={assignModalSearch}
-                      onChange={(e) => setAssignModalSearch(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs outline-hidden text-neutral-850 dark:text-neutral-150 focus:border-primary placeholder:text-neutral-400"
-                    />
-                  </div>
-
-                  {/* Options List */}
-                  <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                    {assignActiveTab === "users" ? (
-                      (() => {
-                        const currentUser = atsApi.auth.getCurrentUser();
-                        const isSuperAdmin = currentUser?.roles?.includes("SUPER_ADMIN");
-                        const isTenantAdmin = isSuperAdmin || currentUser?.roles?.includes("ADMIN") || currentUser?.permissions?.includes("tenant:settings");
-                        const isBranchAdmin = 
-                          currentUser?.roles?.includes("BRANCH_ADMIN") || 
-                          currentUser?.permissions?.includes("branch_admin:manage") ||
-                          (assignModalJob?.branchId && (currentUser as any)?.branchRoles?.[assignModalJob.branchId]?.some((r: string) => ['ADMIN', 'BRANCH_ADMIN'].includes(r)));
-
-                        const hasDelegatedPermission = 
-                          currentUser?.permissions?.includes("job:assign") ||
-                          currentUser?.permissions?.includes("job:assign_recruiter") ||
-                          currentUser?.permissions?.includes("job:assign_pod") ||
-                          currentUser?.permissions?.includes("job:edit") ||
-                          currentUser?.permissions?.includes("pod:edit") ||
-                          currentUser?.permissions?.includes("pod:overlap") ||
-                          currentUser?.roles?.includes("DELIVERY_HEAD");
-
-                        const isPodLead = currentUser?.systemRole === "POD_LEAD" || currentUser?.roles?.includes("POD_LEAD");
-                        const hasBypass = isTenantAdmin || isBranchAdmin || hasDelegatedPermission;
-                        
-                        let listToShow = usersList;
-                        if (!hasBypass && isPodLead && currentUser?.podId) {
-                          listToShow = usersList.filter((u) => u.podId === currentUser.podId);
-                        } else if (isBranchAdmin && !isTenantAdmin && assignModalJob?.branchId) {
-                          listToShow = usersList.filter((u) => u.branchId === assignModalJob.branchId || (u as any).assignedBranchIds?.includes(assignModalJob.branchId));
-                        }
-
-                        return (
-                          <>
-                            {/* Select All Users Option */}
-                            {assignModalType !== "primaryRecruiter" && (
-                              <label className="flex items-center gap-2 px-1.5 py-1 hover:bg-neutral-50 dark:hover:bg-slate-800/50 rounded cursor-pointer select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    listToShow.length > 0 &&
-                                    listToShow.every((u) => assignModalSelected.includes(u.fullName))
-                                  }
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setAssignModalSelected(listToShow.map((u) => u.fullName));
-                                    } else {
-                                      setAssignModalSelected([]);
-                                    }
-                                  }}
-                                  className="h-3 w-3 accent-primary rounded-xs cursor-pointer"
-                                />
-                                <span className="font-bold text-neutral-850 dark:text-neutral-200">Select Users</span>
-                              </label>
-                            )}
-
-                            {/* List of Users */}
-                            {listToShow
-                              .filter((u) =>
-                                u.fullName.toLowerCase().includes(assignModalSearch.toLowerCase()) ||
-                                u.email.toLowerCase().includes(assignModalSearch.toLowerCase())
-                              )
-                              .map((u) => {
-                                const isChecked = assignModalSelected.includes(u.fullName);
-                                return (
-                                  <label
-                                    key={u.id}
-                                    className="flex items-center gap-2 px-1.5 py-0.5 hover:bg-neutral-50 dark:hover:bg-slate-800/50 rounded cursor-pointer select-none text-neutral-700 dark:text-neutral-300"
-                                  >
-                                    <input
-                                      type={assignModalType === "primaryRecruiter" ? "radio" : "checkbox"}
-                                      checked={isChecked}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          if (assignModalType === "primaryRecruiter") {
-                                            setAssignModalSelected([u.fullName]);
-                                          } else {
-                                            setAssignModalSelected((prev) => [...prev, u.fullName]);
-                                          }
-                                        } else {
-                                          setAssignModalSelected((prev) => prev.filter((name) => name !== u.fullName));
-                                        }
-                                      }}
-                                      className="h-3 w-3 accent-primary rounded-xs cursor-pointer"
-                                    />
-                                    <span className="truncate">{u.fullName} <span className="text-[9.5px] text-neutral-400 dark:text-neutral-500 font-medium">({u.email})</span></span>
-                                  </label>
-                                );
-                              })}
-                          </>
-                        );
-                      })()
-                    ) : (
-                      <>
-                        {/* Select All Teams Option */}
-                        <label className="flex items-center gap-2 px-1.5 py-1 hover:bg-neutral-50 dark:hover:bg-slate-800/50 rounded cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={
-                              mockTeams.every((t) => assignModalSelected.includes(t))
-                            }
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setAssignModalSelected(mockTeams);
-                              } else {
-                                setAssignModalSelected([]);
-                              }
-                            }}
-                            className="h-3 w-3 accent-primary rounded-xs cursor-pointer"
-                          />
-                          <span className="font-bold text-neutral-850 dark:text-neutral-200">Select Teams</span>
-                        </label>
-
-                        {/* List of Teams */}
-                        {mockTeams
-                          .filter((t) => t.toLowerCase().includes(assignModalSearch.toLowerCase()))
-                          .map((teamName) => {
-                            const isChecked = assignModalSelected.includes(teamName);
-                            return (
-                              <label
-                                key={teamName}
-                                className="flex items-center gap-2 px-1.5 py-1 hover:bg-neutral-50 dark:hover:bg-slate-800/50 rounded cursor-pointer select-none text-neutral-700 dark:text-neutral-300"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setAssignModalSelected((prev) => [...prev, teamName]);
-                                    } else {
-                                      setAssignModalSelected((prev) => prev.filter((name) => name !== teamName));
-                                    }
-                                  }}
-                                  className="h-3 w-3 accent-primary rounded-xs cursor-pointer"
-                                />
-                                <span>{teamName}</span>
-                              </label>
-                            );
-                          })}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Pane (Selected Users) - 4 cols */}
-                <div className="col-span-4 p-2.5 flex flex-col min-h-0 bg-neutral-50/20 dark:bg-slate-905/30 border-l border-neutral-200 dark:border-slate-800">
-                  <h4 className="font-bold text-neutral-805 dark:text-neutral-200 mb-1.5 border-b border-neutral-200 dark:border-slate-800 pb-1 uppercase tracking-wider text-[9.5px]">
-                    Selected {assignActiveTab === "users" ? "Users" : "Teams"}
-                  </h4>
-                  <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                    {assignModalSelected.map((name) => (
-                      <div
-                        key={name}
-                        className="flex items-center justify-between bg-neutral-100 dark:bg-slate-800 text-neutral-800 dark:text-neutral-250 px-2 py-0.5 rounded-xs text-[10px] border border-neutral-200/50 dark:border-slate-700/50"
-                      >
-                        <span className="truncate pr-1 font-medium">{name}</span>
-                        <button
-                          onClick={() => setAssignModalSelected((prev) => prev.filter((x) => x !== name))}
-                          className="text-neutral-500 hover:text-red-500 font-bold text-sm cursor-pointer select-none px-1"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                    {assignModalSelected.length === 0 && (
-                      <span className="text-[10px] text-neutral-400 italic">None selected</span>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
 
-              {/* Bottom Comment Area */}
-              <div className="grid grid-cols-12 items-start gap-3">
-                <span className="col-span-2 text-neutral-600 dark:text-neutral-400 font-semibold pt-1 text-right">Comment</span>
+              {/* Options Sections List */}
+              <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+                {/* 1. Assign to */}
+                {showPoolSection && (
+                  <div className="space-y-1.5">
+                    <div className="px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 bg-neutral-100/70 dark:bg-slate-800/50 rounded flex items-center justify-between">
+                      <span>Assign to</span>
+                      <span className="text-[9.5px] font-normal text-neutral-400">Branch Wide</span>
+                    </div>
+
+                    {/* All Branch Recruiters */}
+                    {(branchAllowsAllBroadcast || !hasAnyAssignmentEnabled) && (
+                      <div
+                        onClick={() => setAssignModalSelectedId("all")}
+                        className={cn(
+                          "px-3 py-2.5 rounded-md cursor-pointer border transition-all flex items-center justify-between gap-3 text-xs",
+                          assignModalSelectedId === "all"
+                            ? "bg-slate-100 dark:bg-slate-800/80 border-slate-400 dark:border-slate-600 text-slate-900 dark:text-slate-100 shadow-2xs"
+                            : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-800 hover:bg-neutral-50 dark:hover:bg-slate-800/60 text-neutral-800 dark:text-neutral-200"
+                        )}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className={cn(
+                            "flex items-center justify-center h-6 w-6 rounded-md shrink-0",
+                            assignModalSelectedId === "all"
+                              ? "bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200"
+                              : "bg-neutral-100 dark:bg-slate-800 text-neutral-500"
+                          )}>
+                            <Users className="h-3.5 w-3.5" />
+                          </span>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-xs text-neutral-900 dark:text-white">
+                              All recruiters
+                            </span>
+                            <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                              All recruiters in {assignModalTargetBranch?.name || "this branch"} can work on this job
+                            </span>
+                          </div>
+                        </div>
+                        {assignModalSelectedId === "all" && (
+                          <Check className="h-4 w-4 text-slate-800 dark:text-slate-200 shrink-0" />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Unassigned Allocation */}
+                    {(branchAllowsUnassigned || !hasAnyAssignmentEnabled) && (
+                      <div
+                        onClick={() => setAssignModalSelectedId("none")}
+                        className={cn(
+                          "px-3 py-2.5 rounded-md cursor-pointer border transition-all flex items-center justify-between gap-3 text-xs",
+                          assignModalSelectedId === "none"
+                            ? "bg-neutral-100 dark:bg-slate-800 border-neutral-400 dark:border-slate-600 text-neutral-900 dark:text-neutral-100"
+                            : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-800 hover:bg-neutral-50 dark:hover:bg-slate-800/60 text-neutral-800 dark:text-neutral-200"
+                        )}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className={cn(
+                            "flex items-center justify-center h-6 w-6 rounded-md shrink-0",
+                            assignModalSelectedId === "none"
+                              ? "bg-neutral-200 dark:bg-slate-700 text-neutral-700 dark:text-neutral-300"
+                              : "bg-neutral-100 dark:bg-slate-800 text-neutral-500"
+                          )}>
+                            <UserX className="h-3.5 w-3.5" />
+                          </span>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-xs text-neutral-900 dark:text-white">
+                              Unassigned Allocation (Hold for Manager Assignment)
+                            </span>
+                            <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                              Keep on hold without notifying recruiters until manually assigned
+                            </span>
+                          </div>
+                        </div>
+                        {assignModalSelectedId === "none" && (
+                          <Check className="h-4 w-4 text-neutral-800 dark:text-neutral-200 shrink-0" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 2. Recruitment Pods */}
+                {showPodsSection && targetBranchPods.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 bg-neutral-100/70 dark:bg-slate-800/50 rounded flex items-center justify-between">
+                      <span>Recruitment Pods</span>
+                      <span className="text-[9.5px] font-normal text-neutral-400">{targetBranchPods.length} Pods</span>
+                    </div>
+                    {targetBranchPods
+                      .filter((pod: any) => {
+                        if (!assignModalSearch.trim()) return true;
+                        const q = assignModalSearch.toLowerCase();
+                        return (
+                          (pod.name || "").toLowerCase().includes(q) ||
+                          (pod.podHeadName || "").toLowerCase().includes(q)
+                        );
+                      })
+                      .map((pod: any) => {
+                        const isSelected = assignModalSelectedId === `pod:${pod.id}`;
+                        return (
+                          <div
+                            key={`pod:${pod.id}`}
+                            onClick={() => setAssignModalSelectedId(`pod:${pod.id}`)}
+                            className={cn(
+                              "px-3 py-2 rounded-md cursor-pointer border transition-all flex items-center justify-between gap-3 text-xs",
+                              isSelected
+                                ? "bg-slate-100 dark:bg-slate-800/80 border-slate-400 dark:border-slate-600 text-slate-900 dark:text-slate-100 shadow-2xs"
+                                : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-800 hover:bg-neutral-50 dark:hover:bg-slate-800/60"
+                            )}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className={cn(
+                                "flex items-center justify-center h-6 w-6 rounded-md shrink-0",
+                                isSelected
+                                  ? "bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200"
+                                  : "bg-neutral-100 dark:bg-slate-800 text-neutral-500"
+                              )}>
+                                <Users className="h-3.5 w-3.5" />
+                              </span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-neutral-900 dark:text-white">
+                                  Pod: {pod.name}
+                                </span>
+                                {pod.podHeadName && (
+                                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-400">
+                                    Lead: {pod.podHeadName}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <Check className="h-4 w-4 text-slate-800 dark:text-slate-200 shrink-0" />
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* 3. Direct Staff Assignment */}
+                {showStaffSection && targetRecruitersList.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 bg-neutral-100/70 dark:bg-slate-800/50 rounded flex items-center justify-between">
+                      <span>Direct Staff Assignment</span>
+                      <span className="text-[9.5px] font-normal text-neutral-400">{targetRecruitersList.length} Members</span>
+                    </div>
+                    {targetRecruitersList
+                      .filter((rec: any) => {
+                        if (!assignModalSearch.trim()) return true;
+                        const q = assignModalSearch.toLowerCase();
+                        const name = (rec.fullName || rec.name || "").toLowerCase();
+                        const email = (rec.email || "").toLowerCase();
+                        const role = getUserRoleLabel(rec, assignModalTargetBranch?.id).toLowerCase();
+                        return name.includes(q) || email.includes(q) || role.includes(q);
+                      })
+                      .map((rec: any) => {
+                        const name = rec.fullName || rec.name || "User";
+                        const roleLabel = getUserRoleLabel(rec, assignModalTargetBranch?.id);
+                        const isSelected = assignModalSelectedId === `rec:${rec.id}`;
+                        return (
+                          <div
+                            key={`rec:${rec.id}`}
+                            onClick={() => setAssignModalSelectedId(`rec:${rec.id}`)}
+                            className={cn(
+                              "px-3 py-2 rounded-md cursor-pointer border transition-all flex items-center justify-between gap-3 text-xs",
+                              isSelected
+                                ? "bg-slate-100 dark:bg-slate-800/80 border-slate-400 dark:border-slate-600 text-slate-900 dark:text-slate-100 shadow-2xs"
+                                : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-800 hover:bg-neutral-50 dark:hover:bg-slate-800/60"
+                            )}
+                          >
+                            <div className="flex flex-col text-left min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-semibold text-neutral-900 dark:text-white truncate">
+                                  {name}
+                                </span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium border border-slate-200 dark:border-slate-700">
+                                  [{roleLabel}]
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal mt-0.5 truncate">
+                                {rec.email}
+                              </span>
+                            </div>
+                            {isSelected && (
+                              <Check className="h-4 w-4 text-slate-800 dark:text-slate-200 shrink-0" />
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Comment Input */}
+              <div className="pt-2 border-t border-neutral-200 dark:border-slate-800">
+                <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 mb-1 block">
+                  Assignment Note / Comment (Optional)
+                </label>
                 <textarea
-                  placeholder="Comment"
+                  placeholder="Add an internal note or reason for assignment change..."
                   value={assignModalComment}
                   onChange={(e) => setAssignModalComment(e.target.value)}
-                  className="col-span-10 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden text-neutral-850 dark:text-neutral-200 focus:border-primary h-12 text-xs resize-none"
+                  className="w-full bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 outline-none focus:border-indigo-500 h-14 resize-none"
                 />
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-2 px-4 py-2 bg-neutral-50 dark:bg-slate-900 border-t border-neutral-200 dark:border-slate-800 text-xs">
-              <Button
-                size="sm"
-                onClick={handleAssignSave}
-                className="h-8 bg-blue-600 hover:bg-blue-755 text-white font-bold cursor-pointer rounded-sm"
-              >
-                Save
-              </Button>
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-end gap-2.5 px-5 py-3 bg-neutral-50 dark:bg-slate-800/80 border-t border-neutral-200 dark:border-slate-700">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setAssignModalJob(null)}
-                className="h-8 border border-neutral-300 dark:border-slate-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-slate-800 font-bold cursor-pointer rounded-sm"
+                className="h-8 px-4 text-xs font-semibold cursor-pointer"
               >
                 Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleAssignSave}
+                className="h-8 px-5 bg-primary text-white text-xs font-bold shadow-xs hover:bg-primary/90 cursor-pointer"
+              >
+                Save Assignment
               </Button>
             </div>
           </div>

@@ -278,11 +278,53 @@ export default function AdminNotificationsPage() {
             Job Approved
           </span>
         );
+      case "SUBMISSION_APPROVED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+            <CheckCircle2 className="w-3 h-3" />
+            Submission Approved
+          </span>
+        );
       case "JOB_REJECTED":
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
             <XCircle className="w-3 h-3" />
             Job Rejected
+          </span>
+        );
+      case "SUBMISSION_REJECTED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300">
+            <XCircle className="w-3 h-3" />
+            Submission Rejected
+          </span>
+        );
+      case "SUBMISSION_PENDING_APPROVAL":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+            <Briefcase className="w-3 h-3" />
+            Pending Review
+          </span>
+        );
+      case "INTERVIEW_SCHEDULED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300">
+            <Clock className="w-3 h-3" />
+            Interview Scheduled
+          </span>
+        );
+      case "SUBMISSION_OFFER":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300">
+            <UserCheck className="w-3 h-3" />
+            Offer Extended
+          </span>
+        );
+      case "SUBMISSION_PLACED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+            <CheckCircle2 className="w-3 h-3" />
+            Placed / Joined
           </span>
         );
       case "JOB_NEW":

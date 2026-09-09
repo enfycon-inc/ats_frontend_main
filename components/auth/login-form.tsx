@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { Loader2, Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
 import { getCurrentSubdomain, getBaseDomain, getTenantIdentifier } from "@/utils/subdomain-helper";
@@ -97,7 +97,8 @@ const LoginForm = () => {
           if (typeof window !== "undefined") {
             localStorage.setItem("ats_access_token", ssoToken);
           }
-          window.location.href = "/dashboard";
+          const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+          window.location.href = callbackUrl;
         } else {
           setIsAuthorizingSso(false);
           toast.error("Session verification expired. Please sign in.");
@@ -106,6 +107,44 @@ const LoginForm = () => {
         setIsAuthorizingSso(false);
         toast.error("SSO handoff failed.");
       });
+    } else if (!isExpired && !errorParam) {
+      // If user lands on login page while already authenticated, redirect them appropriately
+      fetch("/api/auth/session", { cache: "no-store" })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((session) => {
+          if (session?.user && (session as any).error !== "RefreshAccessTokenError") {
+            const user = session.user as any;
+            const isSuperAdmin = user.roles?.includes("SUPER_ADMIN") || user.systemRole === "SUPER_ADMIN";
+            const rawUserSub = user.tenantDomain || "";
+            const userSub = rawUserSub.split(".")[0].toLowerCase().trim();
+            const isMasterTenant = !userSub || userSub === "enfy" || userSub === "www" || userSub === "localhost";
+
+            const currentSub = getCurrentSubdomain();
+            const base = getBaseDomain();
+            const protocol = window.location.protocol;
+
+            if (isSuperAdmin) {
+              if (currentSub) {
+                window.location.replace(`${protocol}//${base}/dashboard`);
+              } else {
+                window.location.replace("/dashboard");
+              }
+            } else if (userSub && !isMasterTenant) {
+              if (currentSub === userSub) {
+                // User is already on their respective tenant subdomain (e.g. deb.localhost:3000)
+                window.location.replace("/dashboard");
+              } else if (!currentSub) {
+                // User is on root domain (localhost:3000) with a residual tenant session.
+                // Purge the root session so they are not treated as logged in on the main domain.
+                // Do NOT redirect to another subdomain — stay on localhost!
+                signOut({ redirect: false });
+              }
+            } else if (isMasterTenant && !currentSub) {
+              window.location.replace("/dashboard");
+            }
+          }
+        })
+        .catch(() => {});
     }
   }, [searchParams, setValue]);
 
@@ -121,7 +160,49 @@ const LoginForm = () => {
           return;
         }
 
-        // 2. Establish NextAuth session via fast token-handoff
+        // Subdomain & Tenant redirection logic
+        const isSuperAdmin = syncRes?.user?.roles?.includes("SUPER_ADMIN") || (syncRes?.user as any)?.systemRole === "SUPER_ADMIN";
+        const rawTenantDomain = syncRes?.user?.tenantDomain || "";
+        const userTenantDomain = rawTenantDomain.split(".")[0].toLowerCase().trim();
+        const currentSubdomain = getCurrentSubdomain();
+        const base = getBaseDomain();
+        const protocol = window.location.protocol;
+        const isMasterTenant = !userTenantDomain || userTenantDomain === "enfy" || userTenantDomain === "www" || userTenantDomain === "localhost";
+
+        if (isSuperAdmin) {
+          // Super Admin always operates on root domain
+          const signInRes = await signIn("token-handoff", {
+            redirect: false,
+            token: syncRes.accessToken,
+            userJson: JSON.stringify(syncRes.user),
+            callbackUrl: "/dashboard",
+          });
+
+          if (signInRes?.error) {
+            toast.error("Sign in failed. Please check credentials.");
+            return;
+          }
+
+          toast.success("Successfully logged in");
+          if (currentSubdomain) {
+            window.location.href = `${protocol}//${base}/dashboard`;
+          } else {
+            window.location.href = "/dashboard";
+          }
+          return;
+        }
+
+        if (userTenantDomain && !isMasterTenant && currentSubdomain !== userTenantDomain) {
+          // Tenant member logging in from root domain or different subdomain:
+          // Do NOT establish a NextAuth session on root domain (avoids ghost root sessions).
+          // Immediately redirect to tenant subdomain with SSO handoff token!
+          toast.success("Redirecting to your workspace...");
+          const tokenParam = syncRes?.accessToken ? `?sso_token=${encodeURIComponent(syncRes.accessToken)}` : "";
+          window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login${tokenParam}`;
+          return;
+        }
+
+        // User logging in directly on their tenant subdomain (or master tenant on root)
         const signInRes = await signIn("token-handoff", {
           redirect: false,
           token: syncRes.accessToken,
@@ -136,32 +217,7 @@ const LoginForm = () => {
 
         toast.success("Successfully logged in");
 
-        // Redirection logic
-        const isSuperAdmin = syncRes?.user?.roles?.includes("SUPER_ADMIN") || (syncRes?.user as any)?.systemRole === "SUPER_ADMIN";
-        const userTenantDomain = syncRes?.user?.tenantDomain;
-        const currentSubdomain = getCurrentSubdomain();
-        const base = getBaseDomain();
-        const protocol = window.location.protocol;
-
-        if (isSuperAdmin) {
-          // Super Admin always stays on root domain (enfyjobs.com/dashboard)
-          if (currentSubdomain) {
-            window.location.href = `${protocol}//${base}/dashboard`;
-          } else {
-            window.location.href = "/dashboard";
-          }
-        } else if (userTenantDomain && userTenantDomain !== "enfy" && userTenantDomain !== "www" && currentSubdomain !== userTenantDomain) {
-          // Only redirect to tenant subdomain if currently logging in from the root domain (enfyjobs.com / localhost)
-          const isRootHost = window.location.hostname === "enfyjobs.com" || window.location.hostname === "www.enfyjobs.com" || window.location.hostname === "localhost";
-          if (isRootHost) {
-            const tokenParam = syncRes?.accessToken ? `?sso_token=${encodeURIComponent(syncRes.accessToken)}` : "";
-            window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login${tokenParam}`;
-          } else {
-            // Already on custom domain (e.g. ats.golgrab.com) -> proceed straight to /dashboard
-            window.location.href = "/dashboard";
-          }
-        } else if (currentSubdomain === "enfy") {
-          // Master tenant user on enfy.localhost -> redirect to root /dashboard
+        if (currentSubdomain === "enfy" && isMasterTenant) {
           window.location.href = `${protocol}//${base}/dashboard`;
         } else {
           window.location.href = "/dashboard";
@@ -292,8 +348,10 @@ const LoginForm = () => {
       {/* Social Login Options */}
       <div className="pt-3">
         <div className="relative flex items-center justify-center mb-4">
-          <div className="border-t border-slate-200 w-full" />
-          <span className="bg-white px-3 text-xs uppercase font-semibold text-slate-400">
+          <div className="absolute inset-0 flex items-center">
+            <div className="border-t border-slate-200 w-full" />
+          </div>
+          <span className="relative bg-white px-3 text-xs uppercase font-semibold text-slate-400">
             Or Sign In With
           </span>
         </div>

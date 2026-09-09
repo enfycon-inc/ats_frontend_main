@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { 
   Building2, MapPin, Plus, Edit2, Users, CheckCircle2, XCircle, 
-  Search, ShieldAlert, Sparkles, X, Globe, UserPlus, Briefcase, Crown, Shield,
-  GitFork, ChevronRight, ChevronDown, Layers, Rocket, ArrowRight, MessageSquare, ListChecks, Trash2,
+  Search, ShieldAlert, X, Globe, UserPlus, Briefcase, Crown, Shield,
+  GitFork, ChevronRight, ChevronDown, Layers, ArrowRight, MessageSquare, ListChecks, Trash2,
   Clock, Calendar, Sun, Moon, Check, Loader2, Table as TableIcon, Mail
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -184,6 +184,17 @@ export default function BranchManagementPage() {
   const [allTenantUsers, setAllTenantUsers] = useState<any[]>([]);
   const [selectedUserToAssign, setSelectedUserToAssign] = useState<string>("");
 
+  // Recruitment Pods state for the branch currently being edited
+  const [branchPods, setBranchPods] = useState<any[]>([]);
+  const [loadingBranchPods, setLoadingBranchPods] = useState(false);
+  const [isQuickCreatePodOpen, setIsQuickCreatePodOpen] = useState(false);
+  const [quickPodName, setQuickPodName] = useState("");
+  const [quickPodHeadId, setQuickPodHeadId] = useState("");
+  const [quickPodRecruiterIds, setQuickPodRecruiterIds] = useState<string[]>([]);
+  const [quickPodDesc, setQuickPodDesc] = useState("");
+  const [isCreatingQuickPod, setIsCreatingQuickPod] = useState(false);
+  const [availableBranchRecruiters, setAvailableBranchRecruiters] = useState<any[]>([]);
+
   // Form states (Blank by default - zero hardcoding)
   const [formData, setFormData] = useState({
     name: "",
@@ -292,7 +303,7 @@ export default function BranchManagementPage() {
         shiftTiming: formData.shiftTiming?.trim() || (formData.market === "US" ? "US Shift" : "General Shift"),
         breakDurationMinutes: formData.breakDurationMinutes,
         allowNone: formData.allowNone,
-        allowPods: formData.allowNone ? false : formData.allowPods,
+        allowPods: (formData.allowNone || branchPods.length === 0) ? false : formData.allowPods,
         allowAll: formData.allowNone ? false : formData.allowAll,
         allowUnassigned: formData.allowNone ? false : formData.allowUnassigned,
         podDistributionStrategy: formData.podDistributionStrategy,
@@ -386,9 +397,12 @@ export default function BranchManagementPage() {
     }
   };
 
-  const openEditModal = (b: any) => {
+  const openEditModal = async (b: any) => {
     setSelectedBranch(b);
     const allowNone = Boolean(b.allowNone);
+    const existingPodsCount = b.podsCount ?? (Array.isArray(b.pods) ? b.pods.length : 0);
+    const initialAllowPods = (allowNone || existingPodsCount === 0) ? false : (b.allowPods !== false);
+
     setFormData({
       name: b.name || "",
       code: b.code || "",
@@ -405,7 +419,7 @@ export default function BranchManagementPage() {
       shiftTiming: b.shiftTiming || (b.market === "US" ? "US Shift" : "General Shift"),
       breakDurationMinutes: b.breakDurationMinutes ?? 60,
       allowNone: allowNone,
-      allowPods: allowNone ? false : b.allowPods !== false,
+      allowPods: initialAllowPods,
       allowAll: allowNone ? false : b.allowAll !== false,
       allowUnassigned: allowNone ? false : b.allowUnassigned !== false,
       podDistributionStrategy: (b.podDistributionStrategy || "AUTO") as "AUTO" | "MANUAL",
@@ -422,6 +436,78 @@ export default function BranchManagementPage() {
     });
     setFormError("");
     setIsEditOpen(true);
+
+    // Fetch live pods for selected branch
+    setLoadingBranchPods(true);
+    setBranchPods([]);
+    try {
+      const podsList = await atsApi.pods.list(b.id);
+      const pods = Array.isArray(podsList) ? podsList : [];
+      setBranchPods(pods);
+      if (pods.length === 0) {
+        setFormData((prev) => ({ ...prev, allowPods: false }));
+      }
+    } catch (err) {
+      console.error("Failed to load branch pods:", err);
+      setBranchPods([]);
+      setFormData((prev) => ({ ...prev, allowPods: false }));
+    } finally {
+      setLoadingBranchPods(false);
+    }
+  };
+
+  const openQuickCreatePod = async () => {
+    if (!selectedBranch) return;
+    setQuickPodName("");
+    setQuickPodHeadId("");
+    setQuickPodRecruiterIds([]);
+    setQuickPodDesc("");
+    setIsQuickCreatePodOpen(true);
+    try {
+      const recruiters = await atsApi.pods.getAvailableRecruiters(selectedBranch.id).catch(() => []);
+      setAvailableBranchRecruiters(recruiters || []);
+    } catch (err) {
+      console.error("Failed to fetch available recruiters:", err);
+      setAvailableBranchRecruiters([]);
+    }
+  };
+
+  const handleQuickCreatePod = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBranch) return;
+    if (!quickPodName.trim()) {
+      toast.error("Pod Name is required.");
+      return;
+    }
+
+    try {
+      setIsCreatingQuickPod(true);
+      await atsApi.pods.create({
+        name: quickPodName.trim(),
+        branchId: selectedBranch.id,
+        podHeadId: quickPodHeadId || undefined,
+        recruiterIds: quickPodRecruiterIds.length > 0 ? quickPodRecruiterIds : undefined,
+        description: quickPodDesc.trim() || undefined,
+      });
+
+      toast.success(`Recruitment Pod "${quickPodName}" created! Pod routing is now enabled.`);
+      setIsQuickCreatePodOpen(false);
+
+      // Refresh pods for branch
+      const podsList = await atsApi.pods.list(selectedBranch.id);
+      const pods = Array.isArray(podsList) ? podsList : [];
+      setBranchPods(pods);
+
+      // Auto-enable allowPods in the edit form!
+      setFormData((prev) => ({ ...prev, allowPods: true }));
+
+      // Refresh hierarchy and branch list in background
+      loadBranchesAndHierarchy();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create pod");
+    } finally {
+      setIsCreatingQuickPod(false);
+    }
   };
 
   const openMembersModal = async (b: any) => {
@@ -461,18 +547,6 @@ export default function BranchManagementPage() {
     setSelectedMember(user);
     setSelectedRoles(Array.isArray(user.roles) ? user.roles : ["RECRUITER"]);
     setIsAssignUserOpen(true);
-  };
-
-  const openCreateWithPreset = (presetMarket: string) => {
-    resetForm();
-    setFormData((prev) => ({
-      ...prev,
-      country: presetMarket === "US" ? "United States" : "India",
-      market: presetMarket,
-      timezone: presetMarket === "US" ? "America/New_York" : "Asia/Kolkata",
-      shiftTiming: presetMarket === "US" ? "US Shift" : "General Shift",
-    }));
-    setIsCreateOpen(true);
   };
 
   const resetForm = () => {
@@ -666,44 +740,6 @@ export default function BranchManagementPage() {
           )}
         </div>
       </div>
-
-      {/* DYNAMIC HERO BANNER WHEN 0 BRANCHES */}
-      {branches.length === 0 && !loading && (
-        <div className="p-6 rounded-xl bg-gradient-to-r from-indigo-900 via-indigo-850 to-slate-900 text-white border border-indigo-700/50 shadow-lg space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1 max-w-2xl">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-400 text-slate-950 flex items-center gap-1 w-fit">
-                <Rocket className="h-3 w-3" /> Initial Workspace Setup
-              </span>
-              <h2 className="text-lg font-bold text-white">
-                Configure Your First Operating Branch Location
-              </h2>
-              <p className="text-xs text-indigo-200 leading-relaxed">
-                Your company workspace currently has no operating branches configured. Establish your primary branch (e.g., Main Office, Regional Hub, or US Staffing Branch) to start assigning recruiters, pods, and jobs.
-              </p>
-            </div>
-          </div>
-
-          {canManageBranches && (
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <Button
-                onClick={() => openCreateWithPreset("INDIA")}
-                className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs h-9 px-4 rounded-lg flex items-center gap-2 shadow cursor-pointer"
-              >
-                <Building2 className="h-4 w-4" /> + Add Domestic India Branch <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                onClick={() => openCreateWithPreset("US")}
-                variant="outline"
-                className="border-indigo-400/50 text-indigo-100 hover:bg-indigo-800/50 font-bold text-xs h-9 px-4 rounded-lg flex items-center gap-2 cursor-pointer"
-              >
-                <Globe className="h-4 w-4" /> + Add US IT Staffing Branch
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* SEARCH TOOLBAR */}
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
@@ -756,7 +792,7 @@ export default function BranchManagementPage() {
                             ? "Try clearing your search query to see all configured branches."
                             : "Create your first operating branch location to manage staff and jobs."}
                         </p>
-                        {!searchQuery && (
+                        {!searchQuery && canManageBranches && (
                           <Button
                             onClick={() => {
                               resetForm();
@@ -764,7 +800,7 @@ export default function BranchManagementPage() {
                             }}
                             className="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
                           >
-                            <Plus className="h-3.5 w-3.5" /> + Add New Branch
+                            <Plus className="h-3.5 w-3.5" /> Add New Branch
                           </Button>
                         )}
                       </div>
@@ -930,8 +966,8 @@ export default function BranchManagementPage() {
             {/* BRANCH NODES CONTAINER */}
             <div className="pl-6 border-l-2 border-neutral-200 dark:border-slate-800 space-y-6 ml-6">
               {filteredBranches.length === 0 ? (
-                <div className="py-6 text-xs text-neutral-450 italic border border-dashed border-neutral-300 dark:border-slate-800 p-4 rounded-lg text-center">
-                  No branches configured under this tenant yet. Click <strong>"+ Add New Branch"</strong> above to create your first operating location.
+                <div className="py-6 text-xs text-neutral-400 italic border border-dashed border-neutral-300 dark:border-slate-800 p-4 rounded-lg text-center">
+                  No branches configured under this tenant yet. Click <strong>"Add New Branch"</strong> above to create your first operating location.
                 </div>
               ) : (
                 filteredBranches.map((b) => {
@@ -1075,8 +1111,34 @@ export default function BranchManagementPage() {
         </Card>
       ) : (
         /* ─── CARDS GRID VIEW ────────────────────────────────────────── */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredBranches.map((b) => (
+        filteredBranches.length === 0 ? (
+          <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-xs rounded-xl p-16 text-center">
+            <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+              <Building2 className="h-10 w-10 text-neutral-300 dark:text-neutral-600" />
+              <p className="font-semibold text-neutral-700 dark:text-neutral-200 text-sm">
+                {searchQuery ? "No matching branches found" : "No branch locations configured"}
+              </p>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                {searchQuery
+                  ? "Try clearing your search query to see all configured branches."
+                  : "Create your first operating branch location to manage staff and jobs."}
+              </p>
+              {!searchQuery && canManageBranches && (
+                <Button
+                  onClick={() => {
+                    resetForm();
+                    setIsCreateOpen(true);
+                  }}
+                  className="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add New Branch
+                </Button>
+              )}
+            </div>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredBranches.map((b) => (
             <Card key={b.id} className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-sm hover:shadow transition-all">
               <CardContent className="p-5 space-y-4">
                 <div className="flex items-start justify-between">
@@ -1191,6 +1253,7 @@ export default function BranchManagementPage() {
             </Card>
           ))}
         </div>
+        )
       )}
 
       {/* CREATE BRANCH MODAL */}
@@ -1671,7 +1734,7 @@ export default function BranchManagementPage() {
                             allowNone: isNone,
                             ...(isNone
                               ? { allowPods: false, allowAll: false, allowUnassigned: false }
-                              : { allowPods: true, allowAll: true, allowUnassigned: true }),
+                              : { allowPods: branchPods.length > 0, allowAll: true, allowUnassigned: true }),
                           });
                         }}
                         className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
@@ -1714,31 +1777,99 @@ export default function BranchManagementPage() {
                       </div>
                     </label>
 
-                    {/* Option 2: Pod System (with sub-strategy) */}
+                    {/* Option 2: Pod System (with sub-strategy & 0-pod gating) */}
                     <div className={`space-y-2.5 p-3 rounded-xl border text-xs transition-all ${
                       formData.allowNone
                         ? "opacity-40 pointer-events-none bg-neutral-100 dark:bg-slate-900 border-neutral-200"
+                        : branchPods.length === 0
+                        ? "bg-amber-50/25 dark:bg-amber-950/15 border-amber-200/80 dark:border-amber-900/40"
                         : "bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750"
                     }`}>
-                      <label className={`flex items-start gap-2.5 ${formData.allowNone ? "cursor-not-allowed" : "cursor-pointer"}`}>
-                        <input
-                          type="checkbox"
-                          checked={formData.allowPods}
-                          disabled={formData.allowNone}
-                          onChange={(e) => setFormData({ ...formData, allowPods: e.target.checked })}
-                          className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-neutral-900 dark:text-white">2. Recruitment Pod System</span>
+                      <div className="flex items-start justify-between gap-2">
+                        <label 
+                          className={`flex items-start gap-2.5 flex-1 ${
+                            formData.allowNone 
+                              ? "cursor-not-allowed" 
+                              : branchPods.length === 0 
+                              ? "cursor-pointer" 
+                              : "cursor-pointer"
+                          }`}
+                          onClick={(e) => {
+                            if (branchPods.length === 0 && !formData.allowNone) {
+                              e.preventDefault();
+                              toast.error("No pods created for this branch. Create a pod first!");
+                              openQuickCreatePod();
+                            }
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={Boolean(formData.allowPods && branchPods.length > 0)}
+                            disabled={formData.allowNone || branchPods.length === 0}
+                            onChange={(e) => {
+                              if (branchPods.length === 0) {
+                                toast.error("No pods created for this branch. Create a pod first!");
+                                openQuickCreatePod();
+                                return;
+                              }
+                              setFormData({ ...formData, allowPods: e.target.checked });
+                            }}
+                            className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-neutral-900 dark:text-white">2. Recruitment Pod System</span>
+                              {loadingBranchPods ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-neutral-400">
+                                  <Loader2 className="h-3 w-3 animate-spin" /> Checking pods...
+                                </span>
+                              ) : branchPods.length === 0 ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800/80">
+                                  0 Pods Available
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-800/80">
+                                  {branchPods.length} {branchPods.length === 1 ? "Pod" : "Pods"} Available
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                              Allow selecting and routing jobs to recruitment pods.
+                            </p>
                           </div>
-                          <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
-                            Allow selecting and routing jobs to recruitment pods.
-                          </p>
-                        </div>
-                      </label>
+                        </label>
+                      </div>
 
-                      {formData.allowPods && !formData.allowNone && (
+                      {/* When NO pods exist for this branch: Show "Create Pod First" banner and action */}
+                      {branchPods.length === 0 && !loadingBranchPods && (
+                        <div className="mt-1.5 p-3 rounded-lg bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/90 dark:border-amber-800/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                          <div className="flex items-start gap-2">
+                            <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                            <div className="space-y-0.5">
+                              <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                                Create Pod First
+                              </p>
+                              <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-tight">
+                                This branch has no recruitment pods. Create a pod first to enable pod-based routing.
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openQuickCreatePod();
+                            }}
+                            className="h-7 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-md flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                          >
+                            <Plus className="h-3.5 w-3.5" /> Create Pod First
+                          </Button>
+                        </div>
+                      )}
+
+                      {formData.allowPods && branchPods.length > 0 && !formData.allowNone && (
                         <div className="ml-5 pl-3 border-l-2 border-indigo-200 dark:border-indigo-800 space-y-1.5 pt-1">
                           <span className="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 block">Pod Strategy:</span>
                           <div className="grid grid-cols-2 gap-2 text-[10.5px]">
@@ -2773,6 +2904,192 @@ export default function BranchManagementPage() {
               </Button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ── QUICK CREATE POD MODAL (Allows creating a pod on the spot to unblock Pod Routing) ── */}
+      {isQuickCreatePodOpen && selectedBranch && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden my-auto animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-200/80 dark:border-slate-800 bg-neutral-50/80 dark:bg-slate-850">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                  <Layers className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Create Recruitment Pod
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    Enable pod routing for <span className="font-semibold text-neutral-700 dark:text-neutral-200">{selectedBranch.name}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsQuickCreatePodOpen(false)}
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickCreatePod} className="p-6 space-y-4">
+              {/* Branch Scope Banner */}
+              <div className="p-3 rounded-xl bg-neutral-100/70 dark:bg-slate-800/60 border border-neutral-200 dark:border-slate-700/80 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-neutral-600 dark:text-neutral-300 shrink-0" />
+                  <div>
+                    <span className="font-bold text-neutral-900 dark:text-white block">{selectedBranch.name}</span>
+                    <span className="text-[10.5px] text-neutral-500 font-mono">
+                      {selectedBranch.city || "Branch Location"} • {selectedBranch.market === "US" ? "US IT Market" : "Domestic India"}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  Branch Isolated
+                </span>
+              </div>
+
+              {/* Pod Name Field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                  Pod Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={quickPodName}
+                  onChange={(e) => setQuickPodName(e.target.value)}
+                  placeholder="e.g. IT Sourcing Pod Alpha"
+                  className="h-9 text-xs rounded-lg border-neutral-300 dark:border-slate-700 font-semibold bg-white dark:bg-slate-900"
+                  required
+                  autoFocus
+                />
+                <p className="text-[10.5px] text-neutral-400">
+                  Descriptive pod label visible during job routing and candidate submission workflows.
+                </p>
+              </div>
+
+              {/* Pod Head / Lead Field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                  Designated Pod Head (Optional)
+                </label>
+                <select
+                  value={quickPodHeadId}
+                  onChange={(e) => setQuickPodHeadId(e.target.value)}
+                  className="w-full h-9 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 font-medium text-neutral-900 dark:text-white cursor-pointer"
+                >
+                  <option value="">Unassigned (Select Pod Head Later)</option>
+                  {availableBranchRecruiters.map((u: any) => (
+                    <option key={u.id} value={u.id}>
+                      {u.fullName || u.email} — {u.roleName || u.systemRole}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10.5px] text-neutral-400">
+                  Pod Heads oversee job distribution and review internal submissions.
+                </p>
+              </div>
+
+              {/* Assigned Recruiters Multi-select */}
+              {availableBranchRecruiters.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                      Assign Branch Recruiters ({quickPodRecruiterIds.length} selected)
+                    </label>
+                    <span className="text-[10px] text-neutral-400">Optional</span>
+                  </div>
+                  <div className="p-2.5 max-h-36 overflow-y-auto rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50/50 dark:bg-slate-900/50 space-y-1.5">
+                    {availableBranchRecruiters.map((rec: any) => {
+                      const isChecked = quickPodRecruiterIds.includes(rec.id);
+                      return (
+                        <label
+                          key={rec.id}
+                          className="flex items-center gap-2 p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-slate-800 cursor-pointer text-xs transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setQuickPodRecruiterIds([...quickPodRecruiterIds, rec.id]);
+                              } else {
+                                setQuickPodRecruiterIds(quickPodRecruiterIds.filter((id) => id !== rec.id));
+                              }
+                            }}
+                            className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="font-medium text-neutral-800 dark:text-neutral-200 truncate flex-1">
+                            {rec.fullName || rec.email}
+                          </span>
+                          <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-neutral-200 dark:bg-slate-800 text-neutral-600 dark:text-neutral-300">
+                            {rec.roleName || rec.systemRole}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                  Pod Description (Optional)
+                </label>
+                <Input
+                  value={quickPodDesc}
+                  onChange={(e) => setQuickPodDesc(e.target.value)}
+                  placeholder="e.g. Dedicated to domestic Java & Cloud requisition sourcing"
+                  className="h-9 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                />
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-slate-800">
+                <a
+                  href={`/utility/pods?branch=${selectedBranch.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
+                >
+                  Manage Pods in Directory ↗
+                </a>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsQuickCreatePodOpen(false)}
+                    className="h-8.5 text-xs font-semibold px-3.5 cursor-pointer"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={isCreatingQuickPod || !quickPodName.trim()}
+                    className="h-8.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {isCreatingQuickPod ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-3.5 w-3.5" />
+                        Create Pod &amp; Enable Routing
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

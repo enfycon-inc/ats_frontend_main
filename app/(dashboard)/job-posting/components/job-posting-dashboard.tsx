@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { mockJobs, mockJobsIN, mapApiJobToJob, Job } from "../data/mock-jobs";
 import { atsApi } from "@/lib/ats-api";
+import { resolveActiveSystemRole } from "@/lib/role-permissions";
 import DataTable from "./data-table";
 import FilterDrawer, { SelectedFilters } from "./filter-drawer";
 import ColumnDrawer from "./column-drawer";
@@ -18,21 +20,20 @@ import {
 } from "lucide-react";
 import { getUserColumnPreferences, saveUserColumnPreferences } from "@/utils/user-column-preferences";
 
-const DEFAULT_JOB_COLUMNS = [
+const getBaseJobColumns = (usesPods: boolean) => [
   "jobCode",
   "jobTitle",
   "businessUnit",
   "createdBy",
+  "assignedTo",
   "client",
   "endClientName",
   "location",
   "states",
   "jobStatus",
-  "podName",
+  ...(usesPods ? ["podName"] : []),
   "clientBillRate",
   "payRate",
-  "recruitmentManager",
-  "primaryRecruiter",
   "submissionsCount",
 ];
 
@@ -54,10 +55,23 @@ interface JobPostingDashboardProps {
 export default function JobPostingDashboard({
   initialStatusFilter = "All",
 }: JobPostingDashboardProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const filterParam = searchParams.get("filter"); // e.g. "direct", "pod", "unassigned", etc.
+
   // Drawer States
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isColumnOpen, setIsColumnOpen] = useState(false);
   const [market, setMarket] = useState<"US" | "IN">("IN");
+
+  // Branch Pods System Support State
+  const [branchUsesPods, setBranchUsesPods] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("active_branch_allow_pods");
+      if (stored !== null) return stored === "true";
+    }
+    return true;
+  });
 
   // User details & permission controls
   const currentUser = useMemo(() => {
@@ -67,35 +81,98 @@ export default function JobPostingDashboard({
     return null;
   }, []);
 
+  const systemRole = useMemo(() => {
+    if (!currentUser) return "RECRUITER";
+    return resolveActiveSystemRole(currentUser.roles, [], currentUser);
+  }, [currentUser]);
+
+  const isRecruiter = systemRole === "RECRUITER";
+  const isAccountManager = systemRole === "ACCOUNT_MANAGER";
+
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
     return permissions.includes("job:edit") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("ADMIN");
   }, [currentUser]);
 
+  // Load and verify active branch's pod system capability
+  useEffect(() => {
+    async function checkBranchPodSupport() {
+      try {
+        const branches = await atsApi.branches.list();
+        const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+        const currentBranch = branches.find((b: any) => b.id === activeBranchId) || branches[0];
+        if (currentBranch) {
+          const podsAllowed = Boolean(currentBranch.allowPods ?? (currentBranch.podsCount > 0 && currentBranch.allowPods !== false));
+          setBranchUsesPods(podsAllowed);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("active_branch_allow_pods", String(podsAllowed));
+          }
+        }
+      } catch (e) {
+        console.warn("Could not determine branch pod support:", e);
+      }
+    }
+    checkBranchPodSupport();
+
+    const handleBranchChange = () => {
+      checkBranchPodSupport();
+    };
+    window.addEventListener("branchChanged", handleBranchChange);
+    return () => window.removeEventListener("branchChanged", handleBranchChange);
+  }, []);
+
+  // Sanitize user columns: remove legacy primaryRecruiter / recruitmentManager,
+  // enforce podName presence strictly based on branchUsesPods, and ensure assignedTo is included.
+  const sanitizeColumns = useCallback((cols: string[], usesPods: boolean) => {
+    let clean = cols.filter((c) => c !== "primaryRecruiter" && c !== "recruitmentManager");
+    if (!usesPods) {
+      clean = clean.filter((c) => c !== "podName");
+    } else if (!clean.includes("podName")) {
+      const statusIdx = clean.indexOf("jobStatus");
+      if (statusIdx !== -1) clean.splice(statusIdx + 1, 0, "podName");
+      else clean.push("podName");
+    }
+    if (!clean.includes("createdBy")) {
+      const buIdx = clean.indexOf("businessUnit");
+      if (buIdx !== -1) clean.splice(buIdx + 1, 0, "createdBy");
+      else clean.unshift("createdBy");
+    }
+    if (!clean.includes("assignedTo")) {
+      const createdIdx = clean.indexOf("createdBy");
+      if (createdIdx !== -1) clean.splice(createdIdx + 1, 0, "assignedTo");
+      else clean.push("assignedTo");
+    } else {
+      const createdIdx = clean.indexOf("createdBy");
+      const assignedIdx = clean.indexOf("assignedTo");
+      if (createdIdx !== -1 && assignedIdx !== -1 && assignedIdx !== createdIdx + 1) {
+        clean = clean.filter((c) => c !== "assignedTo");
+        const newCreatedIdx = clean.indexOf("createdBy");
+        clean.splice(newCreatedIdx + 1, 0, "assignedTo");
+      }
+    }
+    return clean;
+  }, []);
+
   // Table Configuration States (User Persistent)
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
-    const cols = getUserColumnPreferences("jobs", DEFAULT_JOB_COLUMNS);
-    if (!cols.includes("createdBy")) {
-      const buIdx = cols.indexOf("businessUnit");
-      if (buIdx !== -1) cols.splice(buIdx + 1, 0, "createdBy");
-      else cols.unshift("createdBy");
-    }
-    return cols;
+    const defaultCols = getBaseJobColumns(branchUsesPods);
+    const userCols = getUserColumnPreferences("jobs", defaultCols);
+    return sanitizeColumns(userCols, branchUsesPods);
   });
 
-  // Sync user-specific columns when currentUser resolves or changes
+  // Sync user-specific columns when branchUsesPods or currentUser changes
+  useEffect(() => {
+    setSelectedColumns((prev) => sanitizeColumns(prev, branchUsesPods));
+  }, [branchUsesPods, sanitizeColumns]);
+
   useEffect(() => {
     if (currentUser) {
-      const userSavedCols = getUserColumnPreferences("jobs", DEFAULT_JOB_COLUMNS);
-      if (!userSavedCols.includes("createdBy")) {
-        const buIdx = userSavedCols.indexOf("businessUnit");
-        if (buIdx !== -1) userSavedCols.splice(buIdx + 1, 0, "createdBy");
-        else userSavedCols.unshift("createdBy");
-      }
-      setSelectedColumns(userSavedCols);
+      const defaultCols = getBaseJobColumns(branchUsesPods);
+      const userSavedCols = getUserColumnPreferences("jobs", defaultCols);
+      setSelectedColumns(sanitizeColumns(userSavedCols, branchUsesPods));
     }
-  }, [currentUser]);
+  }, [currentUser, branchUsesPods, sanitizeColumns]);
 
   const activeSelectedColumns = useMemo(() => {
     if (!hasEditPermission) {
@@ -104,13 +181,42 @@ export default function JobPostingDashboard({
     return selectedColumns;
   }, [selectedColumns, hasEditPermission]);
 
-  // Saved Views State
-  const [savedViews, setSavedViews] = useState<string[]>([
-    "My Open Requirements",
-    "Hot IT Jobs",
-    "Bench Jobs",
-  ]);
-  const [activeView, setActiveView] = useState("All Jobs");
+  // View Labels and Saved Views based on Role
+  const defaultViewLabel = isRecruiter ? "All Assigned Jobs" : "All Jobs";
+
+  const roleDefaultSavedViews = useMemo(() => {
+    if (isRecruiter) {
+      return ["Assigned to Me", "My Pod Jobs"];
+    }
+    if (isAccountManager) {
+      return ["Active Jobs", "Unassigned Jobs", "Draft Jobs"];
+    }
+    return ["Active Jobs", "Unassigned Jobs", "My Open Requirements", "Hot IT Jobs", "Bench Jobs"];
+  }, [isRecruiter, isAccountManager]);
+
+  const [savedViews, setSavedViews] = useState<string[]>(roleDefaultSavedViews);
+
+  useEffect(() => {
+    setSavedViews(roleDefaultSavedViews);
+  }, [roleDefaultSavedViews]);
+
+  const initialActiveView = useMemo(() => {
+    if (isRecruiter) {
+      if (filterParam === "direct") return "Assigned to Me";
+      if (filterParam === "pod") return "My Pod Jobs";
+      return "All Assigned Jobs";
+    }
+    if (filterParam === "unassigned") return "Unassigned Jobs";
+    if (initialStatusFilter === "Active") return "Active Jobs";
+    if (initialStatusFilter === "Draft") return "Draft Jobs";
+    return "All Jobs";
+  }, [isRecruiter, filterParam, initialStatusFilter]);
+
+  const [activeView, setActiveView] = useState(initialActiveView);
+
+  useEffect(() => {
+    setActiveView(initialActiveView);
+  }, [initialActiveView]);
 
   // Filtering States
   const [currentFilters, setCurrentFilters] = useState<SelectedFilters>({
@@ -159,7 +265,7 @@ export default function JobPostingDashboard({
   const fetchJobs = useCallback(async () => {
     setIsLoading(true);
     try {
-      const apiJobs = await atsApi.jobs.list();
+      const apiJobs = await atsApi.jobs.list(filterParam ? { filter: filterParam } : undefined);
       if (apiJobs && apiJobs.length > 0) {
         const mapped = apiJobs.map(mapApiJobToJob);
         // Filter by current market shift (matching IN/INDIA/DOMESTIC vs US/USA)
@@ -176,29 +282,39 @@ export default function JobPostingDashboard({
         let jobsToDisplay = shiftJobs.length > 0 ? shiftJobs : mapped;
 
         // ── Recruiter scoping (frontend safety net) ──────────────────────────
-        // The backend already enforces this via SQL. This client-side guard
-        // covers mock/cached data paths (e.g. fallback mock data).
-        const PRIVILEGED_ROLES = ['SUPER_ADMIN', 'ADMIN', 'DELIVERY_HEAD', 'POD_LEAD', 'ACCOUNT_MANAGER'];
-        const isRecruiterOnly = currentUser?.roles?.includes('RECRUITER') &&
-          !currentUser?.roles?.some((r: string) => PRIVILEGED_ROLES.includes(r));
-
-        if (isRecruiterOnly && currentUser?.id) {
+        // Backend strictly isolates in SQL. This client-side guard provides defense-in-depth.
+        // NOTE: Open pool (assignedTo = 'ALL') is completely removed for recruiters per user requirement!
+        if (isRecruiter && currentUser?.id) {
           const userPodId = (currentUser as any)?.podId;
           jobsToDisplay = jobsToDisplay.filter((job) => {
             // 1. Assigned directly as primary recruiter or recruitment manager
             if (job.primaryRecruiterId === currentUser.id || job.recruitmentManagerId === currentUser.id) {
               return true;
             }
-            // 2. Assigned to a Pod that the recruiter belongs to
+            if (currentUser.fullName && (job.primaryRecruiter === currentUser.fullName || job.recruitmentManager === currentUser.fullName)) {
+              return true;
+            }
+            // 2. Assigned to user's Pod
             if (userPodId && job.podId && job.podId === userPodId) {
               return true;
             }
-            // 3. Assigned to ALL branch recruiters
-            if (job.assignedTo && (job.assignedTo.toUpperCase() === 'ALL' || job.assignedTo.toUpperCase().startsWith('ALL'))) {
-              return true;
-            }
-            // 4. Otherwise (unassigned or other pod) -> hidden
+            // Open pool / 'ALL' is REMOVED for recruiters!
             return false;
+          });
+        }
+
+        // ── Account Manager scoping (frontend safety net) ────────────────────
+        // Account managers should strictly NOT see jobs posted by other members.
+        if (isAccountManager && currentUser?.id) {
+          jobsToDisplay = jobsToDisplay.filter((job) => {
+            const createdById = (job as any).createdById || job.createdBy;
+            const recMgrId = job.recruitmentManagerId;
+            return (
+              createdById === currentUser.id ||
+              createdById === currentUser.email ||
+              recMgrId === currentUser.id ||
+              (job.createdBy && currentUser.fullName && job.createdBy.toLowerCase() === currentUser.fullName.toLowerCase())
+            );
           });
         }
         // ────────────────────────────────────────────────────────────────────
@@ -218,7 +334,7 @@ export default function JobPostingDashboard({
     } finally {
       setIsLoading(false);
     }
-  }, [initialStatusFilter, market]);
+  }, [initialStatusFilter, market, filterParam, isRecruiter, isAccountManager, currentUser]);
 
   useEffect(() => {
     fetchJobs();
@@ -230,14 +346,15 @@ export default function JobPostingDashboard({
       { id: "jobTitle", label: "Job Title" },
       { id: "businessUnit", label: "Business Unit" },
       { id: "createdBy", label: "Job Created By" },
+      { id: "assignedTo", label: "Assigned To" },
       { id: "client", label: "Client" },
       { id: "endClientName", label: "End Client" },
       { id: "clientJobId", label: "Client Job ID" },
-      { id: "location", label: "Location" },
+      { id: "location", label: "Work Mode" },
       { id: "states", label: "States" },
       { id: "jobStatus", label: "Job Status" },
       { id: "priority", label: "Priority" },
-      { id: "podName", label: "Assigned Pod" },
+      ...(branchUsesPods ? [{ id: "podName", label: "Assigned Pod" }] : []),
       {
         id: "clientBillRate",
         label: market === "IN" ? "Client Bill Rate / CTC" : "Client Bill Rate / Salary",
@@ -246,9 +363,6 @@ export default function JobPostingDashboard({
         id: "payRate",
         label: market === "IN" ? "Pay Rate / CTC" : "Pay Rate / Salary",
       },
-      { id: "recruitmentManager", label: "Recruitment Manager" },
-      { id: "primaryRecruiter", label: "Primary Recruiter" },
-      { id: "assignedTo", label: "Assigned To" },
       { id: "createdOn", label: "Job Created" },
       { id: "modifiedOn", label: "Job Modified On" },
       { id: "submissionsCount", label: "Submissions & Pipeline" },
@@ -257,7 +371,7 @@ export default function JobPostingDashboard({
       return cols.filter((col) => col.id !== "clientBillRate");
     }
     return cols;
-  }, [market, hasEditPermission]);
+  }, [market, hasEditPermission, branchUsesPods]);
 
   const handleApplyFilters = (filters: SelectedFilters) => {
     setCurrentFilters(filters);
@@ -314,9 +428,36 @@ export default function JobPostingDashboard({
       baseData = baseData.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
     }
 
-    if (viewName === "All Jobs") {
+    if (viewName === "All Jobs" || viewName === "All Assigned Jobs") {
       setJobsData(baseData);
       setCurrentFilters({ businessUnit: "All selected", predefined: [] });
+    } else if (viewName === "Assigned to Me") {
+      const myJobs = baseData.filter(
+        (job) =>
+          job.primaryRecruiterId === currentUser?.id ||
+          (currentUser?.fullName && job.primaryRecruiter === currentUser.fullName) ||
+          job.recruitmentManagerId === currentUser?.id
+      );
+      setJobsData(myJobs);
+    } else if (viewName === "My Pod Jobs") {
+      const userPodId = (currentUser as any)?.podId;
+      const podJobs = baseData.filter(
+        (job) => userPodId && job.podId === userPodId
+      );
+      setJobsData(podJobs);
+    } else if (viewName === "Unassigned Jobs") {
+      const unassigned = baseData.filter((job) => {
+        const hasNoRecruiter = !job.primaryRecruiterId || job.primaryRecruiter === "N/A" || !job.primaryRecruiter;
+        const hasNoPod = !job.podId && (!job.podName || job.podName === "Unassigned" || job.podName === "N/A");
+        const assignedToUpper = (job.assignedTo || "").trim().toUpperCase();
+        const hasNoAssignedTo = !assignedToUpper || assignedToUpper === "UNASSIGNED" || assignedToUpper === "NONE" || assignedToUpper === "N/A";
+        return hasNoRecruiter && hasNoPod && hasNoAssignedTo;
+      });
+      setJobsData(unassigned);
+    } else if (viewName === "Active Jobs") {
+      setJobsData(baseData.filter((j) => j.jobStatus === "Active"));
+    } else if (viewName === "Draft Jobs") {
+      setJobsData(baseData.filter((j) => j.jobStatus === "Draft" || (j.jobStatus as any) === "Pending Approval"));
     } else if (viewName === "My Open Requirements") {
       const myJobs = baseData.filter(
         (job) =>
@@ -354,8 +495,11 @@ export default function JobPostingDashboard({
       if (updatedFields.priority !== undefined) apiPayload.priority = updatedFields.priority;
       if (updatedFields.assignedTo !== undefined) apiPayload.assignedTo = updatedFields.assignedTo;
 
-      // Handle recruiter name resolution to user UUID
-      if (updatedFields.primaryRecruiter !== undefined) {
+      if (updatedFields.podId !== undefined) apiPayload.podId = updatedFields.podId;
+
+      if (updatedFields.primaryRecruiterId !== undefined) {
+        apiPayload.primaryRecruiterId = updatedFields.primaryRecruiterId;
+      } else if (updatedFields.primaryRecruiter !== undefined) {
         const recruiterName = updatedFields.primaryRecruiter;
         if (recruiterName === "N/A" || !recruiterName) {
           apiPayload.primaryRecruiterId = null;
@@ -371,7 +515,8 @@ export default function JobPostingDashboard({
       }
 
       await atsApi.jobs.update(jobId, apiPayload);
-      toast.success("Job updated successfully.");
+      toast.success("Job assignment updated successfully.");
+      fetchJobs();
     } catch (err: any) {
       toast.error("Failed to update job: " + err.message);
       // Revert local state by reloading from server
@@ -381,7 +526,7 @@ export default function JobPostingDashboard({
 
   const handleRefresh = () => {
     setCurrentFilters({ businessUnit: "All selected", predefined: [] });
-    setActiveView("All Jobs");
+    setActiveView(defaultViewLabel);
     fetchJobs();
     toast.success("Jobs list reloaded.");
   };
@@ -422,6 +567,7 @@ export default function JobPostingDashboard({
           onSaveView={handleSaveView}
           savedViews={savedViews}
           activeView={activeView}
+          defaultViewLabel={defaultViewLabel}
           onSelectView={handleSelectView}
           onUpdateJob={handleUpdateJob}
         />

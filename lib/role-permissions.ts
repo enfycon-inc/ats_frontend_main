@@ -79,6 +79,8 @@ export function resolveActiveSystemRole(
   if (upper === "ACCOUNT_MANAGER" || upper === "ACCOUNT MANAGER") return "ACCOUNT_MANAGER";
   if (upper === "POD_LEAD" || upper === "POD LEAD") return "POD_LEAD";
   if (upper === "RECRUITER") return "RECRUITER";
+  if (upper === "FINANCE_ADMIN" || upper === "FINANCE ADMIN" || upper.includes("FINANCE")) return "ADMIN";
+  if (upper === "SENSE") return "RECRUITER";
 
   // 2. Lookup in availableRoles list
   if (Array.isArray(availableRoles) && availableRoles.length > 0) {
@@ -361,7 +363,47 @@ export function getFilteredPrimaryNav(
     allowedIds.add("reports");
   }
 
-  return PRIMARY_NAV_ITEMS.filter((item) => allowedIds.has(item.id));
+  return PRIMARY_NAV_ITEMS.filter((item) => allowedIds.has(item.id)).map((item) => {
+    if (item.id === "job-posting") {
+      if (sysRole === "RECRUITER") {
+        return {
+          ...item,
+          label: "Assigned Jobs",
+          children: [
+            { label: "All Assigned Jobs", href: "/job-posting" },
+            { label: "Assigned to Me", href: "/job-posting?filter=direct" },
+            { label: "My Pod Jobs", href: "/job-posting?filter=pod" },
+          ],
+        };
+      }
+      if (sysRole === "ACCOUNT_MANAGER") {
+        return {
+          ...item,
+          label: "Job Postings",
+          children: [
+            { label: "All Jobs", href: "/job-posting" },
+            { label: "Active Jobs", href: "/job-posting/active" },
+            { label: "Unassigned Jobs", href: "/job-posting?filter=unassigned" },
+            { label: "Draft Jobs", href: "/job-posting/drafts" },
+            { label: "Job Boards", href: "/job-posting/boards" },
+          ],
+        };
+      }
+      // Admins, Branch Admins, Delivery Heads
+      return {
+        ...item,
+        label: "Job Posting",
+        children: [
+          { label: "All Jobs", href: "/job-posting" },
+          { label: "Active Jobs", href: "/job-posting/active" },
+          { label: "Unassigned Jobs", href: "/job-posting?filter=unassigned" },
+          { label: "Draft Jobs", href: "/job-posting/drafts" },
+          { label: "Job Boards", href: "/job-posting/boards" },
+        ],
+      };
+    }
+    return item;
+  });
 }
 
 /**

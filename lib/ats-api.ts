@@ -93,26 +93,12 @@ function getCurrentUser(): any | null {
 
 async function getOrFetchToken(): Promise<string | null> {
   let token = getToken();
-  if (token) {
-    // Check if token in localStorage is expired
-    try {
-      const parts = token.split('.');
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-        const nowSec = Math.floor(Date.now() / 1000);
-        if (payload.exp && nowSec > payload.exp) {
-          console.warn('[getOrFetchToken] Stored token expired, attempting auto-refresh...');
-          const refreshed = await tryAutoRefresh();
-          if (refreshed) return refreshed;
-          clearToken();
-          token = null;
-        }
-      }
-    } catch {}
-    if (token) return token;
-  }
+  // If a stored token exists, use it — Keycloak/NextAuth manage expiry server-side.
+  // Client-side JWT decode is intentionally avoided: we don't re-verify signatures here,
+  // and 401 responses from the API will trigger tryAutoRefresh() in apiFetch().
+  if (token) return token;
 
-  // If no valid token in localStorage, attempt auto-refresh from refresh token
+  // No stored token — attempt to recover via refresh token
   if (getRefreshToken()) {
     const refreshed = await tryAutoRefresh();
     if (refreshed) return refreshed;
@@ -890,8 +876,9 @@ export interface JobMatchesResponse {
 }
 
 const jobs = {
-  async list(): Promise<JobPayload[]> {
-    return apiFetch<JobPayload[]>('/api/jobs');
+  async list(opts?: { filter?: string }): Promise<JobPayload[]> {
+    const qs = opts?.filter ? `?filter=${encodeURIComponent(opts.filter)}` : '';
+    return apiFetch<JobPayload[]>(`/api/jobs${qs}`);
   },
 
   async get(id: string): Promise<JobPayload> {

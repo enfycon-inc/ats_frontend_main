@@ -10,11 +10,13 @@ const DEFAULT_TENANT_ID = "d3b07384-d113-49c3-a555-9ee75c13ca33";
 const isProd = process.env.NODE_ENV === "production";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "1kc7Cf4Z2V2XX0WfGLrET9iZzWyDkar9RlqjIK3Vkxo",
+  // AUTH_SECRET is required. Generate one with: openssl rand -base64 32
+  secret: process.env.AUTH_SECRET,
   trustHost: true,
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 Days
+    // Matches Keycloak's SSO Session Max. Set KEYCLOAK_REFRESH_TOKEN_TTL_SECONDS in .env.
+    maxAge: parseInt(process.env.KEYCLOAK_REFRESH_TOKEN_TTL_SECONDS || '28800'), // Default 8 hours
   },
   cookies: {
     sessionToken: {
@@ -254,7 +256,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.roles = (user as any).roles || []
         token.accessToken = (user as any).accessToken
         token.refreshToken = (user as any).refreshToken || null
-        token.accessTokenExpiry = Date.now() + (((user as any).expiresIn || 604800) * 1000)
+        // Use actual Keycloak expiresIn — do not apply a local default
+        token.accessTokenExpiry = Date.now() + (((user as any).expiresIn || 3600) * 1000)
         token.tenantDomain = (user as any).tenantDomain
         token.systemRole = (user as any).systemRole
         token.podId = (user as any).podId
