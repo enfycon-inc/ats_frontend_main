@@ -7,12 +7,40 @@ import LoginForm from "@/components/auth/login-form";
 import Social from "@/components/auth/social";
 import { Building2 } from "lucide-react";
 
+const MAIN_DOMAINS = [
+  "localhost",
+  "127.0.0.1",
+  "enfyjobs.com",
+  "www.enfyjobs.com",
+  "enfycon.com",
+  "www.enfycon.com",
+];
+
+function checkIsSubdomain(hostname: string): boolean {
+  const host = hostname.toLowerCase().split(":")[0];
+  if (host === "localhost" || host === "127.0.0.1") return false;
+  if (host.endsWith(".localhost")) return true;
+  if (MAIN_DOMAINS.includes(host)) return false;
+  const parts = host.split(".");
+  if (parts.length > 2 && parts[0] !== "www") return true;
+  return false;
+}
+
 function Copyright() {
   const currentYear = new Date().getFullYear();
   return <>Copyright © {currentYear} Enfycon Inc. All Rights Reserved.</>;
 }
 
 const Login = () => {
+  const [mounted, setMounted] = React.useState(false);
+  const [isSubdomain, setIsSubdomain] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+    if (typeof window !== "undefined") {
+      setIsSubdomain(checkIsSubdomain(window.location.hostname));
+    }
+  }, []);
   return (
     <div className="min-h-screen w-full bg-[#F8FAFC] text-slate-900 flex flex-col justify-between font-sans relative overflow-x-hidden">
       
@@ -81,21 +109,23 @@ const Login = () => {
                 <LoginForm />
               </React.Suspense>
 
-              {/* Register Company Banner */}
-              <div className="pt-2">
-                <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-100 text-center space-y-2">
-                  <span className="text-xs text-slate-600 block font-medium">
-                    New to Enfycon ATS?
-                  </span>
-                  <Link
-                    href="/auth/register"
-                    className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-white border border-indigo-200 text-indigo-600 font-semibold text-sm hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm"
-                  >
-                    <Building2 className="w-4 h-4 text-indigo-500" />
-                    Register Your Company
-                  </Link>
+              {/* Register Company Banner — Only shown on main platform domain */}
+              {mounted && !isSubdomain && (
+                <div className="pt-2">
+                  <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-100 text-center space-y-2">
+                    <span className="text-xs text-slate-600 block font-medium">
+                      New to Enfycon ATS?
+                    </span>
+                    <Link
+                      href="/auth/register"
+                      className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-white border border-indigo-200 text-indigo-600 font-semibold text-sm hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm"
+                    >
+                      <Building2 className="w-4 h-4 text-indigo-500" />
+                      Register Your Company
+                    </Link>
+                  </div>
                 </div>
-              </div>
+              )}
 
             </div>
 
