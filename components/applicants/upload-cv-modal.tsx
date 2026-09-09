@@ -70,10 +70,13 @@ export default function UploadCvModal({ onClose, onDone }: UploadCvModalProps) {
         }
 
         const currentUser = atsApi.auth.getCurrentUser();
+        if (!currentUser?.id) {
+          throw new Error("You must be logged in to submit a candidate to a job.");
+        }
         await atsApi.submissions.create({
           candidateId: parsedCandidateId || candidate.id || 1,
           jobId: selectedJobId,
-          recruiterId: currentUser?.id || "d2ec2da8-816c-410a-8c0c-4737b5ae21cf",
+          recruiterId: currentUser.id,
           finalStatus: "PENDING_APPROVAL",
           submittedRate: submittedRate.trim() || null,
           recruiterComment: recruiterComment.trim() || null

@@ -55,10 +55,13 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
 
       // 2. Create submission record
       const currentUser = atsApi.auth.getCurrentUser();
+      if (!currentUser?.id) {
+        throw new Error("You must be logged in to submit a candidate.");
+      }
       await atsApi.submissions.create({
         candidateId: parsedCandidateId || candidate.id || 1,
         jobId: job?.id,
-        recruiterId: currentUser?.id || "d2ec2da8-816c-410a-8c0c-4737b5ae21cf",
+        recruiterId: currentUser.id,
         finalStatus: "PENDING_APPROVAL",
         submittedRate: submittedRate.trim() || null,
         recruiterComment: recruiterComment.trim() || null

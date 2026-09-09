@@ -148,10 +148,14 @@ export default function JobMatchesPage() {
     setSubmitting(true);
     try {
       const currentUser = atsApi.auth.getCurrentUser();
+      if (!currentUser?.id) {
+        toast.error("You must be logged in to submit a candidate to this job.");
+        return;
+      }
       await atsApi.submissions.create({
         candidateId: selectedCandidate.candidateId,
         jobId: jobId,
-        recruiterId: currentUser?.id || "d2ec2da8-816c-410a-8c0c-4737b5ae21cf",
+        recruiterId: currentUser.id,
         finalStatus: "PENDING_APPROVAL",
         submittedRate: submittedRate.trim() || null,
         recruiterComment: recruiterComment.trim() || null

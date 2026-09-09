@@ -6,7 +6,7 @@ import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id"
 import { ZodError } from "zod"
 import { loginSchema } from "./lib/zod"
 
-const DEFAULT_TENANT_ID = "d3b07384-d113-49c3-a555-9ee75c13ca33";
+const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || "d3b07384-d113-49c3-a555-9ee75c13ca33";
 const isProd = process.env.NODE_ENV === "production";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
