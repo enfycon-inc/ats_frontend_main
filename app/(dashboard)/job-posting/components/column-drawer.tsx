@@ -10,7 +10,9 @@ interface ColumnDrawerProps {
   onClose: () => void;
   allColumns: { id: string; label: string }[];
   selectedColumns: string[];
+  defaultColumns?: string[];
   onApply: (newSelectedOrder: string[]) => void;
+  onResetToDefault?: () => void;
 }
 
 export default function ColumnDrawer({
@@ -18,7 +20,9 @@ export default function ColumnDrawer({
   onClose,
   allColumns,
   selectedColumns: initialSelected,
+  defaultColumns,
   onApply,
+  onResetToDefault,
 }: ColumnDrawerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [tempSelected, setTempSelected] = useState<string[]>(initialSelected);
@@ -115,19 +119,32 @@ export default function ColumnDrawer({
                   />
                 </div>
 
-                {/* Select All */}
-                <button
-                  onClick={handleSelectAll}
-                  className="text-[11px] text-primary dark:text-blue-400 font-bold flex items-center gap-1.5 hover:underline text-left cursor-pointer"
-                >
-                  <Check
-                    className={cn(
-                      "h-3.5 w-3.5",
-                      tempSelected.length === allColumns.length ? "opacity-100" : "opacity-40"
-                    )}
-                  />
-                  Select All
-                </button>
+                {/* Select All & Reset to Default */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={handleSelectAll}
+                    className="text-[11px] text-primary dark:text-blue-400 font-bold flex items-center gap-1.5 hover:underline text-left cursor-pointer"
+                  >
+                    <Check
+                      className={cn(
+                        "h-3.5 w-3.5",
+                        tempSelected.length === allColumns.length ? "opacity-100" : "opacity-40"
+                      )}
+                    />
+                    Select All
+                  </button>
+                  {defaultColumns && defaultColumns.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTempSelected(defaultColumns);
+                      }}
+                      className="text-[11px] text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 font-medium hover:underline cursor-pointer"
+                    >
+                      Reset Default
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Checklist */}
@@ -219,22 +236,40 @@ export default function ColumnDrawer({
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50 dark:bg-slate-900/50 flex items-center justify-end gap-2 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-slate-800 cursor-pointer font-semibold text-xs"
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleApply}
-              className="bg-primary text-white hover:bg-primary/90 px-5 cursor-pointer font-bold text-xs shadow-xs"
-            >
-              Apply Changes
-            </Button>
+          <div className="p-4 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50 dark:bg-slate-900/50 flex items-center justify-between gap-2 shrink-0">
+            {defaultColumns && defaultColumns.length > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => {
+                  setTempSelected(defaultColumns);
+                  if (onResetToDefault) onResetToDefault();
+                }}
+                className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 border-neutral-300 dark:border-slate-700 text-xs font-semibold cursor-pointer"
+              >
+                Reset Default
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-slate-800 cursor-pointer font-semibold text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleApply}
+                className="bg-primary text-white hover:bg-primary/90 px-5 cursor-pointer font-bold text-xs shadow-xs"
+              >
+                Apply Changes
+              </Button>
+            </div>
           </div>
         </div>
       </div>

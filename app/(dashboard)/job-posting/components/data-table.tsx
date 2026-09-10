@@ -116,6 +116,49 @@ function isJobPostedToday(job: Job): boolean {
   return false;
 }
 
+export function formatDateTimeDisplay(
+  dateStr?: string | null,
+  job?: Job
+): { date: string; time: string } {
+  if (!dateStr) return { date: "—", time: "" };
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) {
+      return { date: String(dateStr), time: "" };
+    }
+
+    // Determine target timezone: job snapshot timezone -> market timezone -> local fallback
+    let timeZone: string | undefined = undefined;
+    if (job?.jobTimezone) {
+      timeZone = job.jobTimezone;
+    } else if (job?.market === "US") {
+      timeZone = "America/New_York";
+    } else if (job?.market === "IN") {
+      timeZone = "Asia/Kolkata";
+    }
+
+    const dateFormatted = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone,
+    });
+
+    const timeFormatted = d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+      timeZoneName: "short",
+      timeZone,
+    });
+
+    return { date: dateFormatted, time: timeFormatted };
+  } catch {
+    return { date: String(dateStr), time: "" };
+  }
+}
+
 interface DataTableProps {
   data: Job[];
   selectedColumns: string[];
@@ -733,6 +776,14 @@ export default function DataTable({
         const valA = a[sortColumn];
         const valB = b[sortColumn];
 
+        if (sortColumn === "createdOn" || sortColumn === "modifiedOn") {
+          const timeA = new Date(String(valA || "")).getTime();
+          const timeB = new Date(String(valB || "")).getTime();
+          if (!isNaN(timeA) && !isNaN(timeB)) {
+            return sortDirection === "asc" ? timeA - timeB : timeB - timeA;
+          }
+        }
+
         if (typeof valA === "number" && typeof valB === "number") {
           return sortDirection === "asc" ? valA - valB : valB - valA;
         }
@@ -977,10 +1028,10 @@ export default function DataTable({
       <div className="flex-1 overflow-auto relative min-h-0 bg-neutral-50/20 dark:bg-slate-950/10">
         <table className="w-full border-collapse text-left table-auto border-neutral-200 dark:border-slate-800">
           {/* Table Header */}
-          <thead className="sticky top-0 z-10 bg-blue-50 dark:bg-slate-800 border-b border-neutral-200 dark:border-slate-700 shadow-xs select-none">
+          <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-900 border-b border-neutral-200 dark:border-slate-800 shadow-2xs select-none backdrop-blur-xs">
             <tr>
               {/* Checkbox Header (Sticky Left) */}
-              <th className="sticky left-0 z-20 w-[36px] min-w-[36px] p-1 text-center bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700">
+              <th className="sticky left-0 z-20 w-[36px] min-w-[36px] p-1.5 text-center bg-slate-100/95 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800">
                 <input
                   type="checkbox"
                   checked={
@@ -988,7 +1039,7 @@ export default function DataTable({
                     paginatedData.every((job) => selectedRowIds.includes(job.id))
                   }
                   onChange={(e) => handleSelectAll(e.target.checked)}
-                  className="h-3 w-3 accent-primary cursor-pointer rounded-xs"
+                  className="h-3.5 w-3.5 accent-primary cursor-pointer rounded-xs"
                 />
               </th>
 
@@ -999,12 +1050,12 @@ export default function DataTable({
                 return (
                   <th
                     key={colId}
-                    className="p-1.5 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 hover:bg-blue-100 dark:hover:bg-slate-750 transition-colors cursor-pointer relative whitespace-nowrap"
+                    className="p-2 text-[10.5px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100/95 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors cursor-pointer relative whitespace-nowrap"
                     onClick={() => handleSort(colId as keyof Job)}
                   >
-                    <div className="flex items-center justify-between gap-1 pr-3">
-                      <span className="uppercase tracking-wider text-[10px] whitespace-nowrap">{col?.label || colId}</span>
-                      <div className="flex items-center gap-0.5 opacity-60">
+                    <div className="flex items-center justify-between gap-1 pr-2">
+                      <span className="uppercase tracking-wider text-[10px] whitespace-nowrap font-bold text-slate-600 dark:text-slate-300">{col?.label || colId}</span>
+                      <div className="flex items-center gap-0.5 opacity-70">
                         {isSorted ? (
                           sortDirection === "asc" ? (
                             <ChevronUp className="h-3 w-3 text-primary font-bold" />
@@ -1012,7 +1063,7 @@ export default function DataTable({
                             <ChevronDown className="h-3 w-3 text-primary font-bold" />
                           )
                         ) : (
-                          <ChevronsUpDown className="h-3 w-3 text-neutral-400" />
+                          <ChevronsUpDown className="h-3 w-3 text-slate-400" />
                         )}
                       </div>
                     </div>
@@ -1021,7 +1072,7 @@ export default function DataTable({
               })}
 
               {/* Actions Header (Sticky Right) */}
-              <th className="sticky right-0 z-20 w-[56px] min-w-[56px] p-1 text-center bg-blue-50 dark:bg-slate-800 border-l border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] font-bold text-neutral-700 dark:text-neutral-200">
+              <th className="sticky right-0 z-20 w-[56px] min-w-[56px] p-1.5 text-center bg-slate-100/95 dark:bg-slate-900 border-l border-b border-neutral-200 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold text-slate-600 dark:text-slate-300">
                 Action
               </th>
             </tr>
@@ -1227,12 +1278,12 @@ export default function DataTable({
                           ) : colId === "jobCode" ? (
                             <div className="flex items-center gap-1.5 whitespace-nowrap">
                               <Link href={`/job-posting/${job.id}`}>
-                                <span className="text-[#1a4fa0] dark:text-blue-400 font-semibold hover:underline cursor-pointer">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-[11px] font-mono font-semibold text-slate-850 dark:text-slate-200 hover:border-[#1a4fa0] hover:text-[#1a4fa0] dark:hover:text-blue-400 transition-colors shadow-2xs cursor-pointer">
                                   {job.jobCode}
                                 </span>
                               </Link>
                               {isJobPostedToday(job) && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide bg-emerald-500 text-white shadow-xs select-none">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-400 select-none">
                                   NEW
                                 </span>
                               )}
@@ -1268,8 +1319,8 @@ export default function DataTable({
 
                               if (isPending && canApproveThisJob) {
                                 return (
-                                  <div className="inline-flex items-center gap-1.5 bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-md px-2 py-0.5 select-none">
-                                    <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 whitespace-nowrap">
+                                  <div className="inline-flex items-center gap-1.5 bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded px-2 py-0.5 select-none">
+                                    <span className="text-[10.5px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wide whitespace-nowrap">
                                       Pending Approval
                                     </span>
                                     <div className="flex items-center gap-0.5 pl-1 border-l border-amber-200 dark:border-amber-800/60">
@@ -1281,7 +1332,7 @@ export default function DataTable({
                                           setApprovePreset("Approved — Requisition verified and rates validated");
                                           setApproveRemark("");
                                         }}
-                                        className="p-1 rounded-sm text-emerald-600 hover:text-white hover:bg-emerald-600 dark:text-emerald-400 dark:hover:bg-emerald-600 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                                        className="p-1 rounded-xs text-emerald-600 hover:text-white hover:bg-emerald-600 dark:text-emerald-400 dark:hover:bg-emerald-600 dark:hover:text-white transition-all cursor-pointer shadow-2xs active:scale-95"
                                         title="Review & Approve Job Requisition"
                                       >
                                         <CheckCircle className="h-3.5 w-3.5" />
@@ -1294,7 +1345,7 @@ export default function DataTable({
                                           setRejectCategory("Rate / Budget is too low for required experience level");
                                           setRejectReason("");
                                         }}
-                                        className="p-1 rounded-sm text-rose-600 hover:text-white hover:bg-rose-600 dark:text-rose-400 dark:hover:bg-rose-600 dark:hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                                        className="p-1 rounded-xs text-rose-600 hover:text-white hover:bg-rose-600 dark:text-rose-400 dark:hover:bg-rose-600 dark:hover:text-white transition-all cursor-pointer shadow-2xs active:scale-95"
                                         title="Review & Reject Job Requisition"
                                       >
                                         <XCircle className="h-3.5 w-3.5" />
@@ -1307,20 +1358,20 @@ export default function DataTable({
                               return (
                                 <span
                                   className={cn(
-                                    "text-xs font-semibold select-none",
+                                    "inline-flex items-center justify-center px-2 py-0.5 rounded text-[10.5px] font-bold tracking-wide uppercase select-none border",
                                     isPending
-                                      ? "text-amber-600 dark:text-amber-400"
+                                      ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/50"
                                       : status === "Active"
-                                      ? "text-emerald-600 dark:text-emerald-400"
-                                      : status === "Archived"
-                                      ? "text-amber-600 dark:text-amber-400"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/50"
+                                      : status === "Archived" || status === "Hold" || status === "Hold by Client"
+                                      ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/50"
                                       : status === "Close" || status === "Closed"
-                                      ? "text-rose-600 dark:text-rose-400"
+                                      ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800/50"
                                       : status === "Filled"
-                                      ? "text-blue-600 dark:text-blue-400"
+                                      ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800/50"
                                       : status === "Draft"
-                                      ? "text-slate-400 dark:text-slate-500 italic"
-                                      : "text-neutral-600 dark:text-neutral-300"
+                                      ? "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 italic"
+                                      : "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300"
                                   )}
                                 >
                                   {status}
@@ -1343,8 +1394,8 @@ export default function DataTable({
                           ) : colId === "podName" ? (
                             job.podName ? (
                               <div className="flex items-center gap-1.5">
-                                <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80 rounded-md px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
-                                  <Users className="h-2.5 w-2.5 shrink-0 text-slate-500" />
+                                <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-800/40 rounded-md px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap">
+                                  <Users className="h-2.5 w-2.5 shrink-0 text-purple-600 dark:text-purple-400" />
                                   {job.podName}
                                 </span>
                               </div>
@@ -1354,7 +1405,7 @@ export default function DataTable({
                           ) : colId === "jobTitle" ? (
                             <div className="flex items-center gap-1">
                               <Link href={`/job-posting/${job.id}`}>
-                                <span className="whitespace-nowrap hover:underline cursor-pointer text-slate-900 dark:text-slate-100 hover:text-[#1a4fa0] dark:hover:text-blue-400 font-medium">
+                                <span className="whitespace-nowrap hover:underline cursor-pointer text-slate-900 dark:text-slate-100 hover:text-[#1a4fa0] dark:hover:text-blue-400 font-semibold">
                                   {job.jobTitle}
                                 </span>
                               </Link>
@@ -1365,22 +1416,74 @@ export default function DataTable({
                               )}
                             </div>
                           ) : colId === "createdBy" ? (
-                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                              {String(job.createdBy || (job as any).creator_name || (job as any).created_by || "Account Manager")}
-                            </span>
-                          ) : colId === "submissionsCount" ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md font-medium text-[10px]">
-                                {job.submissionsCount} Sub
+                            <div className="flex flex-col leading-tight py-0.5">
+                              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[160px]">
+                                {String(job.createdBy || (job as any).creator_name || (job as any).created_by || "Account Manager")}
                               </span>
-                              <div className="flex items-center gap-1 text-[9.5px] text-slate-500 dark:text-slate-400">
-                                <span className="text-slate-600 dark:text-slate-300 font-medium" title="Applied">{job.pipeline.applied}A</span>
-                                <span>/</span>
-                                <span className="text-slate-600 dark:text-slate-300 font-medium" title="Interviewing">{job.pipeline.interviewing}I</span>
-                                <span>/</span>
-                                <span className="text-slate-600 dark:text-slate-300 font-medium" title="Offered">{job.pipeline.offered}O</span>
-                              </div>
+                              {((job as any).creatorEmail || (job as any).creator_email) && (
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[160px]">
+                                  {(job as any).creatorEmail || (job as any).creator_email}
+                                </span>
+                              )}
                             </div>
+                          ) : colId === "location" ? (
+                            <div className="flex flex-col leading-tight py-0.5">
+                              <span className="font-medium text-slate-800 dark:text-slate-200 text-xs">
+                                {job.jobType || "Contract"}
+                              </span>
+                              <span className="text-[10.5px] text-slate-400 dark:text-slate-500">
+                                {job.location || job.states || "Remote"}
+                              </span>
+                            </div>
+                          ) : colId === "submissionsCount" ? (
+                            <div className="flex flex-col items-center justify-center leading-tight py-0.5 min-w-[55px]">
+                              <span className="font-bold text-slate-800 dark:text-slate-100 text-xs">
+                                {job.submissionsCount || 0} / {job.submissionRequired || 5}
+                              </span>
+                              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium tracking-tight">
+                                done / req
+                              </span>
+                            </div>
+                          ) : colId === "createdOn" ? (
+                            (() => {
+                              const formatted = formatDateTimeDisplay(job.createdOn || (job as any).createdAt, job);
+                              return (
+                                <div className="flex flex-col leading-tight py-0.5 min-w-[110px]">
+                                  <span className="font-medium text-slate-800 dark:text-slate-200 text-xs whitespace-nowrap">
+                                    {formatted.date}
+                                  </span>
+                                  {formatted.time && (
+                                    <span className="font-mono text-[10.5px] text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                                      {formatted.time}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()
+                          ) : colId === "modifiedOn" ? (
+                            (() => {
+                              const formatted = formatDateTimeDisplay(job.modifiedOn || (job as any).updatedAt || job.createdOn, job);
+                              return (
+                                <div className="flex flex-col leading-tight py-0.5 min-w-[110px]">
+                                  <span className="font-medium text-slate-800 dark:text-slate-200 text-xs whitespace-nowrap">
+                                    {formatted.date}
+                                  </span>
+                                  {formatted.time && (
+                                    <span className="font-mono text-[10.5px] text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                                      {formatted.time}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()
+                          ) : colId === "visaType" ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-[10.5px] italic text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                              {job.visaType || "All Visa"}
+                            </span>
+                          ) : colId === "noOfPositions" ? (
+                            <span className="font-medium text-slate-800 dark:text-slate-200 text-xs">
+                              {job.noOfPositions || 1}
+                            </span>
                           ) : colId === "primaryRecruiter" ? (
                             <span className="text-xs text-neutral-800 dark:text-neutral-200">
                               {String(job.primaryRecruiter || "N/A")}

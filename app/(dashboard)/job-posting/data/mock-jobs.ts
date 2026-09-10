@@ -20,6 +20,10 @@ export interface Job {
   createdBy: string;
   createdOn: string;
   modifiedOn: string;
+  createdAt?: string;
+  updatedAt?: string;
+  creatorEmail?: string | null;
+  jobTimezone?: string;
   submissionsCount: number;
   pipeline: {
     applied: number;
@@ -75,8 +79,12 @@ export function mapApiJobToJob(api: any): Job {
     primaryRecruiterId: api.primaryRecruiterId || undefined,
     assignedTo: api.assignedTo || "N/A",
     createdBy: api.createdBy || "System Admin",
-    createdOn: api.createdOn || api.createdAt || new Date().toISOString().split("T")[0],
-    modifiedOn: api.modifiedOn || api.updatedAt || api.createdOn || new Date().toISOString().split("T")[0],
+    createdOn: api.createdAt || api.createdOn || new Date().toISOString(),
+    modifiedOn: api.updatedAt || api.modifiedOn || api.createdAt || api.createdOn || new Date().toISOString(),
+    createdAt: api.createdAt || api.createdOn || undefined,
+    updatedAt: api.updatedAt || api.modifiedOn || undefined,
+    creatorEmail: api.creatorEmail || api.creator_email || undefined,
+    jobTimezone: api.jobTimezone || api.job_timezone || undefined,
     submissionsCount: api.submissionsCount || 0,
     pipeline: api.pipeline || { applied: 0, interviewing: 0, offered: 0 },
     agingDays: api.agingDays || 0,

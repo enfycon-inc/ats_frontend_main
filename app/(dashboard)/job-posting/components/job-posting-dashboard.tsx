@@ -34,6 +34,8 @@ const getBaseJobColumns = (usesPods: boolean) => [
   ...(usesPods ? ["podName"] : []),
   "clientBillRate",
   "payRate",
+  "createdOn",
+  "modifiedOn",
   "submissionsCount",
 ];
 
@@ -123,33 +125,11 @@ export default function JobPostingDashboard({
   }, []);
 
   // Sanitize user columns: remove legacy primaryRecruiter / recruitmentManager,
-  // enforce podName presence strictly based on branchUsesPods, and ensure assignedTo is included.
+  // and remove podName only if the current branch does not use pods.
   const sanitizeColumns = useCallback((cols: string[], usesPods: boolean) => {
     let clean = cols.filter((c) => c !== "primaryRecruiter" && c !== "recruitmentManager");
     if (!usesPods) {
       clean = clean.filter((c) => c !== "podName");
-    } else if (!clean.includes("podName")) {
-      const statusIdx = clean.indexOf("jobStatus");
-      if (statusIdx !== -1) clean.splice(statusIdx + 1, 0, "podName");
-      else clean.push("podName");
-    }
-    if (!clean.includes("createdBy")) {
-      const buIdx = clean.indexOf("businessUnit");
-      if (buIdx !== -1) clean.splice(buIdx + 1, 0, "createdBy");
-      else clean.unshift("createdBy");
-    }
-    if (!clean.includes("assignedTo")) {
-      const createdIdx = clean.indexOf("createdBy");
-      if (createdIdx !== -1) clean.splice(createdIdx + 1, 0, "assignedTo");
-      else clean.push("assignedTo");
-    } else {
-      const createdIdx = clean.indexOf("createdBy");
-      const assignedIdx = clean.indexOf("assignedTo");
-      if (createdIdx !== -1 && assignedIdx !== -1 && assignedIdx !== createdIdx + 1) {
-        clean = clean.filter((c) => c !== "assignedTo");
-        const newCreatedIdx = clean.indexOf("createdBy");
-        clean.splice(newCreatedIdx + 1, 0, "assignedTo");
-      }
     }
     return clean;
   }, []);
@@ -586,11 +566,18 @@ export default function JobPostingDashboard({
         isOpen={isColumnOpen}
         onClose={() => setIsColumnOpen(false)}
         allColumns={allColumns}
+        defaultColumns={getBaseJobColumns(branchUsesPods)}
         selectedColumns={activeSelectedColumns}
         onApply={(newCols) => {
           setSelectedColumns(newCols);
           saveUserColumnPreferences("jobs", newCols);
-          toast.success("Column view saved for your account!");
+          toast.success("Column preferences saved!");
+        }}
+        onResetToDefault={() => {
+          const defaultCols = getBaseJobColumns(branchUsesPods);
+          setSelectedColumns(defaultCols);
+          saveUserColumnPreferences("jobs", defaultCols);
+          toast.success("Columns reset to default view!");
         }}
       />
     </div>
