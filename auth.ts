@@ -29,6 +29,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   // AUTH_SECRET is required. Generate one with: openssl rand -base64 32
   secret: process.env.AUTH_SECRET,
   trustHost: true,
+  // Redirect all NextAuth errors to the login page instead of the generic /api/auth/error
+  pages: {
+    error: "/auth/login",
+    signIn: "/auth/login",
+  },
   session: {
     strategy: "jwt",
     // Matches Keycloak's SSO Session Max. Set KEYCLOAK_REFRESH_TOKEN_TTL_SECONDS in .env.
@@ -238,14 +243,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               (user as any).defaultMarket = data.user.defaultMarket || "US";
               return true;
             }
-          } else {
-            const errData = res ? await res.json().catch(() => ({})) : {};
-            console.warn(`SSO authentication rejected: ${errData.message || res?.statusText}`);
-            return false;
           }
+          // SSO backend rejected — redirect to login with error message
+          const errData = res ? await res.json().catch(() => ({})) : {};
+          console.warn(`SSO authentication rejected: ${errData.message || res?.statusText}`);
+          return `/auth/login?error=AccessDenied`;
         } catch (err) {
           console.error("SSO signIn callback error:", err);
-          return false;
+          return `/auth/login?error=AccessDenied`;
         }
       }
       return true;
