@@ -180,6 +180,13 @@ export default function BranchManagementPage() {
   const [addingBranchRemark, setAddingBranchRemark] = useState(false);
   const [isTogglingGlobalRemarks, setIsTogglingGlobalRemarks] = useState(false);
 
+  // Global Remarks Selection Picker for Branch Admin
+  const [availableGlobalRemarks, setAvailableGlobalRemarks] = useState<any[]>([]);
+  const [isGlobalSelectorOpen, setIsGlobalSelectorOpen] = useState(false);
+  const [selectedGlobalIds, setSelectedGlobalIds] = useState<number[]>([]);
+  const [savingGlobalSelection, setSavingGlobalSelection] = useState(false);
+  const [globalSelectorStageFilter, setGlobalSelectorStageFilter] = useState("all");
+
   const [selectedBranch, setSelectedBranch] = useState<any>(null);
   const [branchMembers, setBranchMembers] = useState<any[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -618,9 +625,28 @@ export default function BranchManagementPage() {
     setRemarksStageFilter("review");
     setNewAcceptText("");
     setNewRejectText("");
+
+    let initialSelectedIds: number[] = [];
+    if (branch.selectedGlobalRemarkIds && branch.selectedGlobalRemarkIds !== 'ALL') {
+      try {
+        const parsed = JSON.parse(branch.selectedGlobalRemarkIds);
+        if (Array.isArray(parsed)) initialSelectedIds = parsed;
+      } catch {}
+    }
+    setSelectedGlobalIds(initialSelectedIds);
+
     try {
-      const data = await atsApi.submissions.getCustomRemarks(branch.id, Boolean(branch.enableGlobalRemarks));
+      const [data, allGlobals] = await Promise.all([
+        atsApi.submissions.getCustomRemarks(branch.id, Boolean(branch.enableGlobalRemarks)),
+        atsApi.submissions.getCustomRemarks(undefined, true).catch(() => []),
+      ]);
       setBranchRemarks(data || []);
+      const filteredGlobals = (allGlobals || []).filter((r: any) => !r.branchId || r.isGlobal);
+      setAvailableGlobalRemarks(filteredGlobals);
+
+      if (!branch.selectedGlobalRemarkIds || branch.selectedGlobalRemarkIds === 'ALL') {
+        setSelectedGlobalIds(filteredGlobals.map((r: any) => r.id));
+      }
     } catch (err: any) {
       toast.error("Failed to load branch remarks: " + err.message);
     } finally {
@@ -634,7 +660,13 @@ export default function BranchManagementPage() {
     const nextState = !currentState;
     setIsTogglingGlobalRemarks(true);
     try {
-      const updatedBranch = await atsApi.branches.toggleGlobalRemarks(selectedBranchForRemarks.id, nextState);
+      const remarkIdsParam = nextState
+        ? (selectedGlobalIds.length > 0 && selectedGlobalIds.length < availableGlobalRemarks.length
+            ? JSON.stringify(selectedGlobalIds)
+            : 'ALL')
+        : undefined;
+
+      const updatedBranch = await atsApi.branches.toggleGlobalRemarks(selectedBranchForRemarks.id, nextState, remarkIdsParam);
       setSelectedBranchForRemarks(updatedBranch);
       setBranches((prev) => prev.map((b) => b.id === updatedBranch.id ? updatedBranch : b));
       // Reload remarks for this branch with the updated flag
@@ -645,6 +677,35 @@ export default function BranchManagementPage() {
       toast.error("Failed to toggle global remarks: " + err.message);
     } finally {
       setIsTogglingGlobalRemarks(false);
+    }
+  };
+
+  const handleSaveGlobalSelection = async (mode: 'ALL' | 'CUSTOM', customIds?: number[]) => {
+    if (!selectedBranchForRemarks || !selectedBranchForRemarks.id) return;
+    setSavingGlobalSelection(true);
+    try {
+      const isAll = mode === 'ALL';
+      const idsToSave = isAll ? 'ALL' : JSON.stringify(customIds ?? selectedGlobalIds);
+
+      const updatedBranch = await atsApi.branches.toggleGlobalRemarks(selectedBranchForRemarks.id, true, idsToSave);
+      setSelectedBranchForRemarks(updatedBranch);
+      setBranches((prev) => prev.map((b) => b.id === updatedBranch.id ? updatedBranch : b));
+
+      if (isAll) {
+        setSelectedGlobalIds(availableGlobalRemarks.map((r) => r.id));
+      } else if (customIds) {
+        setSelectedGlobalIds(customIds);
+      }
+
+      // Reload remarks for this branch
+      const data = await atsApi.submissions.getCustomRemarks(selectedBranchForRemarks.id, true);
+      setBranchRemarks(data || []);
+      setIsGlobalSelectorOpen(false);
+      toast.success(isAll ? "All global remarks templates enabled for this branch!" : `Saved ${customIds?.length ?? selectedGlobalIds.length} global templates for this branch!`);
+    } catch (err: any) {
+      toast.error("Failed to save selection: " + err.message);
+    } finally {
+      setSavingGlobalSelection(false);
     }
   };
 
@@ -2668,6 +2729,21 @@ export default function BranchManagementPage() {
                     }`}>
                       {selectedBranchForRemarks.enableGlobalRemarks ? 'Enabled' : 'Disabled'}
                     </span>
+                    {selectedBranchForRemarks.enableGlobalRemarks && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsGlobalSelectorOpen(true)}
+                        className="ml-1 h-6 px-2 text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 border border-indigo-200/80 dark:border-indigo-800 rounded flex items-center gap-1 cursor-pointer"
+                        title="Choose which global remarks templates are active for this branch"
+                      >
+                        <ListChecks className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />
+                        {(!selectedBranchForRemarks.selectedGlobalRemarkIds || selectedBranchForRemarks.selectedGlobalRemarkIds === 'ALL' || (availableGlobalRemarks.length > 0 && selectedGlobalIds.length === availableGlobalRemarks.length))
+                          ? 'All Templates'
+                          : `${selectedGlobalIds.length}/${availableGlobalRemarks.length} Selected`}
+                      </Button>
+                    )}
                   </div>
                 )}
 
@@ -2966,6 +3042,213 @@ export default function BranchManagementPage() {
               </Button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ── GLOBAL REMARKS SELECTION PICKER MODAL (Allows branch admin to pick specific or all global remarks) ── */}
+      {isGlobalSelectorOpen && selectedBranchForRemarks && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden my-auto animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                  <ListChecks className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    Select Global Remarks for {selectedBranchForRemarks.name}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Choose which global templates recruiters in this branch can use during candidate reviews.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGlobalSelectorOpen(false)}
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Filter & Bulk Selection Controls */}
+            <div className="px-6 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 overflow-x-auto">
+                <span className="text-[10.5px] font-semibold text-slate-400 uppercase tracking-wider mr-1">Stage:</span>
+                {[
+                  { key: "all", label: "All" },
+                  { key: "review", label: "Review" },
+                  { key: "l1", label: "L1" },
+                  { key: "l2", label: "L2" },
+                  { key: "l3", label: "L3" },
+                  { key: "final", label: "Final" },
+                ].map((s) => (
+                  <button
+                    key={s.key}
+                    type="button"
+                    onClick={() => setGlobalSelectorStageFilter(s.key)}
+                    className={`px-2.5 py-1 rounded text-xs transition-colors cursor-pointer ${
+                      globalSelectorStageFilter === s.key
+                        ? "bg-indigo-600 text-white font-semibold shadow-xs"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const visibleIds = availableGlobalRemarks
+                      .filter((r) => globalSelectorStageFilter === "all" || r.stage === globalSelectorStageFilter || (globalSelectorStageFilter === "review" && r.stage === "internal_review"))
+                      .map((r) => r.id);
+                    setSelectedGlobalIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+                  }}
+                  className="h-7 text-[11px] text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 px-2 cursor-pointer"
+                >
+                  Select Filtered
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedGlobalIds(availableGlobalRemarks.map((r) => r.id));
+                  }}
+                  className="h-7 text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 px-2 cursor-pointer"
+                >
+                  Select All
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedGlobalIds([])}
+                  className="h-7 text-[11px] text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 px-2 cursor-pointer"
+                >
+                  Deselect All
+                </Button>
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="p-6 overflow-y-auto flex-1 divide-y divide-slate-100 dark:divide-slate-800/60">
+              {availableGlobalRemarks.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400 italic">
+                  No global templates exist yet. A Global Admin can create them in the Global Remarks Templates view.
+                </div>
+              ) : (
+                (() => {
+                  const filtered = availableGlobalRemarks.filter(
+                    (r) => globalSelectorStageFilter === "all" || r.stage === globalSelectorStageFilter || (globalSelectorStageFilter === "review" && r.stage === "internal_review")
+                  );
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="p-8 text-center text-xs text-slate-400 italic">
+                        No global templates found for stage &quot;{globalSelectorStageFilter}&quot;.
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="space-y-2">
+                      {filtered.map((rem) => {
+                        const isChecked = selectedGlobalIds.includes(rem.id);
+                        return (
+                          <div
+                            key={rem.id}
+                            onClick={() => {
+                              setSelectedGlobalIds((prev) =>
+                                isChecked ? prev.filter((id) => id !== rem.id) : [...prev, rem.id]
+                              );
+                            }}
+                            className={`p-3 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                              isChecked
+                                ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800/80 shadow-2xs"
+                                : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                            }`}
+                          >
+                            <div className="flex items-start gap-3 min-w-0 flex-1">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}} // handled by parent div onClick
+                                className="h-4 w-4 accent-indigo-600 rounded cursor-pointer mt-0.5 shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {rem.remarkType === "ACCEPT" ? (
+                                    <span className="text-emerald-700 dark:text-emerald-400 font-semibold text-[10px] bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.2 rounded inline-flex items-center gap-1">
+                                      <span>✓</span> Accept
+                                    </span>
+                                  ) : (
+                                    <span className="text-rose-700 dark:text-rose-400 font-semibold text-[10px] bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 px-1.5 py-0.2 rounded inline-flex items-center gap-1">
+                                      <span>✕</span> Reject
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] font-medium px-1.5 py-0.2 rounded uppercase bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
+                                    {rem.stage}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-normal">
+                                  {rem.remarkText}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850 flex items-center justify-between shrink-0">
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedGlobalIds.length}</span> of {availableGlobalRemarks.length} selected
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsGlobalSelectorOpen(false)}
+                  disabled={savingGlobalSelection}
+                  className="h-8 text-xs font-semibold px-4 cursor-pointer"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSaveGlobalSelection('ALL')}
+                  disabled={savingGlobalSelection}
+                  className="h-8 text-xs font-semibold px-4 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer"
+                >
+                  Enable All ({availableGlobalRemarks.length})
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => handleSaveGlobalSelection('CUSTOM')}
+                  disabled={savingGlobalSelection}
+                  className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  {savingGlobalSelection && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Save Selection ({selectedGlobalIds.length})
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

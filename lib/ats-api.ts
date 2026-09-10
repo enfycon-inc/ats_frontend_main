@@ -1309,10 +1309,10 @@ const branches = {
   async get(id: string): Promise<any> {
     return apiFetch<any>(`/api/branches/${id}`);
   },
-  async toggleGlobalRemarks(id: string, enableGlobalRemarks?: boolean): Promise<any> {
+  async toggleGlobalRemarks(id: string, enableGlobalRemarks?: boolean, selectedGlobalRemarkIds?: string): Promise<any> {
     return apiFetch<any>(`/api/branches/${id}/toggle-global-remarks`, {
       method: 'PATCH',
-      body: JSON.stringify({ enableGlobalRemarks }),
+      body: JSON.stringify({ enableGlobalRemarks, selectedGlobalRemarkIds }),
     });
   },
   async create(data: {
