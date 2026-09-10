@@ -188,33 +188,11 @@ export default function GlobalRemarksPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-5">
-      <DashboardBreadcrumb title="Global Stage Remarks Templates" text="Settings" />
+    <div className="w-full max-w-full p-6 space-y-5">
+      <DashboardBreadcrumb title="Global Remarks Templates" text="Settings" />
 
-      {/* Clean Compact Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-        <div>
-          <h1 className="text-lg font-bold text-slate-900 dark:text-white">
-            Global Remarks Templates
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Manage organization-wide quick-pick templates for candidate interview stages.
-          </p>
-        </div>
-
-        <Button
-          onClick={loadGlobalRemarks}
-          variant="outline"
-          size="sm"
-          disabled={loading}
-          className="h-8 text-xs font-semibold border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-1.5 cursor-pointer"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-        </Button>
-      </div>
-
-      {/* Stage Toolbar */}
-      <div className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      {/* Stage Toolbar with Search and Refresh */}
+      <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mr-1 shrink-0">Stage:</span>
           {STAGES.map((s) => {
@@ -246,14 +224,25 @@ export default function GlobalRemarksPage() {
           })}
         </div>
 
-        <div className="relative w-full md:w-64 shrink-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search templates..."
-            className="pl-8.5 h-8 text-xs bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 rounded-lg"
-          />
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search templates..."
+              className="pl-8.5 h-8 text-xs bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 rounded-lg"
+            />
+          </div>
+          <Button
+            onClick={loadGlobalRemarks}
+            variant="outline"
+            size="sm"
+            disabled={loading}
+            className="h-8 text-xs font-semibold border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-1.5 cursor-pointer shrink-0"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
         </div>
       </div>
 
