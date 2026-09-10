@@ -37,7 +37,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "jwt",
     // Matches Keycloak's SSO Session Max. Set KEYCLOAK_REFRESH_TOKEN_TTL_SECONDS in .env.
-    maxAge: parseInt(process.env.KEYCLOAK_REFRESH_TOKEN_TTL_SECONDS || '28800'), // Default 8 hours
+    maxAge: parseInt(process.env.KEYCLOAK_REFRESH_TOKEN_TTL_SECONDS || '86400'), // Default 24 hours (supports 12h idle timeout)
   },
   cookies: {
     sessionToken: {
