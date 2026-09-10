@@ -27,7 +27,7 @@ async function fetchBackend(path: string, options: RequestInit = {}): Promise<Re
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // AUTH_SECRET is required. Generate one with: openssl rand -base64 32
-  secret: process.env.AUTH_SECRET,
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   trustHost: true,
   // Redirect all NextAuth errors to the login page instead of the generic /api/auth/error
   pages: {
