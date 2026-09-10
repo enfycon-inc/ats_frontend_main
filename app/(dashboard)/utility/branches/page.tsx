@@ -142,6 +142,11 @@ export default function BranchManagementPage() {
   const canAssignManager = userPermissions.includes('branch:assign_manager') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('user:manage') || userPermissions.includes('tenant:settings');
   const canAssignUserRoles = userPermissions.includes('branch:assign_user') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('user:manage') || userPermissions.includes('tenant:settings');
   const canManageBranches = canCreateBranch || canDeleteBranch;
+  const isGlobalAdmin =
+    userPermissions.includes('system:admin') ||
+    sessionUser?.roles?.some((r: string) => String(r).toUpperCase() === 'SUPER_ADMIN') ||
+    String(sessionUser?.systemRole || '').toUpperCase() === 'SUPER_ADMIN' ||
+    String(overrideRole || '').toUpperCase() === 'SUPER_ADMIN';
   const canManageGlobalRemarks =
     userPermissions.includes('tenant:settings') ||
     userPermissions.includes('tenant:manage') ||
@@ -825,16 +830,6 @@ export default function BranchManagementPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {canManageGlobalRemarks && (
-              <Button
-                onClick={openGlobalRemarksModal}
-                variant="outline"
-                className="border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/60 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 font-semibold text-xs h-9 px-3.5 rounded-lg flex items-center gap-1.5 shadow-2xs cursor-pointer"
-              >
-                <Globe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" /> Global Remarks Templates
-              </Button>
-            )}
-
             {canManageBranches && (
               <Button
                 onClick={() => {
@@ -2895,7 +2890,7 @@ export default function BranchManagementPage() {
                                     Global
                                   </span>
                                 )}
-                                {(isGlobalRemarksMode ? canManageGlobalRemarks : (rem.branchId ? canEditBranch : canManageGlobalRemarks)) && (
+                                {(rem.branchId ? canEditBranch : isGlobalAdmin) && (
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteBranchRemark(rem.id)}
@@ -3005,7 +3000,7 @@ export default function BranchManagementPage() {
                                     Global
                                   </span>
                                 )}
-                                {(isGlobalRemarksMode ? canManageGlobalRemarks : (rem.branchId ? canEditBranch : canManageGlobalRemarks)) && (
+                                {(rem.branchId ? canEditBranch : isGlobalAdmin) && (
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteBranchRemark(rem.id)}

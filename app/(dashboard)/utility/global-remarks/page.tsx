@@ -10,7 +10,8 @@ import {
   RefreshCw, 
   ShieldAlert, 
   Search,
-  MessageSquare
+  MessageSquare,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +62,17 @@ export default function GlobalRemarksPage() {
     return Array.isArray(sessionUser?.permissions) ? sessionUser.permissions : [];
   }, [sessionUser]);
 
+  const isGlobalAdmin = useMemo(() => {
+    const roles = Array.isArray(sessionUser?.roles) ? sessionUser.roles : [];
+    const sysRole = sessionUser?.systemRole;
+    return (
+      userPermissions.includes("system:admin") ||
+      roles.some((r: string) => String(r).toUpperCase() === "SUPER_ADMIN") ||
+      String(sysRole || "").toUpperCase() === "SUPER_ADMIN" ||
+      String(overrideRole || "").toUpperCase() === "SUPER_ADMIN"
+    );
+  }, [sessionUser, userPermissions, overrideRole]);
+
   const canManageGlobalRemarks = useMemo(() => {
     const roles = Array.isArray(sessionUser?.roles) ? sessionUser.roles : [];
     const sysRole = sessionUser?.systemRole;
@@ -92,6 +104,10 @@ export default function GlobalRemarksPage() {
   }, []);
 
   const handleAddRemarks = async (type: "ACCEPT" | "REJECT", text: string) => {
+    if (!isGlobalAdmin) {
+      toast.error("Only Global Administrators can add universal global remarks templates.");
+      return;
+    }
     if (!text.trim()) return;
     const items = text
       .split(/,|\n/)
@@ -130,6 +146,10 @@ export default function GlobalRemarksPage() {
   };
 
   const handleDeleteRemark = async (id: number) => {
+    if (!isGlobalAdmin) {
+      toast.error("Only Global Administrators can delete universal global remarks templates.");
+      return;
+    }
     try {
       await atsApi.submissions.deleteCustomRemark(id);
       setRemarks((prev) => prev.filter((r) => r.id !== id));
@@ -190,6 +210,12 @@ export default function GlobalRemarksPage() {
   return (
     <div className="w-full max-w-full p-6 space-y-5">
       <DashboardBreadcrumb title="Global Remarks Templates" text="Settings" />
+
+      {!isGlobalAdmin && (
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs text-amber-800 dark:text-amber-300">
+          <span>Read-only mode: As a Tenant Administrator, you can view global remarks and enable them in Branch settings. Only Global Administrators can create or delete global remark templates.</span>
+        </div>
+      )}
 
       {/* Stage Toolbar with Search and Refresh */}
       <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -273,28 +299,35 @@ export default function GlobalRemarksPage() {
             </CardHeader>
 
             <CardContent className="p-4 space-y-3.5">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleAddRemarks("ACCEPT", newAcceptText);
-                }}
-                className="flex gap-2"
-              >
-                <Input
-                  value={newAcceptText}
-                  onChange={(e) => setNewAcceptText(e.target.value)}
-                  placeholder="Enter acceptance remark (comma-separated for multiple)..."
-                  disabled={addingAccept}
-                  className="text-xs h-8.5 bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
-                />
-                <Button
-                  type="submit"
-                  disabled={addingAccept || !newAcceptText.trim()}
-                  className="h-8.5 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 cursor-pointer"
+              {!isGlobalAdmin ? (
+                <div className="text-[11px] text-slate-500 italic bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 flex items-center gap-2">
+                  <Lock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <span>Only Global Administrators can add global acceptance remarks.</span>
+                </div>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleAddRemarks("ACCEPT", newAcceptText);
+                  }}
+                  className="flex gap-2"
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
-                </Button>
-              </form>
+                  <Input
+                    value={newAcceptText}
+                    onChange={(e) => setNewAcceptText(e.target.value)}
+                    placeholder="Enter acceptance remark (comma-separated for multiple)..."
+                    disabled={addingAccept}
+                    className="text-xs h-8.5 bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={addingAccept || !newAcceptText.trim()}
+                    className="h-8.5 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                  </Button>
+                </form>
+              )}
 
               <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
                 {acceptRemarks.length === 0 ? (
@@ -318,14 +351,16 @@ export default function GlobalRemarksPage() {
                         <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
                           {rem.stage}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRemark(rem.id)}
-                          className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                          title="Delete template"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        {isGlobalAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRemark(rem.id)}
+                            className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            title="Delete template"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -353,28 +388,35 @@ export default function GlobalRemarksPage() {
             </CardHeader>
 
             <CardContent className="p-4 space-y-3.5">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleAddRemarks("REJECT", newRejectText);
-                }}
-                className="flex gap-2"
-              >
-                <Input
-                  value={newRejectText}
-                  onChange={(e) => setNewRejectText(e.target.value)}
-                  placeholder="Enter rejection remark (comma-separated for multiple)..."
-                  disabled={addingReject}
-                  className="text-xs h-8.5 bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
-                />
-                <Button
-                  type="submit"
-                  disabled={addingReject || !newRejectText.trim()}
-                  className="h-8.5 px-3.5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shrink-0 cursor-pointer"
+              {!isGlobalAdmin ? (
+                <div className="text-[11px] text-slate-500 italic bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 flex items-center gap-2">
+                  <Lock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <span>Only Global Administrators can add global rejection remarks.</span>
+                </div>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleAddRemarks("REJECT", newRejectText);
+                  }}
+                  className="flex gap-2"
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
-                </Button>
-              </form>
+                  <Input
+                    value={newRejectText}
+                    onChange={(e) => setNewRejectText(e.target.value)}
+                    placeholder="Enter rejection remark (comma-separated for multiple)..."
+                    disabled={addingReject}
+                    className="text-xs h-8.5 bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={addingReject || !newRejectText.trim()}
+                    className="h-8.5 px-3.5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shrink-0 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                  </Button>
+                </form>
+              )}
 
               <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
                 {rejectRemarks.length === 0 ? (
@@ -398,14 +440,16 @@ export default function GlobalRemarksPage() {
                         <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
                           {rem.stage}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRemark(rem.id)}
-                          className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                          title="Delete template"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        {isGlobalAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRemark(rem.id)}
+                            className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            title="Delete template"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
