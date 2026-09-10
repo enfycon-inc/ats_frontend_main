@@ -9,7 +9,11 @@ export async function doLogout(): Promise<LogoutResponse> {
     const cookieStore = await cookies();
 
     cookieStore.delete("ats.session-token");
+    cookieStore.delete("__Secure-ats.session-token");
     cookieStore.delete("authjs.session-token");
+    cookieStore.delete("__Secure-authjs.session-token");
+    cookieStore.delete("next-auth.session-token");
+    cookieStore.delete("__Secure-next-auth.session-token");
 
     return { success: true };
   } catch (error) {

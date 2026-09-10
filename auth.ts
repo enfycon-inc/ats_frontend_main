@@ -8,6 +8,22 @@ import { loginSchema } from "./lib/zod"
 
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || "d3b07384-d113-49c3-a555-9ee75c13ca33";
 const isProd = process.env.NODE_ENV === "production";
+const cookiePrefix = isProd ? "__Secure-" : "";
+
+async function fetchBackend(path: string, options: RequestInit = {}): Promise<Response> {
+  const internalBase = process.env.INTERNAL_API_URL || (isProd ? "http://backend_blue:5000" : (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000"));
+  try {
+    const res = await fetch(`${internalBase}${path}`, options);
+    if (res) return res;
+  } catch (err) {
+    console.warn(`[auth.ts] Internal fetch to ${internalBase}${path} failed, trying fallback:`, (err as any)?.message || err);
+  }
+
+  const publicBase = (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes("localhost"))
+    ? process.env.NEXT_PUBLIC_API_URL
+    : "https://api.enfyjobs.com";
+  return fetch(`${publicBase}${path}`, options);
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // AUTH_SECRET is required. Generate one with: openssl rand -base64 32
@@ -20,7 +36,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   cookies: {
     sessionToken: {
-      name: `ats.session-token`,
+      name: `${cookiePrefix}ats.session-token`,
       options: {
         httpOnly: true,
         sameSite: "lax",
@@ -69,16 +85,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
 
           // 2. Network verification fallback against backend API
-          let apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.enfyjobs.com";
-          if (process.env.NODE_ENV === "production" && apiBase.includes("localhost")) {
-            apiBase = "https://api.enfyjobs.com";
-          }
-          const res = await fetch(`${apiBase}/api/auth/me`, {
+          const res = await fetchBackend(`/api/auth/me`, {
             headers: {
               Authorization: `Bearer ${credentials.token}`,
             },
-          });
-          if (res.ok) {
+          }).catch(() => null);
+          if (res && res.ok) {
             const data = await res.json();
             const u = data?.user || data;
             if (u && u.id) {
@@ -118,19 +130,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const { email, password } = parsed;
           const subdomain = credentials?.subdomain || "";
 
-          let apiBase = process.env.NEXT_PUBLIC_API_URL || "https://api.enfyjobs.com";
-          if (process.env.NODE_ENV === "production" && apiBase.includes("localhost")) {
-            apiBase = "https://api.enfyjobs.com";
-          }
-
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 4000);
-          const res = await fetch(`${apiBase}/api/auth/login`, {
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
+          const res = await fetchBackend(`/api/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password, subdomain }),
             signal: controller.signal,
-          });
+          }).catch(() => null);
           clearTimeout(timeoutId);
 
           if (res && res.ok) {
@@ -201,12 +208,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (account?.provider === "google" || account?.provider === "microsoft-entra-id" || account?.provider === "microsoft") {
         try {
           const provider = account.provider.includes("microsoft") ? "microsoft" : "google";
-          let apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000";
-          if (process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_API_URL) {
-            apiBase = "http://backend:5000";
-          }
-
-          const res = await fetch(`${apiBase}/api/auth/sso-login`, {
+          const res = await fetchBackend(`/api/auth/sso-login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -216,9 +218,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               picture: user.image,
               microsoftTenantId: (profile as any)?.tid || null,
             }),
-          });
+          }).catch(() => null);
 
-          if (res.ok) {
+          if (res && res.ok) {
             const data = await res.json();
             if (data?.user) {
               user.id = data.user.id;
@@ -237,8 +239,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               return true;
             }
           } else {
-            const errData = await res.json().catch(() => ({}));
-            console.warn(`SSO authentication rejected: ${errData.message || res.statusText}`);
+            const errData = res ? await res.json().catch(() => ({})) : {};
+            console.warn(`SSO authentication rejected: ${errData.message || res?.statusText}`);
             return false;
           }
         } catch (err) {
@@ -282,13 +284,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // Token expired or about to expire — try silent refresh via backend
       if (token.refreshToken) {
         try {
-          // Docker-internal URL (production), env var fallback (dev)
-          const apiBase =
-            process.env.NODE_ENV === 'production'
-              ? 'http://backend:5000'
-              : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000')
-
-          const res = await fetch(`${apiBase}/api/auth/refresh`, {
+          const res = await fetchBackend(`/api/auth/refresh`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ refreshToken: token.refreshToken }),

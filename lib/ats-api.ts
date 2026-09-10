@@ -37,10 +37,16 @@ export function getApiBase(): string {
   }
 
   // Server-side execution inside container
+  if (process.env.INTERNAL_API_URL) {
+    return process.env.INTERNAL_API_URL;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.NEXT_PUBLIC_API_URL || 'http://backend_blue:5000';
+  }
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  return 'http://backend:5000';
+  return 'http://127.0.0.1:5000';
 }
 
 // ─── Token Management ──────────────────────────────────────────────

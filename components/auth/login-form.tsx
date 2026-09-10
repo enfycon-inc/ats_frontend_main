@@ -89,8 +89,10 @@ const LoginForm = () => {
     const ssoToken = searchParams.get("sso_token") || searchParams.get("token");
     if (ssoToken) {
       setIsAuthorizingSso(true);
+      const cachedUser = typeof window !== "undefined" ? localStorage.getItem("ats_current_user") : null;
       signIn("token-handoff", {
         token: ssoToken,
+        userJson: cachedUser || undefined,
         redirect: false,
       }).then((res) => {
         if (res?.ok) {
