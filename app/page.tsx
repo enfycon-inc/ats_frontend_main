@@ -80,6 +80,31 @@ export default function RootPage() {
   const [isLoggingIn, startLoginTransition] = useTransition();
   const [loginEmail, setLoginEmail] = useState<string | null>(null);
 
+  /**
+   * Poll /api/auth/session until the NextAuth cookie is committed, then navigate.
+   * Prevents the dashboard layout from seeing no session and bouncing back to login.
+   */
+  const navigateAfterLogin = async (destination: string) => {
+    const MAX_ATTEMPTS = 12;
+    const POLL_INTERVAL_MS = 250;
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      try {
+        const res = await fetch("/api/auth/session", { cache: "no-store" });
+        if (res.ok) {
+          const session = await res.json();
+          if (session?.user) {
+            window.location.href = destination;
+            return;
+          }
+        }
+      } catch {
+        // network hiccup — keep trying
+      }
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    window.location.href = destination;
+  };
+
   const handleQuickLogin = async (email: string, roleName: string) => {
     setLoginEmail(email);
     startLoginTransition(async () => {
@@ -116,23 +141,21 @@ export default function RootPage() {
         const base = getBaseDomain();
         const protocol = window.location.protocol;
 
+        let dest: string;
         if (isSuperAdmin) {
-          // Super Admin always stays on root domain (localhost:3000/dashboard)
-          if (currentSubdomain) {
-            window.location.href = `${protocol}//${base}/dashboard`;
-          } else {
-            window.location.href = "/dashboard";
-          }
+          dest = currentSubdomain ? `${protocol}//${base}/dashboard` : "/dashboard";
         } else if (userTenantDomain && userTenantDomain !== "enfy" && userTenantDomain !== "www" && currentSubdomain !== userTenantDomain) {
           // Tenant user logging in -> redirect to tenant subdomain with SSO token
           const tokenParam = syncRes?.accessToken ? `?sso_token=${encodeURIComponent(syncRes.accessToken)}` : "";
           window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login${tokenParam}`;
+          return;
         } else if (currentSubdomain === "enfy") {
-          // Master tenant user on enfy.localhost -> redirect to root localhost:3000/dashboard
-          window.location.href = `${protocol}//${base}/dashboard`;
+          dest = `${protocol}//${base}/dashboard`;
         } else {
-          window.location.href = "/dashboard";
+          dest = "/dashboard";
         }
+
+        await navigateAfterLogin(dest);
       } catch (err: any) {
         toast.error(err.message || "Failed to sign in.");
       }

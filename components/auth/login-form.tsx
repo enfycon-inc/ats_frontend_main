@@ -150,6 +150,39 @@ const LoginForm = () => {
     }
   }, [searchParams, setValue]);
 
+  /**
+   * Wait until the NextAuth session cookie is committed before navigating away.
+   *
+   * signIn({ redirect: false }) resolves as soon as the server sends Set-Cookie,
+   * but the browser may not have persisted the cookie before window.location.href
+   * fires — causing the dashboard layout's server-side auth() to see no session
+   * and redirect straight back to /auth/login.
+   *
+   * We poll /api/auth/session (same origin) for up to ~3 s to confirm the cookie
+   * is readable, then navigate. Falls back to immediate navigation on timeout.
+   */
+  const navigateAfterLogin = async (destination: string) => {
+    const MAX_ATTEMPTS = 12;
+    const POLL_INTERVAL_MS = 250;
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      try {
+        const res = await fetch("/api/auth/session", { cache: "no-store" });
+        if (res.ok) {
+          const session = await res.json();
+          if (session?.user) {
+            window.location.href = destination;
+            return;
+          }
+        }
+      } catch {
+        // network hiccup — keep trying
+      }
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    // Session didn't appear within timeout — navigate anyway (best-effort)
+    window.location.href = destination;
+  };
+
   const onSubmit = (data: z.infer<typeof schema>) => {
     startTransition(async () => {
       try {
@@ -186,11 +219,8 @@ const LoginForm = () => {
           }
 
           toast.success("Successfully logged in");
-          if (currentSubdomain) {
-            window.location.href = `${protocol}//${base}/dashboard`;
-          } else {
-            window.location.href = "/dashboard";
-          }
+          const dest = currentSubdomain ? `${protocol}//${base}/dashboard` : "/dashboard";
+          await navigateAfterLogin(dest);
           return;
         }
 
@@ -219,11 +249,10 @@ const LoginForm = () => {
 
         toast.success("Successfully logged in");
 
-        if (currentSubdomain === "enfy" && isMasterTenant) {
-          window.location.href = `${protocol}//${base}/dashboard`;
-        } else {
-          window.location.href = "/dashboard";
-        }
+        const dest = (currentSubdomain === "enfy" && isMasterTenant)
+          ? `${protocol}//${base}/dashboard`
+          : "/dashboard";
+        await navigateAfterLogin(dest);
       } catch (err: any) {
         toast.error(err.message || "Failed to sign in.");
       }
