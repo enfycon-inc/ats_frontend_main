@@ -820,13 +820,8 @@ export default function SubmissionsPage() {
   const [submittedRate, setSubmittedRate] = useState("");
   const [reviewFeedback, setReviewFeedback] = useState(""); // AM/Pod feedback for recruiter
 
-  // Tenant Custom Remarks Configuration State
+  // Custom Remarks Choices State (configured in Branch & Office Locations)
   const [customRemarks, setCustomRemarks] = useState<any[]>([]);
-  const [customRemarksModalOpen, setCustomRemarksModalOpen] = useState(false);
-  const [customRemarksStageFilter, setCustomRemarksStageFilter] = useState<"review" | "l1" | "l2" | "l3" | "final" | "all">("review");
-  const [newCustomAcceptText, setNewCustomAcceptText] = useState("");
-  const [newCustomRejectText, setNewCustomRejectText] = useState("");
-  const [addingRemark, setAddingRemark] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
 
   // Quick Decision Modal state (for inline Table Approve / Reject)
@@ -1047,7 +1042,6 @@ export default function SubmissionsPage() {
   const canApproveClient = canInternalScreen || canFinalStatus;
   const canEditRate = isAdmin || isDeliveryHead || effectivePerms.includes("submission:edit_rate");
   const isRecruiterOnly = activeSystemRole === "RECRUITER" && !canAuditL1 && !canAuditL2 && !canAuditL3 && !canInternalScreen && !canFinalStatus && !canAuditRounds;
-  const canManageRemarks = isAdmin || effectivePerms.includes("tenant:settings");
 
   const canEditRecruiterComment = useMemo(() => {
     if (isAdmin) return true;
@@ -1090,53 +1084,6 @@ export default function SubmissionsPage() {
       toast.error("Failed: " + err.message);
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleAddDirectCustomRemark = async (type: "ACCEPT" | "REJECT", text: string) => {
-    if (!text.trim()) return;
-    const items = text
-      .split(/,|\n/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    if (items.length === 0) return;
-
-    try {
-      setAddingRemark(true);
-      const user = atsApi.auth.getCurrentUser();
-      const stage = customRemarksStageFilter === "all" ? "review" : customRemarksStageFilter;
-      const createdList = await Promise.all(
-        items.map((itemText) =>
-          atsApi.submissions.createCustomRemark({
-            stage: stage,
-            remarkText: itemText,
-            remarkType: type,
-            branchId: user?.branchId || undefined,
-          })
-        )
-      );
-      setCustomRemarks((prev) => [...prev, ...createdList]);
-      if (type === "ACCEPT") setNewCustomAcceptText("");
-      if (type === "REJECT") setNewCustomRejectText("");
-      if (items.length === 1) {
-        toast.success(`✓ ${type === "ACCEPT" ? "Acceptance" : "Rejection"} template added!`);
-      } else {
-        toast.success(`✓ Added ${items.length} ${type === "ACCEPT" ? "acceptance" : "rejection"} templates!`);
-      }
-    } catch (err: any) {
-      toast.error("Failed to add remark: " + err.message);
-    } finally {
-      setAddingRemark(false);
-    }
-  };
-
-  const handleDeleteCustomRemark = async (id: number) => {
-    try {
-      await atsApi.submissions.deleteCustomRemark(id);
-      setCustomRemarks((prev) => prev.filter((r) => r.id !== id));
-      toast.success("Custom remark removed!");
-    } catch (err: any) {
-      toast.error("Failed to delete remark: " + err.message);
     }
   };
 
@@ -1343,16 +1290,6 @@ export default function SubmissionsPage() {
                 Board
               </button>
             </div>
-            {canManageRemarks && (
-              <Button
-                onClick={() => setCustomRemarksModalOpen(true)}
-                variant="outline"
-                className="flex items-center gap-1.5 border-indigo-200 bg-indigo-50/60 hover:bg-indigo-100 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300 font-semibold text-xs h-9"
-              >
-                <Icon icon="heroicons:cog-6-tooth" className="h-4 w-4" />
-                Manage Stage Remarks
-              </Button>
-            )}
             <Button
               onClick={handleExportCSV}
               variant="outline"
@@ -2541,259 +2478,6 @@ export default function SubmissionsPage() {
         onSuccess={loadData}
       />
 
-      {/* ── TENANT CUSTOM REMARKS SETTINGS MODAL (THEME MATCHED ENTERPRISE DESIGN) ── */}
-      <Dialog open={customRemarksModalOpen} onOpenChange={setCustomRemarksModalOpen}>
-        <DialogContent className="sm:max-w-[950px] font-sans max-h-[90vh] flex flex-col p-0 overflow-hidden border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl">
-          <DialogHeader className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850">
-            <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <Icon icon="heroicons:cog-6-tooth" className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-              Stage Remarks Templates
-            </DialogTitle>
-            <DialogDescription className="text-[11.5px] text-slate-500 dark:text-slate-400">
-              Standard quick-pick templates for approving or rejecting candidates across hiring stages.
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Stage Tabs */}
-          <div className="px-6 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mr-1.5 shrink-0">Stage:</span>
-            {[
-              { key: "review", label: "Internal Review Gate", count: customRemarks.filter(r => r.stage === "review" || r.stage === "internal_review").length },
-              { key: "l1", label: "Round 1 (L1)", count: customRemarks.filter(r => r.stage === "l1").length },
-              { key: "l2", label: "Round 2 (L2)", count: customRemarks.filter(r => r.stage === "l2").length },
-              { key: "l3", label: "Round 3 (L3)", count: customRemarks.filter(r => r.stage === "l3").length },
-              { key: "final", label: "Final Milestone", count: customRemarks.filter(r => r.stage === "final").length },
-              { key: "all", label: "All Stages", count: customRemarks.length },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setCustomRemarksStageFilter(tab.key as any)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                  customRemarksStageFilter === tab.key
-                    ? "bg-indigo-600 text-white font-semibold shadow-xs"
-                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium"
-                }`}
-              >
-                <span>{tab.label}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
-                  customRemarksStageFilter === tab.key
-                    ? "bg-white/20 text-white"
-                    : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-                }`}>
-                  {tab.count}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* Body: 2 Columns */}
-          <div className="p-6 overflow-y-auto flex-1 bg-slate-50/40 dark:bg-slate-900/40">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
-              
-              {/* ── LEFT COLUMN: ACCEPTANCE REMARKS ── */}
-              <div className="bg-white dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
-                <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-6 w-6 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center font-bold text-xs">
-                      ✓
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                        Acceptance / Approval Templates
-                      </h4>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Predefined remarks when approving or clearing candidates
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                    {
-                      customRemarks.filter(r => 
-                        (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
-                        r.remarkType === "ACCEPT"
-                      ).length
-                    } items
-                  </span>
-                </div>
-
-                <form 
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleAddDirectCustomRemark("ACCEPT", newCustomAcceptText);
-                  }} 
-                  className="p-3 bg-white dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex gap-2"
-                >
-                  <Input
-                    placeholder="Type remark(s) — separate multiple with comma (,)..."
-                    value={newCustomAcceptText}
-                    onChange={(e) => setNewCustomAcceptText(e.target.value)}
-                    className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
-                  />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={addingRemark || !newCustomAcceptText.trim()}
-                    className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
-                  >
-                    + Add
-                  </Button>
-                </form>
-
-                <div className="p-3 space-y-2 max-h-[380px] overflow-y-auto">
-                  {customRemarks.filter(r => 
-                    (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
-                    r.remarkType === "ACCEPT"
-                  ).length === 0 ? (
-                    <div className="p-6 text-center text-xs text-slate-400 italic">
-                      No acceptance remarks added yet for this stage. Type above to add (comma-separated supported).
-                    </div>
-                  ) : (
-                    customRemarks
-                      .filter(r => 
-                        (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
-                        r.remarkType === "ACCEPT"
-                      )
-                      .map((rem) => (
-                        <div 
-                          key={rem.id}
-                          className="p-2.5 bg-slate-50/60 dark:bg-slate-800/50 rounded-lg border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between gap-2.5 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors text-xs"
-                        >
-                          <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                            <span className="text-emerald-600 font-bold text-xs mt-0.5">✓</span>
-                            <span className="text-slate-800 dark:text-slate-200 font-normal leading-relaxed">
-                              {rem.remarkText}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {customRemarksStageFilter === "all" && (
-                              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded uppercase bg-slate-200/70 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                                {rem.stage}
-                              </span>
-                            )}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteCustomRemark(rem.id)}
-                              className="text-slate-400 hover:text-rose-600 p-1 h-7 w-7 rounded hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                              title="Delete template"
-                            >
-                              <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))
-                  )}
-                </div>
-              </div>
-
-              {/* ── RIGHT COLUMN: REJECTION REMARKS ── */}
-              <div className="bg-white dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
-                <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-6 w-6 rounded-md bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 flex items-center justify-center font-bold text-xs">
-                      ✕
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                        Rejection / Issue Templates
-                      </h4>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Predefined feedback reasons when candidate does not qualify
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                    {
-                      customRemarks.filter(r => 
-                        (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
-                        r.remarkType === "REJECT"
-                      ).length
-                    } items
-                  </span>
-                </div>
-
-                <form 
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleAddDirectCustomRemark("REJECT", newCustomRejectText);
-                  }} 
-                  className="p-3 bg-white dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex gap-2"
-                >
-                  <Input
-                    placeholder="Type rejection reason(s) — separate multiple with comma (,)..."
-                    value={newCustomRejectText}
-                    onChange={(e) => setNewCustomRejectText(e.target.value)}
-                    className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
-                  />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={addingRemark || !newCustomRejectText.trim()}
-                    className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
-                  >
-                    + Add
-                  </Button>
-                </form>
-
-                <div className="p-3 space-y-2 max-h-[380px] overflow-y-auto">
-                  {customRemarks.filter(r => 
-                    (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
-                    r.remarkType === "REJECT"
-                  ).length === 0 ? (
-                    <div className="p-6 text-center text-xs text-slate-400 italic">
-                      No rejection remarks added yet for this stage. Type above to add (comma-separated supported).
-                    </div>
-                  ) : (
-                    customRemarks
-                      .filter(r => 
-                        (customRemarksStageFilter === "all" || r.stage === customRemarksStageFilter || (customRemarksStageFilter === "review" && r.stage === "internal_review")) &&
-                        r.remarkType === "REJECT"
-                      )
-                      .map((rem) => (
-                        <div 
-                          key={rem.id}
-                          className="p-2.5 bg-slate-50/60 dark:bg-slate-800/50 rounded-lg border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between gap-2.5 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors text-xs"
-                        >
-                          <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                            <span className="text-rose-500 font-bold text-xs mt-0.5">✕</span>
-                            <span className="text-slate-800 dark:text-slate-200 font-normal leading-relaxed">
-                              {rem.remarkText}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {customRemarksStageFilter === "all" && (
-                              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded uppercase bg-slate-200/70 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                                {rem.stage}
-                              </span>
-                            )}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteCustomRemark(rem.id)}
-                              className="text-slate-400 hover:text-rose-600 p-1 h-7 w-7 rounded hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                              title="Delete template"
-                            >
-                              <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))
-                  )}
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          <DialogFooter className="px-6 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850">
-            <Button variant="outline" size="sm" onClick={() => setCustomRemarksModalOpen(false)} className="text-xs font-semibold px-5 rounded-lg border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 cursor-pointer">
-              Close &amp; Finish
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* ── QUICK REVIEW DECISION MODAL (Approve / Reject from Table) ── */}
       <Dialog open={quickReviewModalOpen} onOpenChange={setQuickReviewModalOpen}>

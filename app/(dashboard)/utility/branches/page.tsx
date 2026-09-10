@@ -142,6 +142,12 @@ export default function BranchManagementPage() {
   const canAssignManager = userPermissions.includes('branch:assign_manager') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('user:manage') || userPermissions.includes('tenant:settings');
   const canAssignUserRoles = userPermissions.includes('branch:assign_user') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('user:manage') || userPermissions.includes('tenant:settings');
   const canManageBranches = canCreateBranch || canDeleteBranch;
+  const canManageGlobalRemarks =
+    userPermissions.includes('tenant:settings') ||
+    userPermissions.includes('tenant:manage') ||
+    userPermissions.includes('system:admin') ||
+    sessionUser?.roles?.some((r: string) => ['ADMIN', 'SUPER_ADMIN', 'TENANT_ADMIN'].includes(String(r).toUpperCase())) ||
+    ['ADMIN', 'TENANT_ADMIN'].includes(String(overrideRole || '').toUpperCase());
 
   const [branches, setBranches] = useState<any[]>([]);
   const [hierarchyData, setHierarchyData] = useState<any>(null);
@@ -162,8 +168,9 @@ export default function BranchManagementPage() {
   const [branchToDelete, setBranchToDelete] = useState<any>(null);
   const [isDeletingBranch, setIsDeletingBranch] = useState(false);
 
-  // Branch Stage Remarks Modal State
+  // Branch & Global Stage Remarks Modal State
   const [isRemarksOpen, setIsRemarksOpen] = useState(false);
+  const [isGlobalRemarksMode, setIsGlobalRemarksMode] = useState(false);
   const [selectedBranchForRemarks, setSelectedBranchForRemarks] = useState<any>(null);
   const [branchRemarks, setBranchRemarks] = useState<any[]>([]);
   const [loadingRemarks, setLoadingRemarks] = useState(false);
@@ -579,7 +586,32 @@ export default function BranchManagementPage() {
     setSelectedBranch(null);
   };
 
+  const openGlobalRemarksModal = async () => {
+    setIsGlobalRemarksMode(true);
+    setSelectedBranchForRemarks({
+      id: null,
+      name: "Global Organization (All Branches)",
+      market: "GLOBAL",
+      enableGlobalRemarks: true,
+    });
+    setIsRemarksOpen(true);
+    setLoadingRemarks(true);
+    setRemarksStageFilter("review");
+    setNewAcceptText("");
+    setNewRejectText("");
+    try {
+      const data = await atsApi.submissions.getCustomRemarks(undefined, true);
+      const globalOnly = (data || []).filter((r: any) => !r.branchId || r.isGlobal);
+      setBranchRemarks(globalOnly);
+    } catch (err: any) {
+      toast.error("Failed to load global remarks: " + err.message);
+    } finally {
+      setLoadingRemarks(false);
+    }
+  };
+
   const openBranchRemarksModal = async (branch: any) => {
+    setIsGlobalRemarksMode(false);
     setSelectedBranchForRemarks(branch);
     setIsRemarksOpen(true);
     setLoadingRemarks(true);
@@ -587,7 +619,7 @@ export default function BranchManagementPage() {
     setNewAcceptText("");
     setNewRejectText("");
     try {
-      const data = await atsApi.submissions.getCustomRemarks(branch.id);
+      const data = await atsApi.submissions.getCustomRemarks(branch.id, Boolean(branch.enableGlobalRemarks));
       setBranchRemarks(data || []);
     } catch (err: any) {
       toast.error("Failed to load branch remarks: " + err.message);
@@ -597,7 +629,7 @@ export default function BranchManagementPage() {
   };
 
   const handleToggleBranchGlobalRemarks = async () => {
-    if (!selectedBranchForRemarks) return;
+    if (!selectedBranchForRemarks || !selectedBranchForRemarks.id) return;
     const currentState = Boolean(selectedBranchForRemarks.enableGlobalRemarks);
     const nextState = !currentState;
     setIsTogglingGlobalRemarks(true);
@@ -627,17 +659,21 @@ export default function BranchManagementPage() {
     try {
       setAddingBranchRemark(true);
       const stage = remarksStageFilter === "all" ? "review" : remarksStageFilter;
+      const isGlobal = isGlobalRemarksMode || !selectedBranchForRemarks.id;
+      const branchId = isGlobal ? undefined : selectedBranchForRemarks.id;
+
       const createdList = await Promise.all(
         items.map((itemText) =>
           atsApi.submissions.createCustomRemark({
             stage: stage,
             remarkText: itemText,
             remarkType: type,
-            branchId: selectedBranchForRemarks.id,
+            branchId: branchId,
+            isGlobal: isGlobal,
           })
         )
       );
-      setBranchRemarks((prev) => [...prev, ...createdList]);
+      setBranchRemarks((prev) => [...prev, ...(Array.isArray(createdList) ? createdList.flat() : [createdList])]);
       if (type === "ACCEPT") setNewAcceptText("");
       if (type === "REJECT") setNewRejectText("");
       if (items.length === 1) {
@@ -656,7 +692,7 @@ export default function BranchManagementPage() {
     try {
       await atsApi.submissions.deleteCustomRemark(id);
       setBranchRemarks((prev) => prev.filter((r) => r.id !== id));
-      toast.success("Branch remark removed!");
+      toast.success(isGlobalRemarksMode ? "Global remark template removed!" : "Remark template removed!");
     } catch (err: any) {
       toast.error("Failed to delete remark: " + err.message);
     }
@@ -727,17 +763,29 @@ export default function BranchManagementPage() {
             </button>
           </div>
 
-          {canManageBranches && (
-            <Button
-              onClick={() => {
-                resetForm();
-                setIsCreateOpen(true);
-              }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <Plus className="h-4 w-4" /> Add New Branch
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {canManageGlobalRemarks && (
+              <Button
+                onClick={openGlobalRemarksModal}
+                variant="outline"
+                className="border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/60 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 font-semibold text-xs h-9 px-3.5 rounded-lg flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              >
+                <Globe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" /> Global Remarks Templates
+              </Button>
+            )}
+
+            {canManageBranches && (
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setIsCreateOpen(true);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Plus className="h-4 w-4" /> Add New Branch
+              </Button>
+            )}
+          </div>
         </div>
       </div>
       {/* SEARCH TOOLBAR */}
@@ -2564,57 +2612,70 @@ export default function BranchManagementPage() {
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold border border-indigo-100 dark:border-indigo-900/50">
-                  <MessageSquare className="h-4.5 w-4.5" />
+                <div className={`h-9 w-9 rounded-lg flex items-center justify-center font-bold border ${
+                  isGlobalRemarksMode 
+                    ? "bg-indigo-600 text-white border-indigo-500 shadow-xs"
+                    : "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50"
+                }`}>
+                  {isGlobalRemarksMode ? <Globe className="h-4.5 w-4.5" /> : <MessageSquare className="h-4.5 w-4.5" />}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                      Stage Remarks: {selectedBranchForRemarks.name}
+                      {isGlobalRemarksMode ? "Global Stage Remarks Templates" : `Stage Remarks: ${selectedBranchForRemarks.name}`}
                     </h3>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium">
-                      {selectedBranchForRemarks.market || "INDIA"}
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-medium ${
+                      isGlobalRemarksMode 
+                        ? "bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-semibold" 
+                        : "bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                    }`}>
+                      {isGlobalRemarksMode ? "GLOBAL TEMPLATES" : (selectedBranchForRemarks.market || "INDIA")}
                     </span>
                   </div>
                   <p className="text-[11.5px] text-slate-500 dark:text-slate-400">
-                    Standard quick-pick templates for approving or rejecting candidates across hiring stages
+                    {isGlobalRemarksMode 
+                      ? "Universal standard quick-pick templates available across all stages for branches"
+                      : "Standard quick-pick templates for approving or rejecting candidates across hiring stages"}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                {/* Global Remarks Toggle */}
-                <div className="flex items-center gap-2.5 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs">
-                  <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <Globe className="h-3.5 w-3.5 text-indigo-500" />
-                    Include Global Remarks:
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleToggleBranchGlobalRemarks}
-                    disabled={isTogglingGlobalRemarks}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
-                      selectedBranchForRemarks.enableGlobalRemarks ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
-                    }`}
-                    title={selectedBranchForRemarks.enableGlobalRemarks ? "Click to disable global remarks" : "Click to enable global remarks (Default: Disabled)"}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-xs ${
-                        selectedBranchForRemarks.enableGlobalRemarks ? 'translate-x-4.5' : 'translate-x-0.5'
+                {/* Global Remarks Toggle - only when managing a specific branch */}
+                {!isGlobalRemarksMode && (
+                  <div className="flex items-center gap-2.5 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs">
+                    <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Globe className="h-3.5 w-3.5 text-indigo-500" />
+                      Include Global Remarks:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleToggleBranchGlobalRemarks}
+                      disabled={isTogglingGlobalRemarks}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
+                        selectedBranchForRemarks.enableGlobalRemarks ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
                       }`}
-                    />
-                  </button>
-                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${
-                    selectedBranchForRemarks.enableGlobalRemarks ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'
-                  }`}>
-                    {selectedBranchForRemarks.enableGlobalRemarks ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
+                      title={selectedBranchForRemarks.enableGlobalRemarks ? "Click to disable global remarks" : "Click to enable global remarks (Default: Disabled)"}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-xs ${
+                          selectedBranchForRemarks.enableGlobalRemarks ? 'translate-x-4.5' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </button>
+                    <span className={`text-[10px] font-semibold uppercase tracking-wider ${
+                      selectedBranchForRemarks.enableGlobalRemarks ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'
+                    }`}>
+                      {selectedBranchForRemarks.enableGlobalRemarks ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                )}
 
                 <button 
                   onClick={() => {
                     setIsRemarksOpen(false);
                     setSelectedBranchForRemarks(null);
+                    setIsGlobalRemarksMode(false);
                   }} 
                   className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 >
@@ -2750,15 +2811,15 @@ export default function BranchManagementPage() {
                                   </span>
                                 )}
                                 {rem.branchId ? (
-                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
                                     Branch
                                   </span>
                                 ) : (
-                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-800">
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
                                     Global
                                   </span>
                                 )}
-                                {rem.branchId && (
+                                {(isGlobalRemarksMode ? canManageGlobalRemarks : (rem.branchId ? canEditBranch : canManageGlobalRemarks)) && (
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteBranchRemark(rem.id)}
@@ -2860,15 +2921,15 @@ export default function BranchManagementPage() {
                                   </span>
                                 )}
                                 {rem.branchId ? (
-                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
                                     Branch
                                   </span>
                                 ) : (
-                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-800">
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
                                     Global
                                   </span>
                                 )}
-                                {rem.branchId && (
+                                {(isGlobalRemarksMode ? canManageGlobalRemarks : (rem.branchId ? canEditBranch : canManageGlobalRemarks)) && (
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteBranchRemark(rem.id)}
@@ -2897,6 +2958,7 @@ export default function BranchManagementPage() {
                 onClick={() => {
                   setIsRemarksOpen(false);
                   setSelectedBranchForRemarks(null);
+                  setIsGlobalRemarksMode(false);
                 }}
                 className="text-xs font-semibold px-5 rounded-lg border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800 cursor-pointer"
               >
