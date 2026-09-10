@@ -892,9 +892,9 @@ function TenantAdminSettingsView(props: any) {
             </CardContent>
           </Card>
 
-          {/* 6. Branch-Isolated Job Assignment Policies */}
+          {/* Branch-Isolated Job Assignment Notice Card */}
           <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
-            <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60 flex flex-row items-center justify-between">
+            <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
                   <Shield className="h-4 w-4 text-indigo-600" />
@@ -911,6 +911,29 @@ function TenantAdminSettingsView(props: any) {
                 className="h-8 text-xs font-bold px-3 gap-1 bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
               >
                 Manage Branch Policies →
+              </Button>
+            </CardHeader>
+          </Card>
+
+          {/* Global Remarks Templates Card */}
+          <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
+            <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-indigo-600" />
+                  Global Stage Remarks Templates
+                </CardTitle>
+                <CardDescription className="text-xs text-neutral-500 mt-0.5">
+                  Universal quick-pick templates for candidate acceptances and rejections across all hiring stages.
+                </CardDescription>
+              </div>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => { window.location.href = "/utility/global-remarks"; }}
+                className="h-8 text-xs font-bold px-3 gap-1 bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
+              >
+                Manage Global Templates →
               </Button>
             </CardHeader>
           </Card>

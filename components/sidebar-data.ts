@@ -364,6 +364,11 @@ export const data = {
           circleColor: "bg-primary",
         },
         {
+          title: "Global Remarks Templates",
+          url: "/utility/global-remarks",
+          circleColor: "bg-indigo-500",
+        },
+        {
           title: "Tenant Management",
           url: "/utility/approvals",
           circleColor: "bg-cyan-500",

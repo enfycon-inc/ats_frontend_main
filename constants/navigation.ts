@@ -211,6 +211,7 @@ export const MORE_NAV_ITEMS: NavItem[] = [
     icon: Settings,
     children: [
       { label: "Company & Workspace", href: "/company" },
+      { label: "Global Remarks Templates", href: "/utility/global-remarks" },
       { label: "Sound & Tone Preferences", href: "/utility/settings-notifications" },
     ],
   },
@@ -283,6 +284,7 @@ export const GLOBAL_ADMIN_MORE_ITEMS: NavItem[] = [
     icon: Settings,
     children: [
       { label: "Company & Workspace", href: "/company" },
+      { label: "Global Remarks Templates", href: "/utility/global-remarks" },
       { label: "Sound & Tone Preferences", href: "/utility/settings-notifications" },
     ],
   },

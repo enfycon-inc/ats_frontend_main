@@ -497,6 +497,9 @@ export function getFilteredMoreNav(
         if (canManageCompany) {
           subChildren.push({ label: "Company & Workspace", href: "/company" });
         }
+        if (isAdmin || permissions.includes("tenant:settings") || permissions.includes("tenant:manage") || permissions.includes("system:admin")) {
+          subChildren.push({ label: "Global Remarks Templates", href: "/utility/global-remarks" });
+        }
         subChildren.push({ label: "Sound & Tone Preferences", href: "/utility/settings-notifications" });
         return {
           ...item,
