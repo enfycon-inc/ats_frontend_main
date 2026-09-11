@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Search, Filter, Columns3, ChevronDown } from "lucide-react";
+import { Search, Filter, Settings, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SearchToolbarProps {
@@ -69,33 +69,31 @@ export default function SearchToolbar({
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Filter Button */}
-      <button
-        onClick={onOpenFilters}
-        className={cn(
-          "flex items-center gap-1.5 px-2.5 py-0.5 text-xs rounded-sm border transition-colors cursor-pointer font-medium",
-          activeFiltersCount > 0
-            ? "bg-primary/10 border-primary/30 text-primary"
-            : "bg-white dark:bg-slate-950 border-neutral-300 dark:border-slate-700 text-neutral-600 dark:text-neutral-400 hover:border-neutral-400 dark:hover:border-slate-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-        )}
-      >
-        <Filter className="h-3.5 w-3.5" />
-        Filters
-        {activeFiltersCount > 0 && (
-          <span className="ml-0.5 inline-flex items-center justify-center h-3.5 w-3.5 text-[9px] font-bold bg-primary text-white rounded-full">
-            {activeFiltersCount}
-          </span>
-        )}
-      </button>
-
-      {/* Columns Button */}
-      <button
-        onClick={onOpenColumns}
-        className="flex items-center gap-1.5 px-2.5 py-0.5 text-xs rounded-sm border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-neutral-600 dark:text-neutral-400 hover:border-neutral-400 dark:hover:border-slate-500 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors cursor-pointer font-medium"
-      >
-        <Columns3 className="h-3.5 w-3.5" />
-        Columns
-      </button>
+      {/* Right side settings icons */}
+      <div className="flex items-center border-l border-neutral-200 dark:border-slate-800 pl-1.5 gap-0.5">
+        <button
+          onClick={onOpenFilters}
+          className={cn(
+            "p-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer relative",
+            activeFiltersCount > 0 && "text-primary"
+          )}
+          title="Filters"
+        >
+          <Filter className="h-3.5 w-3.5" />
+          {activeFiltersCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] text-white font-bold">
+              {activeFiltersCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={onOpenColumns}
+          className="p-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
+          title="Columns settings"
+        >
+          <Settings className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   );
 }

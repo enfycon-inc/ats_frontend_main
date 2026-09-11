@@ -46,6 +46,10 @@ import {
   Settings,
   GripVertical,
   SlidersHorizontal,
+  RefreshCw,
+  Download,
+  Filter,
+  Search,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
@@ -827,6 +831,7 @@ export default function SubmissionsPage() {
     getUserColumnPreferences("submissions", DEFAULT_SUBMISSION_COLUMNS)
   );
   const [isColumnDrawerOpen, setIsColumnDrawerOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
 
   // Direct Column Drag & Drop Reordering State
   const [draggedColId, setDraggedColId] = useState<string | null>(null);
@@ -1544,31 +1549,25 @@ export default function SubmissionsPage() {
                 Board
               </button>
             </div>
-            <Button
-              onClick={handleExportCSV}
-              variant="outline"
-              className="flex items-center gap-1.5 border-default-300 font-semibold text-sm"
-            >
-              <Icon icon="heroicons:arrow-down-tray" className="h-4 w-4" />
-              Export CSV
-            </Button>
-            <Button
-              onClick={loadData}
-              variant="outline"
-              className="flex items-center gap-1.5 border-default-300 font-semibold text-sm"
-            >
-              <Icon icon="heroicons:arrow-path" className="h-4 w-4" />
-              Refresh
-            </Button>
-            {viewMode === "list" && (
-              <Button
-                onClick={() => setIsColumnDrawerOpen(true)}
-                variant="outline"
-                className="flex items-center gap-1.5 border-default-300 font-semibold text-sm cursor-pointer"
-              >
-                <SlidersHorizontal className="h-4 w-4 text-indigo-600" />
-                Columns
-              </Button>
+            {viewMode === "kanban" && (
+              <>
+                <Button
+                  onClick={handleExportCSV}
+                  variant="outline"
+                  className="flex items-center gap-1.5 border-default-300 font-semibold text-sm cursor-pointer"
+                >
+                  <Download className="h-4 w-4" />
+                  Export CSV
+                </Button>
+                <Button
+                  onClick={loadData}
+                  variant="outline"
+                  className="flex items-center gap-1.5 border-default-300 font-semibold text-sm cursor-pointer"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -1593,74 +1592,156 @@ export default function SubmissionsPage() {
           ))}
         </div>
 
-        {/* SEARCH & FILTERS BAR */}
-        <Card className="border border-default-150 bg-white dark:bg-slate-900 p-4 shadow-sm rounded-xl mt-6">
-          <form onSubmit={handleApplyFilters} className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-3 items-end">
-            {/* Search Query */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-default-450 uppercase tracking-wider">Search Query</label>
-              <Input
-                placeholder="Candidate, Job code, Title..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 text-xs"
-              />
-            </div>
-            
-            {/* Status Filter */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-default-450 uppercase tracking-wider">Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full text-xs border border-default-250 dark:border-slate-700 rounded-md px-3 h-9 bg-transparent text-default-850 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-              >
-                <option value="">All Statuses</option>
-                <option value="PENDING_APPROVAL">Pending Approval</option>
-                <option value="SUBMITTED">Submitted to Client</option>
-                <option value="REJECTED">Rejected</option>
-                <option value="OFFER">Offer Stage</option>
-                <option value="JOIN">Joined / Placed</option>
-              </select>
-            </div>
-
-            {/* Start Date */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-default-450 uppercase tracking-wider">From Date</label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="h-9 text-xs"
-              />
-            </div>
-
-            {/* End Date */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-default-450 uppercase tracking-wider">To Date</label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="h-9 text-xs"
-              />
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2 h-9">
-              <Button type="submit" size="sm" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-xs">
-                Filter
-              </Button>
-              <Button type="button" size="sm" onClick={handleClearFilters} variant="outline" className="flex-1 text-xs border-default-300 font-semibold">
-                Clear
-              </Button>
-            </div>
-          </form>
-        </Card>
-
         {/* SUBMISSIONS LIST VS KANBAN PIPELINE */}
         {viewMode === "list" ? (
-          <div className="border border-neutral-200 dark:border-slate-800 rounded-sm bg-white dark:bg-slate-900 overflow-hidden shadow-xs mt-6">
+          <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none overflow-hidden relative font-sans mt-6">
+            {/* Action Bar */}
+            <div className="py-1 px-2.5 border-b border-neutral-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 bg-neutral-50/50 dark:bg-slate-900/50 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
+                  {submissions.length} {submissions.length === 1 ? "Record" : "Records"}
+                </span>
+              </div>
+
+              {/* Global actions */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={loadData}
+                  className="p-1.5 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
+                  title="Refresh Table"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                </button>
+
+                <button
+                  onClick={handleExportCSV}
+                  className="flex items-center gap-1 px-2 py-1 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
+                >
+                  <Download className="h-3 w-3" /> Export CSV
+                </button>
+
+                {/* Right side settings icons */}
+                <div className="flex items-center border-l border-neutral-200 dark:border-slate-800 pl-1.5 gap-0.5">
+                  <button
+                    onClick={() => setShowFilters((prev) => !prev)}
+                    className={cn(
+                      "p-1.5 rounded transition-colors cursor-pointer",
+                      showFilters
+                        ? "bg-neutral-200 dark:bg-slate-700 text-neutral-900 dark:text-neutral-100"
+                        : "hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400"
+                    )}
+                    title="Filters"
+                  >
+                    <Filter className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setIsColumnDrawerOpen(true)}
+                    className="p-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
+                    title="Columns settings"
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* EnfySync-Style Multi-Filter Bar */}
+            {showFilters && (
+              <div className="px-4 py-3 bg-slate-50/70 dark:bg-slate-900/60 border-b border-neutral-200 dark:border-slate-800">
+                <form onSubmit={handleApplyFilters} className="flex flex-wrap items-end gap-3 lg:gap-3.5">
+                  {/* SEARCH */}
+                  <div className="flex flex-col gap-1.5 flex-[1.4] min-w-[200px]">
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+                      SEARCH
+                    </label>
+                    <div className="relative flex items-center">
+                      <Search className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 absolute left-2.5 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Candidate, Job code, Title..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-8 pr-7 h-9 text-xs bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#1a4fa0] focus:border-[#1a4fa0] transition-colors"
+                      />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery("")}
+                          className="absolute right-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs p-0.5 cursor-pointer"
+                          title="Clear search"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* STATUS */}
+                  <div className="flex flex-col gap-1.5 flex-1 min-w-[150px]">
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+                      STATUS
+                    </label>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="w-full h-9 px-2.5 text-xs bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#1a4fa0] focus:border-[#1a4fa0] transition-colors cursor-pointer"
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="PENDING_APPROVAL">Pending Approval</option>
+                      <option value="SUBMITTED">Submitted to Client</option>
+                      <option value="REJECTED">Rejected</option>
+                      <option value="OFFER">Offer Stage</option>
+                      <option value="JOIN">Joined / Placed</option>
+                    </select>
+                  </div>
+
+                  {/* FROM DATE */}
+                  <div className="flex flex-col gap-1.5 flex-1 min-w-[130px]">
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+                      FROM DATE
+                    </label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full h-9 px-2.5 text-xs bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#1a4fa0] focus:border-[#1a4fa0] transition-colors"
+                    />
+                  </div>
+
+                  {/* TO DATE */}
+                  <div className="flex flex-col gap-1.5 flex-1 min-w-[130px]">
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+                      TO DATE
+                    </label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full h-9 px-2.5 text-xs bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#1a4fa0] focus:border-[#1a4fa0] transition-colors"
+                    />
+                  </div>
+
+                  {/* ACTION BUTTONS */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="submit"
+                      className="h-9 px-3.5 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                    >
+                      Filter
+                    </button>
+                    {(searchQuery || statusFilter || startDate || endDate) && (
+                      <button
+                        type="button"
+                        onClick={handleClearFilters}
+                        className="h-9 px-3 rounded-md border border-neutral-300 dark:border-slate-700 hover:bg-neutral-100 dark:hover:bg-slate-800 text-xs font-semibold text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+            )}
             <div className="overflow-auto max-h-[calc(100vh-270px)] relative">
               <table className="w-full border-collapse text-left table-auto border-neutral-200 dark:border-slate-800 min-w-[1200px]">
                 <thead className="sticky top-0 z-20 bg-blue-50 dark:bg-slate-800 border-b border-neutral-250 dark:border-slate-700 shadow-xs select-none">
@@ -1768,9 +1849,75 @@ export default function SubmissionsPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Table Footer */}
+            <div className="py-1 px-3 border-t border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-850 flex items-center justify-between select-none shrink-0 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+              <div className="flex items-center gap-1.5">
+                <span>
+                  {submissions.length} {submissions.length === 1 ? "record" : "records"}
+                </span>
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4 mt-6 overflow-x-auto pb-4">
+          <div className="space-y-4 mt-6">
+            {/* Kanban Search & Filters Bar */}
+            <Card className="border border-default-150 bg-white dark:bg-slate-900 p-3.5 shadow-none rounded-sm">
+              <form onSubmit={handleApplyFilters} className="flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-1.5 flex-[1.4] min-w-[180px]">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Search</label>
+                  <Input
+                    placeholder="Candidate, Job code, Title..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-8.5 text-xs"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5 flex-1 min-w-[130px]">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-full h-8.5 px-2.5 text-xs border border-default-250 dark:border-slate-700 rounded-md bg-transparent text-default-850 focus:outline-none"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="PENDING_APPROVAL">Pending Approval</option>
+                    <option value="SUBMITTED">Submitted to Client</option>
+                    <option value="REJECTED">Rejected</option>
+                    <option value="OFFER">Offer Stage</option>
+                    <option value="JOIN">Joined / Placed</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5 flex-1 min-w-[120px]">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">From Date</label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="h-8.5 text-xs"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5 flex-1 min-w-[120px]">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">To Date</label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="h-8.5 text-xs"
+                  />
+                </div>
+                <div className="flex items-center gap-2 h-8.5">
+                  <Button type="submit" size="sm" className="h-8.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold">
+                    Filter
+                  </Button>
+                  <Button type="button" size="sm" onClick={handleClearFilters} variant="outline" className="h-8.5 px-3 text-xs border-default-300 font-semibold">
+                    Clear
+                  </Button>
+                </div>
+              </form>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4 overflow-x-auto pb-4">
             {[
               {
                 id: "l1",
@@ -1873,7 +2020,8 @@ export default function SubmissionsPage() {
               </div>
             ))}
           </div>
-        )}
+        </div>
+      )}
       </div>
 
       {/* RIGHT SIDE PANEL — Update Statuses */}

@@ -10,6 +10,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from "@/components/ui/hover-card";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
 import { useSession } from "next-auth/react";
@@ -1920,8 +1925,8 @@ export default function BranchManagementPage() {
                             }}
                             className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
                           />
-                          <div>
-                            <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
                               <span className="font-bold text-neutral-900 dark:text-white">2. Recruitment Pod System</span>
                               {loadingBranchPods ? (
                                 <span className="inline-flex items-center gap-1 text-[10px] text-neutral-400">
@@ -1932,16 +1937,134 @@ export default function BranchManagementPage() {
                                   0 Pods Available
                                 </span>
                               ) : (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-800/80">
-                                  {branchPods.length} {branchPods.length === 1 ? "Pod" : "Pods"} Available
-                                </span>
+                                <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                                  <HoverCard openDelay={80} closeDelay={150}>
+                                    <HoverCardTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-800/80 hover:bg-emerald-200/90 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                                        title="Hover to view all available pods, leads, and members"
+                                      >
+                                        <Users className="h-2.5 w-2.5" />
+                                        <span>{branchPods.length} {branchPods.length === 1 ? "Pod" : "Pods"} Available</span>
+                                      </button>
+                                    </HoverCardTrigger>
+                                    <HoverCardContent
+                                      align="start"
+                                      side="bottom"
+                                      sideOffset={6}
+                                      className="w-84 sm:w-96 p-3 shadow-2xl z-60 font-sans bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl"
+                                    >
+                                      <div className="space-y-2.5">
+                                        {/* Pop-up Header */}
+                                        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-2">
+                                          <div className="flex items-center gap-1.5">
+                                            <Layers className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                                            <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                                              Available Recruitment Pods
+                                            </span>
+                                            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                              {branchPods.length}
+                                            </span>
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              openQuickCreatePod();
+                                            }}
+                                            className="text-[10.5px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 flex items-center gap-0.5 hover:underline cursor-pointer"
+                                          >
+                                            <Plus className="h-2.5 w-2.5" /> New Pod
+                                          </button>
+                                        </div>
+
+                                        {/* Pod List with Leads & Members */}
+                                        <div className="max-h-60 overflow-y-auto space-y-2 pr-1 select-text">
+                                          {branchPods.map((pod: any) => (
+                                            <div
+                                              key={pod.id}
+                                              className="p-2.5 rounded-lg border border-neutral-200/80 dark:border-slate-800 bg-neutral-50/60 dark:bg-slate-850/50 space-y-1.5 text-xs"
+                                            >
+                                              {/* Pod Title & Status */}
+                                              <div className="flex items-center justify-between gap-2">
+                                                <span className="font-bold text-xs text-neutral-900 dark:text-white truncate">
+                                                  {pod.name}
+                                                </span>
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                                                  <Check className="h-2 w-2" /> Active
+                                                </span>
+                                              </div>
+
+                                              {/* Pod Lead */}
+                                              <div className="flex items-center gap-1.5 text-[11px]">
+                                                <Crown className="h-3 w-3 text-amber-500 shrink-0" />
+                                                <span className="text-neutral-500 dark:text-neutral-400">Pod Lead:</span>
+                                                <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+                                                  {pod.podHeadName || "No Lead Assigned"}
+                                                </span>
+                                              </div>
+
+                                              {/* Members */}
+                                              <div className="space-y-1 text-[11px] pt-0.5">
+                                                <div className="flex items-center justify-between text-neutral-500 dark:text-neutral-400">
+                                                  <span className="flex items-center gap-1">
+                                                    <Users className="h-3 w-3 text-indigo-500 shrink-0" />
+                                                    Members ({pod.members?.length || 0}):
+                                                  </span>
+                                                </div>
+                                                {pod.members && pod.members.length > 0 ? (
+                                                  <div className="flex flex-wrap gap-1">
+                                                    {pod.members.map((m: any) => (
+                                                      <span
+                                                        key={m.id}
+                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 text-[10px] text-neutral-700 dark:text-neutral-300 font-medium"
+                                                        title={m.email || m.fullName}
+                                                      >
+                                                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />
+                                                        {m.fullName || m.email}
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                ) : (
+                                                  <p className="text-[10px] text-neutral-400 dark:text-neutral-500 italic pl-4">
+                                                    No recruiters assigned to this pod yet.
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </HoverCardContent>
+                                  </HoverCard>
+                                </div>
                               )}
                             </div>
-                            <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                            <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-0.5">
                               Allow selecting and routing jobs to recruitment pods.
                             </p>
                           </div>
                         </label>
+
+                        {/* Top-Right "Create New Pod" Button */}
+                        <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openQuickCreatePod();
+                            }}
+                            className="h-7 text-[11px] font-semibold border-indigo-200 dark:border-indigo-800/80 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+                            title="Create a new recruitment pod for this branch"
+                          >
+                            <Plus className="h-3 w-3 text-indigo-600 dark:text-indigo-400" /> Create New Pod
+                          </Button>
+                        </div>
                       </div>
 
                       {/* When NO pods exist for this branch: Show "Create Pod First" banner and action */}
@@ -1975,7 +2098,20 @@ export default function BranchManagementPage() {
 
                       {formData.allowPods && branchPods.length > 0 && !formData.allowNone && (
                         <div className="ml-5 pl-3 border-l-2 border-indigo-200 dark:border-indigo-800 space-y-1.5 pt-1">
-                          <span className="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 block">Pod Strategy:</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 block">Pod Strategy:</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openQuickCreatePod();
+                              }}
+                              className="text-[10.5px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center gap-0.5 hover:underline cursor-pointer"
+                            >
+                              <Plus className="h-2.5 w-2.5" /> Add Pod
+                            </button>
+                          </div>
                           <div className="grid grid-cols-2 gap-2 text-[10.5px]">
                             <label className={`flex items-center gap-1.5 p-1.5 rounded-lg border cursor-pointer ${
                               formData.podDistributionStrategy === "AUTO"
@@ -1990,7 +2126,7 @@ export default function BranchManagementPage() {
                                 onChange={() => setFormData({ ...formData, podDistributionStrategy: "AUTO" })}
                                 className="sr-only"
                               />
-                              <span>⚡ Auto Broadcast</span>
+                              <span>⚡ Auto (Sequential)</span>
                             </label>
                             <label className={`flex items-center gap-1.5 p-1.5 rounded-lg border cursor-pointer ${
                               formData.podDistributionStrategy === "MANUAL"
@@ -2005,7 +2141,7 @@ export default function BranchManagementPage() {
                                 onChange={() => setFormData({ ...formData, podDistributionStrategy: "MANUAL" })}
                                 className="sr-only"
                               />
-                              <span>👤 Manual Lead</span>
+                              <span>👤 Manual</span>
                             </label>
                           </div>
                         </div>

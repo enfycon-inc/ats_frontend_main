@@ -2787,7 +2787,7 @@ export default function EditJobPostingPage() {
                               } else if (selectedPodId === "none") {
                                 return <span className="font-semibold text-neutral-900 dark:text-white">Unassigned Allocation (Hold for Manager Assignment)</span>;
                               } else if (selectedPodId === "auto_pod") {
-                                return <span className="font-semibold text-neutral-900 dark:text-white">Recruitment Pod System (Auto Broadcast)</span>;
+                                return <span className="font-semibold text-neutral-900 dark:text-white">Recruitment Pod System (Auto - Sequential)</span>;
                               }
                               return <span className="text-neutral-400">Select Staff, Pod, or Pool...</span>;
                             })()}
@@ -2860,7 +2860,7 @@ export default function EditJobPostingPage() {
                                       }}
                                       className="px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800/70 text-xs font-semibold text-neutral-700 dark:text-neutral-300"
                                     >
-                                      Recruitment Pod System (Auto Broadcast)
+                                      Recruitment Pod System (Auto - Sequential)
                                     </div>
                                   )}
                                 </div>
