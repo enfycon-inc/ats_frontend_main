@@ -688,6 +688,10 @@ export default function ClientDashboard() {
             data={clientsData}
             selectedColumns={selectedColumns}
             allColumns={allColumns}
+            onReorderColumns={(newCols) => {
+              setSelectedColumns(newCols);
+              saveUserColumnPreferences("clients", newCols);
+            }}
             onOpenFilters={() => setIsFilterOpen(true)}
             onOpenColumns={() => setIsColumnOpen(true)}
             onRefresh={handleRefresh}
@@ -1102,6 +1106,7 @@ export default function ClientDashboard() {
         onClose={() => setIsColumnOpen(false)}
         allColumns={allColumns}
         selectedColumns={selectedColumns}
+        defaultColumns={DEFAULT_CLIENT_COLUMNS}
         onApply={(newCols) => {
           setSelectedColumns(newCols);
           saveUserColumnPreferences("clients", newCols);

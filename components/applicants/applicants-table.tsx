@@ -125,6 +125,7 @@ interface ApplicantsTableProps {
   onPageSizeChange: (size: number) => void;
   selectedRowIds: string[];
   onSelectionChange: (ids: string[]) => void;
+  onReorderColumns?: (newOrder: string[]) => void;
   isRecruiter?: boolean;
 }
 
@@ -140,6 +141,7 @@ export default function ApplicantsTable({
   onPageSizeChange,
   selectedRowIds,
   onSelectionChange,
+  onReorderColumns,
   isRecruiter = false,
 }: ApplicantsTableProps) {
   const router = useRouter();
@@ -153,6 +155,62 @@ export default function ApplicantsTable({
     y: number;
     applicantId: string;
   } | null>(null);
+
+  // Direct Column Drag & Drop Reordering State
+  const [draggedColId, setDraggedColId] = useState<string | null>(null);
+  const [dragOverColId, setDragOverColId] = useState<string | null>(null);
+  const [isDragReordering, setIsDragReordering] = useState(false);
+
+  const handleDragStart = (e: React.DragEvent, colId: string) => {
+    setDraggedColId(colId);
+    setIsDragReordering(true);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", colId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, colId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (draggedColId && draggedColId !== colId) {
+      setDragOverColId(colId);
+    }
+  };
+
+  const handleDragLeave = (colId: string) => {
+    if (dragOverColId === colId) {
+      setDragOverColId(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetColId: string) => {
+    e.preventDefault();
+    if (!draggedColId || draggedColId === targetColId) {
+      setDraggedColId(null);
+      setDragOverColId(null);
+      setTimeout(() => setIsDragReordering(false), 200);
+      return;
+    }
+
+    const fromIdx = selectedColumns.indexOf(draggedColId);
+    const toIdx = selectedColumns.indexOf(targetColId);
+
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const newCols = [...selectedColumns];
+      const [moved] = newCols.splice(fromIdx, 1);
+      newCols.splice(toIdx, 0, moved);
+      onReorderColumns?.(newCols);
+    }
+
+    setDraggedColId(null);
+    setDragOverColId(null);
+    setTimeout(() => setIsDragReordering(false), 200);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedColId(null);
+    setDragOverColId(null);
+    setTimeout(() => setIsDragReordering(false), 200);
+  };
 
   const extractDbId = (applicant: any): string => {
     if (applicant.dbId) return String(applicant.dbId);
@@ -490,18 +548,18 @@ export default function ApplicantsTable({
           <thead className="sticky top-0 z-10">
             <tr className="bg-neutral-100 dark:bg-slate-800 border-b border-neutral-200 dark:border-slate-700">
               {/* Checkbox col */}
-              <th className="w-8 min-w-[32px] max-w-[32px] px-2 py-1 border-r border-neutral-200 dark:border-slate-700 sticky left-0 z-30 bg-neutral-100 dark:bg-slate-800">
+              <th className="w-[36px] min-w-[36px] max-w-[36px] px-2.5 py-3 text-center border-r border-neutral-200 dark:border-slate-700 sticky left-0 z-30 bg-neutral-100 dark:bg-slate-800">
                 <input
                   type="checkbox"
                   checked={allPageSelected}
                   onChange={(e) => handleSelectAll(e.target.checked)}
-                  className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                  className="h-3.5 w-3.5 accent-primary cursor-pointer align-middle"
                 />
               </th>
 
               {/* Data columns */}
               {(() => {
-                let currentLeftTh = 32; // Checkbox width
+                let currentLeftTh = 36; // Checkbox width
                 
                 return selectedColumns.map((colId) => {
                   const col = allColumns.find((c) => c.id === colId);
@@ -536,15 +594,25 @@ export default function ApplicantsTable({
                   return (
                     <th
                       key={colId}
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, colId)}
+                      onDragOver={(e) => handleDragOver(e, colId)}
+                      onDragLeave={() => handleDragLeave(colId)}
+                      onDrop={(e) => handleDrop(e, colId)}
+                      onDragEnd={handleDragEnd}
                       style={style}
                       className={cn(
-                        "px-2 py-1 text-left text-[10px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide border-r border-neutral-200 dark:border-slate-700 whitespace-nowrap",
-                        isSortable && "cursor-pointer hover:bg-neutral-200 dark:hover:bg-slate-700 select-none",
+                        "px-4 py-3 text-left text-[11px] font-bold text-neutral-700 dark:text-neutral-200 uppercase tracking-wider border-r border-neutral-200 dark:border-slate-700 whitespace-nowrap transition-all select-none",
+                        isSortable && "cursor-pointer hover:bg-neutral-200 dark:hover:bg-slate-700",
+                        draggedColId === colId && "opacity-40",
+                        dragOverColId === colId && "border-l-2 border-l-primary bg-primary/10 ring-1 ring-primary/30",
                         stickyClass, shadowClass
                       )}
-                      onClick={() =>
-                        isSortable && handleSort(colId as keyof Applicant)
-                      }
+                      onClick={() => {
+                        if (isDragReordering) return;
+                        if (isSortable) handleSort(colId as keyof Applicant);
+                      }}
+                      title="Drag to reorder column"
                     >
                       <div className="flex items-center">
                         {col.label}
@@ -556,7 +624,7 @@ export default function ApplicantsTable({
               })()}
 
               {/* Actions col */}
-              <th className="w-10 px-2 py-1 text-center text-[10px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide sticky right-0 bg-neutral-100 dark:bg-slate-800 z-20 border-l border-neutral-200 dark:border-slate-700">
+              <th className="w-[56px] min-w-[56px] px-3 py-3 text-center text-[11px] font-bold text-neutral-700 dark:text-neutral-200 uppercase tracking-wider sticky right-0 bg-neutral-100 dark:bg-slate-800 z-20 border-l border-neutral-200 dark:border-slate-700">
                 Act.
               </th>
             </tr>
@@ -593,20 +661,20 @@ export default function ApplicantsTable({
                     )}
                   >
                     {/* Checkbox */}
-                    <td className="w-8 min-w-[32px] max-w-[32px] px-2 py-0.5 border-r border-neutral-100 dark:border-slate-800 sticky left-0 z-20 bg-inherit">
+                    <td className="w-[36px] min-w-[36px] max-w-[36px] px-2.5 py-3.5 border-r border-neutral-100 dark:border-slate-800 sticky left-0 z-20 bg-inherit text-center align-middle">
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={(e) =>
                           handleSelectRow(applicant.applicantId, e.target.checked)
                         }
-                        className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                        className="h-3.5 w-3.5 accent-primary cursor-pointer align-middle"
                       />
                     </td>
 
                     {/* Data cells */}
                     {(() => {
-                      let currentLeftTd = 32;
+                      let currentLeftTd = 36;
                       return selectedColumns.map((colId) => {
                         const isAppId = colId === "applicantId";
                         const isAppName = colId === "applicantName";
@@ -626,7 +694,7 @@ export default function ApplicantsTable({
                           <td
                             key={colId}
                             style={style}
-                            className={cn("px-2 py-0.5 border-r border-neutral-100 dark:border-slate-800 text-neutral-700 dark:text-neutral-300 font-normal", stickyClass, shadowClass)}
+                            className={cn("px-4 py-3.5 border-r border-neutral-100 dark:border-slate-800 text-neutral-700 dark:text-neutral-300 font-normal align-middle", stickyClass, shadowClass)}
                           >
                             {renderCell(applicant, colId)}
                           </td>
@@ -635,7 +703,7 @@ export default function ApplicantsTable({
                     })()}
 
                     {/* Actions */}
-                    <td className="w-10 px-1 py-0.5 text-center sticky right-0 bg-inherit z-10 border-l border-neutral-100 dark:border-slate-800">
+                    <td className="w-[56px] min-w-[56px] px-3 py-3.5 text-center sticky right-0 bg-inherit z-10 border-l border-neutral-100 dark:border-slate-800 align-middle">
                         <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <button

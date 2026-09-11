@@ -43,6 +43,9 @@ import {
   MessageSquare,
   ArrowDown,
   ArrowRight,
+  Settings,
+  GripVertical,
+  SlidersHorizontal,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
@@ -69,6 +72,36 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ScheduleInterviewModal } from "@/components/interviews/schedule-interview-modal";
+import { getUserColumnPreferences, saveUserColumnPreferences } from "@/utils/user-column-preferences";
+import ColumnManager from "@/components/applicants/column-manager";
+
+export const ALL_SUBMISSION_COLUMNS = [
+  { id: "jobCode", label: "Job Code" },
+  { id: "candidate", label: "Candidate" },
+  { id: "jobTitle", label: "Job Title & Client" },
+  { id: "payRate", label: "Pay Rate" },
+  { id: "internalReview", label: "Internal Review" },
+  { id: "interviewRounds", label: "Interview Rounds" },
+  { id: "currentStatus", label: "Current Status" },
+  { id: "remarks", label: "Remarks & Date" },
+  { id: "recruiter", label: "Recruiter" },
+  { id: "accountManager", label: "Account Manager" },
+  { id: "location", label: "Candidate Location" },
+  { id: "experience", label: "Experience" },
+  { id: "workAuth", label: "Work Auth" },
+  { id: "createdOn", label: "Submission Date" },
+];
+
+export const DEFAULT_SUBMISSION_COLUMNS = [
+  "jobCode",
+  "candidate",
+  "jobTitle",
+  "payRate",
+  "internalReview",
+  "interviewRounds",
+  "currentStatus",
+  "remarks",
+];
 
 interface Submission {
   id: number;
@@ -789,6 +822,64 @@ export default function SubmissionsPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
 
+  // Column Customization & User Persistent Preferences
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() =>
+    getUserColumnPreferences("submissions", DEFAULT_SUBMISSION_COLUMNS)
+  );
+  const [isColumnDrawerOpen, setIsColumnDrawerOpen] = useState(false);
+
+  // Direct Column Drag & Drop Reordering State
+  const [draggedColId, setDraggedColId] = useState<string | null>(null);
+  const [dragOverColId, setDragOverColId] = useState<string | null>(null);
+
+  const handleColDragStart = (e: React.DragEvent, colId: string) => {
+    setDraggedColId(colId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", colId);
+  };
+
+  const handleColDragOver = (e: React.DragEvent, colId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (draggedColId && draggedColId !== colId) {
+      setDragOverColId(colId);
+    }
+  };
+
+  const handleColDragLeave = (colId: string) => {
+    if (dragOverColId === colId) {
+      setDragOverColId(null);
+    }
+  };
+
+  const handleColDrop = (e: React.DragEvent, targetColId: string) => {
+    e.preventDefault();
+    if (!draggedColId || draggedColId === targetColId) {
+      setDraggedColId(null);
+      setDragOverColId(null);
+      return;
+    }
+
+    const fromIdx = selectedColumns.indexOf(draggedColId);
+    const toIdx = selectedColumns.indexOf(targetColId);
+
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const newCols = [...selectedColumns];
+      const [moved] = newCols.splice(fromIdx, 1);
+      newCols.splice(toIdx, 0, moved);
+      setSelectedColumns(newCols);
+      saveUserColumnPreferences("submissions", newCols);
+    }
+
+    setDraggedColId(null);
+    setDragOverColId(null);
+  };
+
+  const handleColDragEnd = () => {
+    setDraggedColId(null);
+    setDragOverColId(null);
+  };
+
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -1248,6 +1339,169 @@ export default function SubmissionsPage() {
     }
   };
 
+  const renderSubmissionCell = (sub: Submission, colId: string) => {
+    switch (colId) {
+      case "jobCode":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+            {sub.jobId ? (
+              <Link href={`/job-posting/${sub.jobId}`} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                <span className="text-[#1a4fa0] dark:text-blue-400 font-semibold hover:underline cursor-pointer font-mono">
+                  {sub.jobCode || "—"}
+                </span>
+              </Link>
+            ) : (
+              <span className="text-[#1a4fa0] dark:text-blue-400 font-semibold font-mono">
+                {sub.jobCode || "—"}
+              </span>
+            )}
+          </td>
+        );
+      case "candidate":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+            <div className="flex flex-col justify-center gap-0.5 max-w-[200px]">
+              <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 group-hover:text-[#1a4fa0] dark:group-hover:text-blue-400 transition-colors truncate">
+                {sub.candidateName}
+              </span>
+              <span className="text-[10.5px] text-neutral-400 font-normal truncate">
+                {sub.candidateEmail || "—"}
+              </span>
+            </div>
+          </td>
+        );
+      case "jobTitle":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+            <div className="flex flex-col justify-center gap-0.5 max-w-[220px]">
+              <span className="font-medium text-xs text-slate-900 dark:text-slate-100 truncate">
+                {sub.jobTitle || "—"}
+              </span>
+              <span className="text-[10.5px] text-neutral-500 truncate">
+                {sub.clientName || "Direct Client"}
+              </span>
+            </div>
+          </td>
+        );
+      case "payRate":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle font-normal text-xs text-neutral-800 dark:text-neutral-200">
+            {formatSubmittedRate(sub.submittedRate, sub.market, sub.jobCode, sub.jobTitle)}
+          </td>
+        );
+      case "internalReview":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+            <div className="flex items-center gap-1.5">
+              {renderInternalReviewStatus(sub)}
+              {sub.finalStatus === "PENDING_APPROVAL" && canInternalScreen && (
+                <div className="flex items-center gap-1 ml-1" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openQuickReview(sub, "APPROVE");
+                    }}
+                    className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded shadow-xs cursor-pointer"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openQuickReview(sub, "REJECT");
+                    }}
+                    className="px-1.5 py-0.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 dark:bg-slate-900 dark:border-rose-900 font-semibold text-[10px] rounded cursor-pointer"
+                  >
+                    Reject
+                  </button>
+                </div>
+              )}
+            </div>
+          </td>
+        );
+      case "interviewRounds":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+            <div className="flex items-center gap-1">
+              {renderPipelineProgress(sub)}
+            </div>
+          </td>
+        );
+      case "currentStatus":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
+            {sub.finalStatus === "PENDING_APPROVAL" ? (
+              <span className="text-xs text-neutral-400 italic select-none">In Review</span>
+            ) : sub.finalStatus === "SUBMITTED" ? (
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold select-none">
+                Submitted to Client
+              </span>
+            ) : sub.finalStatus === "OFFER" ? (
+              <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold select-none">
+                Offer Released
+              </span>
+            ) : sub.finalStatus === "JOIN" ? (
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold select-none">
+                Joined / Placed
+              </span>
+            ) : sub.finalStatus === "REJECTED" ? (
+              <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold select-none">
+                Rejected
+              </span>
+            ) : (
+              <span className="text-xs text-neutral-700 dark:text-neutral-300 font-semibold select-none">
+                {sub.finalStatus}
+              </span>
+            )}
+          </td>
+        );
+      case "remarks":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 min-w-[220px] max-w-[320px] whitespace-nowrap align-middle">
+            {renderClutterFreeRemarks(sub)}
+          </td>
+        );
+      case "recruiter":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle text-xs font-medium text-neutral-700 dark:text-neutral-300">
+            {sub.recruiterName || "—"}
+          </td>
+        );
+      case "accountManager":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle text-xs font-medium text-neutral-700 dark:text-neutral-300">
+            {sub.accountManagerName || "—"}
+          </td>
+        );
+      case "location":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle text-xs text-neutral-700 dark:text-neutral-300">
+            {sub.candidateCurrentLocation || "—"}
+          </td>
+        );
+      case "experience":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle text-xs text-neutral-700 dark:text-neutral-300">
+            {sub.candidateExperience !== null && sub.candidateExperience !== undefined ? `${sub.candidateExperience} yrs` : "—"}
+          </td>
+        );
+      case "workAuth":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle text-xs text-neutral-700 dark:text-neutral-300">
+            {sub.candidateWorkAuth || "—"}
+          </td>
+        );
+      case "createdOn":
+        return (
+          <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle text-xs text-neutral-500">
+            {sub.createdAt ? new Date(sub.createdAt).toLocaleDateString() : "—"}
+          </td>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="relative min-h-screen">
       {/* Main View Area */}
@@ -1306,6 +1560,16 @@ export default function SubmissionsPage() {
               <Icon icon="heroicons:arrow-path" className="h-4 w-4" />
               Refresh
             </Button>
+            {viewMode === "list" && (
+              <Button
+                onClick={() => setIsColumnDrawerOpen(true)}
+                variant="outline"
+                className="flex items-center gap-1.5 border-default-300 font-semibold text-sm cursor-pointer"
+              >
+                <SlidersHorizontal className="h-4 w-4 text-indigo-600" />
+                Columns
+              </Button>
+            )}
           </div>
         </div>
 
@@ -1401,31 +1665,30 @@ export default function SubmissionsPage() {
               <table className="w-full border-collapse text-left table-auto border-neutral-200 dark:border-slate-800 min-w-[1200px]">
                 <thead className="sticky top-0 z-20 bg-blue-50 dark:bg-slate-800 border-b border-neutral-250 dark:border-slate-700 shadow-xs select-none">
                   <tr>
-                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                      Job Code
-                    </th>
-                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                      Candidate
-                    </th>
-                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                      Job Title &amp; Client
-                    </th>
-                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                      Pay Rate
-                    </th>
-                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                      Internal Review
-                    </th>
-                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                      Interview Rounds
-                    </th>
-                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                      Current Status
-                    </th>
-                    <th className="sticky top-0 z-20 p-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                      Remarks &amp; Date
-                    </th>
-                    <th className="sticky top-0 z-20 p-2 text-center text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap w-[56px]">
+                    {selectedColumns.map((colId) => {
+                      const colDef = ALL_SUBMISSION_COLUMNS.find((c) => c.id === colId);
+                      const label = colDef?.label || colId;
+                      return (
+                        <th
+                          key={colId}
+                          draggable={true}
+                          onDragStart={(e) => handleColDragStart(e, colId)}
+                          onDragOver={(e) => handleColDragOver(e, colId)}
+                          onDragLeave={() => handleColDragLeave(colId)}
+                          onDrop={(e) => handleColDrop(e, colId)}
+                          onDragEnd={handleColDragEnd}
+                          className={cn(
+                            "sticky top-0 z-20 px-4 py-3 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider whitespace-nowrap transition-all select-none cursor-grab active:cursor-grabbing",
+                            draggedColId === colId && "opacity-40",
+                            dragOverColId === colId && "border-l-2 border-l-primary bg-primary/10 ring-1 ring-primary/30"
+                          )}
+                          title="Drag to reorder column"
+                        >
+                          {label}
+                        </th>
+                      );
+                    })}
+                    <th className="sticky top-0 z-20 px-3 py-3 text-center text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider whitespace-nowrap w-[56px] min-w-[56px]">
                       Action
                     </th>
                   </tr>
@@ -1433,7 +1696,7 @@ export default function SubmissionsPage() {
                 <tbody className="divide-y divide-neutral-200 dark:divide-slate-800 text-xs">
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900">
+                      <td colSpan={selectedColumns.length + 1} className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900">
                         <div className="flex flex-col items-center gap-2">
                           <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent" />
                           <span className="text-xs">Loading candidate submissions…</span>
@@ -1442,7 +1705,7 @@ export default function SubmissionsPage() {
                     </tr>
                   ) : submissions.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900">
+                      <td colSpan={selectedColumns.length + 1} className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900">
                         No submissions found. Try adjusting your search queries or date filters.
                       </td>
                     </tr>
@@ -1452,7 +1715,7 @@ export default function SubmissionsPage() {
                         key={sub.id}
                         onClick={() => openEditPanel(sub)}
                         className={cn(
-                          "group transition-colors cursor-pointer border-b border-neutral-200 dark:border-slate-800/80 h-[52px]",
+                          "group transition-colors cursor-pointer border-b border-neutral-200 dark:border-slate-800/80 h-[56px]",
                           selectedSubmission?.id === sub.id
                             ? "bg-primary/10 hover:bg-primary/10 dark:bg-primary/15 dark:hover:bg-primary/15"
                             : idx % 2 === 0
@@ -1460,120 +1723,10 @@ export default function SubmissionsPage() {
                             : "bg-slate-50 dark:bg-slate-800/40 hover:bg-blue-50/40 dark:hover:bg-slate-800/60"
                         )}
                       >
-                        {/* 1. Job Code (Leftmost Column) */}
-                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
-                          {sub.jobId ? (
-                            <Link href={`/job-posting/${sub.jobId}`} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                              <span className="text-[#1a4fa0] dark:text-blue-400 font-semibold hover:underline cursor-pointer font-mono">
-                                {sub.jobCode || "—"}
-                              </span>
-                            </Link>
-                          ) : (
-                            <span className="text-[#1a4fa0] dark:text-blue-400 font-semibold font-mono">
-                              {sub.jobCode || "—"}
-                            </span>
-                          )}
-                        </td>
+                        {selectedColumns.map((colId) => renderSubmissionCell(sub, colId))}
 
-                        {/* 2. Candidate */}
-                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
-                          <div className="flex flex-col justify-center gap-0.5 max-w-[200px]">
-                            <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 group-hover:text-[#1a4fa0] dark:group-hover:text-blue-400 transition-colors truncate">
-                              {sub.candidateName}
-                            </span>
-                            <span className="text-[10.5px] text-neutral-400 font-normal truncate">
-                              {sub.candidateEmail || "—"}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* 3. Job Title & Client */}
-                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
-                          <div className="flex flex-col justify-center gap-0.5 max-w-[220px]">
-                            <span className="font-medium text-xs text-slate-900 dark:text-slate-100 truncate">
-                              {sub.jobTitle || "—"}
-                            </span>
-                            <span className="text-[10.5px] text-neutral-500 truncate">
-                              {sub.clientName || "Direct Client"}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* 4. Pay Rate */}
-                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle font-normal text-xs text-neutral-800 dark:text-neutral-200">
-                          {formatSubmittedRate(sub.submittedRate, sub.market, sub.jobCode, sub.jobTitle)}
-                        </td>
-
-                        {/* 5. Internal Review Status (Pure clean text with HoverCard) */}
-                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
-                          <div className="flex items-center gap-1.5">
-                            {renderInternalReviewStatus(sub)}
-                            {sub.finalStatus === "PENDING_APPROVAL" && canInternalScreen && (
-                              <div className="flex items-center gap-1 ml-1" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openQuickReview(sub, "APPROVE");
-                                  }}
-                                  className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded shadow-xs cursor-pointer"
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openQuickReview(sub, "REJECT");
-                                  }}
-                                  className="px-1.5 py-0.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 dark:bg-slate-900 dark:border-rose-900 font-semibold text-[10px] rounded cursor-pointer"
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* 6. Interview Rounds (L1, L2, L3) */}
-                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
-                          <div className="flex items-center gap-1">
-                            {renderPipelineProgress(sub)}
-                          </div>
-                        </td>
-
-                        {/* 7. Current Status (Pure clean text, no dots) */}
-                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
-                          {sub.finalStatus === "PENDING_APPROVAL" ? (
-                            <span className="text-xs text-neutral-400 italic select-none">In Review</span>
-                          ) : sub.finalStatus === "SUBMITTED" ? (
-                            <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold select-none">
-                              Submitted to Client
-                            </span>
-                          ) : sub.finalStatus === "OFFER" ? (
-                            <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold select-none">
-                              Offer Released
-                            </span>
-                          ) : sub.finalStatus === "JOIN" ? (
-                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold select-none">
-                              Joined / Placed
-                            </span>
-                          ) : sub.finalStatus === "REJECTED" ? (
-                            <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold select-none">
-                              Rejected
-                            </span>
-                          ) : (
-                            <span className="text-xs text-neutral-700 dark:text-neutral-300 font-semibold select-none">
-                              {sub.finalStatus}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* 8. Remarks & Date */}
-                        <td className="h-[52px] py-1 px-2.5 border-r border-neutral-200 dark:border-slate-800 min-w-[220px] max-w-[320px] whitespace-nowrap align-middle">
-                          {renderClutterFreeRemarks(sub)}
-                        </td>
-
-                        {/* 9. Action */}
-                        <td className="h-[52px] py-1 px-2.5 text-center whitespace-nowrap align-middle" onClick={(e) => e.stopPropagation()}>
+                        {/* Action */}
+                        <td className="h-[56px] py-3.5 px-3 text-center whitespace-nowrap align-middle" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button className="p-1 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer">
@@ -2606,6 +2759,19 @@ export default function SubmissionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Universal Column Customization Drawer */}
+      <ColumnManager
+        isOpen={isColumnDrawerOpen}
+        onClose={() => setIsColumnDrawerOpen(false)}
+        allColumns={ALL_SUBMISSION_COLUMNS}
+        selectedColumns={selectedColumns}
+        defaultColumns={DEFAULT_SUBMISSION_COLUMNS}
+        onApply={(newCols) => {
+          setSelectedColumns(newCols);
+          saveUserColumnPreferences("submissions", newCols);
+        }}
+      />
     </div>
   );
 }

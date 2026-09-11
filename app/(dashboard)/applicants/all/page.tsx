@@ -353,6 +353,10 @@ export default function AllApplicantsPage() {
           }}
           selectedRowIds={selectedRowIds}
           onSelectionChange={setSelectedRowIds}
+          onReorderColumns={(newCols) => {
+            setSelectedColumns(newCols);
+            saveUserColumnPreferences("applicants", newCols);
+          }}
           isRecruiter={isRecruiter}
         />
 
@@ -396,6 +400,7 @@ export default function AllApplicantsPage() {
         onClose={() => setIsColumnManagerOpen(false)}
         allColumns={ALL_COLUMNS}
         selectedColumns={selectedColumns}
+        defaultColumns={DEFAULT_COLUMNS}
         onApply={(newCols) => {
           setSelectedColumns(newCols);
           saveUserColumnPreferences("applicants", newCols);

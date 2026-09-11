@@ -71,6 +71,8 @@ export interface DataTableProps<TData> {
   editableColumns?: string[];
   
   searchPlaceholder?: string;
+
+  onReorderColumns?: (newSelectedOrder: string[]) => void;
 }
 
 export default function DataTable<TData extends Record<string, any>>({
@@ -95,6 +97,7 @@ export default function DataTable<TData extends Record<string, any>>({
   topRightActions,
   editableColumns = [],
   searchPlaceholder = "Type search terms...",
+  onReorderColumns,
 }: DataTableProps<TData>) {
   const router = useRouter();
   
@@ -105,6 +108,62 @@ export default function DataTable<TData extends Record<string, any>>({
   // Selection State
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+
+  // Direct Column Drag & Drop Reordering State
+  const [draggedColId, setDraggedColId] = useState<string | null>(null);
+  const [dragOverColId, setDragOverColId] = useState<string | null>(null);
+  const [isDragReordering, setIsDragReordering] = useState(false);
+
+  const handleDragStart = (e: React.DragEvent, colId: string) => {
+    setDraggedColId(colId);
+    setIsDragReordering(true);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", colId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, colId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (draggedColId && draggedColId !== colId) {
+      setDragOverColId(colId);
+    }
+  };
+
+  const handleDragLeave = (colId: string) => {
+    if (dragOverColId === colId) {
+      setDragOverColId(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetColId: string) => {
+    e.preventDefault();
+    if (!draggedColId || draggedColId === targetColId) {
+      setDraggedColId(null);
+      setDragOverColId(null);
+      setTimeout(() => setIsDragReordering(false), 200);
+      return;
+    }
+
+    const fromIdx = selectedColumns.indexOf(draggedColId);
+    const toIdx = selectedColumns.indexOf(targetColId);
+
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const newCols = [...selectedColumns];
+      const [moved] = newCols.splice(fromIdx, 1);
+      newCols.splice(toIdx, 0, moved);
+      onReorderColumns?.(newCols);
+    }
+
+    setDraggedColId(null);
+    setDragOverColId(null);
+    setTimeout(() => setIsDragReordering(false), 200);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedColId(null);
+    setDragOverColId(null);
+    setTimeout(() => setIsDragReordering(false), 200);
+  };
 
   // Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -418,7 +477,7 @@ export default function DataTable<TData extends Record<string, any>>({
           <thead className="sticky top-0 z-10 bg-blue-50 dark:bg-slate-800 border-b border-neutral-200 dark:border-slate-700 shadow-xs select-none">
             <tr>
               {/* Checkbox Header (Sticky Left) */}
-              <th className="sticky left-0 z-20 w-[36px] min-w-[36px] p-1 text-center bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700">
+              <th className="sticky left-0 z-20 w-[36px] min-w-[36px] px-2.5 py-3 text-center bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700">
                 <input
                   type="checkbox"
                   checked={
@@ -426,7 +485,7 @@ export default function DataTable<TData extends Record<string, any>>({
                     paginatedData.every((row) => selectedRowIds.includes(getRowId(row)))
                   }
                   onChange={(e) => handleSelectAll(e.target.checked)}
-                  className="h-3 w-3 accent-primary cursor-pointer rounded-xs"
+                  className="h-3.5 w-3.5 accent-primary cursor-pointer rounded-xs align-middle"
                 />
               </th>
 
@@ -437,8 +496,22 @@ export default function DataTable<TData extends Record<string, any>>({
                 return (
                   <th
                     key={colId}
-                    className="p-1.5 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 hover:bg-blue-100 dark:hover:bg-slate-750 transition-colors cursor-pointer relative whitespace-nowrap"
-                    onClick={() => handleSort(colId)}
+                    draggable={true}
+                    onDragStart={(e) => handleDragStart(e, colId)}
+                    onDragOver={(e) => handleDragOver(e, colId)}
+                    onDragLeave={() => handleDragLeave(colId)}
+                    onDrop={(e) => handleDrop(e, colId)}
+                    onDragEnd={handleDragEnd}
+                    className={cn(
+                      "px-4 py-3 text-[11px] font-bold text-neutral-700 dark:text-neutral-200 bg-blue-50 dark:bg-slate-800 border-r border-b border-neutral-250 dark:border-slate-700 hover:bg-blue-100 dark:hover:bg-slate-750 transition-all cursor-pointer relative whitespace-nowrap select-none",
+                      draggedColId === colId && "opacity-40",
+                      dragOverColId === colId && "border-l-2 border-l-primary bg-primary/10 ring-1 ring-primary/30"
+                    )}
+                    onClick={() => {
+                      if (isDragReordering) return;
+                      handleSort(colId);
+                    }}
+                    title="Drag to reorder column"
                   >
                     <div className="flex items-center justify-between gap-1 pr-3">
                       <span className="uppercase tracking-wider text-[10px] whitespace-nowrap">{col?.label || colId}</span>
@@ -459,7 +532,7 @@ export default function DataTable<TData extends Record<string, any>>({
               })}
 
               {/* Actions Header (Sticky Right) */}
-              <th className="sticky right-0 z-20 w-[56px] min-w-[56px] p-1 text-center bg-blue-50 dark:bg-slate-800 border-l border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] font-bold text-neutral-700 dark:text-neutral-200">
+              <th className="sticky right-0 z-20 w-[56px] min-w-[56px] px-3 py-3 text-center bg-blue-50 dark:bg-slate-800 border-l border-b border-neutral-250 dark:border-slate-700 uppercase tracking-wider text-[10px] font-bold text-neutral-700 dark:text-neutral-200">
                 Action
               </th>
             </tr>
@@ -486,7 +559,7 @@ export default function DataTable<TData extends Record<string, any>>({
                     key={rowId}
                     onContextMenu={(e) => handleContextMenu(e, rowId)}
                     className={cn(
-                      "group transition-colors cursor-default border-b border-neutral-200 dark:border-slate-800/80",
+                      "group transition-colors cursor-default border-b border-neutral-200 dark:border-slate-800/80 h-[56px]",
                       isSelected
                         ? "bg-primary/10 hover:bg-primary/10 dark:bg-primary/15 dark:hover:bg-primary/15"
                         : idx % 2 === 0
@@ -497,7 +570,7 @@ export default function DataTable<TData extends Record<string, any>>({
                   >
                     {/* Checkbox (Sticky Left) */}
                     <td className={cn(
-                      "sticky left-0 z-10 w-[36px] min-w-[36px] p-1.5 text-center border-r border-neutral-200 dark:border-slate-800 transition-colors duration-150",
+                      "sticky left-0 z-10 w-[36px] min-w-[36px] px-2.5 py-3.5 text-center border-r border-neutral-200 dark:border-slate-800 transition-colors duration-150 align-middle",
                       isSelected
                         ? "bg-blue-50/95 dark:bg-blue-950/95"
                         : idx % 2 === 0
@@ -508,7 +581,7 @@ export default function DataTable<TData extends Record<string, any>>({
                         type="checkbox"
                         checked={isSelected}
                         onChange={(e) => handleSelectRow(rowId, e.target.checked)}
-                        className="h-3 w-3 accent-primary cursor-pointer rounded-xs"
+                        className="h-3.5 w-3.5 accent-primary cursor-pointer rounded-xs align-middle"
                       />
                     </td>
 
@@ -522,7 +595,7 @@ export default function DataTable<TData extends Record<string, any>>({
                           key={colId}
                           onDoubleClick={() => isEditable && handleCellDoubleClick(rowId, colId, rawValue)}
                           className={cn(
-                            "py-2 px-2 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap font-normal text-neutral-800 dark:text-neutral-200 transition-colors",
+                            "py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap font-normal text-neutral-800 dark:text-neutral-200 transition-colors align-middle",
                             isEditable && !isCellEditing ? "hover:bg-yellow-50/60 dark:hover:bg-yellow-950/10 cursor-cell" : "",
                             isCellEditing ? "p-0 bg-blue-50/40 dark:bg-blue-950/20" : ""
                           )}
@@ -544,7 +617,7 @@ export default function DataTable<TData extends Record<string, any>>({
 
                     {/* Actions Column (Sticky Right) */}
                     <td className={cn(
-                      "sticky right-0 z-10 w-[56px] min-w-[56px] p-0.5 text-center border-l border-neutral-200 dark:border-slate-800 transition-colors duration-150",
+                      "sticky right-0 z-10 w-[56px] min-w-[56px] px-2 py-3.5 text-center border-l border-neutral-200 dark:border-slate-800 transition-colors duration-150 align-middle",
                       isSelected
                         ? "bg-blue-50/95 dark:bg-blue-950/95"
                         : idx % 2 === 0

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Search, Check, ChevronUp, ChevronDown } from "lucide-react";
+import { X, Search, Check, ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,7 @@ interface ColumnDrawerProps {
   onClose: () => void;
   allColumns: { id: string; label: string }[];
   selectedColumns: string[];
+  defaultColumns?: string[];
   onApply: (newSelectedOrder: string[]) => void;
 }
 
@@ -18,10 +19,13 @@ export default function ColumnManager({
   onClose,
   allColumns,
   selectedColumns: initialSelected,
+  defaultColumns,
   onApply,
 }: ColumnDrawerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [tempSelected, setTempSelected] = useState<string[]>(initialSelected);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Sync state on mount / open
   useEffect(() => {
@@ -46,6 +50,41 @@ export default function ColumnManager({
     } else {
       setTempSelected(allColumns.map((col) => col.id));
     }
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const newOrder = [...tempSelected];
+    const [movedCol] = newOrder.splice(draggedIndex, 1);
+    newOrder.splice(dropIndex, 0, movedCol);
+
+    setTempSelected(newOrder);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   const moveColumn = (index: number, direction: "up" | "down") => {
@@ -115,19 +154,32 @@ export default function ColumnManager({
                   />
                 </div>
 
-                {/* Select All */}
-                <button
-                  onClick={handleSelectAll}
-                  className="text-[11px] text-primary dark:text-blue-400 font-bold flex items-center gap-1.5 hover:underline text-left cursor-pointer"
-                >
-                  <Check
-                    className={cn(
-                      "h-3.5 w-3.5",
-                      tempSelected.length === allColumns.length ? "opacity-100" : "opacity-40"
-                    )}
-                  />
-                  Select All
-                </button>
+                {/* Select All & Reset to Default */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={handleSelectAll}
+                    className="text-[11px] text-primary dark:text-blue-400 font-bold flex items-center gap-1.5 hover:underline text-left cursor-pointer"
+                  >
+                    <Check
+                      className={cn(
+                        "h-3.5 w-3.5",
+                        tempSelected.length === allColumns.length ? "opacity-100" : "opacity-40"
+                      )}
+                    />
+                    Select All
+                  </button>
+                  {defaultColumns && defaultColumns.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTempSelected(defaultColumns);
+                      }}
+                      className="text-[11px] text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 font-medium hover:underline cursor-pointer"
+                    >
+                      Reset Default
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Checklist */}
@@ -175,13 +227,29 @@ export default function ColumnManager({
                       return (
                         <div
                           key={colId}
-                          className="flex items-center justify-between p-2 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded text-xs select-none hover:border-neutral-400 dark:hover:border-slate-650 transition-colors"
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, index)}
+                          onDragOver={(e) => handleDragOver(e, index)}
+                          onDrop={(e) => handleDrop(e, index)}
+                          onDragEnd={handleDragEnd}
+                          className={cn(
+                            "flex items-center justify-between p-2 bg-neutral-50 dark:bg-slate-850 border rounded text-xs select-none transition-all cursor-grab active:cursor-grabbing",
+                            draggedIndex === index
+                              ? "opacity-30 border-dashed border-primary bg-primary/5"
+                              : dragOverIndex === index
+                              ? "border-primary bg-primary/10 ring-1 ring-primary scale-[1.02] shadow-xs"
+                              : "border-neutral-200 dark:border-slate-800 hover:border-neutral-400 dark:hover:border-slate-655"
+                          )}
+                          title="Drag up or down to reorder display order"
                         >
-                          <span className="font-medium text-neutral-800 dark:text-neutral-200 truncate pr-2">
-                            {col.label}
-                          </span>
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-2">
+                            <GripVertical className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0 cursor-grab" />
+                            <span className="font-medium text-neutral-800 dark:text-neutral-200 truncate">
+                              {col.label}
+                            </span>
+                          </div>
 
-                          <div className="flex items-center gap-0.5 shrink-0">
+                          <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"
                               onClick={() => moveColumn(index, "up")}
