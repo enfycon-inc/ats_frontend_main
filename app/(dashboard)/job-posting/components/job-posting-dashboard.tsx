@@ -541,6 +541,7 @@ export default function JobPostingDashboard({
           data={jobsData}
           selectedColumns={activeSelectedColumns}
           allColumns={allColumns}
+          branchUsesPods={branchUsesPods}
           onOpenFilters={() => setIsFilterOpen(true)}
           onOpenColumns={() => setIsColumnOpen(true)}
           onRefresh={handleRefresh}

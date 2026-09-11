@@ -34,6 +34,8 @@ import {
   Check,
   UserX,
   Building2,
+  Calendar,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import {
@@ -116,6 +118,46 @@ function isJobPostedToday(job: Job): boolean {
   return false;
 }
 
+function isJobRecent(job: Job): boolean {
+  if (!job) return false;
+
+  // 1. Check agingDays if available
+  if (typeof job.agingDays === "number" && !isNaN(job.agingDays)) {
+    if (job.agingDays <= 14) return true;
+  }
+
+  // 2. Check createdOn or createdAt date string (within 14 days)
+  const dateStr = (job as any).createdAt || job.createdOn;
+  if (dateStr) {
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        const diffDays = (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24);
+        if (diffDays <= 14) return true;
+      }
+    } catch {}
+  }
+
+  // 3. Fallback: check jobCode date segment if matches (e.g. BBS-260907-D00001)
+  if (job.jobCode) {
+    const match = job.jobCode.match(/-(\d{2})(\d{2})(\d{2})-/);
+    if (match) {
+      try {
+        const yy = parseInt("20" + match[1], 10);
+        const mm = parseInt(match[2], 10) - 1;
+        const dd = parseInt(match[3], 10);
+        const jobDate = new Date(yy, mm, dd);
+        if (!isNaN(jobDate.getTime())) {
+          const diffDays = (Date.now() - jobDate.getTime()) / (1000 * 60 * 60 * 24);
+          if (diffDays <= 14) return true;
+        }
+      } catch {}
+    }
+  }
+
+  return isJobPostedToday(job);
+}
+
 export function formatDateTimeDisplay(
   dateStr?: string | null,
   job?: Job
@@ -163,6 +205,7 @@ interface DataTableProps {
   data: Job[];
   selectedColumns: string[];
   allColumns: { id: string; label: string }[];
+  branchUsesPods?: boolean;
   onOpenFilters: () => void;
   onOpenColumns: () => void;
   onRefresh: () => void;
@@ -178,6 +221,7 @@ export default function DataTable({
   data,
   selectedColumns,
   allColumns,
+  branchUsesPods,
   onOpenFilters,
   onOpenColumns,
   onRefresh,
@@ -233,9 +277,117 @@ export default function DataTable({
   // Selection State
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
-  // Search State
+  // Search & Filter Bar States (multi-tenant & custom role compatible)
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchFilter, setSearchFilter] = useState("All");
+  const [selectedPod, setSelectedPod] = useState("All");
+  const [selectedCreator, setSelectedCreator] = useState("All");
+  const [selectedAssignee, setSelectedAssignee] = useState("All");
+  const [selectedClient, setSelectedClient] = useState("All");
+  const [selectedPeriod, setSelectedPeriod] = useState("All Time");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [selectedSort, setSelectedSort] = useState("Latest Posted");
+  const [showRangePicker, setShowRangePicker] = useState(false);
+  const [podsList, setPodsList] = useState<any[]>([]);
+
+  // Check whether pod system is enabled for current active branch / workspace
+  const isPodSystemEnabled = useMemo(() => {
+    if (branchUsesPods !== undefined) return branchUsesPods;
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("active_branch_allow_pods");
+      if (stored !== null) return stored === "true";
+    }
+    return false;
+  }, [branchUsesPods]);
+
+  // Load pods list when pod system is enabled
+  useEffect(() => {
+    if (isPodSystemEnabled) {
+      atsApi.pods
+        .list()
+        .then((res) => {
+          if (Array.isArray(res)) setPodsList(res);
+        })
+        .catch((e) => console.warn("Could not load pods:", e));
+    }
+  }, [isPodSystemEnabled]);
+
+  // Unique available pods for dropdown
+  const availablePods = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    podsList.forEach((p: any) => {
+      if (p && p.name) map.set(p.name, { id: p.id, name: p.name });
+    });
+    data.forEach((j) => {
+      if (j.podName && j.podName !== "N/A" && j.podName.toLowerCase() !== "unassigned") {
+        map.set(j.podName, { id: j.podId || j.podName, name: j.podName });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [podsList, data]);
+
+  // Unique available Creators for dropdown (role-agnostic, multi-tenant compatible)
+  const availableCreators = useMemo(() => {
+    const creators = new Set<string>();
+    data.forEach((j) => {
+      const creator = j.createdBy || (j as any).creator_name || (j as any).created_by;
+      if (creator && creator !== "System Admin" && creator !== "N/A" && creator.trim()) {
+        creators.add(creator.trim());
+      }
+    });
+    return Array.from(creators).sort();
+  }, [data]);
+
+  // Unique available Assignees for dropdown (recruiters, pods, unassigned)
+  const availableAssignees = useMemo(() => {
+    const assignees = new Set<string>();
+    data.forEach((j) => {
+      const info = getAssignedPersonDisplay(j);
+      if (info.label && info.label !== "Unassigned" && info.label.trim()) {
+        assignees.add(info.label.trim());
+      }
+    });
+    return Array.from(assignees).sort();
+  }, [data]);
+
+  // Unique available Clients for dropdown
+  const availableClients = useMemo(() => {
+    const clients = new Set<string>();
+    data.forEach((j) => {
+      if (j.client && j.client !== "N/A") clients.add(j.client.trim());
+      if (j.endClientName && j.endClientName !== "N/A") clients.add(j.endClientName.trim());
+    });
+    return Array.from(clients).sort();
+  }, [data]);
+
+  const isAnyFilterActive = useMemo(() => {
+    return (
+      searchQuery.trim() !== "" ||
+      selectedPod !== "All" ||
+      selectedCreator !== "All" ||
+      selectedAssignee !== "All" ||
+      selectedClient !== "All" ||
+      selectedPeriod !== "All Time" ||
+      startDate !== "" ||
+      endDate !== "" ||
+      selectedSort !== "Latest Posted"
+    );
+  }, [searchQuery, selectedPod, selectedCreator, selectedAssignee, selectedClient, selectedPeriod, startDate, endDate, selectedSort]);
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setSelectedPod("All");
+    setSelectedCreator("All");
+    setSelectedAssignee("All");
+    setSelectedClient("All");
+    setSelectedPeriod("All Time");
+    setStartDate("");
+    setEndDate("");
+    setSelectedSort("Latest Posted");
+    setSortColumn(null);
+    setShowRangePicker(false);
+    toast.success("Filters reset to default");
+  };
 
   // Pagination State
   const [pageSize, setPageSize] = useState(25);
@@ -429,7 +581,6 @@ export default function DataTable({
 
   // Assignment Context Data
   const [usersList, setUsersList] = useState<any[]>([]);
-  const [podsList, setPodsList] = useState<any[]>([]);
   const [branchesList, setBranchesList] = useState<any[]>([]);
   const [rolesList, setRolesList] = useState<any[]>([]);
 
@@ -740,29 +891,104 @@ export default function DataTable({
   const processedData = useMemo(() => {
     let result = [...data];
 
-    // Search Query
+    // 1. Search Query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter((job) => {
         const assignedLabel = getAssignedPersonDisplay(job).label.toLowerCase();
-        if (searchFilter === "All") {
-          return (
-            (job.jobTitle || "").toLowerCase().includes(q) ||
-            (job.jobCode || "").toLowerCase().includes(q) ||
-            (job.client || "").toLowerCase().includes(q) ||
-            (job.location || "").toLowerCase().includes(q) ||
-            assignedLabel.includes(q)
-          );
-        } else if (searchFilter === "assignedTo") {
-          return assignedLabel.includes(q);
-        } else {
-          const val = job[searchFilter as keyof Job];
-          return typeof val === "string" && val.toLowerCase().includes(q);
-        }
+        return (
+          (job.jobTitle || "").toLowerCase().includes(q) ||
+          (job.jobCode || "").toLowerCase().includes(q) ||
+          (job.client || "").toLowerCase().includes(q) ||
+          (job.endClientName || "").toLowerCase().includes(q) ||
+          (job.location || "").toLowerCase().includes(q) ||
+          (job.businessUnit || "").toLowerCase().includes(q) ||
+          assignedLabel.includes(q)
+        );
       });
     }
 
-    // Sort
+    // 2. Pod Filter (only active if pod system enabled for workspace)
+    if (isPodSystemEnabled && selectedPod !== "All") {
+      result = result.filter(
+        (job) => job.podName === selectedPod || job.podId === selectedPod
+      );
+    }
+
+    // 3. Created By Filter (role-agnostic, multi-tenant compatible)
+    if (selectedCreator !== "All") {
+      result = result.filter((job) => {
+        const creator = job.createdBy || (job as any).creator_name || (job as any).created_by;
+        return creator?.trim().toLowerCase() === selectedCreator.trim().toLowerCase();
+      });
+    }
+
+    // 4. Assigned To Filter (multi-tenant custom role compatible)
+    if (selectedAssignee !== "All") {
+      result = result.filter((job) => {
+        const info = getAssignedPersonDisplay(job);
+        if (selectedAssignee === "Unassigned") {
+          return info.type === "unassigned";
+        }
+        return info.label.trim().toLowerCase() === selectedAssignee.trim().toLowerCase();
+      });
+    }
+
+    // 4. Client Filter
+    if (selectedClient !== "All") {
+      result = result.filter(
+        (job) =>
+          (job.client && job.client.toLowerCase() === selectedClient.toLowerCase()) ||
+          (job.endClientName && job.endClientName.toLowerCase() === selectedClient.toLowerCase())
+      );
+    }
+
+    // 5. Period & Date Range Filter
+    if (selectedPeriod !== "All Time" || startDate || endDate) {
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+      const startOfWeek = startOfToday - 7 * 24 * 60 * 60 * 1000;
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      const startOf30Days = startOfToday - 30 * 24 * 60 * 60 * 1000;
+
+      result = result.filter((job) => {
+        const dateStr = (job as any).createdAt || job.createdOn;
+        if (!dateStr) return true;
+        const jobTime = new Date(dateStr).getTime();
+        if (isNaN(jobTime)) return true;
+
+        if (selectedPeriod === "Today") {
+          return jobTime >= startOfToday;
+        }
+        if (selectedPeriod === "Yesterday") {
+          return jobTime >= startOfYesterday && jobTime < startOfToday;
+        }
+        if (selectedPeriod === "This Week") {
+          return jobTime >= startOfWeek;
+        }
+        if (selectedPeriod === "This Month") {
+          return jobTime >= startOfMonth;
+        }
+        if (selectedPeriod === "Last 30 Days") {
+          return jobTime >= startOf30Days;
+        }
+        if (selectedPeriod === "Custom" || startDate || endDate) {
+          if (startDate) {
+            const sTime = new Date(startDate).getTime();
+            if (!isNaN(sTime) && jobTime < sTime) return false;
+          }
+          if (endDate) {
+            const eTime = new Date(endDate + "T23:59:59.999Z").getTime();
+            if (!isNaN(eTime) && jobTime > eTime) return false;
+          }
+          return true;
+        }
+        return true;
+      });
+    }
+
+    // 6. Sorting: Table column header click takes precedence, otherwise selectedSort applies
     if (sortColumn) {
       result.sort((a, b) => {
         if (sortColumn === "assignedTo") {
@@ -794,10 +1020,57 @@ export default function DataTable({
         if (strA > strB) return sortDirection === "asc" ? 1 : -1;
         return 0;
       });
+    } else {
+      // Default / selectedSort dropdown
+      result.sort((a, b) => {
+        if (selectedSort === "Latest Posted") {
+          const tA = new Date(String((a as any).createdAt || a.createdOn || 0)).getTime();
+          const tB = new Date(String((b as any).createdAt || b.createdOn || 0)).getTime();
+          return tB - tA;
+        }
+        if (selectedSort === "Oldest Posted") {
+          const tA = new Date(String((a as any).createdAt || a.createdOn || 0)).getTime();
+          const tB = new Date(String((b as any).createdAt || b.createdOn || 0)).getTime();
+          return tA - tB;
+        }
+        if (selectedSort === "Recently Updated") {
+          const tA = new Date(String((a as any).updatedAt || a.modifiedOn || 0)).getTime();
+          const tB = new Date(String((b as any).updatedAt || b.modifiedOn || 0)).getTime();
+          return tB - tA;
+        }
+        if (selectedSort === "Job Title (A-Z)") {
+          return (a.jobTitle || "").localeCompare(b.jobTitle || "");
+        }
+        if (selectedSort === "Job Title (Z-A)") {
+          return (b.jobTitle || "").localeCompare(a.jobTitle || "");
+        }
+        if (selectedSort === "Hot First") {
+          const rank = (j: Job) => {
+            const p = String(j.priority || (j as any).urgency || "").toLowerCase();
+            return p.includes("hot") ? 0 : p.includes("warm") ? 1 : 2;
+          };
+          return rank(a) - rank(b);
+        }
+        return 0;
+      });
     }
 
     return result;
-  }, [data, searchQuery, searchFilter, sortColumn, sortDirection]);
+  }, [
+    data,
+    searchQuery,
+    isPodSystemEnabled,
+    selectedPod,
+    selectedCreator,
+    selectedAssignee,
+    selectedClient,
+    selectedPeriod,
+    startDate,
+    endDate,
+    sortColumn,
+    sortDirection,
+    selectedSort,
+  ]);
 
   // Paginated Data
   const paginatedData = useMemo(() => {
@@ -1000,27 +1273,269 @@ export default function DataTable({
         </div>
       </div>
 
-      {/* Search and Filters bar */}
-      <div className="py-1 px-2.5 border-b border-neutral-200 dark:border-slate-800 flex flex-wrap items-center gap-2 bg-white dark:bg-slate-900">
-        <div className="flex items-center bg-neutral-50 dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded-sm w-[280px]">
-          <select
-            value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value)}
-            className="pl-2 pr-1 py-0.5 text-xs text-neutral-700 dark:text-neutral-300 bg-transparent outline-hidden cursor-pointer border-r border-neutral-300 dark:border-slate-700 font-medium"
-          >
-            <option value="All">Search Any</option>
-            <option value="jobCode">Job Code</option>
-            <option value="jobTitle">Job Title</option>
-            <option value="client">Client</option>
-          </select>
-          <input
-            type="text"
-            placeholder="Type search terms..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 px-2 py-0.5 text-xs text-neutral-850 dark:text-neutral-150 bg-transparent outline-hidden placeholder:text-neutral-400 font-medium"
-          />
-          <Search className="h-3.5 w-3.5 text-neutral-400 mr-2" />
+      {/* EnfySync-Style Multi-Filter Bar (matching old enfySync layout) */}
+      <div className="px-4 py-3 bg-slate-50/70 dark:bg-slate-900/60 border-b border-neutral-200 dark:border-slate-800">
+        <div className="flex flex-wrap items-end gap-3 lg:gap-3.5">
+          {/* 1. SEARCH */}
+          <div className="flex flex-col gap-1.5 flex-[1.4] min-w-[200px]">
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+              SEARCH
+            </label>
+            <div className="relative flex items-center">
+              <Search className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 absolute left-2.5 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Job title or code..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-7 h-9 text-xs bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#1a4fa0] focus:border-[#1a4fa0] transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs p-0.5 cursor-pointer"
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 2. POD (Only rendered if pod system is enabled!) */}
+          {isPodSystemEnabled && (
+            <div className="flex flex-col gap-1.5 flex-1 min-w-[130px]">
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none flex items-center gap-1">
+                <span>POD</span>
+              </label>
+              <select
+                value={selectedPod}
+                onChange={(e) => setSelectedPod(e.target.value)}
+                className="w-full px-2.5 h-9 text-xs bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:ring-1 focus:ring-[#1a4fa0] cursor-pointer transition-colors"
+              >
+                <option value="All">All Pods</option>
+                {availablePods.map((p) => (
+                  <option key={p.id || p.name} value={p.name}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* 3. CREATED BY */}
+          <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+              CREATED BY
+            </label>
+            <select
+              value={selectedCreator}
+              onChange={(e) => setSelectedCreator(e.target.value)}
+              className="w-full px-2.5 h-9 text-xs bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:ring-1 focus:ring-[#1a4fa0] cursor-pointer transition-colors"
+            >
+              <option value="All">All Creators</option>
+              {availableCreators.map((creator) => (
+                <option key={creator} value={creator}>
+                  {creator}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 4. ASSIGNED TO */}
+          <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+              ASSIGNED TO
+            </label>
+            <select
+              value={selectedAssignee}
+              onChange={(e) => setSelectedAssignee(e.target.value)}
+              className="w-full px-2.5 h-9 text-xs bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:ring-1 focus:ring-[#1a4fa0] cursor-pointer transition-colors"
+            >
+              <option value="All">All Assignees</option>
+              <option value="Unassigned">Unassigned</option>
+              {availableAssignees.map((assignee) => (
+                <option key={assignee} value={assignee}>
+                  {assignee}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 4. CLIENT */}
+          <div className="flex flex-col gap-1.5 flex-1 min-w-[130px]">
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+              CLIENT
+            </label>
+            <select
+              value={selectedClient}
+              onChange={(e) => setSelectedClient(e.target.value)}
+              className="w-full px-2.5 h-9 text-xs bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:ring-1 focus:ring-[#1a4fa0] cursor-pointer transition-colors"
+            >
+              <option value="All">All Clients</option>
+              {availableClients.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 5. PERIOD */}
+          <div className="flex flex-col gap-1.5 flex-1 min-w-[120px]">
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+              PERIOD
+            </label>
+            <select
+              value={selectedPeriod}
+              onChange={(e) => {
+                setSelectedPeriod(e.target.value);
+                if (e.target.value !== "Custom") {
+                  setStartDate("");
+                  setEndDate("");
+                } else {
+                  setShowRangePicker(true);
+                }
+              }}
+              className="w-full px-2.5 h-9 text-xs bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:ring-1 focus:ring-[#1a4fa0] cursor-pointer transition-colors"
+            >
+              <option value="All Time">All Time</option>
+              <option value="Today">Today</option>
+              <option value="Yesterday">Yesterday</option>
+              <option value="This Week">This Week</option>
+              <option value="This Month">This Month</option>
+              <option value="Last 30 Days">Last 30 Days</option>
+              <option value="Custom">Custom Range</option>
+            </select>
+          </div>
+
+          {/* 6. RANGE */}
+          <div className="flex flex-col gap-1.5 flex-1 min-w-[150px] relative">
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+              RANGE
+            </label>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowRangePicker(!showRangePicker)}
+                className={cn(
+                  "w-full px-2.5 h-9 text-xs bg-white dark:bg-slate-850 border rounded-md font-medium text-left flex items-center justify-between transition-colors shadow-2xs cursor-pointer",
+                  startDate || endDate || selectedPeriod === "Custom"
+                    ? "border-[#1a4fa0] text-[#1a4fa0] dark:text-blue-400 font-semibold"
+                    : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                )}
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  <span className="truncate">
+                    {startDate && endDate
+                      ? `${startDate} ~ ${endDate}`
+                      : startDate
+                      ? `From ${startDate}`
+                      : endDate
+                      ? `Until ${endDate}`
+                      : "Pick a range"}
+                  </span>
+                </div>
+                <ChevronDown className="h-3 w-3 shrink-0 text-slate-400 ml-1" />
+              </button>
+
+              {showRangePicker && (
+                <div className="absolute right-0 top-full mt-1.5 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl p-3 w-[260px] space-y-2.5 animate-in fade-in zoom-in-95">
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Pick Date Range</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowRangePicker(false)}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-medium">From Date</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => {
+                        setStartDate(e.target.value);
+                        setSelectedPeriod("Custom");
+                      }}
+                      className="w-full px-2.5 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-850 text-slate-800 dark:text-slate-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-medium">To Date</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => {
+                        setEndDate(e.target.value);
+                        setSelectedPeriod("Custom");
+                      }}
+                      className="w-full px-2.5 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-850 text-slate-800 dark:text-slate-200"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStartDate("");
+                        setEndDate("");
+                        setSelectedPeriod("All Time");
+                        setShowRangePicker(false);
+                      }}
+                      className="text-[11px] text-slate-500 hover:text-rose-600 hover:underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowRangePicker(false)}
+                      className="px-3 py-1 bg-primary text-white text-[11px] font-bold rounded-md shadow-2xs hover:bg-primary/90 cursor-pointer"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 7. SORT BY */}
+          <div className="flex flex-col gap-1.5 flex-1 min-w-[130px]">
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+              SORT BY
+            </label>
+            <select
+              value={selectedSort}
+              onChange={(e) => setSelectedSort(e.target.value)}
+              className="w-full px-2.5 h-9 text-xs bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:ring-1 focus:ring-[#1a4fa0] cursor-pointer transition-colors"
+            >
+              <option value="Latest Posted">Latest Posted</option>
+              <option value="Oldest Posted">Oldest Posted</option>
+              <option value="Recently Updated">Recently Updated</option>
+              <option value="Job Title (A-Z)">Job Title (A-Z)</option>
+              <option value="Job Title (Z-A)">Job Title (Z-A)</option>
+              <option value="Hot First">Hot Priority First</option>
+            </select>
+          </div>
+
+          {/* Reset Filters button */}
+          {isAnyFilterActive && (
+            <div className="flex items-end pb-0.5">
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="h-9 px-3 rounded-md border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-semibold hover:bg-rose-100 dark:hover:bg-rose-900/50 flex items-center gap-1 transition-colors cursor-pointer"
+                title="Reset all filters"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>Reset</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1031,7 +1546,7 @@ export default function DataTable({
           <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-900 border-b border-neutral-200 dark:border-slate-800 shadow-2xs select-none backdrop-blur-xs">
             <tr>
               {/* Checkbox Header (Sticky Left) */}
-              <th className="sticky left-0 z-20 w-[36px] min-w-[36px] p-1.5 text-center bg-slate-100/95 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800">
+              <th className="sticky left-0 z-20 w-[44px] min-w-[44px] px-3.5 py-3.5 text-center bg-slate-100/95 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800">
                 <input
                   type="checkbox"
                   checked={
@@ -1050,7 +1565,7 @@ export default function DataTable({
                 return (
                   <th
                     key={colId}
-                    className="p-2 text-[10.5px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100/95 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors cursor-pointer relative whitespace-nowrap"
+                    className="px-4 py-3.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100/95 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors cursor-pointer relative whitespace-nowrap"
                     onClick={() => handleSort(colId as keyof Job)}
                   >
                     <div className="flex items-center justify-between gap-1 pr-2">
@@ -1072,7 +1587,7 @@ export default function DataTable({
               })}
 
               {/* Actions Header (Sticky Right) */}
-              <th className="sticky right-0 z-20 w-[56px] min-w-[56px] p-1.5 text-center bg-slate-100/95 dark:bg-slate-900 border-l border-b border-neutral-200 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold text-slate-600 dark:text-slate-300">
+              <th className="sticky right-0 z-20 w-[64px] min-w-[64px] px-3 py-3.5 text-center bg-slate-100/95 dark:bg-slate-900 border-l border-b border-neutral-200 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold text-slate-600 dark:text-slate-300">
                 Action
               </th>
             </tr>
@@ -1109,7 +1624,7 @@ export default function DataTable({
                   >
                     {/* Checkbox (Sticky Left) */}
                     <td className={cn(
-                      "sticky left-0 z-10 w-[36px] min-w-[36px] p-1.5 text-center border-r border-neutral-200 dark:border-slate-800 transition-colors duration-150",
+                      "sticky left-0 z-10 w-[44px] min-w-[44px] px-3.5 py-4 text-center border-r border-neutral-200 dark:border-slate-800 transition-colors duration-150",
                       isSelected
                         ? "bg-blue-50/95 dark:bg-blue-950/95"
                         : idx % 2 === 0
@@ -1120,7 +1635,7 @@ export default function DataTable({
                         type="checkbox"
                         checked={isSelected}
                         onChange={(e) => handleSelectRow(job.id, e.target.checked)}
-                        className="h-3 w-3 accent-primary cursor-pointer rounded-xs"
+                        className="h-3.5 w-3.5 accent-primary cursor-pointer rounded-xs"
                       />
                     </td>
 
@@ -1134,7 +1649,7 @@ export default function DataTable({
                           key={colId}
                           onDoubleClick={() => isEditable && handleCellDoubleClick(job.id, colId, rawValue)}
                           className={cn(
-                            "py-2 px-2 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap font-normal text-neutral-800 dark:text-neutral-200 transition-colors relative",
+                            "py-4 px-4 border-r border-neutral-200/80 dark:border-slate-800/80 whitespace-nowrap font-normal text-slate-850 dark:text-slate-200 text-xs transition-colors relative",
                             isEditable && !isCellEditing ? "hover:bg-blue-50 dark:hover:bg-blue-950/50 cursor-cell" : "",
                             isCellEditing ? "p-0 bg-blue-100/90 dark:bg-blue-950/90 ring-2 ring-blue-600" : ""
                           )}
@@ -1282,11 +1797,6 @@ export default function DataTable({
                                   {job.jobCode}
                                 </span>
                               </Link>
-                              {isJobPostedToday(job) && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-400 select-none">
-                                  NEW
-                                </span>
-                              )}
                             </div>
                           ) : colId === "jobStatus" ? (
                             (() => {
@@ -1403,18 +1913,70 @@ export default function DataTable({
                               <span className="text-neutral-400 dark:text-neutral-600 italic text-[10px]">Unassigned</span>
                             )
                           ) : colId === "jobTitle" ? (
-                            <div className="flex items-center gap-1">
-                              <Link href={`/job-posting/${job.id}`}>
-                                <span className="whitespace-nowrap hover:underline cursor-pointer text-slate-900 dark:text-slate-100 hover:text-[#1a4fa0] dark:hover:text-blue-400 font-semibold">
-                                  {job.jobTitle}
-                                </span>
-                              </Link>
-                              {job.agingDays > 30 && (
-                                <Badge className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/30 text-[9px] scale-90 flex items-center gap-0.5 shadow-none px-1 py-0 font-medium">
-                                  <AlertTriangle className="h-2.5 w-2.5" /> SLA
-                                </Badge>
-                              )}
-                            </div>
+                            (() => {
+                              const isPending = job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL";
+                              const isDraft = job.jobStatus === "Draft";
+                              const isHold = job.jobStatus === "Hold" || job.jobStatus === "Hold by Client" || job.jobStatus === "Archived";
+                              const isClosed = job.jobStatus === "Close" || job.jobStatus === "Closed";
+                              const isFilled = job.jobStatus === "Filled";
+                              const isRecent = isJobRecent(job);
+
+                              let statusLabel = "ACTIVE";
+                              let statusClasses = "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/40";
+
+                              if (isPending) {
+                                statusLabel = "PENDING";
+                                statusClasses = "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/40";
+                              } else if (isDraft) {
+                                statusLabel = "DRAFT";
+                                statusClasses = "bg-slate-500/10 text-slate-600 border-slate-500/30 dark:bg-slate-500/20 dark:text-slate-400 dark:border-slate-500/40";
+                              } else if (isRecent) {
+                                statusLabel = "NEW";
+                                statusClasses = "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/40";
+                              } else if (isHold) {
+                                statusLabel = "ON HOLD";
+                                statusClasses = "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/40";
+                              } else if (isClosed) {
+                                statusLabel = "CLOSED";
+                                statusClasses = "bg-zinc-500/10 text-zinc-500 border-zinc-500/30 dark:bg-zinc-500/20 dark:text-zinc-400 dark:border-zinc-500/40";
+                              } else if (isFilled) {
+                                statusLabel = "FILLED";
+                                statusClasses = "bg-blue-500/10 text-blue-600 border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/40";
+                              }
+
+                              const rawPriority = String(job.priority || (job as any).urgency || "Warm").toUpperCase();
+                              const isHot = rawPriority.includes("HOT") || rawPriority.includes("HIGH") || rawPriority.includes("URGENT");
+                              const isCold = rawPriority.includes("COLD") || rawPriority.includes("LOW");
+                              const priorityLabel = isHot ? "HOT" : isCold ? "COLD" : "WARM";
+                              const priorityClasses = isHot
+                                ? "bg-rose-500/10 text-rose-600 border-rose-500/30 dark:bg-rose-500/20 dark:text-rose-400 dark:border-rose-500/40"
+                                : isCold
+                                ? "bg-sky-500/10 text-sky-600 border-sky-500/30 dark:bg-sky-500/20 dark:text-sky-400 dark:border-sky-500/40"
+                                : "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/40";
+
+                              return (
+                                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                                  <Link href={`/job-posting/${job.id}`}>
+                                    <span className="whitespace-nowrap hover:underline cursor-pointer text-slate-900 dark:text-slate-100 hover:text-[#1a4fa0] dark:hover:text-blue-400 font-semibold">
+                                      {job.jobTitle}
+                                    </span>
+                                  </Link>
+                                  {statusLabel && (
+                                    <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border select-none leading-none shrink-0", statusClasses)}>
+                                      {statusLabel}
+                                    </span>
+                                  )}
+                                  <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border select-none leading-none shrink-0", priorityClasses)}>
+                                    {priorityLabel}
+                                  </span>
+                                  {job.agingDays > 30 && (
+                                    <Badge className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/30 text-[9px] scale-90 flex items-center gap-0.5 shadow-none px-1 py-0 font-medium shrink-0">
+                                      <AlertTriangle className="h-2.5 w-2.5" /> SLA
+                                    </Badge>
+                                  )}
+                                </div>
+                              );
+                            })()
                           ) : colId === "createdBy" ? (
                             <div className="flex flex-col leading-tight py-0.5">
                               <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[160px]">
@@ -1552,7 +2114,7 @@ export default function DataTable({
 
                     {/* Actions Column (Sticky Right) */}
                     <td className={cn(
-                      "sticky right-0 z-10 w-[56px] min-w-[56px] p-0.5 text-center border-l border-neutral-200 dark:border-slate-800 transition-colors duration-150",
+                      "sticky right-0 z-10 w-[64px] min-w-[64px] px-3 py-4 text-center border-l border-neutral-200 dark:border-slate-800 transition-colors duration-150",
                       isSelected
                         ? "bg-blue-50/95 dark:bg-blue-950/95"
                         : idx % 2 === 0

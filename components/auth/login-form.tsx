@@ -76,31 +76,38 @@ const LoginForm = () => {
       setValue("password", passwordParam);
     }
 
-    // Immediately clean plain-text credentials from the browser address bar for security
-    if (typeof window !== "undefined" && (searchParams.has("password") || searchParams.has("email"))) {
+    // Immediately clean plain-text credentials and transfer payloads from the browser address bar for security
+    if (typeof window !== "undefined" && (searchParams.has("password") || searchParams.has("email") || searchParams.has("user_json"))) {
       const url = new URL(window.location.href);
       url.searchParams.delete("password");
       url.searchParams.delete("email");
+      url.searchParams.delete("user_json");
       const cleanQuery = url.searchParams.toString();
       const cleanUrl = url.pathname + (cleanQuery ? `?${cleanQuery}` : "");
       window.history.replaceState({}, "", cleanUrl);
     }
 
     const ssoToken = searchParams.get("sso_token") || searchParams.get("token");
+    const userJsonParam = searchParams.get("user_json");
     if (ssoToken) {
       setIsAuthorizingSso(true);
-      const cachedUser = typeof window !== "undefined" ? localStorage.getItem("ats_current_user") : null;
+      if (userJsonParam && typeof window !== "undefined") {
+        try {
+          localStorage.setItem("ats_current_user", userJsonParam);
+        } catch {}
+      }
+      const cachedUser = userJsonParam || (typeof window !== "undefined" ? localStorage.getItem("ats_current_user") : null);
       signIn("token-handoff", {
         token: ssoToken,
         userJson: cachedUser || undefined,
         redirect: false,
-      }).then((res) => {
+      }).then(async (res) => {
         if (res?.ok) {
           if (typeof window !== "undefined") {
             localStorage.setItem("ats_access_token", ssoToken);
           }
           const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
-          window.location.href = callbackUrl;
+          await navigateAfterLogin(callbackUrl);
         } else {
           setIsAuthorizingSso(false);
           toast.error("Session verification expired. Please sign in.");
@@ -227,10 +234,13 @@ const LoginForm = () => {
         if (userTenantDomain && !isMasterTenant && currentSubdomain !== userTenantDomain) {
           // Tenant member logging in from root domain or different subdomain:
           // Do NOT establish a NextAuth session on root domain (avoids ghost root sessions).
-          // Immediately redirect to tenant subdomain with SSO handoff token!
+          // Immediately redirect to tenant subdomain with SSO handoff token and user payload!
           toast.success("Redirecting to your workspace...");
           const tokenParam = syncRes?.accessToken ? `?sso_token=${encodeURIComponent(syncRes.accessToken)}` : "";
-          window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login${tokenParam}`;
+          const userParam = syncRes?.user ? `&user_json=${encodeURIComponent(JSON.stringify(syncRes.user))}` : "";
+          const callbackUrlParam = searchParams.get("callbackUrl");
+          const cbParam = callbackUrlParam ? `&callbackUrl=${encodeURIComponent(callbackUrlParam)}` : "";
+          window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login${tokenParam}${userParam}${cbParam}`;
           return;
         }
 

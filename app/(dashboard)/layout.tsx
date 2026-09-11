@@ -49,10 +49,9 @@ export default async function DashboardLayout({
       if (userSub && !isMasterTenant) {
         // A tenant user can ONLY access the dashboard on their own tenant subdomain (e.g. deb.localhost:3000).
         // If accessed from root domain (localhost:3000) or another tenant's subdomain:
-        // Do NOT allow access to this host's dashboard — direct to /auth/login on the CURRENT host.
-        // It remains in the same domain and does NOT redirect to another subdomain.
+        // Seamlessly route them to their designated tenant workspace dashboard.
         if (currentSub !== userSub) {
-          redirect("/auth/login");
+          redirect(`${protocol}://${userSub}.${baseDomain}/dashboard`);
         }
       } else if (isMasterTenant && currentSub && currentSub !== "enfy") {
         // Master tenant operates on the base root domain
