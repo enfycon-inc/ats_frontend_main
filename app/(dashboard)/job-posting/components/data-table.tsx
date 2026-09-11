@@ -121,24 +121,36 @@ function isJobPostedToday(job: Job): boolean {
 function isJobRecent(job: Job): boolean {
   if (!job) return false;
 
-  // 1. Check agingDays if available
+  // Must be Active
+  const status = String(job.jobStatus || (job as any).status || "").toLowerCase();
+  if (status !== "active") return false;
+
+  // 1. Check agingDays if available (must be <= 1 day)
   if (typeof job.agingDays === "number" && !isNaN(job.agingDays)) {
-    if (job.agingDays <= 14) return true;
+    if (job.agingDays <= 1) return true;
+    if (job.agingDays > 1) return false;
   }
 
-  // 2. Check createdOn or createdAt date string (within 14 days)
+  // 2. Check createdOn or createdAt date string (within 1 day / 24 hours)
   const dateStr = (job as any).createdAt || job.createdOn;
   if (dateStr) {
     try {
       const d = new Date(dateStr);
       if (!isNaN(d.getTime())) {
-        const diffDays = (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24);
-        if (diffDays <= 14) return true;
+        const diffHours = (Date.now() - d.getTime()) / (1000 * 60 * 60);
+        if (diffHours >= 0 && diffHours <= 24) return true;
+
+        // Also check if created yesterday / today within 36h timezone buffer
+        const now = new Date();
+        const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
+        if (d.getTime() >= startOfYesterday && diffHours <= 36) return true;
+
+        return false;
       }
     } catch {}
   }
 
-  // 3. Fallback: check jobCode date segment if matches (e.g. BBS-260907-D00001)
+  // 3. Fallback: check jobCode date segment if matches (e.g. BBS-260910-D00003)
   if (job.jobCode) {
     const match = job.jobCode.match(/-(\d{2})(\d{2})(\d{2})-/);
     if (match) {
@@ -149,7 +161,8 @@ function isJobRecent(job: Job): boolean {
         const jobDate = new Date(yy, mm, dd);
         if (!isNaN(jobDate.getTime())) {
           const diffDays = (Date.now() - jobDate.getTime()) / (1000 * 60 * 60 * 24);
-          if (diffDays <= 14) return true;
+          if (diffDays <= 1) return true;
+          return false;
         }
       } catch {}
     }
@@ -210,11 +223,12 @@ interface DataTableProps {
   onOpenColumns: () => void;
   onRefresh: () => void;
   onSaveView: (viewName: string) => void;
-  savedViews: string[];
-  activeView: string;
+  savedViews?: string[];
+  activeView?: string;
   defaultViewLabel?: string;
-  onSelectView: (viewName: string) => void;
+  onSelectView?: (viewName: string) => void;
   onUpdateJob?: (jobId: string, updatedFields: Partial<Job>) => void;
+  onReorderColumns?: (newColumns: string[]) => void;
 }
 
 export default function DataTable({
@@ -226,11 +240,8 @@ export default function DataTable({
   onOpenColumns,
   onRefresh,
   onSaveView,
-  savedViews,
-  activeView,
-  defaultViewLabel = "All Jobs",
-  onSelectView,
   onUpdateJob,
+  onReorderColumns,
 }: DataTableProps) {
   const router = useRouter();
 
@@ -270,6 +281,59 @@ export default function DataTable({
     return allColumns;
   }, [allColumns, hasEditPermission]);
   
+  // Direct Column Drag & Drop Reordering State
+  const [draggedColId, setDraggedColId] = useState<string | null>(null);
+  const [dragOverColId, setDragOverColId] = useState<string | null>(null);
+  const [isDragReordering, setIsDragReordering] = useState(false);
+
+  const handleColDragStart = (e: React.DragEvent, colId: string) => {
+    setIsDragReordering(true);
+    setDraggedColId(colId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", colId);
+  };
+
+  const handleColDragOver = (e: React.DragEvent, targetColId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverColId !== targetColId) {
+      setDragOverColId(targetColId);
+    }
+  };
+
+  const handleColDrop = (e: React.DragEvent, targetColId: string) => {
+    e.preventDefault();
+    if (!draggedColId || draggedColId === targetColId) {
+      setDraggedColId(null);
+      setDragOverColId(null);
+      setTimeout(() => setIsDragReordering(false), 150);
+      return;
+    }
+
+    const currentIndex = selectedColumns.indexOf(draggedColId);
+    const targetIndex = selectedColumns.indexOf(targetColId);
+
+    if (currentIndex !== -1 && targetIndex !== -1) {
+      const newOrder = [...selectedColumns];
+      const [removed] = newOrder.splice(currentIndex, 1);
+      newOrder.splice(targetIndex, 0, removed);
+
+      if (onReorderColumns) {
+        onReorderColumns(newOrder);
+      }
+    }
+
+    setDraggedColId(null);
+    setDragOverColId(null);
+    setTimeout(() => setIsDragReordering(false), 150);
+  };
+
+  const handleColDragEnd = () => {
+    setDraggedColId(null);
+    setDragOverColId(null);
+    setTimeout(() => setIsDragReordering(false), 150);
+  };
+
   // Sorting State
   const [sortColumn, setSortColumn] = useState<keyof Job | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -536,7 +600,7 @@ export default function DataTable({
   // Columns editable via double-click text input
   const EDITABLE_TEXT_COLS = ["jobTitle", "location", "states", "clientBillRate", "payRate", "recruitmentManager"];
   // Columns editable via inline select
-  const PRIORITY_OPTIONS = ["Hot", "Urgent", "High", "Warm", "Medium", "Low"];
+  const PRIORITY_OPTIONS = ["Hot", "Warm", "Cold"];
 
   // Context Menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -1189,28 +1253,9 @@ export default function DataTable({
       {/* Action Bar */}
       <div className="py-1 px-2.5 border-b border-neutral-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 bg-neutral-50/50 dark:bg-slate-900/50 text-xs">
         <div className="flex items-center gap-2">
-          {/* Saved Views Select */}
-          <div className="flex items-center bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded-sm">
-            <select
-              value={activeView}
-              onChange={(e) => onSelectView(e.target.value)}
-              className="px-2 py-0.5 text-xs text-neutral-800 dark:text-neutral-200 bg-transparent outline-hidden cursor-pointer border-none font-bold"
-            >
-              <option value={defaultViewLabel}>{defaultViewLabel}</option>
-              {savedViews.map((view) => (
-                <option key={view} value={view}>
-                  {view}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Global actions */}
-        <div className="flex items-center gap-1.5">
           {/* Bulk Actions */}
           {selectedRowIds.length > 0 && (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-sm mr-1">
+            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-sm">
               <span className="text-[10px] font-bold text-primary">
                 {selectedRowIds.length} Selected
               </span>
@@ -1228,6 +1273,10 @@ export default function DataTable({
               </button>
             </div>
           )}
+        </div>
+
+        {/* Global actions */}
+        <div className="flex items-center gap-1.5">
 
           <button
             onClick={onRefresh}
@@ -1562,13 +1611,28 @@ export default function DataTable({
               {activeSelectedColumns.map((colId) => {
                 const col = activeAllColumns.find((c) => c.id === colId);
                 const isSorted = sortColumn === colId;
+                const isDraggingThis = draggedColId === colId;
+                const isOverThis = dragOverColId === colId;
                 return (
                   <th
                     key={colId}
-                    className="px-4 py-3.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100/95 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors cursor-pointer relative whitespace-nowrap"
-                    onClick={() => handleSort(colId as keyof Job)}
+                    draggable
+                    onDragStart={(e) => handleColDragStart(e, colId)}
+                    onDragOver={(e) => handleColDragOver(e, colId)}
+                    onDrop={(e) => handleColDrop(e, colId)}
+                    onDragEnd={handleColDragEnd}
+                    className={cn(
+                      "px-4 py-3.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100/95 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors cursor-grab active:cursor-grabbing relative whitespace-nowrap select-none",
+                      isDraggingThis && "opacity-30 bg-slate-200/60 dark:bg-slate-800/60",
+                      isOverThis && "border-l-4 border-l-[#1a4fa0] bg-blue-100/60 dark:bg-blue-950/60"
+                    )}
+                    onClick={() => {
+                      if (isDragReordering) return;
+                      handleSort(colId as keyof Job);
+                    }}
+                    title="Drag to reorder column, or click to sort"
                   >
-                    <div className="flex items-center justify-between gap-1 pr-2">
+                    <div className="flex items-center justify-between gap-1 pr-2 pointer-events-none">
                       <span className="uppercase tracking-wider text-[10px] whitespace-nowrap font-bold text-slate-600 dark:text-slate-300">{col?.label || colId}</span>
                       <div className="flex items-center gap-0.5 opacity-70">
                         {isSorted ? (
@@ -1894,12 +1958,12 @@ export default function DataTable({
                                 "text-[10px] font-medium px-2 py-0.5 rounded-md border shadow-none cursor-cell",
                                 job.priority === "Hot" || job.priority === "High" || job.priority === "Urgent"
                                   ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800/40"
-                                  : job.priority === "Warm" || job.priority === "Medium"
-                                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40"
-                                  : "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                                  : job.priority === "Cold" || job.priority === "Low"
+                                  ? "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-800/40"
+                                  : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40"
                               )}
                             >
-                              {job.priority || "Warm"}
+                              {job.priority === "Hot" || job.priority === "High" || job.priority === "Urgent" ? "Hot" : job.priority === "Cold" || job.priority === "Low" ? "Cold" : "Warm"}
                             </Badge>
                           ) : colId === "podName" ? (
                             job.podName ? (
@@ -1914,35 +1978,10 @@ export default function DataTable({
                             )
                           ) : colId === "jobTitle" ? (
                             (() => {
-                              const isPending = job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL";
-                              const isDraft = job.jobStatus === "Draft";
-                              const isHold = job.jobStatus === "Hold" || job.jobStatus === "Hold by Client" || job.jobStatus === "Archived";
-                              const isClosed = job.jobStatus === "Close" || job.jobStatus === "Closed";
-                              const isFilled = job.jobStatus === "Filled";
                               const isRecent = isJobRecent(job);
-
-                              let statusLabel = "ACTIVE";
-                              let statusClasses = "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/40";
-
-                              if (isPending) {
-                                statusLabel = "PENDING";
-                                statusClasses = "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/40";
-                              } else if (isDraft) {
-                                statusLabel = "DRAFT";
-                                statusClasses = "bg-slate-500/10 text-slate-600 border-slate-500/30 dark:bg-slate-500/20 dark:text-slate-400 dark:border-slate-500/40";
-                              } else if (isRecent) {
-                                statusLabel = "NEW";
-                                statusClasses = "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/40";
-                              } else if (isHold) {
-                                statusLabel = "ON HOLD";
-                                statusClasses = "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/40";
-                              } else if (isClosed) {
-                                statusLabel = "CLOSED";
-                                statusClasses = "bg-zinc-500/10 text-zinc-500 border-zinc-500/30 dark:bg-zinc-500/20 dark:text-zinc-400 dark:border-zinc-500/40";
-                              } else if (isFilled) {
-                                statusLabel = "FILLED";
-                                statusClasses = "bg-blue-500/10 text-blue-600 border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/40";
-                              }
+                              // Only show NEW badge if active and posted within 1 day; otherwise no status chip here (JOB STATUS column already displays status)
+                              const statusLabel = isRecent ? "NEW" : null;
+                              const statusClasses = "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/40";
 
                               const rawPriority = String(job.priority || (job as any).urgency || "Warm").toUpperCase();
                               const isHot = rawPriority.includes("HOT") || rawPriority.includes("HIGH") || rawPriority.includes("URGENT");
@@ -2395,7 +2434,7 @@ export default function DataTable({
                 size="sm"
                 onClick={() => {
                   if (newViewName.trim()) {
-                    onSaveView(newViewName);
+                    onSaveView?.(newViewName);
                     setNewViewName("");
                     setIsSavingView(false);
                   }

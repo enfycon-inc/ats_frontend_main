@@ -52,6 +52,44 @@ export default function ColumnDrawer({
     }
   };
 
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const newOrder = [...tempSelected];
+    const [removed] = newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, removed);
+    setTempSelected(newOrder);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
   const moveColumn = (index: number, direction: "up" | "down") => {
     const nextIndex = direction === "up" ? index - 1 : index + 1;
     if (nextIndex < 0 || nextIndex >= tempSelected.length) return;
@@ -192,13 +230,29 @@ export default function ColumnDrawer({
                       return (
                         <div
                           key={colId}
-                          className="flex items-center justify-between p-2 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded text-xs select-none hover:border-neutral-400 dark:hover:border-slate-650 transition-colors"
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, index)}
+                          onDragOver={(e) => handleDragOver(e, index)}
+                          onDrop={(e) => handleDrop(e, index)}
+                          onDragEnd={handleDragEnd}
+                          className={cn(
+                            "flex items-center justify-between p-2 bg-neutral-50 dark:bg-slate-850 border rounded text-xs select-none transition-all cursor-grab active:cursor-grabbing",
+                            draggedIndex === index
+                              ? "opacity-30 border-dashed border-primary bg-primary/5"
+                              : dragOverIndex === index
+                              ? "border-primary bg-primary/10 ring-1 ring-primary scale-[1.02] shadow-xs"
+                              : "border-neutral-200 dark:border-slate-800 hover:border-neutral-400 dark:hover:border-slate-650"
+                          )}
+                          title="Drag up or down to reorder display order"
                         >
-                          <span className="font-medium text-neutral-800 dark:text-neutral-200 truncate pr-2">
-                            {col.label}
-                          </span>
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-2">
+                            <GripVertical className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 shrink-0 cursor-grab" />
+                            <span className="font-medium text-neutral-800 dark:text-neutral-200 truncate">
+                              {col.label}
+                            </span>
+                          </div>
 
-                          <div className="flex items-center gap-0.5 shrink-0">
+                          <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"
                               onClick={() => moveColumn(index, "up")}

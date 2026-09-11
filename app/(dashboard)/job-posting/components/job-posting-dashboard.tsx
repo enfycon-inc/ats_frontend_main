@@ -24,18 +24,17 @@ const getBaseJobColumns = (usesPods: boolean) => [
   "jobCode",
   "jobTitle",
   "businessUnit",
+  "jobStatus",
   "createdBy",
   "assignedTo",
   "client",
   "endClientName",
   "location",
   "states",
-  "jobStatus",
+  "priority",
   ...(usesPods ? ["podName"] : []),
   "clientBillRate",
   "payRate",
-  "createdOn",
-  "modifiedOn",
   "submissionsCount",
 ];
 
@@ -325,6 +324,7 @@ export default function JobPostingDashboard({
       { id: "jobCode", label: "Job Code" },
       { id: "jobTitle", label: "Job Title" },
       { id: "businessUnit", label: "Business Unit" },
+      { id: "jobStatus", label: "Job Status" },
       { id: "createdBy", label: "Job Created By" },
       { id: "assignedTo", label: "Assigned To" },
       { id: "client", label: "Client" },
@@ -332,7 +332,6 @@ export default function JobPostingDashboard({
       { id: "clientJobId", label: "Client Job ID" },
       { id: "location", label: "Work Mode" },
       { id: "states", label: "States" },
-      { id: "jobStatus", label: "Job Status" },
       { id: "priority", label: "Priority" },
       ...(branchUsesPods ? [{ id: "podName", label: "Assigned Pod" }] : []),
       {
@@ -343,9 +342,9 @@ export default function JobPostingDashboard({
         id: "payRate",
         label: market === "IN" ? "Pay Rate / CTC" : "Pay Rate / Salary",
       },
+      { id: "submissionsCount", label: "Submissions & Pipeline" },
       { id: "createdOn", label: "Job Created" },
       { id: "modifiedOn", label: "Job Modified On" },
-      { id: "submissionsCount", label: "Submissions & Pipeline" },
     ];
     if (!hasEditPermission) {
       return cols.filter((col) => col.id !== "clientBillRate");
@@ -528,6 +527,12 @@ export default function JobPostingDashboard({
     return { total, active, closed, totalSubmissions, avgAging, slaAlerts };
   }, [jobsData]);
 
+  const handleReorderColumns = useCallback((newCols: string[]) => {
+    setSelectedColumns(newCols);
+    saveUserColumnPreferences("jobs", newCols);
+    toast.success("Column order updated!");
+  }, []);
+
   return (
     <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
       {/* Main Table Content */}
@@ -551,6 +556,7 @@ export default function JobPostingDashboard({
           defaultViewLabel={defaultViewLabel}
           onSelectView={handleSelectView}
           onUpdateJob={handleUpdateJob}
+          onReorderColumns={handleReorderColumns}
         />
       )}
 

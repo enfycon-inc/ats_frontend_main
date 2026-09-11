@@ -70,7 +70,12 @@ export function mapApiJobToJob(api: any): Job {
     location: api.location || api.jobLocation || "",
     states: api.state || api.states || "",
     jobStatus: (api.jobStatus || api.status || "Active") as any,
-    priority: api.priority || api.urgency || "Warm",
+    priority: (() => {
+      const p = String(api.priority || api.urgency || "Warm").toUpperCase();
+      if (p.includes("HOT") || p.includes("HIGH") || p.includes("URGENT")) return "Hot";
+      if (p.includes("COLD") || p.includes("LOW")) return "Cold";
+      return "Warm";
+    })(),
     clientBillRate: api.clientBillRate || "N/A",
     payRate: api.payRate || "N/A",
     recruitmentManager: api.recruitmentManager || "N/A",
