@@ -1095,8 +1095,10 @@ const candidates = {
     }
 
     const token = getToken();
+    const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (activeBranchId) headers['x-branch-id'] = activeBranchId;
 
     const res = await fetch(`${getApiBase()}/api/candidates/upload`, {
       method: 'POST',
