@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { UserPlus, Sparkles, Loader2, FileText, CheckCircle2, UploadCloud, RefreshCw } from "lucide-react";
+import { UserPlus, Loader2, FileText, CheckCircle2, UploadCloud, RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 
@@ -37,18 +37,29 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
     try {
       const parsed = await atsApi.candidates.parseResume(selectedFile);
 
-      let firstName = parsed.firstName || "";
-      let lastName = parsed.lastName || "";
+      const cleanNameStr = (str: string) =>
+        str
+          .replace(/\(\d+\)/g, '')
+          .replace(/\[\d+\]/g, '')
+          .replace(/\b(resume|cv|curriculum\s+vitae|vitae|profile|biodata)\b/gi, '')
+          .replace(/[_\-]+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+      let firstName = cleanNameStr(parsed.firstName || "");
+      let lastName = cleanNameStr(parsed.lastName || "");
       let email = parsed.email || "";
       let phone = parsed.phone || "";
 
       // Fallback extraction if raw structure returned
       if (!firstName && parsed.candidate_name && parsed.candidate_name !== "Unknown") {
-        const parts = parsed.candidate_name.trim().split(/\s+/);
+        const cleaned = cleanNameStr(parsed.candidate_name);
+        const parts = cleaned.split(/\s+/);
         firstName = parts[0] || "";
         lastName = parts.slice(1).join(" ") || "";
       } else if (!firstName && parsed.candidateName && parsed.candidateName !== "Unknown") {
-        const parts = parsed.candidateName.trim().split(/\s+/);
+        const cleaned = cleanNameStr(parsed.candidateName);
+        const parts = cleaned.split(/\s+/);
         firstName = parts[0] || "";
         lastName = parts.slice(1).join(" ") || "";
       }
@@ -81,17 +92,13 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
 
       if (firstName || email || phone) {
         setAutoFilled(true);
-        const nameStr = [firstName, lastName].filter(Boolean).join(" ");
-        toast.success(
-          `✨ Parsed: ${nameStr || "Candidate"} ${email ? `(${email})` : ""}`.trim(),
-          { duration: 4000 }
-        );
+        toast.success("Resume parsed successfully.");
       } else {
-        toast("CV attached. Please verify or fill details below.", { icon: "📄" });
+        toast("Resume attached. Please verify or fill details below.");
       }
     } catch (err: any) {
       console.warn("CV parsing error:", err);
-      toast("CV attached. Could not auto-extract fields, please enter details manually.", { icon: "ℹ️" });
+      toast("Resume attached. Please verify or enter details manually.");
     } finally {
       setParsing(false);
     }
@@ -190,10 +197,10 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent className="sm:max-w-[640px] p-0 overflow-hidden border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl bg-white dark:bg-slate-900 font-sans">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
+        <div className="px-6 py-4 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div>
             <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <UserPlus className="h-5 w-5 text-slate-700 dark:text-slate-300" />
               Submit Candidate
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -204,16 +211,16 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
 
         {/* Form Body */}
         <div className="p-6 space-y-4 text-xs max-h-[75vh] overflow-y-auto">
-          {/* Step 1: Intelligent CV Upload Dropzone at the Top */}
+          {/* Step 1: CV Upload Dropzone at the Top */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="cv" className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                <FileText className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+              <Label htmlFor="cv" className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
                 <span>Resume Document (CV)</span>
                 <span className="text-red-500">*</span>
               </Label>
-              <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full border border-indigo-200/80 dark:border-indigo-800">
-                <Sparkles className="h-3 w-3 text-indigo-500" /> AI Auto-Fill Enabled
+              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">
+                Auto-extracts contact details
               </span>
             </div>
 
@@ -232,50 +239,50 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-xl p-5 text-center transition-all cursor-pointer ${
+                className={`border-2 border-dashed rounded-lg p-5 text-center transition-colors cursor-pointer ${
                   dragOver
-                    ? "border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/40 scale-[0.99]"
-                    : "border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/30 hover:border-indigo-400 hover:bg-indigo-50/20"
+                    ? "border-blue-600 bg-blue-50/40 dark:bg-blue-950/20"
+                    : "border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 hover:border-slate-400 hover:bg-slate-100/50"
                 }`}
               >
                 <div className="flex flex-col items-center gap-1.5">
-                  <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-2xs">
-                    <UploadCloud className="h-5 w-5" />
+                  <div className="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center">
+                    <UploadCloud className="h-4 w-4" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
                       Click to upload or drag & drop candidate CV
                     </span>
                     <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                      PDF, DOC, DOCX • First name, last name, email & phone will be auto-filled
+                      PDF, DOC, DOCX (Max 10MB)
                     </span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/40 dark:bg-indigo-950/30 flex items-center justify-between gap-3">
+              <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="h-9 w-9 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                    <FileText className="h-5 w-5" />
+                  <div className="h-8 w-8 rounded-md bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
+                    <FileText className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                    <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
                       {file.name}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10.5px] text-slate-500 dark:text-slate-400">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
                         {Math.round(file.size / 1024)} KB
                       </span>
                       {parsing ? (
-                        <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-indigo-600 dark:text-indigo-400">
-                          <Loader2 className="h-3 w-3 animate-spin" /> Extracting details...
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                          <Loader2 className="h-3 w-3 animate-spin text-slate-500" /> Extracting details...
                         </span>
                       ) : autoFilled ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded">
-                          <CheckCircle2 className="h-2.5 w-2.5" /> Details Auto-Filled
+                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+                          <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-500" /> Details extracted
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 px-1.5 py-0.2 rounded">
+                        <span className="text-[11px] text-slate-500">
                           Attached
                         </span>
                       )}
@@ -285,28 +292,28 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
                 <div className="flex items-center gap-1.5 shrink-0">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={parsing || loading}
-                    className="h-7 text-[11px] font-semibold border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/60 cursor-pointer"
+                    className="h-7 px-2.5 text-xs font-medium border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 hover:text-slate-900 hover:border-slate-400 dark:hover:bg-slate-700 dark:hover:text-white cursor-pointer shadow-none transition-colors"
                   >
-                    <RefreshCw className="h-3 w-3 mr-1" /> Change CV
+                    <RefreshCw className="h-3 w-3 mr-1 text-slate-500" /> Change CV
                   </Button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Step 2: Auto-Filled Candidate Information */}
-          <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
+          {/* Step 2: Candidate Information */}
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
             <div className="flex items-center justify-between mb-2.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Candidate Information
               </span>
               {autoFilled && (
-                <span className="text-[10.5px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                  <Sparkles className="h-3 w-3" /> Auto-populated from CV. Review & edit if needed.
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">
+                  Extracted from resume. Edit if needed.
                 </span>
               )}
             </div>
@@ -370,8 +377,8 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
           </div>
 
           {/* Step 3: Submission Rate & Notes */}
-          <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-2.5">
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+            <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-2.5">
               Submission Details
             </span>
 
@@ -399,24 +406,31 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
                 placeholder="Add any relevant notes or candidate highlights..."
                 value={recruiterComment}
                 onChange={(e) => setRecruiterComment(e.target.value)}
-                className="w-full min-h-[64px] text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-md p-2.5 outline-none focus:ring-1 focus:ring-indigo-500 font-medium text-slate-800 dark:text-slate-200"
+                className="w-full min-h-[64px] text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-md p-2.5 outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 focus:border-slate-400 font-medium text-slate-800 dark:text-slate-200"
               />
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 bg-slate-50/80 dark:bg-slate-800/50 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-end gap-2 text-xs">
-          <Button variant="outline" size="sm" onClick={handleClose} disabled={loading || parsing} className="h-9 px-4 border-slate-300 font-semibold cursor-pointer">
+        <div className="px-6 py-3 bg-slate-50/80 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2 text-xs">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleClose}
+            disabled={loading || parsing}
+            className="h-9 px-4 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 hover:text-slate-900 hover:border-slate-400 dark:hover:bg-slate-700 dark:hover:text-white font-medium cursor-pointer transition-colors"
+          >
             Cancel
           </Button>
           <Button
             size="sm"
             onClick={handleSubmit}
             disabled={loading || parsing}
-            className="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-xs disabled:opacity-50"
+            className="h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white font-medium cursor-pointer shadow-xs disabled:opacity-50"
           >
-            {loading ? "Submitting..." : parsing ? "Parsing CV..." : "Submit Candidate"}
+            {loading ? "Submitting..." : parsing ? "Extracting..." : "Submit Candidate"}
           </Button>
         </div>
       </DialogContent>
