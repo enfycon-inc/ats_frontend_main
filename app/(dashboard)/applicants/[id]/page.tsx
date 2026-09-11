@@ -350,34 +350,11 @@ export default function CandidateDetailPage() {
   // Parse experience and education timeline details
   const parsedJson = candidate.parsedJson || {};
   
-  const experienceDetailed = parsedJson.experience_detailed || parsedJson.work_history || [
-    {
-      company: "Lead Developer Corp",
-      role: candidate.jobTitle || "Software Engineer",
-      start_date: "2022-04",
-      end_date: "Present",
-      description: "Designed core UI applications using Next.js and TailwindCSS. Built low-latency REST APIs on Node.js. Mentored 4 junior engineers."
-    },
-    {
-      company: "Growth Solutions Ltd",
-      role: "Web Application Developer",
-      start_date: "2019-06",
-      end_date: "2022-03",
-      description: "Implemented front-end features in React. Set up CI/CD workflows and automated test scripts to boost deployment efficiency."
-    }
-  ];
+  const experienceDetailed = parsedJson.experience_detailed || parsedJson.work_history || [];
 
-  const educationDetailed = parsedJson.education_detailed || parsedJson.education_history || [
-    {
-      school: "State University of Technology",
-      degree: "Bachelor of Science",
-      major: "Computer Science & Engineering",
-      start_date: "2015-09",
-      end_date: "2019-05"
-    }
-  ];
+  const educationDetailed = parsedJson.education_detailed || parsedJson.education_history || [];
 
-  const skills = candidate.skills && candidate.skills.length > 0 ? candidate.skills : ["React", "JavaScript", "TypeScript", "Node.js", "SQL", "Git"];
+  const skills = candidate.skills && candidate.skills.length > 0 ? candidate.skills : (parsedJson.skills || []);
 
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-neutral-50 dark:bg-slate-950 font-sans p-4 space-y-4">
@@ -523,13 +500,17 @@ export default function CandidateDetailPage() {
               <h3 className="text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-500 tracking-wider mb-2 flex items-center gap-1">
                 <Award className="h-3.5 w-3.5" /> Parsed Skill Profile
               </h3>
-              <div className="flex flex-wrap gap-1.5">
-                {skills.map((s: string, idx: number) => (
-                  <Badge key={idx} variant="outline" className="bg-indigo-50/20 text-indigo-700 border-indigo-200/30 dark:bg-indigo-950/20 dark:text-indigo-300 dark:border-indigo-900/40 text-[10px] font-bold py-0.5 px-2">
-                    {s}
-                  </Badge>
-                ))}
-              </div>
+              {skills.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {skills.map((s: string, idx: number) => (
+                    <Badge key={idx} variant="outline" className="bg-indigo-50/20 text-indigo-700 border-indigo-200/30 dark:bg-indigo-950/20 dark:text-indigo-300 dark:border-indigo-900/40 text-[10px] font-bold py-0.5 px-2">
+                      {s}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-neutral-400 dark:text-neutral-500 italic">No skills extracted</p>
+              )}
             </div>
           </div>
 
@@ -580,26 +561,33 @@ export default function CandidateDetailPage() {
                     <h3 className="text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-500 tracking-wider mb-4 flex items-center gap-1">
                       <Briefcase className="h-3.5 w-3.5" /> Employment Timeline
                     </h3>
-                    <div className="space-y-5 relative pl-4 border-l border-neutral-200 dark:border-slate-800">
-                      {experienceDetailed.map((exp: any, idx: number) => (
-                        <div key={idx} className="relative group">
-                          {/* Circle dot on timeline */}
-                          <div className="absolute -left-[20.5px] top-1.5 h-3 w-3 rounded-full bg-white dark:bg-slate-900 border-2 border-indigo-500 group-hover:bg-indigo-500 transition-colors" />
-                          <div className="flex items-center justify-between text-xs">
-                            <h4 className="font-bold text-neutral-800 dark:text-neutral-200">{exp.role}</h4>
-                            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" /> {exp.start_date || "—"} to {exp.end_date || "—"}
-                            </span>
+                    {experienceDetailed.length > 0 ? (
+                      <div className="space-y-5 relative pl-4 border-l border-neutral-200 dark:border-slate-800">
+                        {experienceDetailed.map((exp: any, idx: number) => (
+                          <div key={idx} className="relative group">
+                            {/* Circle dot on timeline */}
+                            <div className="absolute -left-[20.5px] top-1.5 h-3 w-3 rounded-full bg-white dark:bg-slate-900 border-2 border-indigo-500 group-hover:bg-indigo-500 transition-colors" />
+                            <div className="flex items-center justify-between text-xs">
+                              <h4 className="font-bold text-neutral-800 dark:text-neutral-200">{exp.role || exp.title || "Role"}</h4>
+                              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 flex items-center gap-1">
+                                <Calendar className="h-3 w-3" /> {exp.start_date || "—"} to {exp.end_date || "—"}
+                              </span>
+                            </div>
+                            {exp.company && <p className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-450 mt-0.5">{exp.company}</p>}
+                            {exp.description && (
+                              <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1.5 bg-neutral-50 dark:bg-slate-950/40 p-2.5 rounded-sm border border-neutral-100 dark:border-slate-850/50 whitespace-pre-wrap leading-relaxed">
+                                {exp.description}
+                              </p>
+                            )}
                           </div>
-                          <p className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-450 mt-0.5">{exp.company}</p>
-                          {exp.description && (
-                            <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1.5 bg-neutral-50 dark:bg-slate-950/40 p-2.5 rounded-sm border border-neutral-100 dark:border-slate-850/50 whitespace-pre-wrap leading-relaxed">
-                              {exp.description}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-6 px-4 bg-neutral-50/50 dark:bg-slate-900/50 border border-neutral-200/60 dark:border-slate-800 rounded-xs text-center">
+                        <Briefcase className="h-5 w-5 text-neutral-350 dark:text-slate-600 mx-auto mb-1.5" />
+                        <p className="text-xs text-neutral-400 dark:text-neutral-500 font-medium">No employment history detected</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Education Timeline */}
@@ -607,22 +595,29 @@ export default function CandidateDetailPage() {
                     <h3 className="text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-500 tracking-wider mb-4 flex items-center gap-1">
                       <GraduationCap className="h-3.5 w-3.5" /> Academic History
                     </h3>
-                    <div className="space-y-4 relative pl-4 border-l border-neutral-200 dark:border-slate-800">
-                      {educationDetailed.map((edu: any, idx: number) => (
-                        <div key={idx} className="relative group">
-                          <div className="absolute -left-[20.5px] top-1.5 h-3 w-3 rounded-full bg-white dark:bg-slate-900 border-2 border-emerald-500 group-hover:bg-emerald-500 transition-colors" />
-                          <div className="flex items-center justify-between text-xs">
-                            <h4 className="font-bold text-neutral-800 dark:text-neutral-200">
-                              {edu.degree}{edu.major ? ` in ${edu.major}` : ""}
-                            </h4>
-                            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" /> {edu.start_date || "—"} to {edu.end_date || "—"}
-                            </span>
+                    {educationDetailed.length > 0 ? (
+                      <div className="space-y-4 relative pl-4 border-l border-neutral-200 dark:border-slate-800">
+                        {educationDetailed.map((edu: any, idx: number) => (
+                          <div key={idx} className="relative group">
+                            <div className="absolute -left-[20.5px] top-1.5 h-3 w-3 rounded-full bg-white dark:bg-slate-900 border-2 border-emerald-500 group-hover:bg-emerald-500 transition-colors" />
+                            <div className="flex items-center justify-between text-xs">
+                              <h4 className="font-bold text-neutral-800 dark:text-neutral-200">
+                                {edu.degree || edu.degree_name || edu.school || "Degree"}{edu.major ? ` in ${edu.major}` : ""}
+                              </h4>
+                              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 flex items-center gap-1">
+                                <Calendar className="h-3 w-3" /> {edu.start_date || "—"}{edu.end_date ? ` to ${edu.end_date}` : ""}
+                              </span>
+                            </div>
+                            {edu.school && edu.degree && <p className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-450 mt-0.5">{edu.school}</p>}
                           </div>
-                          <p className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-450 mt-0.5">{edu.school}</p>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-6 px-4 bg-neutral-50/50 dark:bg-slate-900/50 border border-neutral-200/60 dark:border-slate-800 rounded-xs text-center">
+                        <GraduationCap className="h-5 w-5 text-neutral-350 dark:text-slate-600 mx-auto mb-1.5" />
+                        <p className="text-xs text-neutral-400 dark:text-neutral-500 font-medium">No academic history detected</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
