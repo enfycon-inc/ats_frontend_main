@@ -14,6 +14,7 @@ import {
   Phone,
   ExternalLink,
   ClipboardList,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -127,6 +128,7 @@ interface ApplicantsTableProps {
   onSelectionChange: (ids: string[]) => void;
   onReorderColumns?: (newOrder: string[]) => void;
   isRecruiter?: boolean;
+  loading?: boolean;
 }
 
 export default function ApplicantsTable({
@@ -143,6 +145,7 @@ export default function ApplicantsTable({
   onSelectionChange,
   onReorderColumns,
   isRecruiter = false,
+  loading = false,
 }: ApplicantsTableProps) {
   const router = useRouter();
   const [sortColumn, setSortColumn] = useState<keyof Applicant | null>(null);
@@ -632,7 +635,24 @@ export default function ApplicantsTable({
 
           {/* ── BODY ────────────────────────────────────── */}
           <tbody>
-            {paginatedData.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td
+                  colSpan={selectedColumns.length + 2}
+                  className="text-center py-20 text-neutral-500 dark:text-neutral-400 text-sm"
+                >
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <Loader2 className="h-7 w-7 animate-spin text-blue-600 dark:text-blue-400" />
+                    <span className="text-xs font-semibold tracking-wide text-neutral-700 dark:text-neutral-200">
+                      Loading candidate profiles...
+                    </span>
+                    <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
+                      Retrieving verified talent records
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            ) : paginatedData.length === 0 ? (
               <tr>
                 <td
                   colSpan={selectedColumns.length + 2}

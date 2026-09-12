@@ -358,6 +358,7 @@ export default function AllApplicantsPage() {
             saveUserColumnPreferences("applicants", newCols);
           }}
           isRecruiter={isRecruiter}
+          loading={loading}
         />
 
         {/* Pagination bar */}
