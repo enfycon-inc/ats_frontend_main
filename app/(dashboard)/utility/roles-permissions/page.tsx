@@ -736,17 +736,6 @@ export default function RolesPermissionsPage() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Unified Active Branch Context Indicator — synced with global header */}
-          {branches.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-neutral-50 dark:bg-slate-800/80 border border-neutral-200 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
-              <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-              <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                {selectedBranchFilter === "all"
-                  ? `All Branches (${customRolesList.length} Roles)`
-                  : (branches.find((b) => b.id === selectedBranchFilter)?.name || "Active Branch")}
-              </span>
-            </div>
-          )}
 
           {/* Refresh Button */}
           <Button
