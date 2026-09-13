@@ -1702,6 +1702,10 @@ function BranchSwitcher() {
         let match = null;
 
         const savedId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+        if (savedId === "all") {
+          setActiveBranch("All Branches");
+          return;
+        }
         if (savedId) {
           match = allowedBranches.find((b: any) => b.id === savedId);
         }
@@ -1749,7 +1753,8 @@ function BranchSwitcher() {
 
   const currentUser = typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null;
   const systemRole = overrideRole || currentUser?.systemRole || (session as any)?.user?.systemRole || "RECRUITER";
-  const isTenantAdmin = systemRole === "ADMIN" || systemRole === "SUPER_ADMIN";
+  const perms: string[] = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+  const isTenantAdmin = systemRole === "ADMIN" || systemRole === "SUPER_ADMIN" || perms.includes("tenant:settings") || perms.includes("tenant:manage");
 
   // Rule: Only Tenant Admin or users assigned to multiple branches can switch branch context.
   const canSwitchBranch = isTenantAdmin || branches.length > 1;
@@ -1764,6 +1769,20 @@ function BranchSwitcher() {
 
   const handleSelectBranch = (b: any) => {
     if (typeof window !== "undefined") {
+      if (b.id === "all") {
+        localStorage.setItem("active_branch_id", "all");
+        localStorage.setItem("active_branch_name", "All Branches");
+        localStorage.removeItem("active_branch_market");
+        localStorage.removeItem("active_branch_timezone");
+        localStorage.removeItem("active_branch_start_time");
+        localStorage.removeItem("active_branch_end_time");
+        localStorage.removeItem("active_branch_allow_pods");
+        window.dispatchEvent(new Event("branchChanged"));
+        setActiveBranch("All Branches");
+        window.location.reload();
+        setOpen(false);
+        return;
+      }
       localStorage.setItem("active_branch_id", b.id);
       localStorage.setItem("active_branch_name", b.name);
       localStorage.setItem("active_branch_market", b.market || "INDIA");
@@ -1830,6 +1849,28 @@ function BranchSwitcher() {
             animate-in fade-in-0 slide-in-from-top-2
           "
         >
+          {isTenantAdmin && (
+            <button
+              onClick={() => handleSelectBranch({ id: "all", name: "All Branches", city: "All Locations", market: "GLOBAL" })}
+              role="menuitem"
+              className={`
+                w-full text-left px-3 py-2 text-[12px] transition-all cursor-pointer flex justify-between items-center border-b border-neutral-100 dark:border-slate-800
+                ${activeBranch === "All Branches"
+                  ? "bg-indigo-50/90 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 font-bold border-l-2 border-indigo-600 dark:border-indigo-400"
+                  : "text-neutral-700 dark:text-slate-200 hover:bg-neutral-50 dark:hover:bg-slate-800/80 font-medium"
+                }
+              `}
+            >
+              <div className="flex flex-col">
+                <span className="font-bold">🌐 All Branches</span>
+                <span className="text-[9.5px] text-neutral-400 font-normal">Company-wide view</span>
+              </div>
+              {activeBranch === "All Branches" && (
+                <span className="h-2 w-2 rounded-full bg-indigo-600 dark:bg-indigo-400 shrink-0" />
+              )}
+            </button>
+          )}
+
           {branches.map((b) => (
             <button
               key={b.id}

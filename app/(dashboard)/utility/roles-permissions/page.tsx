@@ -245,16 +245,21 @@ export default function RolesPermissionsPage() {
     if (hasAccess) {
       const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
       const urlBranch = urlParams?.get("branch");
-      const storedBranch = urlBranch || (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null);
-      if (storedBranch) setSelectedBranchFilter(storedBranch);
-      loadData(storedBranch || "all");
+      let storedBranch = urlBranch || (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null);
+      if (isBranchAdmin && (!storedBranch || storedBranch === "all")) {
+        storedBranch = user?.branchId || assignedBranches[0]?.id || "";
+      }
+      const initialBranch = storedBranch || "all";
+      setSelectedBranchFilter(initialBranch);
+      loadData(initialBranch);
 
       const handleBranchChanged = () => {
-        const updatedBranch = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
-        if (updatedBranch) {
-          setSelectedBranchFilter(updatedBranch);
-          loadData(updatedBranch);
+        let updatedBranch = (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null) || "all";
+        if (isBranchAdmin && (!updatedBranch || updatedBranch === "all")) {
+          updatedBranch = user?.branchId || assignedBranches[0]?.id || "";
         }
+        setSelectedBranchFilter(updatedBranch);
+        loadData(updatedBranch);
       };
       window.addEventListener("branchChanged", handleBranchChanged);
       return () => window.removeEventListener("branchChanged", handleBranchChanged);
@@ -430,9 +435,10 @@ export default function RolesPermissionsPage() {
   const openAddRoleModal = () => {
     setNewRoleName("");
     setNewRoleDesc("");
-    const defaultBranch = isBranchAdmin
+    const rawBranch = isBranchAdmin
       ? (assignedBranches[0]?.id || "")
       : ((selectedBranchFilter !== "all" ? selectedBranchFilter : null) || (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null) || branches[0]?.id || "");
+    const defaultBranch = rawBranch === "all" ? (branches[0]?.id || "") : rawBranch;
     setNewRoleBranchId(defaultBranch);
     setNewRoleSystemRole("RECRUITER");
     setNewRolePermissions(SYSTEM_ARCHETYPES[0].perms);
@@ -730,32 +736,16 @@ export default function RolesPermissionsPage() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Branch Filter — branch admins see their assigned branch only without dropdown; tenant admins see dropdown */}
+          {/* Unified Active Branch Context Indicator — synced with global header */}
           {branches.length > 0 && (
-            isBranchAdmin ? (
-              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
-                <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <span className="text-xs font-semibold text-neutral-800 dark:text-white">
-                  {assignedBranches[0]?.name || branches.find((b) => b.id === selectedBranchFilter)?.name || "Assigned Branch"}
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
-                <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-neutral-400 shrink-0" />
-                <select
-                  value={selectedBranchFilter}
-                  onChange={(e) => handleBranchFilterChange(e.target.value)}
-                  className="bg-transparent text-xs font-semibold text-neutral-800 dark:text-white outline-none cursor-pointer"
-                >
-                  <option value="all">All Branches ({customRolesList.length} Roles)</option>
-                  {assignedBranches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )
+            <div className="flex items-center gap-1.5 bg-neutral-50 dark:bg-slate-800/80 border border-neutral-200 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
+              <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                {selectedBranchFilter === "all"
+                  ? `All Branches (${customRolesList.length} Roles)`
+                  : (branches.find((b) => b.id === selectedBranchFilter)?.name || "Active Branch")}
+              </span>
+            </div>
           )}
 
           {/* Refresh Button */}
