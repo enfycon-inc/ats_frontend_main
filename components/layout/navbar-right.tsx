@@ -4,8 +4,6 @@ import { QUICK_ACTIONS, APP_LAUNCHER_ITEMS } from "@/constants/navigation";
 import Logout from "@/components/auth/logout";
 import {
   Bell,
-  MessageSquare,
-  History,
   Calendar,
   Grid3X3,
   User,
@@ -682,38 +680,6 @@ function NotificationDropdownNav() {
   );
 }
 
-// ─── Messages icon (simple link) ─────────────────────────────────────────────
-function MessagesIcon() {
-  return (
-    <Link href="/email" aria-label="Messages">
-      <NavIconBtn id="navbar-messages" aria-label="Messages" badge={3}>
-        <MessageSquare className="w-4 h-4" />
-      </NavIconBtn>
-    </Link>
-  );
-}
-
-// ─── Activity history (simple link) ──────────────────────────────────────────
-function ActivityIcon() {
-  return (
-    <Link href="#" aria-label="Activity history">
-      <NavIconBtn id="navbar-activity" aria-label="Activity history">
-        <History className="w-4 h-4" />
-      </NavIconBtn>
-    </Link>
-  );
-}
-
-// ─── Calendar (simple link) ──────────────────────────────────────────────────
-function CalendarIcon() {
-  return (
-    <Link href="/calendar" aria-label="Calendar">
-      <NavIconBtn id="navbar-calendar" aria-label="Calendar">
-        <Calendar className="w-4 h-4" />
-      </NavIconBtn>
-    </Link>
-  );
-}
 
 // ─── Quick Actions dropdown ───────────────────────────────────────────────────
 function QuickActionsDropdown() {
@@ -1916,9 +1882,6 @@ export function NavbarRight() {
       <div className="w-px h-5 bg-white/15 mx-1 flex-shrink-0" />
 
       <NotificationDropdownNav />
-      <MessagesIcon />
-      <ActivityIcon />
-      <CalendarIcon />
       <AppsLauncherDropdown />
 
       {/* Divider */}
