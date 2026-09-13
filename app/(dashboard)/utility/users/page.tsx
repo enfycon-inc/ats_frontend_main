@@ -2779,18 +2779,16 @@ export default function UserManagementPage() {
                                   </span>
                                 </div>
                               </div>
-                              <Button
+                              <button
                                 type="button"
-                                variant="outline"
-                                size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setIsManagerDropdownOpen(true);
                                 }}
-                                className="h-7 px-2.5 text-xs text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 ml-2 shrink-0 cursor-pointer"
+                                className="h-7 px-3 text-xs font-semibold rounded-md border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-700 dark:hover:text-indigo-300 hover:border-indigo-300 dark:hover:border-indigo-700 ml-2 shrink-0 cursor-pointer shadow-2xs transition-colors"
                               >
                                 Change
-                              </Button>
+                              </button>
                             </div>
                           ) : (
                             /* Search Input & Scroll-Capped Dropdown */
@@ -2919,7 +2917,7 @@ export default function UserManagementPage() {
                       setIsReviewerModalOpen(false);
                       setReviewerTargetUser(null);
                     }}
-                    className="h-8.5 px-3 text-xs"
+                    className="h-8.5 px-3.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
                   >
                     Cancel
                   </Button>
