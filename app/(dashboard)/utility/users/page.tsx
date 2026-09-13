@@ -190,7 +190,7 @@ function ReviewerSelect({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search reviewers by name, role or email..."
+                placeholder="Search managers by name, role or email..."
                 className="w-full h-8 pl-8 pr-3 text-xs rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 autoFocus
               />
@@ -234,7 +234,7 @@ function ReviewerSelect({
 
             {filtered.length === 0 ? (
               <div className="py-6 text-center text-xs text-neutral-400">
-                No eligible reviewers found matching &quot;{search}&quot;
+                No eligible managers found matching &quot;{search}&quot;
               </div>
             ) : (
               filtered.map((u) => {
@@ -914,7 +914,7 @@ export default function UserManagementPage() {
     try {
       setLoading(true);
       await atsApi.auth.bulkSetJobReviewer(selectedUserIds, targetBulkReviewerId || null);
-      toast.success(`Updated Internal Screening Reviewer for ${selectedUserIds.length} user(s)!`);
+      toast.success(`Updated Manager for ${selectedUserIds.length} user(s)!`);
       setIsBulkReviewerModalOpen(false);
       setSelectedUserIds([]);
       setTargetBulkReviewerId("");
@@ -1106,14 +1106,14 @@ export default function UserManagementPage() {
       });
       toast.success(
         selectedReviewerId
-          ? `Designated reviewer updated for ${reviewerTargetUser.fullName}!`
-          : `Reviewer reset to Pod/Branch default for ${reviewerTargetUser.fullName}!`
+          ? `Designated manager updated for ${reviewerTargetUser.fullName}!`
+          : `Manager reset to Pod/Branch default for ${reviewerTargetUser.fullName}!`
       );
       setIsReviewerModalOpen(false);
       setReviewerTargetUser(null);
       loadData();
     } catch (err: any) {
-      toast.error(err.message || "Failed to update designated reviewer.");
+      toast.error(err.message || "Failed to update designated manager.");
     } finally {
       setSubmitting(false);
     }
@@ -1418,7 +1418,7 @@ export default function UserManagementPage() {
                       }}
                       className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-semibold"
                     >
-                      <UserCheck className="h-3.5 w-3.5 text-indigo-600" /> Assign Internal Screening Reviewer...
+                      <UserCheck className="h-3.5 w-3.5 text-indigo-600" /> Assign Manager...
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
@@ -1539,7 +1539,7 @@ export default function UserManagementPage() {
                   <th className="py-3 px-4">Work Email</th>
                   <th className="py-3 px-4">Assigned Role(s)</th>
                   <th className="py-3 px-4">Branch Location</th>
-                  <th className="py-3 px-4">Internal Screening Reviewer</th>
+                  <th className="py-3 px-4">Manager</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -1653,7 +1653,7 @@ export default function UserManagementPage() {
                                 type="button"
                                 onClick={() => openReviewerModal(user)}
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer"
-                                title="Click to change designated Internal Screening Reviewer"
+                                title="Click to change designated Manager"
                               >
                                 <UserCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                                 <span>{reviewerName}</span>
@@ -1666,7 +1666,7 @@ export default function UserManagementPage() {
                               type="button"
                               onClick={() => openReviewerModal(user)}
                               className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800/60 transition-colors cursor-pointer"
-                              title="Assign an Internal Screening Reviewer"
+                              title="Assign a Manager"
                             >
                               + Assign
                             </button>
@@ -1714,7 +1714,7 @@ export default function UserManagementPage() {
                                 onClick={() => openReviewerModal(user)}
                                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
                               >
-                                <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> Assign Screening Reviewer
+                                <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> Assign Manager
                               </DropdownMenuItem>
 
                               <DropdownMenuItem
@@ -2252,14 +2252,14 @@ export default function UserManagementPage() {
                 </div>
               </div>
 
-              {/* DESIGNATED INTERNAL SCREENING REVIEWER */}
+              {/* DESIGNATED MANAGER */}
               <div className="space-y-2 pt-3 border-t border-neutral-100 dark:border-slate-800">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                    <UserCheck className="h-4 w-4 text-indigo-600" /> Designated Reviewer (Internal Screening Gate)
+                    <UserCheck className="h-4 w-4 text-indigo-600" /> Designated Manager (Approvals & Reviews)
                   </label>
                   <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded">
-                    Internal Screening
+                    Reporting Manager
                   </span>
                 </div>
                 <ReviewerSelect
@@ -2468,13 +2468,13 @@ export default function UserManagementPage() {
         </div>
       )}
 
-      {/* BULK ASSIGN JOB REVIEWER MODAL */}
+      {/* BULK ASSIGN MANAGER MODAL */}
       {isBulkReviewerModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in-0">
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md flex flex-col overflow-hidden">
             <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <UserCheck className="h-4 w-4 text-indigo-600" /> Assign Job Reviewer ({selectedUserIds.length} Selected)
+                <UserCheck className="h-4 w-4 text-indigo-600" /> Assign Manager ({selectedUserIds.length} Selected)
               </h3>
               <button onClick={() => setIsBulkReviewerModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 cursor-pointer">
                 <X className="h-4 w-4" />
@@ -2483,11 +2483,11 @@ export default function UserManagementPage() {
 
             <div className="p-5 space-y-4">
               <p className="text-xs text-neutral-500">
-                Set who will review and approve jobs created by the <strong>{selectedUserIds.length} selected team members</strong>:
+                Choose the designated manager who reviews and approves work for the <strong>{selectedUserIds.length} selected team members</strong>:
               </p>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Designated Job Reviewer *</label>
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Designated Manager *</label>
                 <ReviewerSelect
                   value={targetBulkReviewerId || ""}
                   onChange={(val) => setTargetBulkReviewerId(val)}
@@ -2507,14 +2507,14 @@ export default function UserManagementPage() {
                 disabled={loading}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs"
               >
-                {loading ? "Updating..." : `Set Reviewer for ${selectedUserIds.length} Users`}
+                {loading ? "Updating..." : `Set Manager for ${selectedUserIds.length} Users`}
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* DEDICATED SINGLE USER ASSIGN INTERNAL SCREENING REVIEWER MODAL */}
+      {/* DEDICATED SINGLE USER ASSIGN MANAGER MODAL */}
       {isReviewerModalOpen && reviewerTargetUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in-0">
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-in zoom-in-95">
@@ -2525,7 +2525,7 @@ export default function UserManagementPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    Internal Screening Reviewer
+                    Assign Manager
                   </h3>
                   <p className="text-[11px] text-neutral-500 truncate max-w-[260px]">
                     For <span className="font-semibold text-neutral-800 dark:text-neutral-200">{reviewerTargetUser.fullName}</span>
@@ -2546,7 +2546,7 @@ export default function UserManagementPage() {
             {/* Search Input Bar */}
             <div className="px-5 pt-3.5 pb-2 shrink-0 space-y-2">
               <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                Choose who will review and approve submissions by <strong className="text-neutral-800 dark:text-neutral-200">{reviewerTargetUser.fullName}</strong>:
+                Choose the manager who reviews and approves submissions by <strong className="text-neutral-800 dark:text-neutral-200">{reviewerTargetUser.fullName}</strong>:
               </p>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
@@ -2554,7 +2554,7 @@ export default function UserManagementPage() {
                   type="text"
                   value={reviewerSearch}
                   onChange={(e) => setReviewerSearch(e.target.value)}
-                  placeholder="Search reviewer by name, role, or email..."
+                  placeholder="Search manager by name, role, or email..."
                   className="w-full h-8.5 pl-8.5 pr-8 text-xs rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
                   autoFocus
                 />
@@ -2609,13 +2609,13 @@ export default function UserManagementPage() {
               {/* Option 2: List of Eligible Reviewers */}
               {modalFilteredReviewers.length === 0 ? (
                 <div className="py-8 text-center text-xs text-neutral-400 space-y-1">
-                  <p>No matching reviewers found for &quot;{reviewerSearch}&quot;.</p>
-                  <p className="text-[10px] text-neutral-500">Only team members with screening permissions or management roles appear here.</p>
+                  <p>No matching managers found for &quot;{reviewerSearch}&quot;.</p>
+                  <p className="text-[10px] text-neutral-500">Only team members with management or approval roles appear here.</p>
                 </div>
               ) : (
                 modalFilteredReviewers.map((u) => {
                   const isSelected = selectedReviewerId === u.id;
-                  const displayRole = u.roleName || (u.roles && u.roles.length > 0 ? u.roles[0] : "Reviewer");
+                  const displayRole = u.roleName || (u.roles && u.roles.length > 0 ? u.roles[0] : "Manager");
 
                   return (
                     <div
@@ -2660,7 +2660,7 @@ export default function UserManagementPage() {
             <div className="px-5 py-2 bg-neutral-50/70 dark:bg-slate-850/70 border-t border-neutral-100 dark:border-slate-800">
               <p className="text-[10.5px] text-neutral-500 flex items-center gap-1.5">
                 <span>🛡️</span>
-                <span>Filtered: showing {modalFilteredReviewers.length} team members with screening permissions</span>
+                <span>Filtered: showing {modalFilteredReviewers.length} eligible managers</span>
               </p>
             </div>
 
@@ -2682,7 +2682,7 @@ export default function UserManagementPage() {
                 disabled={submitting}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs"
               >
-                {submitting ? "Saving..." : "Save Reviewer"}
+                {submitting ? "Saving..." : "Save Manager"}
               </Button>
             </div>
           </div>
