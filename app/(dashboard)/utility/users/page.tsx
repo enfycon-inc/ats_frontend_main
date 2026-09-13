@@ -324,6 +324,24 @@ export default function UserManagementPage() {
 
   const isTenantAdmin = sessionPerms.includes('tenant:settings') || (!isBranchAdmin && (overrideRole === 'ADMIN' || overrideRole === 'Tenant Admin'));
 
+  // The branches the current user is assigned to (for filtering dropdowns)
+  const assignedBranches = useMemo(() => {
+    if (!isBranchAdmin) return branches;
+    const ids: string[] = Array.isArray(currentUser?.assignedBranchIds) && currentUser.assignedBranchIds.length > 0
+      ? currentUser.assignedBranchIds
+      : (currentUser?.branchId ? [currentUser.branchId] : []);
+    if (ids.length === 0) return branches;
+    return branches.filter((b) => ids.includes(b.id));
+  }, [isBranchAdmin, branches, currentUser]);
+
+  // Can the current user manage (edit/delete/status) a given target user?
+  const canManageUser = (targetUser: any): boolean => {
+    if (!isBranchAdmin) return true;
+    const targetBranchId = targetUser?.branchId || targetUser?.branch_id;
+    if (!targetBranchId) return false;
+    return assignedBranches.some((b) => b.id === targetBranchId);
+  };
+
   const getDomainSuffix = () => {
     const userEmail = profile?.email || currentUser?.email;
     if (userEmail?.toLowerCase().endsWith("@csm.com")) return "csm";
@@ -548,7 +566,10 @@ export default function UserManagementPage() {
       setRolesList(rolesData || []);
       setProfile(profileData);
       if (branchesData && branchesData.length > 0) {
-        setAddForm((prev) => ({ ...prev, branchId: prev.branchId || branchesData[0].id }));
+        // Branch admins should default to their own branch, not the first branch in the list
+        const userBranchId = profileData?.branchId || currentUser?.branchId;
+        const defaultBranchId = (isBranchAdmin && userBranchId) ? userBranchId : branchesData[0].id;
+        setAddForm((prev) => ({ ...prev, branchId: prev.branchId || defaultBranchId }));
       }
     } catch (err: any) {
       toast.error("Failed to load users: " + (err.message || "Unknown error"));
@@ -777,7 +798,7 @@ export default function UserManagementPage() {
   // Bulk Selection Handlers
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedUserIds(filteredUsers.map((u) => u.id));
+      setSelectedUserIds(filteredUsers.filter((u) => canManageUser(u)).map((u) => u.id));
     } else {
       setSelectedUserIds([]);
     }
@@ -1483,7 +1504,10 @@ export default function UserManagementPage() {
                   <th className="py-3 px-3 w-10 text-center">
                     <input
                       type="checkbox"
-                      checked={filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length}
+                      checked={
+                        filteredUsers.filter((u) => canManageUser(u)).length > 0 &&
+                        selectedUserIds.length === filteredUsers.filter((u) => canManageUser(u)).length
+                      }
                       onChange={(e) => handleSelectAll(e.target.checked)}
                       className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
                     />
@@ -1506,12 +1530,16 @@ export default function UserManagementPage() {
                     <tr key={user.id} className={`transition-colors ${selectedUserIds.includes(user.id) ? "bg-indigo-50/40 dark:bg-indigo-950/20" : "hover:bg-default-50/60 dark:hover:bg-slate-800/40"}`}>
                       {/* Checkbox Column */}
                       <td className="py-3 px-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedUserIds.includes(user.id)}
-                          onChange={() => handleSelectRow(user.id)}
-                          className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
-                        />
+                        {canManageUser(user) ? (
+                          <input
+                            type="checkbox"
+                            checked={selectedUserIds.includes(user.id)}
+                            onChange={() => handleSelectRow(user.id)}
+                            className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                          />
+                        ) : (
+                          <span className="inline-block w-3.5 h-3.5 text-neutral-300 dark:text-neutral-600">-</span>
+                        )}
                       </td>
 
                       {/* Name */}
@@ -1639,69 +1667,75 @@ export default function UserManagementPage() {
 
                       {/* Floating Actions Menu (Triple Dot) */}
                       <td className="py-3 px-4 text-right">
-                        <DropdownMenu modal={false}>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0 rounded-full hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-500 hover:text-neutral-900 dark:hover:white cursor-pointer"
-                              title="User Actions Menu"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-52 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-xl rounded-lg p-1 text-xs">
-                            <DropdownMenuItem
-                              onClick={() => openEditModal(user)}
-                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
-                            >
-                              <Edit2 className="h-3.5 w-3.5 text-indigo-600" /> Edit Profile & Roles
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                              onClick={() => openReviewerModal(user)}
-                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
-                            >
-                              <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> Assign Screening Reviewer
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                              onClick={() => openPasswordModal(user)}
-                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
-                            >
-                              <Key className="h-3.5 w-3.5 text-amber-500" /> Reset Password
-                            </DropdownMenuItem>
-
-                            <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
-
-                            {user.isActive ? (
+                        {canManageUser(user) ? (
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 rounded-full hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-500 hover:text-neutral-900 dark:hover:white cursor-pointer"
+                                title="User Actions Menu"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-xl rounded-lg p-1 text-xs">
                               <DropdownMenuItem
-                                onClick={() => handleStatusToggle(user)}
+                                onClick={() => openEditModal(user)}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
+                              >
+                                <Edit2 className="h-3.5 w-3.5 text-indigo-600" /> Edit Profile & Roles
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem
+                                onClick={() => openReviewerModal(user)}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
+                              >
+                                <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> Assign Screening Reviewer
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem
+                                onClick={() => openPasswordModal(user)}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
+                              >
+                                <Key className="h-3.5 w-3.5 text-amber-500" /> Reset Password
+                              </DropdownMenuItem>
+
+                              <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
+
+                              {user.isActive ? (
+                                <DropdownMenuItem
+                                  onClick={() => handleStatusToggle(user)}
+                                  disabled={isCurrent}
+                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/50 text-amber-700 font-medium"
+                                >
+                                  <UserX className="h-3.5 w-3.5" /> Deactivate & Revoke Access
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem
+                                  onClick={() => handleStatusToggle(user)}
+                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-emerald-700 font-medium"
+                                >
+                                  <UserCheck className="h-3.5 w-3.5" /> Reactivate Account
+                                </DropdownMenuItem>
+                              )}
+
+                              <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
+
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteUser(user)}
                                 disabled={isCurrent}
-                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/50 text-amber-700 font-medium"
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/50 text-rose-600 dark:text-rose-400 font-medium"
                               >
-                                <UserX className="h-3.5 w-3.5" /> Deactivate & Revoke Access
+                                <Trash2 className="h-3.5 w-3.5" /> Delete Team Member
                               </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem
-                                onClick={() => handleStatusToggle(user)}
-                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-emerald-700 font-medium"
-                              >
-                                <UserCheck className="h-3.5 w-3.5" /> Reactivate Account
-                              </DropdownMenuItem>
-                            )}
-
-                            <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
-
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteUser(user)}
-                              disabled={isCurrent}
-                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/50 text-rose-600 dark:text-rose-400 font-medium"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" /> Delete Team Member
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : (
+                          <span className="text-[10px] text-neutral-400 italic px-2 py-0.5 bg-neutral-50 dark:bg-slate-800 rounded border border-neutral-200 dark:border-slate-700">
+                            View Only
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -1820,7 +1854,7 @@ export default function UserManagementPage() {
                     required
                   >
                     <option value="">Select Primary Branch...</option>
-                    {branches.map((b) => (
+                    {assignedBranches.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.name}
                       </option>
@@ -2052,7 +2086,7 @@ export default function UserManagementPage() {
                     className="w-full h-8 text-xs rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 font-semibold"
                   >
                     <option value="">Select Primary Branch...</option>
-                    {branches.map(b => (
+                    {assignedBranches.map(b => (
                       <option key={b.id} value={b.id}>{b.name}</option>
                     ))}
                   </select>
@@ -2064,7 +2098,7 @@ export default function UserManagementPage() {
                     🏢 Office Branch Assignments &amp; Branch-Wise Roles
                   </label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/70 dark:bg-slate-900/60 p-3.5 rounded-xl border border-neutral-200 dark:border-slate-800">
-                    {branches.map((b) => {
+                    {assignedBranches.map((b) => {
                       const isAssigned = editForm.assignedBranchIds.includes(b.id) || editForm.branchId === b.id;
                       const branchCustomRoles = (rolesList || []).filter((r) => {
                         if (r.isSystem) return false;
@@ -2338,8 +2372,8 @@ export default function UserManagementPage() {
                   onChange={(e) => setTargetMoveBranchId(e.target.value)}
                   className="w-full h-9 text-xs font-medium rounded-md border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-neutral-900 dark:text-neutral-100 outline-none"
                 >
-                  <option value="">-- Unassigned (HQ Shared) --</option>
-                  {branches.map((b) => (
+                  {!isBranchAdmin && <option value="">-- Unassigned (HQ Shared) --</option>}
+                  {assignedBranches.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
                     </option>

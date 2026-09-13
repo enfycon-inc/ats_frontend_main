@@ -150,13 +150,43 @@ export default function RolesPermissionsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Core Dynamic RBAC state
   const [roles, setRoles] = useState<CustomRole[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Branch admin detection via permissions (canonical: branch_admin:manage but NOT tenant:settings)
+  const sessionPerms: string[] = useMemo(() => {
+    const u = atsApi.auth.getCurrentUser();
+    return Array.isArray(u?.permissions) ? u.permissions : [];
+  }, []);
+  const isBranchAdmin = useMemo(() =>
+    sessionPerms.includes("branch_admin:manage") && !sessionPerms.includes("tenant:settings"),
+    [sessionPerms]
+  );
+  const isTenantAdminUser = useMemo(() =>
+    sessionPerms.includes("tenant:settings") || sessionPerms.includes("tenant:manage"),
+    [sessionPerms]
+  );
+  // The branches the current user is assigned to (used to filter dropdowns)
+  const assignedBranches = useMemo(() => {
+    if (!isBranchAdmin) return branches;
+    const u = atsApi.auth.getCurrentUser();
+    const ids: string[] = Array.isArray(u?.assignedBranchIds) && u.assignedBranchIds.length > 0
+      ? u.assignedBranchIds
+      : (u?.branchId ? [u.branchId] : []);
+    if (ids.length === 0) return branches;
+    return branches.filter((b) => ids.includes(b.id));
+  }, [isBranchAdmin, branches]);
+
+  // Helper: can the current user edit/delete a role?
+  const canManageRole = (role: CustomRole): boolean => {
+    if (!isBranchAdmin) return true; // tenant admin: yes
+    if (!role.branchId) return false; // no-branch role: no
+    return assignedBranches.some((b) => b.id === role.branchId);
+  };
 
   // Hover Popover States
   const [hoveredPermRoleId, setHoveredPermRoleId] = useState<string | null>(null);
@@ -698,7 +728,7 @@ export default function RolesPermissionsPage() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Branch Filter Dropdown */}
+          {/* Branch Filter Dropdown — branch admins see only their assigned branches */}
           {branches.length > 0 && (
             <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
               <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-neutral-400 shrink-0" />
@@ -707,8 +737,11 @@ export default function RolesPermissionsPage() {
                 onChange={(e) => handleBranchFilterChange(e.target.value)}
                 className="bg-transparent text-xs font-semibold text-neutral-800 dark:text-white outline-none cursor-pointer"
               >
-                <option value="all">All Branches ({customRolesList.length} Roles)</option>
-                {branches.map((b) => (
+                {/* Show "All Branches" only for tenant admins */}
+                {!isBranchAdmin && (
+                  <option value="all">All Branches ({customRolesList.length} Roles)</option>
+                )}
+                {assignedBranches.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
                   </option>
@@ -728,14 +761,16 @@ export default function RolesPermissionsPage() {
             <Icon icon="heroicons:arrow-path" className="h-4 w-4" />
           </Button>
 
-          {/* Primary Create Button */}
-          <Button
-            onClick={openAddRoleModal}
-            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-lg shadow-xs cursor-pointer"
-          >
-            <Icon icon="heroicons:plus" className="h-4 w-4" />
-            Create Custom Role
-          </Button>
+          {/* Primary Create Button — branch admins can only create in their assigned branches */}
+          {(!isBranchAdmin || assignedBranches.length > 0) && (
+            <Button
+              onClick={openAddRoleModal}
+              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-lg shadow-xs cursor-pointer"
+            >
+              <Icon icon="heroicons:plus" className="h-4 w-4" />
+              Create Custom Role
+            </Button>
+          )}
         </div>
       </div>
 
@@ -961,23 +996,27 @@ export default function RolesPermissionsPage() {
                       {/* 9. ACTIONS (CLEAN, ESSENTIAL ACTIONS ONLY) */}
                       <td className="py-3.5 px-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Edit Role Button */}
-                          <button
-                            onClick={() => openEditRoleModal(role)}
-                            className="p-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-300 transition cursor-pointer"
-                            title="Edit Role Details & Configuration"
-                          >
-                            <Icon icon="heroicons:pencil-square" className="h-3.5 w-3.5" />
-                          </button>
+                          {/* Edit Role Button — hidden if branch admin doesn't own this role's branch */}
+                          {canManageRole(role) && (
+                            <button
+                              onClick={() => openEditRoleModal(role)}
+                              className="p-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-300 transition cursor-pointer"
+                              title="Edit Role Details & Configuration"
+                            >
+                              <Icon icon="heroicons:pencil-square" className="h-3.5 w-3.5" />
+                            </button>
+                          )}
 
-                          {/* Delete Role Button */}
-                          <button
-                            onClick={() => handleInitiateDeleteRole(role)}
-                            className="p-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-950/40 text-neutral-400 hover:text-red-600 transition cursor-pointer"
-                            title="Delete Custom Role"
-                          >
-                            <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
-                          </button>
+                          {/* Delete Role Button — hidden if branch admin doesn't own this role's branch */}
+                          {canManageRole(role) && (
+                            <button
+                              onClick={() => handleInitiateDeleteRole(role)}
+                              className="p-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-950/40 text-neutral-400 hover:text-red-600 transition cursor-pointer"
+                              title="Delete Custom Role"
+                            >
+                              <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1015,7 +1054,7 @@ export default function RolesPermissionsPage() {
 
             <form onSubmit={handleCreateRole} className="p-6 space-y-5 overflow-y-auto flex-1">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Branch Selection */}
+                {/* Branch Selection — branch admins see only their assigned branches */}
                 {branches.length > 0 && (
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
@@ -1026,13 +1065,17 @@ export default function RolesPermissionsPage() {
                       onChange={(e) => setNewRoleBranchId(e.target.value)}
                       className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                       required
+                      disabled={isBranchAdmin && assignedBranches.length === 1}
                     >
-                      {branches.map((b) => (
+                      {assignedBranches.map((b) => (
                         <option key={b.id} value={b.id}>
                           {b.name}
                         </option>
                       ))}
                     </select>
+                    {isBranchAdmin && assignedBranches.length === 1 && (
+                      <p className="text-xs text-neutral-500 mt-0.5">Roles will be created in your assigned branch.</p>
+                    )}
                   </div>
                 )}
 
