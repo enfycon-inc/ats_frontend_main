@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { 
   Users, UserPlus, Search, Edit2, Key, Shield, Building2, MapPin, 
   CheckCircle2, XCircle, RefreshCw, Mail, Lock, Sparkles, Filter, ShieldAlert, X, ChevronRight, Loader2,
-  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check
+  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check, Eye, EyeOff
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -478,6 +478,10 @@ export default function UserManagementPage() {
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  // Password visibility states
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   // Add Member Form
   const [addForm, setAddForm] = useState({
@@ -1122,6 +1126,25 @@ export default function UserManagementPage() {
         setRolesList(freshRoles);
       }
     } catch (e) {}
+
+    const userBranchId = profile?.branchId || currentUser?.branchId;
+    const defaultBranchId = (isBranchAdmin && userBranchId) ? userBranchId : (branches[0]?.id || "");
+    setAddForm({
+      firstName: "",
+      lastName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      roles: [],
+      branchId: defaultBranchId,
+      assignedBranchIds: defaultBranchId ? [defaultBranchId] : [],
+      branchRoles: {},
+      sendEmailInvite: false,
+    });
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setEmailStatus("idle");
+    setEmailCheckMsg("");
     setIsAddModalOpen(true);
   };
 
@@ -1256,7 +1279,7 @@ export default function UserManagementPage() {
                 toast.error(`Seat limit reached! (${userLimit} active licenses). Deactivate a user first or upgrade plan.`);
                 return;
               }
-              setIsAddModalOpen(true);
+              openAddModal();
             }}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-lg flex items-center gap-1.5 shadow-sm"
           >
@@ -1764,7 +1787,7 @@ export default function UserManagementPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateMember} className="p-5 space-y-4 overflow-y-auto flex-1">
+            <form onSubmit={handleCreateMember} autoComplete="off" className="p-5 space-y-4 overflow-y-auto flex-1">
               {/* FIRST NAME + LAST NAME GRID */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -1837,29 +1860,36 @@ export default function UserManagementPage() {
                   <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">
                     Primary Office Branch <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    value={addForm.branchId}
-                    onChange={(e) => {
-                      const newBranchId = e.target.value;
-                      const validRolesForNewBranch = (rolesList || [])
-                        .filter((r) => !r.branchId || r.branchId === newBranchId)
-                        .map((r) => r.name);
-                      setAddForm((prev) => ({
-                        ...prev,
-                        branchId: newBranchId,
-                        roles: prev.roles.filter((roleName) => validRolesForNewBranch.includes(roleName)),
-                      }));
-                    }}
-                    className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
-                    required
-                  >
-                    <option value="">Select Primary Branch...</option>
-                    {assignedBranches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
+                  {isBranchAdmin ? (
+                    <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                      <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
+                      <span>{assignedBranches.find((b) => b.id === addForm.branchId)?.name || branches.find((b) => b.id === addForm.branchId)?.name || "Assigned Branch"}</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={addForm.branchId}
+                      onChange={(e) => {
+                        const newBranchId = e.target.value;
+                        const validRolesForNewBranch = (rolesList || [])
+                          .filter((r) => !r.branchId || r.branchId === newBranchId)
+                          .map((r) => r.name);
+                        setAddForm((prev) => ({
+                          ...prev,
+                          branchId: newBranchId,
+                          roles: prev.roles.filter((roleName) => validRolesForNewBranch.includes(roleName)),
+                        }));
+                      }}
+                      className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
+                      required
+                    >
+                      <option value="">Select Primary Branch...</option>
+                      {assignedBranches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
 
@@ -1960,30 +1990,54 @@ export default function UserManagementPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Initial Password *</label>
-                  <Input
-                    type="password"
-                    value={addForm.password}
-                    onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
-                    placeholder="At least 8 characters"
-                    className="h-8.5 text-xs rounded border-neutral-300 dark:border-slate-700 font-mono"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={addForm.password}
+                      onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
+                      placeholder="At least 8 characters"
+                      autoComplete="new-password"
+                      className="h-8.5 text-xs rounded border-neutral-300 dark:border-slate-700 font-mono pr-8"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
+                      tabIndex={-1}
+                      title={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Confirm Password *</label>
-                  <Input
-                    type="password"
-                    value={addForm.confirmPassword}
-                    onChange={(e) => setAddForm({ ...addForm, confirmPassword: e.target.value })}
-                    placeholder="Re-enter password"
-                    className={`h-8.5 text-xs rounded font-mono ${
-                      addForm.confirmPassword && addForm.confirmPassword !== addForm.password
-                        ? "border-red-500 bg-red-50/50 dark:bg-red-950/20"
-                        : "border-neutral-300 dark:border-slate-700"
-                    }`}
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={addForm.confirmPassword}
+                      onChange={(e) => setAddForm({ ...addForm, confirmPassword: e.target.value })}
+                      placeholder="Re-enter password"
+                      autoComplete="new-password"
+                      className={`h-8.5 text-xs rounded font-mono pr-8 ${
+                        addForm.confirmPassword && addForm.confirmPassword !== addForm.password
+                          ? "border-red-500 bg-red-50/50 dark:bg-red-950/20"
+                          : "border-neutral-300 dark:border-slate-700"
+                      }`}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
+                      tabIndex={-1}
+                      title={showConfirmPassword ? "Hide password" : "Show password"}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
                 </div>
               </div>
               {addForm.confirmPassword && addForm.confirmPassword !== addForm.password && (
@@ -2252,14 +2306,26 @@ export default function UserManagementPage() {
 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">New Password *</label>
-                <Input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                  className="h-8 text-xs rounded border-neutral-300 font-mono"
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    type={showResetPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="At least 8 characters"
+                    autoComplete="new-password"
+                    className="h-8 text-xs rounded border-neutral-300 font-mono pr-8"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPassword(!showResetPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
+                    tabIndex={-1}
+                    title={showResetPassword ? "Hide password" : "Show password"}
+                  >
+                    {showResetPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">

@@ -430,7 +430,9 @@ export default function RolesPermissionsPage() {
   const openAddRoleModal = () => {
     setNewRoleName("");
     setNewRoleDesc("");
-    const defaultBranch = (selectedBranchFilter !== "all" ? selectedBranchFilter : null) || (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null) || branches[0]?.id || "";
+    const defaultBranch = isBranchAdmin
+      ? (assignedBranches[0]?.id || "")
+      : ((selectedBranchFilter !== "all" ? selectedBranchFilter : null) || (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null) || branches[0]?.id || "");
     setNewRoleBranchId(defaultBranch);
     setNewRoleSystemRole("RECRUITER");
     setNewRolePermissions(SYSTEM_ARCHETYPES[0].perms);
@@ -728,26 +730,32 @@ export default function RolesPermissionsPage() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Branch Filter Dropdown — branch admins see only their assigned branches */}
+          {/* Branch Filter — branch admins see their assigned branch only without dropdown; tenant admins see dropdown */}
           {branches.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
-              <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-neutral-400 shrink-0" />
-              <select
-                value={selectedBranchFilter}
-                onChange={(e) => handleBranchFilterChange(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-neutral-800 dark:text-white outline-none cursor-pointer"
-              >
-                {/* Show "All Branches" only for tenant admins */}
-                {!isBranchAdmin && (
+            isBranchAdmin ? (
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
+                <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <span className="text-xs font-semibold text-neutral-800 dark:text-white">
+                  {assignedBranches[0]?.name || branches.find((b) => b.id === selectedBranchFilter)?.name || "Assigned Branch"}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
+                <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-neutral-400 shrink-0" />
+                <select
+                  value={selectedBranchFilter}
+                  onChange={(e) => handleBranchFilterChange(e.target.value)}
+                  className="bg-transparent text-xs font-semibold text-neutral-800 dark:text-white outline-none cursor-pointer"
+                >
                   <option value="all">All Branches ({customRolesList.length} Roles)</option>
-                )}
-                {assignedBranches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+                  {assignedBranches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )
           )}
 
           {/* Refresh Button */}
@@ -1041,7 +1049,7 @@ export default function RolesPermissionsPage() {
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
                     Create Custom Staffing Role
                   </h3>
-                  <p className="text-[11px] text-neutral-400">Define operational staffing profile and custom permission matrix</p>
+                  <p className="text-[11px] text-neutral-400">Define operational staffing profile and custom permissions</p>
                 </div>
               </div>
               <button
@@ -1060,21 +1068,24 @@ export default function RolesPermissionsPage() {
                     <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
                       Target Branch Office <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={newRoleBranchId}
-                      onChange={(e) => setNewRoleBranchId(e.target.value)}
-                      className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                      required
-                      disabled={isBranchAdmin && assignedBranches.length === 1}
-                    >
-                      {assignedBranches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </select>
-                    {isBranchAdmin && assignedBranches.length === 1 && (
-                      <p className="text-xs text-neutral-500 mt-0.5">Roles will be created in your assigned branch.</p>
+                    {isBranchAdmin ? (
+                      <div className="flex items-center gap-2 h-10 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                        <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <span>{assignedBranches.find((b) => b.id === newRoleBranchId)?.name || branches.find((b) => b.id === newRoleBranchId)?.name || assignedBranches[0]?.name || "Assigned Branch"}</span>
+                      </div>
+                    ) : (
+                      <select
+                        value={newRoleBranchId}
+                        onChange={(e) => setNewRoleBranchId(e.target.value)}
+                        className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                        required
+                      >
+                        {assignedBranches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
                     )}
                   </div>
                 )}
@@ -1099,19 +1110,32 @@ export default function RolesPermissionsPage() {
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
                   Description
                 </label>
-                <Input
+                <textarea
+                  rows={3}
                   placeholder="Role responsibilities and operational scope..."
                   value={newRoleDesc}
                   onChange={(e) => setNewRoleDesc(e.target.value)}
-                  className="text-xs h-9 font-normal"
+                  className="w-full text-xs font-normal border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[72px]"
                 />
               </div>
 
-              {/* Inherit from System Archetype Dropdown */}
+              {/* Select Base Role */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                  Inherit Permissions from Base System Role
-                </label>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Select Base Role
+                  </label>
+                  <div className="group relative inline-flex items-center">
+                    <Icon
+                      icon="heroicons:information-circle"
+                      className="h-4 w-4 text-neutral-400 hover:text-indigo-600 transition-colors cursor-pointer"
+                    />
+                    <div className="absolute left-0 bottom-full mb-1.5 hidden group-hover:block z-50 w-72 p-2.5 bg-neutral-900 text-white text-[11px] leading-relaxed rounded-lg shadow-xl pointer-events-none">
+                      Base roles provide the foundational archetype and maximum permission ceiling for this custom role. Custom permissions can be adjusted within this base scope.
+                      <div className="absolute left-4 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-neutral-900" />
+                    </div>
+                  </div>
+                </div>
                 <select
                   value={newRoleSystemRole}
                   onChange={(e) => handleCreateArchetypeChange(e.target.value)}
@@ -1139,7 +1163,7 @@ export default function RolesPermissionsPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
-                          Custom Permissions Matrix
+                          Custom Permission
                         </h4>
                         <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full border border-indigo-200/60 dark:border-indigo-800/50">
                           {newRolePermissions.length} enabled
@@ -1376,18 +1400,25 @@ export default function RolesPermissionsPage() {
                     <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
                       Branch Office <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={editRoleBranchId}
-                      onChange={(e) => setEditRoleBranchId(e.target.value)}
-                      className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                      required
-                    >
-                      {branches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </select>
+                    {isBranchAdmin ? (
+                      <div className="flex items-center gap-2 h-10 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                        <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <span>{assignedBranches.find((b) => b.id === editRoleBranchId)?.name || branches.find((b) => b.id === editRoleBranchId)?.name || "Assigned Branch"}</span>
+                      </div>
+                    ) : (
+                      <select
+                        value={editRoleBranchId}
+                        onChange={(e) => setEditRoleBranchId(e.target.value)}
+                        className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                        required
+                      >
+                        {assignedBranches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 )}
 
@@ -1410,26 +1441,40 @@ export default function RolesPermissionsPage() {
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
                   Description
                 </label>
-                <Input
+                <textarea
+                  rows={3}
+                  placeholder="Role responsibilities and operational scope..."
                   value={editRoleDesc}
                   onChange={(e) => setEditRoleDesc(e.target.value)}
-                  className="text-xs h-9 font-normal"
+                  className="w-full text-xs font-normal border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[72px]"
                 />
               </div>
 
-              {/* Base Archetype */}
+              {/* Select Base Role */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                    Base System Archetype Template
-                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                      Select Base Role
+                    </label>
+                    <div className="group relative inline-flex items-center">
+                      <Icon
+                        icon="heroicons:information-circle"
+                        className="h-4 w-4 text-neutral-400 hover:text-indigo-600 transition-colors cursor-pointer"
+                      />
+                      <div className="absolute left-0 bottom-full mb-1.5 hidden group-hover:block z-50 w-72 p-2.5 bg-neutral-900 text-white text-[11px] leading-relaxed rounded-lg shadow-xl pointer-events-none">
+                        Base roles provide the foundational archetype and maximum permission ceiling for this custom role. Custom permissions can be adjusted within this base scope.
+                        <div className="absolute left-4 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-neutral-900" />
+                      </div>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleEditArchetypeChange(editRoleSystemRole)}
                     className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1"
                   >
                     <Icon icon="heroicons:arrow-path" className="h-3 w-3" />
-                    Reset to Template Defaults
+                    Reset to Defaults
                   </button>
                 </div>
                 <select
@@ -1459,7 +1504,7 @@ export default function RolesPermissionsPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
-                          Custom Permissions Matrix
+                          Custom Permission
                         </h4>
                         <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full border border-indigo-200/60 dark:border-indigo-800/50">
                           {editRolePermissions.length} enabled
@@ -1978,7 +2023,7 @@ export default function RolesPermissionsPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    Permissions Matrix: {matrixEditingRole.name}
+                    Custom Permissions: {matrixEditingRole.name}
                   </h3>
                   <p className="text-[11px] text-neutral-400">
                     Base Archetype: <span className="font-semibold text-neutral-700 dark:text-neutral-200">{matrixEditingRole.systemRole || "RECRUITER"}</span> • {matrixPermissions.filter(p => matrixAllowedPerms.includes(p)).length} / {matrixAllowedPerms.length} enabled permissions {permissions.length > matrixAllowedPerms.length && `(${permissions.length - matrixAllowedPerms.length} locked by archetype)`}
@@ -2149,7 +2194,7 @@ export default function RolesPermissionsPage() {
                 onClick={handleSaveMatrixPermissions}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 shadow-xs cursor-pointer flex items-center gap-1.5"
               >
-                {submitting ? "Saving Matrix..." : "Save Permissions Matrix"}
+                {submitting ? "Saving Permissions..." : "Save Custom Permissions"}
               </Button>
             </div>
           </div>
