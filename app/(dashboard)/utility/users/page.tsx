@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { 
   Users, UserPlus, Search, Edit2, Key, Shield, Building2, MapPin, 
   CheckCircle2, XCircle, RefreshCw, Mail, Lock, Sparkles, Filter, ShieldAlert, X, ChevronRight, Loader2,
-  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check, Eye, EyeOff
+  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check, Eye, EyeOff, Info
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -148,14 +148,14 @@ function ReviewerSelect({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
-                  Inherit from Pod / Branch Default
+                  Auto
                 </span>
                 <span className="text-[9.5px] px-1.5 py-0.2 rounded font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                   Recommended
                 </span>
               </div>
               <span className="text-[10px] text-neutral-500 block truncate">
-                Auto-routes approvals to Pod Lead or Branch Delivery Head
+                Auto-routes approvals based on branch hierarchy
               </span>
             </div>
           </div>
@@ -199,7 +199,7 @@ function ReviewerSelect({
 
           {/* Reviewer Options List */}
           <div className="max-h-60 overflow-y-auto p-1.5 space-y-1">
-            {/* Option: Inherit from Default */}
+            {/* Option: Inherit from Default (Auto) */}
             <div
               onClick={() => {
                 onChange("");
@@ -218,14 +218,14 @@ function ReviewerSelect({
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
-                      Inherit from Pod / Branch Default
+                      Auto
                     </span>
                     <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                       Recommended
                     </span>
                   </div>
                   <span className="text-[10px] text-neutral-500 block">
-                    Auto-routes based on Pod or Branch Delivery Head hierarchy
+                    Auto-routes based on branch organizational hierarchy
                   </span>
                 </div>
               </div>
@@ -467,6 +467,8 @@ export default function UserManagementPage() {
   const [reviewerTargetUser, setReviewerTargetUser] = useState<UserItem | null>(null);
   const [selectedReviewerId, setSelectedReviewerId] = useState<string>("");
   const [reviewerSearch, setReviewerSearch] = useState<string>("");
+  const [assignMode, setAssignMode] = useState<"AUTO" | "CUSTOM">("AUTO");
+  const [isManagerDropdownOpen, setIsManagerDropdownOpen] = useState<boolean>(false);
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -1089,25 +1091,98 @@ export default function UserManagementPage() {
     );
   }, [eligibleReviewers, reviewerTargetUser, reviewerSearch]);
 
+  // Dynamic role names for target user's branch hierarchy
+  const dynamicHierarchyText = useMemo(() => {
+    if (!reviewerTargetUser) return "Delivery Head, Pod Lead, or Branch Admin";
+    const userBranchId = reviewerTargetUser.branchId || (reviewerTargetUser as any)?.branch_id;
+
+    // 1. Discover roles configured for this branch
+    const branchRoles = rolesList.filter(
+      (r) => r.branchId && userBranchId && String(r.branchId).toLowerCase() === String(userBranchId).toLowerCase()
+    );
+
+    const leaderNames: string[] = [];
+    const targetArchetypes = ["POD_LEAD", "DELIVERY_HEAD", "BRANCH_ADMIN", "ACCOUNT_MANAGER", "BDM"];
+
+    targetArchetypes.forEach((arch) => {
+      const match = branchRoles.find((r) => {
+        const sys = (r.systemRole || "").toUpperCase().replace(/[\s-_]/g, "");
+        const base = (r.baseRoleName || "").toUpperCase().replace(/[\s-_]/g, "");
+        const name = (r.name || "").toUpperCase().replace(/[\s-_]/g, "");
+        const target = arch.replace(/_/g, "");
+        return sys === target || base === target || name.includes(target);
+      });
+      if (match?.name && !leaderNames.includes(match.name)) {
+        leaderNames.push(match.name);
+      }
+    });
+
+    // 2. Fallback to rolesList if no branch custom roles
+    if (leaderNames.length === 0) {
+      rolesList.forEach((r) => {
+        const nameUpper = (r.name || "").toUpperCase();
+        if (
+          nameUpper.includes("POD LEAD") ||
+          nameUpper.includes("DELIVERY HEAD") ||
+          nameUpper.includes("BRANCH ADMIN")
+        ) {
+          if (!leaderNames.includes(r.name)) leaderNames.push(r.name);
+        }
+      });
+    }
+
+    // 3. Find tenant admin dynamic name
+    const adminRole =
+      rolesList.find(
+        (r) =>
+          r.isSystem &&
+          (r.systemRole === "ADMIN" ||
+            r.name?.toLowerCase().includes("tenant admin") ||
+            r.name?.toLowerCase().includes("administrator"))
+      )?.name || "Tenant Admin";
+
+    if (!leaderNames.some((n) => n.toLowerCase().includes("admin"))) {
+      leaderNames.push(adminRole);
+    }
+
+    if (leaderNames.length === 0) {
+      return `Delivery Head, Pod Lead, or ${adminRole}`;
+    }
+
+    if (leaderNames.length === 1) return leaderNames[0];
+    if (leaderNames.length === 2) return `${leaderNames[0]} or ${leaderNames[1]}`;
+    return `${leaderNames.slice(0, -1).join(", ")}, or ${leaderNames[leaderNames.length - 1]}`;
+  }, [reviewerTargetUser, rolesList]);
+
   const openReviewerModal = (user: UserItem) => {
     if (!user) return;
     setReviewerTargetUser(user);
-    setSelectedReviewerId(user.jobReviewerId || (user as any).job_reviewer_id || "");
+    const existingReviewerId = user.jobReviewerId || (user as any).job_reviewer_id || "";
+    setSelectedReviewerId(existingReviewerId);
+    setAssignMode(existingReviewerId ? "CUSTOM" : "AUTO");
     setReviewerSearch("");
+    setIsManagerDropdownOpen(!existingReviewerId);
     setIsReviewerModalOpen(true);
   };
 
   const handleSaveSingleReviewer = async () => {
     if (!reviewerTargetUser) return;
+    const finalReviewerId = assignMode === "AUTO" ? null : (selectedReviewerId || null);
+
+    if (assignMode === "CUSTOM" && !finalReviewerId) {
+      toast.error("Please select a specific manager or choose Auto.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       await atsApi.auth.updateUserDetail(reviewerTargetUser.id, {
-        jobReviewerId: selectedReviewerId || null,
+        jobReviewerId: finalReviewerId,
       });
       toast.success(
-        selectedReviewerId
+        finalReviewerId
           ? `Designated manager updated for ${reviewerTargetUser.fullName}!`
-          : `Manager reset to Pod/Branch default for ${reviewerTargetUser.fullName}!`
+          : `Manager set to Auto (Hierarchy) for ${reviewerTargetUser.fullName}!`
       );
       setIsReviewerModalOpen(false);
       setReviewerTargetUser(null);
@@ -2515,179 +2590,328 @@ export default function UserManagementPage() {
       )}
 
       {/* DEDICATED SINGLE USER ASSIGN MANAGER MODAL */}
-      {isReviewerModalOpen && reviewerTargetUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in-0">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-in zoom-in-95">
-            <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-100 dark:border-indigo-900 shrink-0">
-                  <UserCheck className="h-4 w-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    Assign Manager
-                  </h3>
-                  <p className="text-[11px] text-neutral-500 truncate max-w-[260px]">
-                    For <span className="font-semibold text-neutral-800 dark:text-neutral-200">{reviewerTargetUser.fullName}</span>
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setIsReviewerModalOpen(false);
-                  setReviewerTargetUser(null);
-                }}
-                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer p-1 rounded-md transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      {isReviewerModalOpen && reviewerTargetUser && (() => {
+        const selectedManagerUser = selectedReviewerId
+          ? (eligibleReviewers.find((u) => u.id === selectedReviewerId) || users.find((u) => u.id === selectedReviewerId) || null)
+          : null;
 
-            {/* Search Input Bar */}
-            <div className="px-5 pt-3.5 pb-2 shrink-0 space-y-2">
-              <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                Choose the manager who reviews and approves submissions by <strong className="text-neutral-800 dark:text-neutral-200">{reviewerTargetUser.fullName}</strong>:
-              </p>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
-                <input
-                  type="text"
-                  value={reviewerSearch}
-                  onChange={(e) => setReviewerSearch(e.target.value)}
-                  placeholder="Search manager by name, role, or email..."
-                  className="w-full h-8.5 pl-8.5 pr-8 text-xs rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
-                  autoFocus
-                />
-                {reviewerSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setReviewerSearch("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-0.5"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Scrollable Reviewers List */}
-            <div className="px-5 py-2 flex-1 overflow-y-auto space-y-2 min-h-[220px] max-h-[45vh]">
-              {/* Option 1: Inherit from Default */}
-              <div
-                onClick={() => setSelectedReviewerId("")}
-                className={`flex items-center justify-between gap-2.5 p-2.5 rounded-xl cursor-pointer transition select-none border ${
-                  !selectedReviewerId
-                    ? "bg-indigo-50/70 dark:bg-indigo-950/60 border-indigo-500 ring-2 ring-indigo-500/20 shadow-2xs"
-                    : "border-neutral-200 dark:border-slate-800 bg-neutral-50/40 dark:bg-slate-850/40 hover:bg-neutral-100/70 dark:hover:bg-slate-800/70"
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="h-7 w-7 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
-                    ⚡
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in-0">
+            <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden animate-in zoom-in-95">
+              {/* Modal Header */}
+              <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/70 dark:bg-slate-850/60">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-100 dark:border-indigo-900 shrink-0 shadow-2xs">
+                    <UserCheck className="h-5 w-5" />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-neutral-900 dark:text-white">
-                        Inherit from Pod / Branch Default
-                      </span>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                        Recommended
-                      </span>
-                    </div>
-                    <span className="text-[10.5px] text-neutral-500 block truncate">
-                      Auto-routes based on Pod Lead or Branch Delivery Head hierarchy
-                    </span>
-                  </div>
-                </div>
-                {!selectedReviewerId && (
-                  <div className="h-4.5 w-4.5 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                    <Check className="h-3 w-3" />
-                  </div>
-                )}
-              </div>
-
-              {/* Option 2: List of Eligible Reviewers */}
-              {modalFilteredReviewers.length === 0 ? (
-                <div className="py-8 text-center text-xs text-neutral-400 space-y-1">
-                  <p>No matching managers found for &quot;{reviewerSearch}&quot;.</p>
-                  <p className="text-[10px] text-neutral-500">Only team members with management or approval roles appear here.</p>
-                </div>
-              ) : (
-                modalFilteredReviewers.map((u) => {
-                  const isSelected = selectedReviewerId === u.id;
-                  const displayRole = u.roleName || (u.roles && u.roles.length > 0 ? u.roles[0] : "Manager");
-
-                  return (
-                    <div
-                      key={u.id}
-                      onClick={() => setSelectedReviewerId(u.id)}
-                      className={`flex items-center justify-between gap-2.5 p-2.5 rounded-xl cursor-pointer transition select-none border ${
-                        isSelected
-                          ? "bg-indigo-50/70 dark:bg-indigo-950/60 border-indigo-500 ring-2 ring-indigo-500/20 shadow-2xs"
-                          : "border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-850 hover:bg-neutral-50 dark:hover:bg-slate-800"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div className="h-7 w-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
-                          {u.fullName ? u.fullName.charAt(0).toUpperCase() : "U"}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs font-bold text-neutral-900 dark:text-white truncate">
-                              {u.fullName}
-                            </span>
-                            <span className="text-[9.5px] px-1.5 py-0.2 rounded font-semibold bg-indigo-50 text-indigo-700 dark:bg-slate-800 dark:text-indigo-300 border border-indigo-200 dark:border-slate-700">
-                              {displayRole}
-                            </span>
-                          </div>
-                          <span className="text-[10.5px] text-neutral-500 font-mono block truncate">
-                            {u.email}
-                          </span>
-                        </div>
-                      </div>
-                      {isSelected && (
-                        <div className="h-4.5 w-4.5 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                          <Check className="h-3 w-3" />
-                        </div>
+                  <div>
+                    <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                      Assign Manager
+                    </h3>
+                    <p className="text-xs text-neutral-500">
+                      For <span className="font-semibold text-neutral-800 dark:text-neutral-200">{reviewerTargetUser.fullName}</span>
+                      {reviewerTargetUser.branchName && (
+                        <span className="ml-1.5 text-[11px] text-neutral-400 font-normal">
+                          • 🏢 {reviewerTargetUser.branchName}
+                        </span>
                       )}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsReviewerModalOpen(false);
+                    setReviewerTargetUser(null);
+                  }}
+                  className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-4 text-xs">
+                <p className="text-neutral-600 dark:text-neutral-400 font-medium">
+                  Select how candidate submissions and job postings created by <strong className="text-neutral-900 dark:text-white">{reviewerTargetUser.fullName}</strong> are approved:
+                </p>
+
+                {/* ─── OPTION 1: AUTO (BRANCH HIERARCHY) ────────────────── */}
+                <div
+                  onClick={() => {
+                    setAssignMode("AUTO");
+                    setIsManagerDropdownOpen(false);
+                  }}
+                  className={`p-4 rounded-xl border transition-all cursor-pointer select-none relative ${
+                    assignMode === "AUTO"
+                      ? "bg-indigo-50/60 dark:bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs"
+                      : "border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-neutral-300 dark:hover:border-slate-700 hover:bg-neutral-50/50"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Radio circle indicator */}
+                    <div className="pt-0.5 shrink-0">
+                      <div
+                        className={`h-4.5 w-4.5 rounded-full border flex items-center justify-center transition-colors ${
+                          assignMode === "AUTO"
+                            ? "border-indigo-600 bg-indigo-600"
+                            : "border-neutral-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                        }`}
+                      >
+                        {assignMode === "AUTO" && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                      </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
 
-            {/* Helper Tag */}
-            <div className="px-5 py-2 bg-neutral-50/70 dark:bg-slate-850/70 border-t border-neutral-100 dark:border-slate-800">
-              <p className="text-[10.5px] text-neutral-500 flex items-center gap-1.5">
-                <span>🛡️</span>
-                <span>Filtered: showing {modalFilteredReviewers.length} eligible managers</span>
-              </p>
-            </div>
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-1.5">
+                          ⚡ Auto
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          Recommended
+                        </span>
+                      </div>
 
-            <div className="border-t border-neutral-100 dark:border-slate-800 p-4 bg-neutral-50 dark:bg-slate-850 flex justify-end gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                onClick={() => {
-                  setIsReviewerModalOpen(false);
-                  setReviewerTargetUser(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSaveSingleReviewer}
-                disabled={submitting}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs"
-              >
-                {submitting ? "Saving..." : "Save Manager"}
-              </Button>
+                      {/* Information text dynamically showing the roles for this branch */}
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                        If not assigned a custom user, reviews and approvals will automatically route to{" "}
+                        <strong className="text-neutral-900 dark:text-neutral-100 font-semibold">
+                          {dynamicHierarchyText}
+                        </strong>
+                        .
+                      </p>
+
+                      <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 bg-neutral-100/70 dark:bg-slate-800/70 px-2.5 py-1.5 rounded-md mt-1 border border-neutral-200/60 dark:border-slate-700/60">
+                        <Info className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <span>Dynamically resolves through organizational hierarchy in this branch.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ─── OPTION 2: SELECT SPECIFIC USER ───────────────────── */}
+                <div
+                  onClick={() => {
+                    if (assignMode !== "CUSTOM") {
+                      setAssignMode("CUSTOM");
+                      if (!selectedReviewerId) {
+                        setIsManagerDropdownOpen(true);
+                      }
+                    }
+                  }}
+                  className={`p-4 rounded-xl border transition-all ${
+                    assignMode === "CUSTOM"
+                      ? "bg-white dark:bg-slate-900 border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs"
+                      : "border-neutral-200 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850/50 hover:border-neutral-300 dark:hover:border-slate-700 cursor-pointer"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Radio circle indicator */}
+                    <div className="pt-0.5 shrink-0">
+                      <div
+                        className={`h-4.5 w-4.5 rounded-full border flex items-center justify-center transition-colors ${
+                          assignMode === "CUSTOM"
+                            ? "border-indigo-600 bg-indigo-600"
+                            : "border-neutral-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                        }`}
+                      >
+                        {assignMode === "CUSTOM" && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2.5 flex-1 min-w-0">
+                      <div>
+                        <span className="text-sm font-bold text-neutral-900 dark:text-white block">
+                          Select from User List
+                        </span>
+                        <span className="text-xs text-neutral-500">
+                          Manually designate an individual manager for this team member.
+                        </span>
+                      </div>
+
+                      {/* USER SELECTION AREA — DISABLED WHEN AUTO IS ACTIVE */}
+                      <div
+                        className={`transition-all duration-200 ${
+                          assignMode === "AUTO" ? "opacity-40 pointer-events-none select-none" : ""
+                        }`}
+                      >
+                        {selectedManagerUser && !isManagerDropdownOpen ? (
+                          /* Selected Manager Pill / Card */
+                          <div className="flex items-center justify-between p-2.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/40 dark:bg-indigo-950/30">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div className="h-7 w-7 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                                {selectedManagerUser.fullName ? selectedManagerUser.fullName.charAt(0).toUpperCase() : "U"}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-bold text-neutral-900 dark:text-white truncate">
+                                    {selectedManagerUser.fullName}
+                                  </span>
+                                  <span className="text-[9.5px] px-1.5 py-0.2 rounded font-semibold bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-slate-700">
+                                    {selectedManagerUser.roleName || (selectedManagerUser.roles && selectedManagerUser.roles[0]) || "Manager"}
+                                  </span>
+                                </div>
+                                <span className="text-[10.5px] text-neutral-500 font-mono block truncate">
+                                  {selectedManagerUser.email}
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsManagerDropdownOpen(true);
+                              }}
+                              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 px-2 py-1 rounded hover:bg-indigo-100/60 dark:hover:bg-indigo-900/50 cursor-pointer transition ml-2 shrink-0"
+                            >
+                              Change
+                            </button>
+                          </div>
+                        ) : (
+                          /* Search Input & Scroll-Capped Dropdown (NEVER STRETCHES MODAL) */
+                          <div className="relative space-y-2">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+                              <input
+                                type="text"
+                                value={reviewerSearch}
+                                onChange={(e) => {
+                                  setReviewerSearch(e.target.value);
+                                  setIsManagerDropdownOpen(true);
+                                }}
+                                onFocus={() => setIsManagerDropdownOpen(true)}
+                                placeholder="Search manager by name, role, or email..."
+                                className="w-full h-9 pl-9 pr-8 text-xs rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                                autoFocus={assignMode === "CUSTOM"}
+                              />
+                              {reviewerSearch && (
+                                <button
+                                  type="button"
+                                  onClick={() => setReviewerSearch("")}
+                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-0.5"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Dropdown List - capped at max-h-44, perfectly scrollable */}
+                            <div className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-850 rounded-xl shadow-xs overflow-hidden">
+                              <div className="max-h-44 overflow-y-auto p-1.5 space-y-1">
+                                {modalFilteredReviewers.length === 0 ? (
+                                  <div className="py-5 text-center text-xs text-neutral-400 space-y-1">
+                                    <p>No matching managers found for &quot;{reviewerSearch}&quot;.</p>
+                                    <p className="text-[10px] text-neutral-500">Only team members with management or approval roles appear here.</p>
+                                  </div>
+                                ) : (
+                                  modalFilteredReviewers.map((u) => {
+                                    const isSelected = selectedReviewerId === u.id;
+                                    const displayRole = u.roleName || (u.roles && u.roles.length > 0 ? u.roles[0] : "Manager");
+
+                                    return (
+                                      <div
+                                        key={u.id}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedReviewerId(u.id);
+                                          setIsManagerDropdownOpen(false);
+                                          setReviewerSearch("");
+                                        }}
+                                        className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition select-none ${
+                                          isSelected
+                                            ? "bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-300 dark:border-indigo-700"
+                                            : "hover:bg-neutral-100/70 dark:hover:bg-slate-800/70"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                          <div className="h-6 w-6 rounded-full bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-2xs">
+                                            {u.fullName ? u.fullName.charAt(0).toUpperCase() : "U"}
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <span className="text-xs font-semibold text-neutral-900 dark:text-white truncate">
+                                                {u.fullName}
+                                              </span>
+                                              <span className="text-[9px] px-1.5 py-0.2 rounded font-medium bg-neutral-100 dark:bg-slate-700 text-neutral-600 dark:text-neutral-300">
+                                                {displayRole}
+                                              </span>
+                                            </div>
+                                            <span className="text-[10px] text-neutral-500 font-mono block truncate">
+                                              {u.email}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        {isSelected && (
+                                          <div className="h-4.5 w-4.5 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                            <Check className="h-3 w-3" />
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                              <div className="px-3 py-1.5 bg-neutral-50/80 dark:bg-slate-800/80 border-t border-neutral-100 dark:border-slate-800 text-[10.5px] text-neutral-400 flex items-center justify-between">
+                                <span>{modalFilteredReviewers.length} eligible manager(s)</span>
+                                {selectedReviewerId && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setIsManagerDropdownOpen(false);
+                                    }}
+                                    className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline cursor-pointer"
+                                  >
+                                    Done
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="border-t border-neutral-100 dark:border-slate-800 px-6 py-4 bg-neutral-50/70 dark:bg-slate-850/60 flex items-center justify-between">
+                <div className="text-[11px] text-neutral-500">
+                  {assignMode === "AUTO" ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">✓ Auto mode active</span>
+                  ) : selectedReviewerId ? (
+                    <span className="text-indigo-600 dark:text-indigo-400 font-medium">✓ Specific manager selected</span>
+                  ) : (
+                    <span className="text-amber-600 dark:text-amber-400 font-medium">⚠️ Select a manager or choose Auto</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={() => {
+                      setIsReviewerModalOpen(false);
+                      setReviewerTargetUser(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveSingleReviewer}
+                    disabled={submitting || (assignMode === "CUSTOM" && !selectedReviewerId)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs"
+                  >
+                    {submitting ? "Saving..." : "Save Manager"}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* DEDICATED BRANCH ROLE ASSIGNMENT POPUP MODAL */}
       {branchRoleModalState && (
