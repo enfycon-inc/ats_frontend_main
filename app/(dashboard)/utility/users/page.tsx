@@ -2639,7 +2639,6 @@ export default function UserManagementPage() {
                       </div>
                       <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
                         {reviewerTargetUser.email}
-                        {reviewerTargetUser.branchName && ` • ${reviewerTargetUser.branchName}`}
                       </p>
                     </div>
                   </div>
@@ -2734,11 +2733,6 @@ export default function UserManagementPage() {
                                   <span className="text-[9.5px] px-1.5 py-0.2 rounded font-medium bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-slate-700">
                                     {displayRole}
                                   </span>
-                                  {u.branchName && (
-                                    <span className="text-[10px] text-neutral-400 font-normal truncate">
-                                      • {u.branchName}
-                                    </span>
-                                  )}
                                 </div>
                                 <span className="text-[10.5px] text-neutral-500 font-mono block truncate">
                                   {u.email}
