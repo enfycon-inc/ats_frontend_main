@@ -146,7 +146,7 @@ export default function DashboardPage() {
             </span>
           </div>
           <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Monitor requisition status, review candidate pipeline, and manage active staffing operations.
+            Monitor active jobs, review candidates, and track team progress.
           </p>
         </div>
 
@@ -154,13 +154,13 @@ export default function DashboardPage() {
           <Link href="/job-posting/new">
             <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-1.5 shadow-xs h-9 px-3.5 cursor-pointer">
               <Icon icon="heroicons:plus-circle" className="h-4 w-4" />
-              + Create Requisition
+              + Post New Job
             </Button>
           </Link>
-          <Link href="/utility/submissions">
+          <Link href="/applicants">
             <Button size="sm" variant="outline" className="text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold gap-1.5 h-9 px-3.5 cursor-pointer">
-              <Icon icon="heroicons:clipboard-document-list" className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-              Submissions Tracker
+              <Icon icon="heroicons:magnifying-glass" className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              Search Candidates
             </Button>
           </Link>
         </div>
@@ -942,14 +942,14 @@ function BranchAdminDashboardView({
     grid: { borderColor: "#f1f5f9", strokeDashArray: 4 }
   };
   const activityChartSeries = [
-    { name: "Candidate Submissions", data: [Math.max(1, Math.round(submissions.length * 0.15)), Math.max(2, Math.round(submissions.length * 0.25)), Math.max(3, Math.round(submissions.length * 0.4)), Math.max(4, submissions.length), Math.max(2, Math.round(submissions.length * 0.6)), 2, 4] },
-    { name: "Active Requisitions", data: [branchActiveJobs.length || 1, branchActiveJobs.length || 2, branchActiveJobs.length || 3, branchActiveJobs.length || 3, branchActiveJobs.length || 2, branchActiveJobs.length || 1, branchActiveJobs.length || 2] },
-    { name: "Client Interviews", data: [l1Count || 1, l2Count || 2, l3Count || 1, activeInterviews.length || 3, l2Count || 2, 0, 1] }
+    { name: "Submissions", data: [Math.max(1, Math.round(submissions.length * 0.15)), Math.max(2, Math.round(submissions.length * 0.25)), Math.max(3, Math.round(submissions.length * 0.4)), Math.max(4, submissions.length), Math.max(2, Math.round(submissions.length * 0.6)), 2, 4] },
+    { name: "Open Jobs", data: [branchActiveJobs.length || 1, branchActiveJobs.length || 2, branchActiveJobs.length || 3, branchActiveJobs.length || 3, branchActiveJobs.length || 2, branchActiveJobs.length || 1, branchActiveJobs.length || 2] },
+    { name: "Interviews", data: [l1Count || 1, l2Count || 2, l3Count || 1, activeInterviews.length || 3, l2Count || 2, 0, 1] }
   ];
 
   const statusMixOptions: any = {
     chart: { type: "donut", fontFamily: "inherit" },
-    labels: ["Active Orders", "Pending Screen", "Selections/Joins", "On Hold"],
+    labels: ["Active", "In Review", "Hired", "On Hold"],
     colors: ["#10b981", "#f59e0b", "#6366f1", "#94a3b8"],
     plotOptions: { pie: { donut: { size: "75%" } } },
     dataLabels: { enabled: false },
@@ -986,11 +986,11 @@ function BranchAdminDashboardView({
               </h2>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Operational
+                Active Office
               </span>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              Branch Command Center • {activeBranchMarket === "US" ? "🇺🇸 US IT Staffing" : "🇮🇳 Domestic India IT"} • Timezone: {activeBranchTimezone}
+              {activeBranchMarket === "US" ? "🇺🇸 US IT Staffing" : "🇮🇳 Domestic India IT"} • Timezone: {activeBranchTimezone}
             </p>
           </div>
         </div>
@@ -999,19 +999,13 @@ function BranchAdminDashboardView({
           <Link href="/utility/users">
             <Button size="sm" variant="outline" className="text-xs font-bold h-8.5 gap-1.5 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 hover:bg-slate-50 cursor-pointer">
               <Icon icon="heroicons:user-group" className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-              Branch Staff
+              Branch Team
             </Button>
           </Link>
           <Link href="/utility/pods">
             <Button size="sm" variant="outline" className="text-xs font-bold h-8.5 gap-1.5 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 hover:bg-slate-50 cursor-pointer">
               <Icon icon="heroicons:squares-plus" className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-              Pods
-            </Button>
-          </Link>
-          <Link href="/utility/submissions">
-            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold h-8.5 gap-1.5 shadow-xs cursor-pointer">
-              <Icon icon="heroicons:clipboard-document-list" className="h-4 w-4" />
-              Submissions Tracker
+              Recruitment Pods
             </Button>
           </Link>
         </div>
@@ -1019,86 +1013,88 @@ function BranchAdminDashboardView({
 
       {/* 2. TOP 4 CORE OPERATIONAL METRICS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Branch Requisitions */}
+        {/* Card 1: Active Jobs */}
         <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-indigo-300 dark:hover:border-indigo-800 transition-colors">
           <CardContent className="p-4 flex items-center gap-3.5">
             <div className="h-11 w-11 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl shrink-0 border border-indigo-100 dark:border-indigo-900/50">
               <Icon icon="heroicons:briefcase" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Branch Requisitions</p>
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Jobs</p>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <h3 className="text-2xl font-black text-slate-900 dark:text-white">{branchActiveJobs.length}</h3>
-                <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">Active</span>
+                <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">Open</span>
               </div>
               <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                {urgentRequisitions.length > 0 ? `${urgentRequisitions.length} Urgent / Hot` : "Normal Priority"} • {totalPositions} Openings
+                {urgentRequisitions.length > 0 ? `${urgentRequisitions.length} Urgent` : "Standard Priority"} • {totalPositions} Open Positions
               </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 2: Submissions Pipeline */}
-        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-800 transition-colors">
-          <CardContent className="p-4 flex items-center gap-3.5">
-            <div className="h-11 w-11 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl shrink-0 border border-emerald-100 dark:border-emerald-900/50">
-              <Icon icon="heroicons:paper-airplane" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Branch Submissions</p>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <h3 className="text-2xl font-black text-slate-900 dark:text-white">{submissions.length}</h3>
-                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Total</span>
+        {/* Card 2: Submissions */}
+        <Link href="/utility/submissions" className="block">
+          <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-800 transition-colors cursor-pointer h-full">
+            <CardContent className="p-4 flex items-center gap-3.5">
+              <div className="h-11 w-11 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl shrink-0 border border-emerald-100 dark:border-emerald-900/50">
+                <Icon icon="heroicons:paper-airplane" />
               </div>
-              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                {pendingScreenings.length} awaiting AM / internal review
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Submissions</p>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white">{submissions.length}</h3>
+                  <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Total</span>
+                </div>
+                <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                  {pendingScreenings.length} waiting for review
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
-        {/* Card 3: Active Interviews */}
+        {/* Card 3: Interviews */}
         <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-cyan-300 dark:hover:border-cyan-800 transition-colors">
           <CardContent className="p-4 flex items-center gap-3.5">
             <div className="h-11 w-11 rounded-lg bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 flex items-center justify-center text-xl shrink-0 border border-cyan-100 dark:border-cyan-900/50">
               <Icon icon="heroicons:academic-cap" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Interviews</p>
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Interviews</p>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <h3 className="text-2xl font-black text-slate-900 dark:text-white">{activeInterviews.length}</h3>
                 <span className="text-[11px] font-semibold text-cyan-600 dark:text-cyan-400">In Progress</span>
               </div>
               <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                {l1Count} L1 • {l2Count} L2 • {l3Count} Client L3
+                {l1Count} Round 1 • {l2Count} Round 2 • {l3Count} Final
               </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 4: Selections & Joins */}
+        {/* Card 4: Hires & Offers */}
         <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-amber-300 dark:hover:border-amber-800 transition-colors">
           <CardContent className="p-4 flex items-center gap-3.5">
             <div className="h-11 w-11 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl shrink-0 border border-amber-100 dark:border-amber-900/50">
               <Icon icon="heroicons:check-badge" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Selections & Joins</p>
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Hires & Offers</p>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <h3 className="text-2xl font-black text-slate-900 dark:text-white">{joinsCount + offersCount}</h3>
-                <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">Placements</span>
+                <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">Total</span>
               </div>
               <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                {offersCount} Offers • {joinsCount} Confirmed Joins
+                {offersCount} Offered • {joinsCount} Joined
               </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* 3. OPERATIONAL ACTION CENTER: SCREENING BOTTLENECKS & AGING JOBS */}
+      {/* 3. OPERATIONAL ACTION CENTER: PROFILES WAITING & JOBS NEEDING ATTENTION */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Screening Queue Card */}
+        {/* Candidate Review Queue Card */}
         <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex flex-col">
           <CardHeader className="p-4 pb-3 border-b border-neutral-100 dark:border-slate-800 flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1107,16 +1103,16 @@ function BranchAdminDashboardView({
               </div>
               <div>
                 <CardTitle className="text-xs font-bold text-slate-900 dark:text-white">
-                  Gatekeeper Screening Queue ({pendingScreenings.length})
+                  Profiles Waiting for Review ({pendingScreenings.length})
                 </CardTitle>
                 <CardDescription className="text-[10.5px]">
-                  Candidate profiles awaiting internal AM / Branch Lead review
+                  Candidates waiting for review before sending to clients
                 </CardDescription>
               </div>
             </div>
             <Link href="/utility/submissions">
               <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer">
-                Review All →
+                View All →
               </Button>
             </Link>
           </CardHeader>
@@ -1124,8 +1120,8 @@ function BranchAdminDashboardView({
             {pendingScreenings.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center py-8 text-slate-400 dark:text-slate-500">
                 <Icon icon="heroicons:check-circle" className="h-8 w-8 text-emerald-500/60 mb-1" />
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">All submissions screened!</p>
-                <p className="text-[11px] mt-0.5">No candidate profiles waiting in internal review queue.</p>
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">All caught up!</p>
+                <p className="text-[11px] mt-0.5">No candidate profiles waiting for review.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -1144,7 +1140,7 @@ function BranchAdminDashboardView({
                     </div>
                     <Link href="/utility/submissions">
                       <Button size="sm" className="h-7 px-2.5 text-[10px] font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 cursor-pointer">
-                        Screen Candidate
+                        Review Candidate
                       </Button>
                     </Link>
                   </div>
@@ -1154,7 +1150,7 @@ function BranchAdminDashboardView({
           </CardContent>
         </Card>
 
-        {/* Aging Requisitions Card */}
+        {/* Jobs Needing Attention Card */}
         <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex flex-col">
           <CardHeader className="p-4 pb-3 border-b border-neutral-100 dark:border-slate-800 flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1163,16 +1159,16 @@ function BranchAdminDashboardView({
               </div>
               <div>
                 <CardTitle className="text-xs font-bold text-slate-900 dark:text-white">
-                  Aging Requisitions Alert ({agingJobs.length})
+                  Jobs Needing Attention ({agingJobs.length})
                 </CardTitle>
                 <CardDescription className="text-[10.5px]">
-                  Active branch jobs open &gt;48h with 0 or &lt;2 candidate submissions
+                  Jobs open for more than 2 days with fewer than 2 candidates
                 </CardDescription>
               </div>
             </div>
             <Link href="/job-posting">
               <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer">
-                View Orders →
+                View All Jobs →
               </Button>
             </Link>
           </CardHeader>
@@ -1180,8 +1176,8 @@ function BranchAdminDashboardView({
             {agingJobs.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center py-8 text-slate-400 dark:text-slate-500">
                 <Icon icon="heroicons:shield-check" className="h-8 w-8 text-emerald-500/60 mb-1" />
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Coverage is healthy!</p>
-                <p className="text-[11px] mt-0.5">All active branch requisitions have active submissions.</p>
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">All jobs are covered!</p>
+                <p className="text-[11px] mt-0.5">Every active job has candidates in progress.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -1200,7 +1196,7 @@ function BranchAdminDashboardView({
                     </div>
                     <Link href={`/applicants?jobId=${job.id}`}>
                       <Button size="sm" variant="outline" className="h-7 px-2.5 text-[10px] font-bold border-rose-200 hover:bg-rose-50 text-rose-700 dark:border-rose-900 dark:hover:bg-rose-950/50 shrink-0 cursor-pointer">
-                        Assign Pod
+                        Assign Team
                       </Button>
                     </Link>
                   </div>
@@ -1211,13 +1207,13 @@ function BranchAdminDashboardView({
         </Card>
       </div>
 
-      {/* 4. VISUAL ANALYTICS: VELOCITY & REQUISITION MIX */}
+      {/* 4. VISUAL ANALYTICS: ACTIVITY TREND & STATUS OVERVIEW */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <Card className="lg:col-span-2 border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
           <CardHeader className="p-4 pb-2 border-b border-neutral-100 dark:border-slate-800 flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-xs font-bold text-slate-900 dark:text-white">Branch Sourcing & Delivery Velocity</CardTitle>
-              <CardDescription className="text-[10.5px]">Weekly trend of candidate submissions, requisitions, and interviews</CardDescription>
+              <CardTitle className="text-xs font-bold text-slate-900 dark:text-white">Weekly Activity Trend</CardTitle>
+              <CardDescription className="text-[10.5px]">Daily overview of candidate submissions, jobs, and interviews</CardDescription>
             </div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Last 7 Days</span>
           </CardHeader>
@@ -1230,8 +1226,8 @@ function BranchAdminDashboardView({
 
         <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
           <CardHeader className="p-4 pb-2 border-b border-neutral-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-bold text-slate-900 dark:text-white">Branch Requisition Mix</CardTitle>
-            <CardDescription className="text-[10.5px]">Status distribution of branch requisitions</CardDescription>
+            <CardTitle className="text-xs font-bold text-slate-900 dark:text-white">Job Status Overview</CardTitle>
+            <CardDescription className="text-[10.5px]">Current status breakdown of branch jobs</CardDescription>
           </CardHeader>
           <CardContent className="p-3 flex items-center justify-center h-[240px]">
             <Chart options={statusMixOptions} series={statusMixSeries} type="donut" height="100%" width="100%" />
@@ -1239,28 +1235,28 @@ function BranchAdminDashboardView({
         </Card>
       </div>
 
-      {/* 5. BOTTOM SECTION: BRANCH RECRUITER OUTPUT & RECENT REQUISITIONS */}
+      {/* 5. BOTTOM SECTION: RECRUITER PERFORMANCE & RECENT JOBS */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Recruiter Output Leaderboard */}
+        {/* Recruiter Performance Table */}
         <div className="lg:col-span-5">
           <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs h-full flex flex-col">
             <CardHeader className="p-4 pb-3 border-b border-neutral-100 dark:border-slate-800 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Icon icon="heroicons:user-group" className="text-indigo-600 h-4 w-4" />
-                  Branch Recruiter Output ({branchRecruiters.length})
+                  Recruiter Performance ({branchRecruiters.length})
                 </CardTitle>
-                <CardDescription className="text-[10.5px]">Team members delivering on branch orders</CardDescription>
+                <CardDescription className="text-[10.5px]">Team members and their delivery metrics</CardDescription>
               </div>
               <Link href="/utility/users">
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer">
-                  Team Roster →
+                  View Team →
                 </Button>
               </Link>
             </CardHeader>
             <CardContent className="p-0 flex-1 overflow-x-auto">
               {branchRecruiters.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-400">No active recruiters assigned to this branch.</div>
+                <div className="p-8 text-center text-xs text-slate-400">No active recruiters in this branch.</div>
               ) : (
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
@@ -1268,7 +1264,7 @@ function BranchAdminDashboardView({
                       <th className="py-2.5 px-3">Recruiter</th>
                       <th className="py-2.5 px-3 text-center">Submissions</th>
                       <th className="py-2.5 px-3 text-center">Interviews</th>
-                      <th className="py-2.5 px-3 text-right">Placements</th>
+                      <th className="py-2.5 px-3 text-right">Hires</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1300,35 +1296,35 @@ function BranchAdminDashboardView({
           </Card>
         </div>
 
-        {/* Recent Branch Requisitions Table */}
+        {/* Recent Jobs Table */}
         <div className="lg:col-span-7">
           <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs h-full flex flex-col">
             <CardHeader className="p-4 pb-3 border-b border-neutral-100 dark:border-slate-800 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Icon icon="heroicons:briefcase" className="text-emerald-600 h-4 w-4" />
-                  Recent Branch Requisitions ({branchJobs.length})
+                  Recent Jobs ({branchJobs.length})
                 </CardTitle>
-                <CardDescription className="text-[10.5px]">Job orders assigned to this office</CardDescription>
+                <CardDescription className="text-[10.5px]">Latest jobs assigned to this office</CardDescription>
               </div>
               <Link href="/job-posting">
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer">
-                  All Orders →
+                  All Jobs →
                 </Button>
               </Link>
             </CardHeader>
             <CardContent className="p-0 flex-1 overflow-x-auto">
               {recentBranchJobs.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-400">No requisitions found for this branch.</div>
+                <div className="p-8 text-center text-xs text-slate-400">No jobs found for this branch.</div>
               ) : (
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-2.5 px-3">Job Code & Title</th>
+                      <th className="py-2.5 px-3">Job Title & Code</th>
                       <th className="py-2.5 px-3">Client</th>
-                      <th className="py-2.5 px-3 text-center">Positions</th>
+                      <th className="py-2.5 px-3 text-center">Openings</th>
                       <th className="py-2.5 px-3 text-center">Status</th>
-                      <th className="py-2.5 px-3 text-right">Created</th>
+                      <th className="py-2.5 px-3 text-right">Date Added</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
