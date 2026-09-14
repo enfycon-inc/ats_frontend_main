@@ -28,6 +28,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const sessionUser = session?.user as any;
   const currentUserId = sessionUser?.id || sessionUser?.dbId;
   const currentUserEmail = sessionUser?.email;
+  const currentToken = sessionUser?.accessToken || sessionUser?.token;
 
   useEffect(() => {
     // Determine user identifiers from NextAuth session or localStorage
@@ -107,7 +108,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       setSocket(null);
       setIsConnected(false);
     };
-  }, [session]);
+  }, [currentUserId, currentUserEmail, currentToken]);
 
   const isUserOnline = (userIdOrEmail?: string): boolean => {
     if (!userIdOrEmail) return false;

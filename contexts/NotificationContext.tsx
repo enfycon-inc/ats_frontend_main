@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { useSession } from "next-auth/react";
 import { useSocket } from "./SocketContext";
 import { SoundPreset, playPresetSound } from "@/lib/audio-synthesizer";
+import { isJwtExpired } from "@/lib/ats-api";
 
 export interface NotificationItem {
   id: string;
@@ -69,7 +70,8 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const { data: session } = useSession();
   const [token, setToken] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("ats_access_token");
+      const local = localStorage.getItem("ats_access_token");
+      if (local && !isJwtExpired(local)) return local;
     }
     return null;
   });
@@ -106,10 +108,10 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   // Fetch paginated user notifications
   const fetchNotifications = useCallback(async () => {
     let activeToken = token;
-    if (!activeToken && typeof window !== "undefined") {
+    if ((!activeToken || isJwtExpired(activeToken)) && typeof window !== "undefined") {
       activeToken = localStorage.getItem("ats_access_token");
     }
-    if (!activeToken) return;
+    if (!activeToken || isJwtExpired(activeToken)) return;
     try {
       setIsLoading(true);
       const res = await fetch(`${apiUrl}/api/notifications?page=1&limit=30`, {
@@ -132,10 +134,10 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   // Fetch user settings from server
   const fetchSettings = useCallback(async () => {
     let activeToken = token;
-    if (!activeToken && typeof window !== "undefined") {
+    if ((!activeToken || isJwtExpired(activeToken)) && typeof window !== "undefined") {
       activeToken = localStorage.getItem("ats_access_token");
     }
-    if (!activeToken) return;
+    if (!activeToken || isJwtExpired(activeToken)) return;
     try {
       const res = await fetch(`${apiUrl}/api/notifications/settings`, {
         headers: {

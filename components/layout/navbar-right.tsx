@@ -1609,17 +1609,24 @@ function BranchSwitcher() {
     if (typeof window !== "undefined") return localStorage.getItem("override_role");
     return null;
   });
-  const [activeBranch, setActiveBranch] = useState<string>(() => {
+  const [activeBranch, setActiveBranch] = useState<string>("Domestic Branch");
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
       const savedId = localStorage.getItem("active_branch_id");
-      if (savedId === "all") return "All Branches";
-      const savedName = localStorage.getItem("active_branch_name");
-      if (savedName) return savedName;
-      const user = atsApi.auth.getCurrentUser();
-      if (user?.branchName) return user.branchName;
+      if (savedId === "all") {
+        setActiveBranch("All Branches");
+      } else {
+        const savedName = localStorage.getItem("active_branch_name");
+        if (savedName) {
+          setActiveBranch(savedName);
+        } else {
+          const user = atsApi.auth.getCurrentUser();
+          if (user?.branchName) setActiveBranch(user.branchName);
+        }
+      }
     }
-    return "Domestic Branch";
-  });
+  }, []);
   const [branches, setBranches] = useState<any[]>([]);
   const cachedAllBranchesRef = useRef<any[]>([]);
 
@@ -1808,7 +1815,7 @@ function BranchSwitcher() {
         "
       >
         <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-indigo-200" />
-        <span>Office: {activeBranch}</span>
+        <span suppressHydrationWarning>Office: {activeBranch}</span>
       </div>
     );
   }
@@ -1828,7 +1835,7 @@ function BranchSwitcher() {
         "
       >
         <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-indigo-200" />
-        <span>Office: {activeBranch}</span>
+        <span suppressHydrationWarning>Office: {activeBranch}</span>
         <ChevronDown className={`w-3 h-3 text-indigo-200 opacity-90 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
 

@@ -54,9 +54,36 @@ const TOKEN_KEY = 'ats_access_token';
 const REFRESH_TOKEN_KEY = 'ats_refresh_token';
 const USER_KEY = 'ats_current_user';
 
+export function isJwtExpired(token: string): boolean {
+  if (!token || typeof token !== 'string') return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const payload = JSON.parse(jsonPayload);
+    if (!payload.exp) return false;
+    // Buffer by 15 seconds to prevent race condition right before expiry
+    return Date.now() >= (payload.exp - 15) * 1000;
+  } catch {
+    return true;
+  }
+}
+
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token && isJwtExpired(token)) {
+    localStorage.removeItem(TOKEN_KEY);
+    return null;
+  }
+  return token;
 }
 
 function setToken(token: string) {
@@ -97,49 +124,49 @@ function getCurrentUser(): any | null {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+async function fetchSessionToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const res = await fetch('/api/auth/session', { cache: 'no-store' });
+    if (res.ok) {
+      const session = await res.json();
+      if (session?.user?.accessToken && (session as any)?.error !== 'RefreshAccessTokenError') {
+        const token = session.user.accessToken;
+        setToken(token);
+        if (session.user) {
+          setCurrentUser({
+            id: session.user.id,
+            email: session.user.email,
+            fullName: session.user.name,
+            roles: session.user.roles,
+            tenantId: session.user.tenantId,
+            defaultMarket: session.user.defaultMarket,
+            permissions: session.user.permissions || [],
+            systemRole: session.user.systemRole || 'RECRUITER',
+            podId: session.user.podId || null,
+          });
+        }
+        return token;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not retrieve token from NextAuth session', e);
+  }
+  return null;
+}
+
 async function getOrFetchToken(): Promise<string | null> {
   let token = getToken();
-  // If a stored token exists, use it — Keycloak/NextAuth manage expiry server-side.
-  // Client-side JWT decode is intentionally avoided: we don't re-verify signatures here,
-  // and 401 responses from the API will trigger tryAutoRefresh() in apiFetch().
   if (token) return token;
 
-  // No stored token — attempt to recover via refresh token
+  // No valid stored token — attempt to recover via refresh token
   if (getRefreshToken()) {
     const refreshed = await tryAutoRefresh();
     if (refreshed) return refreshed;
   }
 
-  if (typeof window !== 'undefined') {
-    try {
-      const res = await fetch('/api/auth/session', { cache: 'no-store' });
-      if (res.ok) {
-        const session = await res.json();
-
-        if (session?.user?.accessToken && (session as any)?.error !== 'RefreshAccessTokenError') {
-          token = session.user.accessToken;
-          setToken(token!);
-          if (session.user) {
-            setCurrentUser({
-              id: session.user.id,
-              email: session.user.email,
-              fullName: session.user.name,
-              roles: session.user.roles,
-              tenantId: session.user.tenantId,
-              defaultMarket: session.user.defaultMarket,
-              permissions: session.user.permissions || [],
-              systemRole: session.user.systemRole || 'RECRUITER',
-              podId: session.user.podId || null,
-            });
-          }
-          return token;
-        }
-      }
-    } catch (e) {
-      console.warn('Could not retrieve token from NextAuth session', e);
-    }
-  }
-  return null;
+  // Fetch fresh token from NextAuth session
+  return await fetchSessionToken();
 }
 
 let isRefreshing = false;
@@ -243,17 +270,13 @@ async function apiFetch<T = any>(
         }
       }
 
-      // If no refresh token or refresh failed, try fetching a fresh session token.
-      // IMPORTANT: Do NOT call clearToken() before this — parallel in-flight requests
-      // still need the current token in localStorage. Clear only after we know there
-      // is genuinely nothing better to use.
+      // If no refresh token or refresh failed, fetch a fresh session token from NextAuth
       if (typeof window !== 'undefined') {
-        const freshToken = await getOrFetchToken();
-        if (freshToken && freshToken !== token) {
+        clearToken();
+        const freshToken = await fetchSessionToken();
+        if (freshToken) {
           return apiFetch<T>(path, options, true);
         }
-        // Only clear if we truly have no valid token to fall back to
-        clearToken();
       }
     }
 
