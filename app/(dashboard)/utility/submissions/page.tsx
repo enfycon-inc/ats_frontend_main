@@ -818,11 +818,20 @@ function formatSubmittedRate(rate: string | null | undefined, market?: string, j
   }
 }
 
+// In-memory Stale-While-Revalidate cache for instantaneous zero-delay page transitions
+let cachedSubmissionsState: {
+  submissions: Submission[];
+  stats: TrackerStats;
+  customRemarks: any[];
+  availableRoles: CustomRoleDefinition[];
+  timestamp: number;
+} | null = null;
+
 export default function SubmissionsPage() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !cachedSubmissionsState);
   const [submitting, setSubmitting] = useState(false);
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [stats, setStats] = useState<TrackerStats>({ total: 0, l1Pending: 0, l2Pending: 0, l3Pending: 0 });
+  const [submissions, setSubmissions] = useState<Submission[]>(() => cachedSubmissionsState?.submissions || []);
+  const [stats, setStats] = useState<TrackerStats>(() => cachedSubmissionsState?.stats || { total: 0, l1Pending: 0, l2Pending: 0, l3Pending: 0 });
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
 
@@ -917,8 +926,8 @@ export default function SubmissionsPage() {
   const [reviewFeedback, setReviewFeedback] = useState(""); // AM/Pod feedback for recruiter
 
   // Custom Remarks Choices State (configured in Branch & Office Locations)
-  const [customRemarks, setCustomRemarks] = useState<any[]>([]);
-  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
+  const [customRemarks, setCustomRemarks] = useState<any[]>(() => cachedSubmissionsState?.customRemarks || []);
+  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>(() => cachedSubmissionsState?.availableRoles || []);
 
   // Quick Decision Modal state (for inline Table Approve / Reject)
   const [quickReviewModalOpen, setQuickReviewModalOpen] = useState(false);
@@ -929,42 +938,66 @@ export default function SubmissionsPage() {
   useEffect(() => {
     const user = atsApi.auth.getCurrentUser();
     setCurrentUser(user);
-    loadData();
+    loadData(false);
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (showLoading: boolean | any = true) => {
     try {
-      setLoading(true);
+      const shouldShowLoading = typeof showLoading === "boolean" ? showLoading : true;
+      if (shouldShowLoading && !cachedSubmissionsState) {
+        setLoading(true);
+      }
       const user = atsApi.auth.getCurrentUser();
       
+      const statsPromise = atsApi.submissions.getTrackerStats().then((data) => {
+        if (data) setStats(data);
+        return data;
+      }).catch(() => null);
+
+      const remarksPromise = atsApi.submissions.getCustomRemarks(user?.branchId || undefined).then((data) => {
+        if (data) setCustomRemarks(data);
+        return data;
+      }).catch(() => []);
+
+      const rolesPromise = atsApi.auth.listRoles().then((data) => {
+        if (data) setAvailableRoles(data);
+        return data;
+      }).catch(() => []);
+
+      const submissionsPromise = atsApi.submissions.list({
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        finalStatus: statusFilter || undefined,
+      }).then((data) => {
+        let list = data?.data || data || [];
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          list = list.filter((s: Submission) => 
+            s.candidateName?.toLowerCase().includes(q) ||
+            s.candidateEmail?.toLowerCase().includes(q) ||
+            s.jobCode?.toLowerCase().includes(q) ||
+            s.jobTitle?.toLowerCase().includes(q)
+          );
+        }
+        setSubmissions(list);
+        setLoading(false);
+        return list;
+      }).catch(() => []);
+
       const [submissionsData, statsData, customRemarksData, rolesData] = await Promise.all([
-        atsApi.submissions.list({
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-          finalStatus: statusFilter || undefined,
-        }),
-        atsApi.submissions.getTrackerStats(),
-        atsApi.submissions.getCustomRemarks(user?.branchId || undefined).catch(() => []),
-        atsApi.auth.listRoles().catch(() => []),
+        submissionsPromise,
+        statsPromise,
+        remarksPromise,
+        rolesPromise,
       ]);
 
-      setAvailableRoles(rolesData || []);
-      setCustomRemarks(customRemarksData || []);
-
-      // Apply search query locally on candidate name, candidate email, job code, or job title
-      let list = submissionsData.data || submissionsData || [];
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        list = list.filter((s: Submission) => 
-          s.candidateName?.toLowerCase().includes(q) ||
-          s.candidateEmail?.toLowerCase().includes(q) ||
-          s.jobCode?.toLowerCase().includes(q) ||
-          s.jobTitle?.toLowerCase().includes(q)
-        );
-      }
-
-      setSubmissions(list);
-      setStats(statsData);
+      cachedSubmissionsState = {
+        submissions: submissionsData || [],
+        stats: statsData || { total: 0, l1Pending: 0, l2Pending: 0, l3Pending: 0 },
+        customRemarks: customRemarksData || [],
+        availableRoles: rolesData || [],
+        timestamp: Date.now(),
+      };
     } catch (err: any) {
       toast.error("Failed to load submissions tracker: " + err.message);
     } finally {
@@ -1586,7 +1619,7 @@ export default function SubmissionsPage() {
               </div>
               <div>
                 <div className="text-[10px] text-default-450 font-bold uppercase tracking-wider">{label}</div>
-                <div className={`text-xl font-bold text-default-900 mt-0.5`}>{loading ? "..." : value}</div>
+                <div className={`text-xl font-bold text-default-900 mt-0.5`}>{value !== undefined && value !== null ? value : "..."}</div>
               </div>
             </Card>
           ))}

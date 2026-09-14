@@ -283,12 +283,21 @@ function ReviewerSelect({
   );
 }
 
+// In-memory Stale-While-Revalidate cache for instantaneous zero-delay page transitions
+let cachedUsersData: {
+  users: UserItem[];
+  branches: any[];
+  rolesList: any[];
+  profile: any;
+  timestamp: number;
+} | null = null;
+
 export default function UserManagementPage() {
-  const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState<UserItem[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
-  const [rolesList, setRolesList] = useState<any[]>([]);
-  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(() => !cachedUsersData);
+  const [users, setUsers] = useState<UserItem[]>(() => cachedUsersData?.users || []);
+  const [branches, setBranches] = useState<any[]>(() => cachedUsersData?.branches || []);
+  const [rolesList, setRolesList] = useState<any[]>(() => cachedUsersData?.rolesList || []);
+  const [profile, setProfile] = useState<any>(() => cachedUsersData?.profile || null);
 
   const currentUser = typeof window !== 'undefined' ? atsApi.auth.getCurrentUser() : null;
   const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
@@ -567,12 +576,15 @@ export default function UserManagementPage() {
 
 
   useEffect(() => {
-    loadData();
+    loadData(false);
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (showLoading: boolean | any = true) => {
     try {
-      setLoading(true);
+      const shouldShowLoading = typeof showLoading === "boolean" ? showLoading : true;
+      if (shouldShowLoading && !cachedUsersData) {
+        setLoading(true);
+      }
       const [usersData, branchesData, rolesData, profileData] = await Promise.all([
         atsApi.auth.listUsers().then((u) => { if (u) setUsers(u); return u; }).catch(() => []),
         atsApi.branches.list().then((b) => { if (b) setBranches(b); return b; }).catch(() => []),
@@ -583,6 +595,13 @@ export default function UserManagementPage() {
       setBranches(branchesData || []);
       setRolesList(rolesData || []);
       setProfile(profileData);
+      cachedUsersData = {
+        users: usersData || [],
+        branches: branchesData || [],
+        rolesList: rolesData || [],
+        profile: profileData,
+        timestamp: Date.now(),
+      };
       if (branchesData && branchesData.length > 0) {
         // Branch admins should default to their own branch, not the first branch in the list
         const userBranchId = profileData?.branchId || currentUser?.branchId;
