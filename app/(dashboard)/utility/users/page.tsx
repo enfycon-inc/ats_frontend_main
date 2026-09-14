@@ -574,10 +574,10 @@ export default function UserManagementPage() {
     try {
       setLoading(true);
       const [usersData, branchesData, rolesData, profileData] = await Promise.all([
-        atsApi.auth.listUsers().catch(() => []),
-        atsApi.branches.list().catch(() => []),
-        atsApi.auth.listRoles(undefined, true).catch(() => []),
-        atsApi.auth.me().catch(() => null),
+        atsApi.auth.listUsers().then((u) => { if (u) setUsers(u); return u; }).catch(() => []),
+        atsApi.branches.list().then((b) => { if (b) setBranches(b); return b; }).catch(() => []),
+        atsApi.auth.listRoles(undefined, true).then((r) => { if (r) setRolesList(r); return r; }).catch(() => []),
+        atsApi.auth.me().then((p) => { if (p) setProfile(p); return p; }).catch(() => null),
       ]);
       setUsers(usersData || []);
       setBranches(branchesData || []);
@@ -1349,7 +1349,9 @@ export default function UserManagementPage() {
         <div className="flex items-center gap-3">
           <div className="px-3 py-1.5 rounded-lg border border-default-200 bg-default-50 text-xs">
             <span className="text-default-500 font-medium">License Usage: </span>
-            <span className="font-bold text-indigo-600">{activeSeats}</span>
+            <span className="font-bold text-indigo-600">
+              {loading && users.length === 0 ? <span className="animate-pulse">...</span> : activeSeats}
+            </span>
             <span className="text-default-600 font-semibold"> / {userLimit} Seats</span>
           </div>
 
