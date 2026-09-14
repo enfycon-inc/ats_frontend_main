@@ -3093,18 +3093,11 @@ export default function DataTable({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={isAssigning}
-                          onClick={() => handleExecuteAssignment("users", [u.id], u.fullName || u.name || u.email)}
-                          className="h-7 px-2.5 text-[11px] font-medium border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/60 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                          title="Assign only this recruiter"
-                        >
-                          Assign Solo
-                        </Button>
-                      </div>
+                      {isSelected && (
+                        <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 shrink-0">
+                          Selected
+                        </span>
+                      )}
                     </div>
                   );
                 })
