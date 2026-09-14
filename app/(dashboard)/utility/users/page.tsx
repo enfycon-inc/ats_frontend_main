@@ -297,6 +297,20 @@ export default function UserManagementPage() {
     return null;
   });
 
+  useEffect(() => {
+    const handleRole = () => {
+      if (typeof window !== 'undefined') {
+        setOverrideRole(localStorage.getItem('override_role'));
+      }
+    };
+    window.addEventListener('storage', handleRole);
+    window.addEventListener('overrideRoleChanged', handleRole);
+    return () => {
+      window.removeEventListener('storage', handleRole);
+      window.removeEventListener('overrideRoleChanged', handleRole);
+    };
+  }, []);
+
   // Granular permission-based access flags for the logged-in user
   const sessionPerms: string[] = useMemo(() => {
     if (Array.isArray(profile?.permissions) && profile.permissions.length > 0) {

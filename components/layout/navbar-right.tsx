@@ -1235,9 +1235,9 @@ function ProfileDropdownNav() {
       } else {
         localStorage.removeItem("override_role");
       }
+      setOverrideRole(roleName);
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new CustomEvent("overrideRoleChanged", { detail: { role: roleName } }));
-      window.location.reload();
     }
     setOpen(false);
   };
@@ -1503,7 +1503,8 @@ function SandboxSwitcher() {
       } else {
         localStorage.removeItem("override_role");
       }
-      window.location.reload();
+      window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new CustomEvent("overrideRoleChanged", { detail: { role } }));
     }
     setOpen(false);
   };
@@ -1604,14 +1605,66 @@ function BranchSwitcher() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const { data: session } = useSession();
-  const [overrideRole, setOverrideRole] = useState<string | null>(null);
-  const [activeBranch, setActiveBranch] = useState<string>("Loading Branch...");
+  const [overrideRole, setOverrideRole] = useState<string | null>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("override_role");
+    return null;
+  });
+  const [activeBranch, setActiveBranch] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const savedId = localStorage.getItem("active_branch_id");
+      if (savedId === "all") return "All Branches";
+      const savedName = localStorage.getItem("active_branch_name");
+      if (savedName) return savedName;
+      const user = atsApi.auth.getCurrentUser();
+      if (user?.branchName) return user.branchName;
+    }
+    return "Domestic Branch";
+  });
   const [branches, setBranches] = useState<any[]>([]);
+  const cachedAllBranchesRef = useRef<any[]>([]);
+
+  const filterAndSetBranches = (allBranches: any[], roleOverride: string | null, userObj: any) => {
+    const sysRole = roleOverride || userObj?.systemRole || (userObj?.roles && userObj.roles[0]) || "RECRUITER";
+    const isTenantAdmin = sysRole === "ADMIN" || sysRole === "SUPER_ADMIN";
+
+    const assignedIds: string[] = Array.isArray(userObj?.assignedBranchIds) && userObj.assignedBranchIds.length > 0
+      ? userObj.assignedBranchIds
+      : userObj?.branchId ? [userObj.branchId] : [];
+
+    let allowedBranches = allBranches;
+    if (!isTenantAdmin) {
+      if (assignedIds.length > 0) {
+        allowedBranches = allBranches.filter((b: any) =>
+          assignedIds.includes(b.id) ||
+          (userObj?.branchId && b.id === userObj.branchId) ||
+          (userObj?.branchName && b.name.toLowerCase() === userObj.branchName.toLowerCase())
+        );
+      } else if (userObj?.branchId) {
+        allowedBranches = allBranches.filter((b: any) => b.id === userObj.branchId);
+      } else {
+        allowedBranches = allBranches.slice(0, 1);
+      }
+    }
+    setBranches(allowedBranches);
+    return allowedBranches;
+  };
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setOverrideRole(localStorage.getItem("override_role"));
-    }
+    const handleRole = () => {
+      if (typeof window !== "undefined") {
+        const newRole = localStorage.getItem("override_role");
+        setOverrideRole(newRole);
+        if (cachedAllBranchesRef.current.length > 0) {
+          const user = atsApi.auth.getCurrentUser() || (session as any)?.user;
+          filterAndSetBranches(cachedAllBranchesRef.current, newRole, user);
+        }
+      }
+    };
+    window.addEventListener("overrideRoleChanged", handleRole);
+    return () => window.removeEventListener("overrideRoleChanged", handleRole);
+  }, [session]);
+
+  useEffect(() => {
     loadLiveBranches();
   }, []);
 
@@ -1637,33 +1690,8 @@ function BranchSwitcher() {
     try {
       const data = await atsApi.branches.list();
       if (Array.isArray(data) && data.length > 0) {
-        const sysRole = overrideRole || currentUser?.systemRole || (currentUser?.roles && currentUser.roles[0]) || "RECRUITER";
-        const isTenantAdmin = sysRole === "ADMIN" || sysRole === "SUPER_ADMIN";
-
-        // Extract user's assigned branch IDs
-        const assignedIds: string[] = Array.isArray(currentUser?.assignedBranchIds) && currentUser.assignedBranchIds.length > 0
-          ? currentUser.assignedBranchIds
-          : currentUser?.branchId ? [currentUser.branchId] : [];
-
-        // Access Control Rule:
-        // Tenant Admin sees ALL branches in the tenant.
-        // Non-tenant admin users ONLY see the branches they are explicitly assigned to.
-        let allowedBranches = data;
-        if (!isTenantAdmin) {
-          if (assignedIds.length > 0) {
-            allowedBranches = data.filter((b: any) =>
-              assignedIds.includes(b.id) ||
-              (currentUser?.branchId && b.id === currentUser.branchId) ||
-              (currentUser?.branchName && b.name.toLowerCase() === currentUser.branchName.toLowerCase())
-            );
-          } else if (currentUser?.branchId) {
-            allowedBranches = data.filter((b: any) => b.id === currentUser.branchId);
-          } else {
-            allowedBranches = data.slice(0, 1);
-          }
-        }
-
-        setBranches(allowedBranches);
+        cachedAllBranchesRef.current = data;
+        const allowedBranches = filterAndSetBranches(data, overrideRole, currentUser);
 
         let match = null;
 
@@ -1698,6 +1726,7 @@ function BranchSwitcher() {
         if (match) {
           setActiveBranch(match.name);
           if (typeof window !== "undefined") {
+            const prevSavedId = localStorage.getItem("active_branch_id");
             localStorage.setItem("active_branch_id", match.id);
             localStorage.setItem("active_branch_name", match.name);
             localStorage.setItem("active_branch_market", match.market || "INDIA");
@@ -1705,7 +1734,9 @@ function BranchSwitcher() {
             localStorage.setItem("active_branch_start_time", match.workStartTime || match.work_start_time || (match.market === "US" ? "09:00 AM" : "09:30 AM"));
             localStorage.setItem("active_branch_end_time", match.workEndTime || match.work_end_time || (match.market === "US" ? "06:00 PM" : "06:30 PM"));
             localStorage.setItem("active_branch_allow_pods", String(match.allowPods ?? (match.podsCount > 0 && match.allowPods !== false)));
-            window.dispatchEvent(new Event("branchChanged"));
+            if (prevSavedId && prevSavedId !== match.id) {
+              window.dispatchEvent(new Event("branchChanged"));
+            }
           }
         }
       } else {

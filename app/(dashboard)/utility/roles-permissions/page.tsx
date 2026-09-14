@@ -261,8 +261,22 @@ export default function RolesPermissionsPage() {
         setSelectedBranchFilter(updatedBranch);
         loadData(updatedBranch);
       };
+
+      const handleRoleChanged = () => {
+        const u = atsApi.auth.getCurrentUser();
+        const ov = typeof window !== "undefined" ? localStorage.getItem("override_role") : null;
+        const access = ov
+          ? isRoleAdmin(ov, roles, u)
+          : (u?.roles?.includes("ADMIN") || u?.roles?.includes("SUPER_ADMIN") || u?.roles?.includes("BRANCH_ADMIN") || u?.permissions?.includes("user:manage"));
+        setIsAdmin(access);
+      };
+
       window.addEventListener("branchChanged", handleBranchChanged);
-      return () => window.removeEventListener("branchChanged", handleBranchChanged);
+      window.addEventListener("overrideRoleChanged", handleRoleChanged);
+      return () => {
+        window.removeEventListener("branchChanged", handleBranchChanged);
+        window.removeEventListener("overrideRoleChanged", handleRoleChanged);
+      };
     } else {
       setLoading(false);
     }

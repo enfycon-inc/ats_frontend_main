@@ -344,9 +344,9 @@ export default function ProfileDropdown() {
       } else {
         localStorage.removeItem("override_role");
       }
+      setOverrideRole(roleName);
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new CustomEvent("overrideRoleChanged", { detail: { role: roleName } }));
-      window.location.reload();
     }
     setOpen(false);
   };

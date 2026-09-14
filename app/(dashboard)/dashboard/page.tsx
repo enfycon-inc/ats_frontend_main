@@ -170,7 +170,7 @@ export default function DashboardPage() {
       {/* Render Dashboard Widgets based on resolved systemRole */}
       {systemRole === "SUPER_ADMIN" ? (
         <GlobalAdminDashboardView profile={profile} />
-      ) : systemRole === "ADMIN" || systemRole === "TENANT_ADMIN" ? (
+      ) : systemRole === "ADMIN" || systemRole === "TENANT_ADMIN" || systemRole === "BRANCH_ADMIN" ? (
         <AdminDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
       ) : systemRole === "ACCOUNT_MANAGER" ? (
         <AccountManagerDashboardView 
