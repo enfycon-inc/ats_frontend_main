@@ -59,6 +59,7 @@ export default function JobPostingDashboard({
   const router = useRouter();
   const searchParams = useSearchParams();
   const filterParam = searchParams.get("filter"); // e.g. "direct", "pod", "unassigned", etc.
+  const priorityParam = searchParams.get("priority") || searchParams.get("urgency");
 
   // Drawer States
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -298,6 +299,19 @@ export default function JobPostingDashboard({
         }
         // ────────────────────────────────────────────────────────────────────
 
+        // ── Filter by Priority / Urgency (Hot / Warm / Cold) ───────────────
+        if (priorityParam) {
+          const target = priorityParam.toUpperCase();
+          jobsToDisplay = jobsToDisplay.filter((job) => {
+            const p = String(job.priority || (job as any).urgency || "").toUpperCase();
+            if (target === "HOT") return p.includes("HOT") || p.includes("HIGH") || p.includes("URGENT");
+            if (target === "COLD") return p.includes("COLD") || p.includes("LOW");
+            if (target === "WARM") return p.includes("WARM") || p.includes("MEDIUM") || (!p.includes("HOT") && !p.includes("COLD") && !p.includes("LOW") && !p.includes("HIGH") && !p.includes("URGENT"));
+            return p === target;
+          });
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         const filteredByRoute = jobsToDisplay.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
 
         setAllJobs(jobsToDisplay);
@@ -313,7 +327,7 @@ export default function JobPostingDashboard({
     } finally {
       setIsLoading(false);
     }
-  }, [initialStatusFilter, market, filterParam, isRecruiter, isAccountManager, currentUser]);
+  }, [initialStatusFilter, market, filterParam, priorityParam, isRecruiter, isAccountManager, currentUser]);
 
   useEffect(() => {
     fetchJobs();
@@ -535,6 +549,23 @@ export default function JobPostingDashboard({
 
   return (
     <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
+      {priorityParam && (
+        <div className="flex items-center justify-between px-3.5 py-1.5 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 rounded-lg text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">Filtered by Priority:</span>
+            <span className="font-black px-2 py-0.5 rounded text-[11px] bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300">
+              {priorityParam.toUpperCase() === "HOT" ? "🔥 HOT" : priorityParam.toUpperCase() === "COLD" ? "❄️ COLD" : "⚡ WARM"}
+            </span>
+            <span className="text-slate-500 text-[11px]">({jobsData.length} requirements found)</span>
+          </div>
+          <button
+            onClick={() => router.push("/job-posting")}
+            className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-bold text-xs hover:underline cursor-pointer"
+          >
+            Clear Filter ×
+          </button>
+        </div>
+      )}
       {/* Main Table Content */}
       {isLoading ? (
         <div className="flex-1 flex flex-col items-center justify-center min-h-[40vh] gap-3">

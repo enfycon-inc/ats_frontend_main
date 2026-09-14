@@ -855,10 +855,24 @@ function BranchAdminDashboardView({
     return branchJobs.filter((j: any) => j.jobStatus === "Active" || j.status === "ACTIVE" || j.status === "Active");
   }, [branchJobs]);
 
-  const urgentRequisitions = useMemo(() => {
+  const hotJobs = useMemo(() => {
     return branchActiveJobs.filter((j: any) => {
-      const p = (j.priority || j.urgency || "").toUpperCase();
-      return p === "HOT" || p === "HIGH" || p === "URGENT";
+      const p = String(j.priority || j.urgency || "").toUpperCase();
+      return p.includes("HOT") || p.includes("HIGH") || p.includes("URGENT");
+    });
+  }, [branchActiveJobs]);
+
+  const warmJobs = useMemo(() => {
+    return branchActiveJobs.filter((j: any) => {
+      const p = String(j.priority || j.urgency || "").toUpperCase();
+      return p.includes("WARM") || p.includes("MEDIUM") || (!p.includes("HOT") && !p.includes("COLD") && !p.includes("LOW") && !p.includes("HIGH") && !p.includes("URGENT"));
+    });
+  }, [branchActiveJobs]);
+
+  const coldJobs = useMemo(() => {
+    return branchActiveJobs.filter((j: any) => {
+      const p = String(j.priority || j.urgency || "").toUpperCase();
+      return p.includes("COLD") || p.includes("LOW");
     });
   }, [branchActiveJobs]);
 
@@ -872,20 +886,63 @@ function BranchAdminDashboardView({
   }, [submissions]);
 
   const activeInterviews = useMemo(() => {
-    return submissions.filter((s: any) =>
-      s.l1Status === "SCHEDULED" ||
-      s.l2Status === "SCHEDULED" ||
-      s.l3Status === "SCHEDULED" ||
-      ["L1", "L2", "L3"].includes(s.finalStatus)
-    );
+    return submissions.filter((s: any) => {
+      const final = (s.finalStatus || "").toUpperCase();
+      if (final === "REJECTED" || final === "OFFER" || final === "OFFERED" || final === "JOIN" || final === "JOINED" || final === "PLACED") {
+        return false;
+      }
+      const l1 = (s.l1Status || "").toUpperCase();
+      const l2 = (s.l2Status || "").toUpperCase();
+      const l3 = (s.l3Status || "").toUpperCase();
+
+      return (
+        ["SCHEDULED", "PASSED", "CLEARED", "COMPLETED"].includes(l1) ||
+        ["SCHEDULED", "PASSED", "CLEARED", "COMPLETED"].includes(l2) ||
+        ["SCHEDULED", "PASSED", "CLEARED", "COMPLETED"].includes(l3) ||
+        ["L1", "L2", "L3", "INTERVIEW", "INTERVIEWING"].includes(final) ||
+        final.includes("PASSED") ||
+        Boolean(s.l1Date || s.l2Date || s.l3Date)
+      );
+    });
   }, [submissions]);
 
-  const l1Count = useMemo(() => submissions.filter((s: any) => s.l1Status === "SCHEDULED" || s.finalStatus === "L1").length, [submissions]);
-  const l2Count = useMemo(() => submissions.filter((s: any) => s.l2Status === "SCHEDULED" || s.finalStatus === "L2").length, [submissions]);
-  const l3Count = useMemo(() => submissions.filter((s: any) => s.l3Status === "SCHEDULED" || s.finalStatus === "L3").length, [submissions]);
+  const l1Count = useMemo(() => {
+    return submissions.filter((s: any) => {
+      const l1 = (s.l1Status || "").toUpperCase();
+      const final = (s.finalStatus || "").toUpperCase();
+      return ["SCHEDULED", "PASSED", "CLEARED", "COMPLETED"].includes(l1) || final === "L1" || Boolean(s.l1Date);
+    }).length;
+  }, [submissions]);
 
-  const offersCount = useMemo(() => submissions.filter((s: any) => s.finalStatus === "OFFER").length, [submissions]);
-  const joinsCount = useMemo(() => submissions.filter((s: any) => s.finalStatus === "JOIN").length, [submissions]);
+  const l2Count = useMemo(() => {
+    return submissions.filter((s: any) => {
+      const l2 = (s.l2Status || "").toUpperCase();
+      const final = (s.finalStatus || "").toUpperCase();
+      return ["SCHEDULED", "PASSED", "CLEARED", "COMPLETED"].includes(l2) || final === "L2" || Boolean(s.l2Date);
+    }).length;
+  }, [submissions]);
+
+  const l3Count = useMemo(() => {
+    return submissions.filter((s: any) => {
+      const l3 = (s.l3Status || "").toUpperCase();
+      const final = (s.finalStatus || "").toUpperCase();
+      return ["SCHEDULED", "PASSED", "CLEARED", "COMPLETED"].includes(l3) || final === "L3" || Boolean(s.l3Date);
+    }).length;
+  }, [submissions]);
+
+  const offersCount = useMemo(() => {
+    return submissions.filter((s: any) => {
+      const f = (s.finalStatus || "").toUpperCase();
+      return f === "OFFER" || f === "OFFERED";
+    }).length;
+  }, [submissions]);
+
+  const joinsCount = useMemo(() => {
+    return submissions.filter((s: any) => {
+      const f = (s.finalStatus || "").toUpperCase();
+      return f === "JOIN" || f === "JOINED" || f === "PLACED";
+    }).length;
+  }, [submissions]);
 
   // Aging jobs (>48 hours open with 0 or <2 submissions)
   const agingJobs = useMemo(() => {
@@ -980,17 +1037,11 @@ function BranchAdminDashboardView({
             <Icon icon="heroicons:building-office-2" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                Office: {activeBranchName}
-              </h2>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Active Office
-              </span>
-            </div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              Office: {activeBranchName}
+            </h2>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              {activeBranchMarket === "US" ? "🇺🇸 US IT Staffing" : "🇮🇳 Domestic India IT"} • Timezone: {activeBranchTimezone}
+              {activeBranchMarket === "US" ? "US IT Staffing" : "Domestic India IT"} • Timezone: {activeBranchTimezone}
             </p>
           </div>
         </div>
@@ -1020,14 +1071,40 @@ function BranchAdminDashboardView({
               <Icon icon="heroicons:briefcase" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Jobs</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Jobs</p>
+                <span className="text-[10px] text-slate-400 font-medium">{totalPositions} Openings</span>
+              </div>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <h3 className="text-2xl font-black text-slate-900 dark:text-white">{branchActiveJobs.length}</h3>
                 <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">Open</span>
               </div>
-              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                {urgentRequisitions.length > 0 ? `${urgentRequisitions.length} Urgent` : "Standard Priority"} • {totalPositions} Open Positions
-              </p>
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                <Link
+                  href="/job-posting?priority=Hot"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 transition-colors cursor-pointer"
+                  title="Filter by Hot priority"
+                >
+                  <span>🔥</span>
+                  <span>{hotJobs.length} Hot</span>
+                </Link>
+                <Link
+                  href="/job-posting?priority=Warm"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60 transition-colors cursor-pointer"
+                  title="Filter by Warm priority"
+                >
+                  <span>⚡</span>
+                  <span>{warmJobs.length} Warm</span>
+                </Link>
+                <Link
+                  href="/job-posting?priority=Cold"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                  title="Filter by Cold priority"
+                >
+                  <span>❄️</span>
+                  <span>{coldJobs.length} Cold</span>
+                </Link>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -1054,42 +1131,46 @@ function BranchAdminDashboardView({
         </Link>
 
         {/* Card 3: Interviews */}
-        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-cyan-300 dark:hover:border-cyan-800 transition-colors">
-          <CardContent className="p-4 flex items-center gap-3.5">
-            <div className="h-11 w-11 rounded-lg bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 flex items-center justify-center text-xl shrink-0 border border-cyan-100 dark:border-cyan-900/50">
-              <Icon icon="heroicons:academic-cap" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Interviews</p>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <h3 className="text-2xl font-black text-slate-900 dark:text-white">{activeInterviews.length}</h3>
-                <span className="text-[11px] font-semibold text-cyan-600 dark:text-cyan-400">In Progress</span>
+        <Link href="/applicants/interviews" className="block">
+          <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-cyan-300 dark:hover:border-cyan-800 transition-colors cursor-pointer h-full">
+            <CardContent className="p-4 flex items-center gap-3.5">
+              <div className="h-11 w-11 rounded-lg bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 flex items-center justify-center text-xl shrink-0 border border-cyan-100 dark:border-cyan-900/50">
+                <Icon icon="heroicons:academic-cap" />
               </div>
-              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                {l1Count} Round 1 • {l2Count} Round 2 • {l3Count} Final
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Interviews</p>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white">{activeInterviews.length}</h3>
+                  <span className="text-[11px] font-semibold text-cyan-600 dark:text-cyan-400">In Progress</span>
+                </div>
+                <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                  {l1Count} L1 • {l2Count} L2 • {l3Count} Final
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* Card 4: Hires & Offers */}
-        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-amber-300 dark:hover:border-amber-800 transition-colors">
-          <CardContent className="p-4 flex items-center gap-3.5">
-            <div className="h-11 w-11 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl shrink-0 border border-amber-100 dark:border-amber-900/50">
-              <Icon icon="heroicons:check-badge" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Hires & Offers</p>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <h3 className="text-2xl font-black text-slate-900 dark:text-white">{joinsCount + offersCount}</h3>
-                <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">Total</span>
+        <Link href="/placements" className="block">
+          <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-amber-300 dark:hover:border-amber-800 transition-colors cursor-pointer h-full">
+            <CardContent className="p-4 flex items-center gap-3.5">
+              <div className="h-11 w-11 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl shrink-0 border border-amber-100 dark:border-amber-900/50">
+                <Icon icon="heroicons:check-badge" />
               </div>
-              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                {offersCount} Offered • {joinsCount} Joined
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Hires & Offers</p>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white">{joinsCount + offersCount}</h3>
+                  <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">Total</span>
+                </div>
+                <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                  {offersCount} Offered • {joinsCount} Joined
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* 3. OPERATIONAL ACTION CENTER: PROFILES WAITING & JOBS NEEDING ATTENTION */}
@@ -1129,7 +1210,12 @@ function BranchAdminDashboardView({
                   <div key={sub.id} className="p-2.5 rounded-lg border border-neutral-150 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-855/50 flex items-center justify-between gap-3 text-xs">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-slate-900 dark:text-white truncate">{sub.candidateName || "Candidate"}</span>
+                        <Link
+                          href={`/applicants/${sub.candidateId || sub.candidate_id || sub.id}`}
+                          className="font-bold text-slate-900 dark:text-white truncate hover:text-indigo-600 transition-colors"
+                        >
+                          {sub.candidateName || "Candidate"}
+                        </Link>
                         <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300">
                           {sub.jobCode || "JOB"}
                         </span>
@@ -1138,7 +1224,7 @@ function BranchAdminDashboardView({
                         {sub.jobTitle} • Sourced by <span className="font-medium text-slate-700 dark:text-slate-300">{sub.recruiterName || "Recruiter"}</span>
                       </p>
                     </div>
-                    <Link href="/utility/submissions">
+                    <Link href={`/applicants/${sub.candidateId || sub.candidate_id || sub.id}`}>
                       <Button size="sm" className="h-7 px-2.5 text-[10px] font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 cursor-pointer">
                         Review Candidate
                       </Button>
