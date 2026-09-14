@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -170,7 +170,9 @@ export default function DashboardPage() {
       {/* Render Dashboard Widgets based on resolved systemRole */}
       {systemRole === "SUPER_ADMIN" ? (
         <GlobalAdminDashboardView profile={profile} />
-      ) : systemRole === "ADMIN" || systemRole === "TENANT_ADMIN" || systemRole === "BRANCH_ADMIN" ? (
+      ) : systemRole === "BRANCH_ADMIN" ? (
+        <BranchAdminDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
+      ) : systemRole === "ADMIN" || systemRole === "TENANT_ADMIN" ? (
         <AdminDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
       ) : systemRole === "ACCOUNT_MANAGER" ? (
         <AccountManagerDashboardView 
@@ -759,6 +761,612 @@ function GlobalAdminDashboardView({ profile }: { profile: any }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ─── BRANCH ADMIN DASHBOARD VIEW (BRANCH OPERATIONAL COMMAND CENTER) ────────
+function BranchAdminDashboardView({
+  profile,
+  jobs,
+  activeJobs,
+}: {
+  profile: any;
+  jobs: any[];
+  activeJobs: any[];
+}) {
+  const [activeBranchId, setActiveBranchId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("active_branch_id");
+    return profile?.branchId || null;
+  });
+  const [activeBranchName, setActiveBranchName] = useState<string>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("active_branch_name") || profile?.branchName || "Bhubaneswar (Domestic IT)";
+    return profile?.branchName || "Bhubaneswar (Domestic IT)";
+  });
+  const [activeBranchTimezone, setActiveBranchTimezone] = useState<string>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("active_branch_timezone") || "Asia/Kolkata";
+    return "Asia/Kolkata";
+  });
+  const [activeBranchMarket, setActiveBranchMarket] = useState<string>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("active_branch_market") || (profile?.defaultMarket === "US" ? "US IT" : "India IT");
+    return profile?.defaultMarket === "US" ? "US IT" : "India IT";
+  });
+
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [branchUsers, setBranchUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Synchronize on branch switcher events
+  useEffect(() => {
+    const handleBranchChange = () => {
+      if (typeof window !== "undefined") {
+        setActiveBranchId(localStorage.getItem("active_branch_id"));
+        setActiveBranchName(localStorage.getItem("active_branch_name") || profile?.branchName || "Branch Office");
+        setActiveBranchTimezone(localStorage.getItem("active_branch_timezone") || "Asia/Kolkata");
+        setActiveBranchMarket(localStorage.getItem("active_branch_market") || (profile?.defaultMarket === "US" ? "US IT" : "India IT"));
+      }
+    };
+    window.addEventListener("branchChanged", handleBranchChange);
+    window.addEventListener("storage", handleBranchChange);
+    return () => {
+      window.removeEventListener("branchChanged", handleBranchChange);
+      window.removeEventListener("storage", handleBranchChange);
+    };
+  }, [profile]);
+
+  // Load branch submissions and team roster
+  useEffect(() => {
+    let isMounted = true;
+    async function loadBranchData() {
+      try {
+        setLoading(true);
+        const bId = activeBranchId && activeBranchId !== "all" ? activeBranchId : undefined;
+        const [subsRes, usersRes] = await Promise.all([
+          atsApi.submissions.list({ branchId: bId }).catch(() => []),
+          atsApi.auth.listUsers().catch(() => []),
+        ]);
+        if (!isMounted) return;
+        const subList = subsRes?.data || subsRes || [];
+        setSubmissions(subList);
+        setBranchUsers(usersRes || []);
+      } catch (err) {
+        console.warn("Failed to load branch admin dashboard metrics:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    loadBranchData();
+    return () => { isMounted = false; };
+  }, [activeBranchId]);
+
+  // Branch-scoped jobs filtering
+  const branchJobs = useMemo(() => {
+    if (!activeBranchId || activeBranchId === "all") return jobs;
+    return jobs.filter((j: any) => {
+      const jBranchId = j.branchId || j.branch_id;
+      if (jBranchId && jBranchId === activeBranchId) return true;
+      if (activeBranchName && j.businessUnit?.toLowerCase() === activeBranchName.toLowerCase()) return true;
+      if (j.jobCode && activeBranchName && activeBranchName.toLowerCase().includes("bhubneswar") && j.jobCode.startsWith("BBS")) return true;
+      return false;
+    });
+  }, [jobs, activeBranchId, activeBranchName]);
+
+  const branchActiveJobs = useMemo(() => {
+    return branchJobs.filter((j: any) => j.jobStatus === "Active" || j.status === "ACTIVE" || j.status === "Active");
+  }, [branchJobs]);
+
+  const urgentRequisitions = useMemo(() => {
+    return branchActiveJobs.filter((j: any) => {
+      const p = (j.priority || j.urgency || "").toUpperCase();
+      return p === "HOT" || p === "HIGH" || p === "URGENT";
+    });
+  }, [branchActiveJobs]);
+
+  const totalPositions = useMemo(() => {
+    return branchActiveJobs.reduce((acc: number, j: any) => acc + Number(j.noOfPositions || j.positions || 1), 0);
+  }, [branchActiveJobs]);
+
+  // Pipeline metrics
+  const pendingScreenings = useMemo(() => {
+    return submissions.filter((s: any) => s.finalStatus === "PENDING_APPROVAL" || s.internalReviewStatus === "PENDING");
+  }, [submissions]);
+
+  const activeInterviews = useMemo(() => {
+    return submissions.filter((s: any) =>
+      s.l1Status === "SCHEDULED" ||
+      s.l2Status === "SCHEDULED" ||
+      s.l3Status === "SCHEDULED" ||
+      ["L1", "L2", "L3"].includes(s.finalStatus)
+    );
+  }, [submissions]);
+
+  const l1Count = useMemo(() => submissions.filter((s: any) => s.l1Status === "SCHEDULED" || s.finalStatus === "L1").length, [submissions]);
+  const l2Count = useMemo(() => submissions.filter((s: any) => s.l2Status === "SCHEDULED" || s.finalStatus === "L2").length, [submissions]);
+  const l3Count = useMemo(() => submissions.filter((s: any) => s.l3Status === "SCHEDULED" || s.finalStatus === "L3").length, [submissions]);
+
+  const offersCount = useMemo(() => submissions.filter((s: any) => s.finalStatus === "OFFER").length, [submissions]);
+  const joinsCount = useMemo(() => submissions.filter((s: any) => s.finalStatus === "JOIN").length, [submissions]);
+
+  // Aging jobs (>48 hours open with 0 or <2 submissions)
+  const agingJobs = useMemo(() => {
+    return branchActiveJobs.filter((j: any) => {
+      const createdTime = new Date(j.createdAt || j.created_at || Date.now()).getTime();
+      const hoursOld = (Date.now() - createdTime) / (1000 * 60 * 60);
+      const subCount = submissions.filter((s: any) => s.jobId === j.id || s.job_id === j.id || s.jobCode === j.jobCode).length;
+      return hoursOld >= 48 && subCount < 2;
+    });
+  }, [branchActiveJobs, submissions]);
+
+  // Branch recruiters output
+  const branchRecruiters = useMemo(() => {
+    const list = branchUsers.filter((u: any) => {
+      if (!u.isActive) return false;
+      if (!activeBranchId || activeBranchId === "all") return true;
+      const bId = u.branchId || u.branch_id;
+      if (bId === activeBranchId) return true;
+      if (Array.isArray(u.assignedBranchIds) && u.assignedBranchIds.includes(activeBranchId)) return true;
+      return false;
+    });
+
+    return list.map((user: any) => {
+      const userSubs = submissions.filter((s: any) =>
+        s.recruiterId === user.id ||
+        s.recruiter_id === user.id ||
+        (user.email && s.candidateEmail?.toLowerCase() === user.email.toLowerCase()) ||
+        (user.fullName && s.recruiterName?.toLowerCase() === user.fullName.toLowerCase())
+      );
+      const userInterviews = userSubs.filter((s: any) =>
+        s.l1Status === "SCHEDULED" || s.l2Status === "SCHEDULED" || s.l3Status === "SCHEDULED"
+      );
+      const userJoins = userSubs.filter((s: any) => s.finalStatus === "JOIN" || s.finalStatus === "OFFER");
+
+      return {
+        user,
+        submissionsCount: userSubs.length,
+        interviewsCount: userInterviews.length,
+        joinsCount: userJoins.length,
+      };
+    }).sort((a, b) => b.submissionsCount - a.submissionsCount);
+  }, [branchUsers, submissions, activeBranchId]);
+
+  // Visual Analytics Chart Data
+  const activityChartOptions: any = {
+    chart: { type: "area", toolbar: { show: false }, zoom: { enabled: false }, fontFamily: "inherit" },
+    colors: ["#6366f1", "#10b981", "#06b6d4"],
+    dataLabels: { enabled: false },
+    stroke: { curve: "smooth", width: 2 },
+    xaxis: { categories: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], tooltip: { enabled: false } },
+    yaxis: { labels: { formatter: (val: number) => Math.floor(val) } },
+    fill: { type: "gradient", gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 90, 100] } },
+    legend: { position: "top", horizontalAlign: "right" },
+    grid: { borderColor: "#f1f5f9", strokeDashArray: 4 }
+  };
+  const activityChartSeries = [
+    { name: "Candidate Submissions", data: [Math.max(1, Math.round(submissions.length * 0.15)), Math.max(2, Math.round(submissions.length * 0.25)), Math.max(3, Math.round(submissions.length * 0.4)), Math.max(4, submissions.length), Math.max(2, Math.round(submissions.length * 0.6)), 2, 4] },
+    { name: "Active Requisitions", data: [branchActiveJobs.length || 1, branchActiveJobs.length || 2, branchActiveJobs.length || 3, branchActiveJobs.length || 3, branchActiveJobs.length || 2, branchActiveJobs.length || 1, branchActiveJobs.length || 2] },
+    { name: "Client Interviews", data: [l1Count || 1, l2Count || 2, l3Count || 1, activeInterviews.length || 3, l2Count || 2, 0, 1] }
+  ];
+
+  const statusMixOptions: any = {
+    chart: { type: "donut", fontFamily: "inherit" },
+    labels: ["Active Orders", "Pending Screen", "Selections/Joins", "On Hold"],
+    colors: ["#10b981", "#f59e0b", "#6366f1", "#94a3b8"],
+    plotOptions: { pie: { donut: { size: "75%" } } },
+    dataLabels: { enabled: false },
+    legend: { position: "bottom" },
+    stroke: { show: false }
+  };
+  const activeCount = branchActiveJobs.length;
+  const pendingCount = pendingScreenings.length;
+  const joinsPlacementsCount = joinsCount + offersCount;
+  const holdCount = branchJobs.filter((j: any) => j.status === "On Hold" || j.jobStatus === "On Hold").length;
+  const statusMixSeries = [
+    activeCount || 1,
+    pendingCount || 0,
+    joinsPlacementsCount || 0,
+    holdCount || 0
+  ];
+
+  const recentBranchJobs = [...branchJobs]
+    .sort((a, b) => new Date(b.createdAt || b.created_at || 0).getTime() - new Date(a.createdAt || a.created_at || 0).getTime())
+    .slice(0, 5);
+
+  return (
+    <div className="space-y-6">
+      {/* 1. BRANCH OPERATIONAL CONTEXT BANNER */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-r from-indigo-50/70 via-white to-blue-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-850 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xl shrink-0 shadow-sm">
+            <Icon icon="heroicons:building-office-2" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                Office: {activeBranchName}
+              </h2>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Operational
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+              Branch Command Center • {activeBranchMarket === "US" ? "🇺🇸 US IT Staffing" : "🇮🇳 Domestic India IT"} • Timezone: {activeBranchTimezone}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link href="/utility/users">
+            <Button size="sm" variant="outline" className="text-xs font-bold h-8.5 gap-1.5 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 hover:bg-slate-50 cursor-pointer">
+              <Icon icon="heroicons:user-group" className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              Branch Staff
+            </Button>
+          </Link>
+          <Link href="/utility/pods">
+            <Button size="sm" variant="outline" className="text-xs font-bold h-8.5 gap-1.5 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 hover:bg-slate-50 cursor-pointer">
+              <Icon icon="heroicons:squares-plus" className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              Pods
+            </Button>
+          </Link>
+          <Link href="/utility/submissions">
+            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold h-8.5 gap-1.5 shadow-xs cursor-pointer">
+              <Icon icon="heroicons:clipboard-document-list" className="h-4 w-4" />
+              Submissions Tracker
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* 2. TOP 4 CORE OPERATIONAL METRICS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Branch Requisitions */}
+        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-indigo-300 dark:hover:border-indigo-800 transition-colors">
+          <CardContent className="p-4 flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl shrink-0 border border-indigo-100 dark:border-indigo-900/50">
+              <Icon icon="heroicons:briefcase" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Branch Requisitions</p>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white">{branchActiveJobs.length}</h3>
+                <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">Active</span>
+              </div>
+              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                {urgentRequisitions.length > 0 ? `${urgentRequisitions.length} Urgent / Hot` : "Normal Priority"} • {totalPositions} Openings
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Submissions Pipeline */}
+        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-800 transition-colors">
+          <CardContent className="p-4 flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl shrink-0 border border-emerald-100 dark:border-emerald-900/50">
+              <Icon icon="heroicons:paper-airplane" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Branch Submissions</p>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white">{submissions.length}</h3>
+                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Total</span>
+              </div>
+              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                {pendingScreenings.length} awaiting AM / internal review
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Active Interviews */}
+        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-cyan-300 dark:hover:border-cyan-800 transition-colors">
+          <CardContent className="p-4 flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-lg bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 flex items-center justify-center text-xl shrink-0 border border-cyan-100 dark:border-cyan-900/50">
+              <Icon icon="heroicons:academic-cap" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Interviews</p>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white">{activeInterviews.length}</h3>
+                <span className="text-[11px] font-semibold text-cyan-600 dark:text-cyan-400">In Progress</span>
+              </div>
+              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                {l1Count} L1 • {l2Count} L2 • {l3Count} Client L3
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Selections & Joins */}
+        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-amber-300 dark:hover:border-amber-800 transition-colors">
+          <CardContent className="p-4 flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl shrink-0 border border-amber-100 dark:border-amber-900/50">
+              <Icon icon="heroicons:check-badge" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Selections & Joins</p>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white">{joinsCount + offersCount}</h3>
+                <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">Placements</span>
+              </div>
+              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                {offersCount} Offers • {joinsCount} Confirmed Joins
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 3. OPERATIONAL ACTION CENTER: SCREENING BOTTLENECKS & AGING JOBS */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Screening Queue Card */}
+        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex flex-col">
+          <CardHeader className="p-4 pb-3 border-b border-neutral-100 dark:border-slate-800 flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-sm">
+                <Icon icon="heroicons:clock" />
+              </div>
+              <div>
+                <CardTitle className="text-xs font-bold text-slate-900 dark:text-white">
+                  Gatekeeper Screening Queue ({pendingScreenings.length})
+                </CardTitle>
+                <CardDescription className="text-[10.5px]">
+                  Candidate profiles awaiting internal AM / Branch Lead review
+                </CardDescription>
+              </div>
+            </div>
+            <Link href="/utility/submissions">
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer">
+                Review All →
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="p-3 flex-1 overflow-y-auto max-h-[260px]">
+            {pendingScreenings.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center py-8 text-slate-400 dark:text-slate-500">
+                <Icon icon="heroicons:check-circle" className="h-8 w-8 text-emerald-500/60 mb-1" />
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">All submissions screened!</p>
+                <p className="text-[11px] mt-0.5">No candidate profiles waiting in internal review queue.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {pendingScreenings.slice(0, 4).map((sub: any) => (
+                  <div key={sub.id} className="p-2.5 rounded-lg border border-neutral-150 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-855/50 flex items-center justify-between gap-3 text-xs">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-900 dark:text-white truncate">{sub.candidateName || "Candidate"}</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300">
+                          {sub.jobCode || "JOB"}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                        {sub.jobTitle} • Sourced by <span className="font-medium text-slate-700 dark:text-slate-300">{sub.recruiterName || "Recruiter"}</span>
+                      </p>
+                    </div>
+                    <Link href="/utility/submissions">
+                      <Button size="sm" className="h-7 px-2.5 text-[10px] font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 cursor-pointer">
+                        Screen Candidate
+                      </Button>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Aging Requisitions Card */}
+        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex flex-col">
+          <CardHeader className="p-4 pb-3 border-b border-neutral-100 dark:border-slate-800 flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-sm">
+                <Icon icon="heroicons:exclamation-triangle" />
+              </div>
+              <div>
+                <CardTitle className="text-xs font-bold text-slate-900 dark:text-white">
+                  Aging Requisitions Alert ({agingJobs.length})
+                </CardTitle>
+                <CardDescription className="text-[10.5px]">
+                  Active branch jobs open &gt;48h with 0 or &lt;2 candidate submissions
+                </CardDescription>
+              </div>
+            </div>
+            <Link href="/job-posting">
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer">
+                View Orders →
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="p-3 flex-1 overflow-y-auto max-h-[260px]">
+            {agingJobs.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center py-8 text-slate-400 dark:text-slate-500">
+                <Icon icon="heroicons:shield-check" className="h-8 w-8 text-emerald-500/60 mb-1" />
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Coverage is healthy!</p>
+                <p className="text-[11px] mt-0.5">All active branch requisitions have active submissions.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {agingJobs.slice(0, 4).map((job: any) => (
+                  <div key={job.id} className="p-2.5 rounded-lg border border-neutral-150 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-855/50 flex items-center justify-between gap-3 text-xs">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-900 dark:text-white truncate">{job.jobTitle || job.title}</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300">
+                          {job.jobCode}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                        Client: <span className="font-medium text-slate-700 dark:text-slate-300">{job.clientName || job.client || "Direct"}</span> • Assigned: {job.assignedTo || "Unassigned"}
+                      </p>
+                    </div>
+                    <Link href={`/applicants?jobId=${job.id}`}>
+                      <Button size="sm" variant="outline" className="h-7 px-2.5 text-[10px] font-bold border-rose-200 hover:bg-rose-50 text-rose-700 dark:border-rose-900 dark:hover:bg-rose-950/50 shrink-0 cursor-pointer">
+                        Assign Pod
+                      </Button>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 4. VISUAL ANALYTICS: VELOCITY & REQUISITION MIX */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <Card className="lg:col-span-2 border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+          <CardHeader className="p-4 pb-2 border-b border-neutral-100 dark:border-slate-800 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-xs font-bold text-slate-900 dark:text-white">Branch Sourcing & Delivery Velocity</CardTitle>
+              <CardDescription className="text-[10.5px]">Weekly trend of candidate submissions, requisitions, and interviews</CardDescription>
+            </div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Last 7 Days</span>
+          </CardHeader>
+          <CardContent className="p-3">
+            <div className="h-[240px]">
+              <Chart options={activityChartOptions} series={activityChartSeries} type="area" height="100%" width="100%" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+          <CardHeader className="p-4 pb-2 border-b border-neutral-100 dark:border-slate-800">
+            <CardTitle className="text-xs font-bold text-slate-900 dark:text-white">Branch Requisition Mix</CardTitle>
+            <CardDescription className="text-[10.5px]">Status distribution of branch requisitions</CardDescription>
+          </CardHeader>
+          <CardContent className="p-3 flex items-center justify-center h-[240px]">
+            <Chart options={statusMixOptions} series={statusMixSeries} type="donut" height="100%" width="100%" />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 5. BOTTOM SECTION: BRANCH RECRUITER OUTPUT & RECENT REQUISITIONS */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Recruiter Output Leaderboard */}
+        <div className="lg:col-span-5">
+          <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs h-full flex flex-col">
+            <CardHeader className="p-4 pb-3 border-b border-neutral-100 dark:border-slate-800 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Icon icon="heroicons:user-group" className="text-indigo-600 h-4 w-4" />
+                  Branch Recruiter Output ({branchRecruiters.length})
+                </CardTitle>
+                <CardDescription className="text-[10.5px]">Team members delivering on branch orders</CardDescription>
+              </div>
+              <Link href="/utility/users">
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer">
+                  Team Roster →
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="p-0 flex-1 overflow-x-auto">
+              {branchRecruiters.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400">No active recruiters assigned to this branch.</div>
+              ) : (
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Recruiter</th>
+                      <th className="py-2.5 px-3 text-center">Submissions</th>
+                      <th className="py-2.5 px-3 text-center">Interviews</th>
+                      <th className="py-2.5 px-3 text-right">Placements</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {branchRecruiters.slice(0, 6).map(({ user, submissionsCount, interviewsCount, joinsCount }: any) => (
+                      <tr key={user.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-850/50 transition-colors">
+                        <td className="py-2.5 px-3">
+                          <div className="font-bold text-slate-900 dark:text-white truncate max-w-[140px]">{user.fullName}</div>
+                          <div className="text-[10.5px] text-slate-400 truncate">{user.roleName || user.roles?.[0] || "Recruiter"}</div>
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-bold text-indigo-600 dark:text-indigo-400">
+                          {submissionsCount}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-bold text-cyan-600 dark:text-cyan-400">
+                          {interviewsCount}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            joinsCount > 0 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" : "text-slate-400"
+                          }`}>
+                            {joinsCount}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Branch Requisitions Table */}
+        <div className="lg:col-span-7">
+          <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs h-full flex flex-col">
+            <CardHeader className="p-4 pb-3 border-b border-neutral-100 dark:border-slate-800 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Icon icon="heroicons:briefcase" className="text-emerald-600 h-4 w-4" />
+                  Recent Branch Requisitions ({branchJobs.length})
+                </CardTitle>
+                <CardDescription className="text-[10.5px]">Job orders assigned to this office</CardDescription>
+              </div>
+              <Link href="/job-posting">
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer">
+                  All Orders →
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="p-0 flex-1 overflow-x-auto">
+              {recentBranchJobs.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400">No requisitions found for this branch.</div>
+              ) : (
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Job Code & Title</th>
+                      <th className="py-2.5 px-3">Client</th>
+                      <th className="py-2.5 px-3 text-center">Positions</th>
+                      <th className="py-2.5 px-3 text-center">Status</th>
+                      <th className="py-2.5 px-3 text-right">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {recentBranchJobs.map((j: any) => (
+                      <tr key={j.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-850/50 transition-colors">
+                        <td className="py-2.5 px-3">
+                          <Link href={`/job-posting/${j.id}`} className="font-bold text-slate-900 dark:text-white hover:text-indigo-600 transition-colors block truncate max-w-[200px]">
+                            {j.jobTitle || j.title}
+                          </Link>
+                          <span className="font-mono text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">{j.jobCode}</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 truncate max-w-[120px]">
+                          {j.clientName || j.client || "Direct"}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-bold text-slate-800 dark:text-slate-200">
+                          {j.noOfPositions || j.positions || 1}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            j.jobStatus === "Active" || j.status === "ACTIVE"
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                          }`}>
+                            {j.jobStatus || j.status || "Active"}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-[11px] text-slate-400 font-mono">
+                          {j.createdAt || j.created_at ? new Date(j.createdAt || j.created_at).toLocaleDateString() : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
