@@ -2777,17 +2777,17 @@ export default function DataTable({
 
       {/* Assign Team / Recruiter Modal Dialog */}
       <Dialog open={!!assignModalJob} onOpenChange={(open) => !open && setAssignModalJob(null)}>
-        <DialogContent className="max-w-xl p-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xl">
-          <DialogHeader className="p-4 pb-3 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/70 dark:bg-slate-850/70">
+        <DialogContent className="sm:max-w-2xl md:max-w-[700px] w-full p-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/70 dark:bg-slate-850/70">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-lg shrink-0 border border-indigo-100 dark:border-indigo-900/50">
+              <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl shrink-0 border border-blue-100 dark:border-blue-900/50">
                 <Icon icon="heroicons:user-group" />
               </div>
               <div>
-                <DialogTitle className="text-sm font-bold text-slate-900 dark:text-white">
+                <DialogTitle className="text-base font-bold text-slate-900 dark:text-white">
                   Assign Team / Recruiters
                 </DialogTitle>
-                <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+                <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Assign requirement to a recruitment pod or select one or more recruiters
                 </DialogDescription>
               </div>
@@ -2795,24 +2795,24 @@ export default function DataTable({
 
             {/* Selected Job Info Banner */}
             {assignModalJob && (
-              <div className="mt-3 p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 flex items-center justify-between gap-2 text-xs">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className="font-bold text-slate-900 dark:text-white truncate">
+              <div className="mt-3.5 p-3.5 sm:p-4 rounded-xl bg-slate-50/90 dark:bg-slate-850/70 border border-slate-200/80 dark:border-slate-750 flex items-center justify-between gap-4 text-xs">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-slate-900 dark:text-white text-sm truncate">
                       {assignModalJob.jobTitle || (assignModalJob as any).title}
                     </span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300">
+                    <span className="text-[10.5px] font-mono px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 font-semibold border border-rose-100 dark:border-rose-900/40">
                       {assignModalJob.jobCode}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                    Client: {assignModalJob.client || (assignModalJob as any).clientName || assignModalJob.endClientName || "Direct"}
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
+                    Client: <span className="font-medium text-slate-700 dark:text-slate-300">{assignModalJob.client || (assignModalJob as any).clientName || assignModalJob.endClientName || "Direct"}</span>
                     {assignModalTargetBranch?.name ? ` • Branch: ${assignModalTargetBranch.name}` : ""}
                   </p>
                 </div>
-                <div className="text-right shrink-0">
-                  <span className="text-[10px] text-slate-400 block">Current:</span>
-                  <Badge variant="outline" className="text-[10px] font-semibold">
+                <div className="text-right shrink-0 pl-2">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-0.5">Currently Assigned</span>
+                  <Badge variant="outline" className="text-xs font-semibold px-2.5 py-0.5 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">
                     {assignModalJob.assignedTo || "Unassigned"}
                   </Badge>
                 </div>
@@ -2820,113 +2820,119 @@ export default function DataTable({
             )}
           </DialogHeader>
 
-          {/* Role Scoping Notice */}
-          {isHigherRole ? (
-            <div className="mx-4 mt-2.5 px-3 py-1.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center gap-2 text-[11px] text-emerald-800 dark:text-emerald-300">
-              <Crown className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span><strong>Leadership Scope:</strong> Full authority to assign any recruitment pod or team member across this branch.</span>
+          {/* Pod Head Scope Notice (clean, compact) */}
+          {isPodHead && (
+            <div className="mx-6 mt-3 px-3.5 py-2 rounded-lg bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/60 flex items-center gap-2 text-xs text-blue-800 dark:text-blue-300">
+              <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span><strong>Pod Lead Scope:</strong> Restricted to your pod {myPod ? `(${myPod.name})` : ""} and active members.</span>
             </div>
-          ) : isPodHead ? (
-            <div className="mx-4 mt-2.5 px-3 py-1.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex items-center gap-2 text-[11px] text-indigo-800 dark:text-indigo-300">
-              <Shield className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-              <span><strong>Pod Lead Scope:</strong> You can assign requirement to your pod {myPod ? `(${myPod.name})` : ""} or its active recruiters.</span>
-            </div>
-          ) : isAccountManager ? (
-            <div className="mx-4 mt-2.5 px-3 py-1.5 rounded-md bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 flex items-center gap-2 text-[11px] text-sky-800 dark:text-sky-300">
-              <Briefcase className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
-              <span><strong>Account Manager Scope:</strong> Assignment options are governed by branch operating policies.</span>
-            </div>
-          ) : null}
+          )}
 
           {/* Branch Policy Alert */}
           {!branchAllowsDirectStaff ? (
-            <div className="mx-4 mt-2 px-3 py-1.5 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-[11px] text-amber-800 dark:text-amber-300">
-              <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <div className="mx-6 mt-3 px-3.5 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300">
+              <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
               <span><strong>Branch Policy Notice:</strong> Direct staff assignment is disabled. Requirements must be routed to Recruitment Pods.</span>
             </div>
           ) : !branchAllowsPods ? (
-            <div className="mx-4 mt-2 px-3 py-1.5 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-[11px] text-amber-800 dark:text-amber-300">
-              <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <div className="mx-6 mt-3 px-3.5 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300">
+              <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
               <span><strong>Branch Policy Notice:</strong> Recruitment Pods are disabled for this branch. Direct recruiter assignments only.</span>
             </div>
           ) : null}
 
-          {/* Tab Selector: Pods vs Individual Users */}
-          <div className="px-4 pt-3 pb-1 flex items-center gap-2 border-b border-neutral-100 dark:border-slate-800">
-            <button
-              type="button"
-              disabled={!branchAllowsPods}
-              onClick={() => {
-                if (branchAllowsPods) {
-                  setAssignTab("pods");
-                  setAssignSearch("");
-                }
-              }}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                !branchAllowsPods
-                  ? "opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400"
-                  : assignTab === "pods"
-                  ? "bg-indigo-600 text-white shadow-xs cursor-pointer"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750 cursor-pointer"
-              )}
-            >
-              <Icon icon="heroicons:squares-plus" className="h-3.5 w-3.5" />
-              Recruitment Pods ({targetBranchPods.length})
-              {!branchAllowsPods && <Lock className="h-3 w-3 ml-0.5 text-slate-400" />}
-            </button>
-
-            <button
-              type="button"
-              disabled={!branchAllowsDirectStaff}
-              onClick={() => {
-                if (branchAllowsDirectStaff) {
-                  setAssignTab("users");
-                  setAssignSearch("");
-                }
-              }}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                !branchAllowsDirectStaff
-                  ? "opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400"
-                  : assignTab === "users"
-                  ? "bg-indigo-600 text-white shadow-xs cursor-pointer"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750 cursor-pointer"
-              )}
-            >
-              <Icon icon="heroicons:user" className="h-3.5 w-3.5" />
-              Recruiters & Staff ({branchRecruiterUsers.length})
-              {selectedUserIds.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 text-[10px] rounded-full bg-white/20 text-white font-mono font-bold">
-                  {selectedUserIds.length}
+          {/* Tab Selector: Sleek Segmented Pill Navigation */}
+          <div className="px-6 pt-4 pb-2 border-b border-neutral-100 dark:border-slate-800 flex items-center justify-between">
+            <div className="p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 inline-flex items-center gap-1.5 border border-slate-200/60 dark:border-slate-700/60">
+              <button
+                type="button"
+                disabled={!branchAllowsPods}
+                onClick={() => {
+                  if (branchAllowsPods) {
+                    setAssignTab("pods");
+                    setAssignSearch("");
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                  !branchAllowsPods
+                    ? "opacity-50 cursor-not-allowed text-slate-400"
+                    : assignTab === "pods"
+                    ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200/70 dark:border-slate-700 cursor-pointer"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 cursor-pointer"
+                )}
+              >
+                <Icon icon="heroicons:squares-plus" className="h-4 w-4" />
+                Recruitment Pods
+                <span className={cn(
+                  "px-1.5 py-0.2 rounded-full text-[10.5px] font-mono",
+                  assignTab === "pods" ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold" : "bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                )}>
+                  {targetBranchPods.length}
                 </span>
-              )}
-              {!branchAllowsDirectStaff && <Lock className="h-3 w-3 ml-0.5 text-slate-400" />}
-            </button>
+                {!branchAllowsPods && <Lock className="h-3 w-3 ml-0.5 text-slate-400" />}
+              </button>
+
+              <button
+                type="button"
+                disabled={!branchAllowsDirectStaff}
+                onClick={() => {
+                  if (branchAllowsDirectStaff) {
+                    setAssignTab("users");
+                    setAssignSearch("");
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                  !branchAllowsDirectStaff
+                    ? "opacity-50 cursor-not-allowed text-slate-400"
+                    : assignTab === "users"
+                    ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200/70 dark:border-slate-700 cursor-pointer"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 cursor-pointer"
+                )}
+              >
+                <Icon icon="heroicons:user" className="h-4 w-4" />
+                Recruiters & Staff
+                <span className={cn(
+                  "px-1.5 py-0.2 rounded-full text-[10.5px] font-mono",
+                  assignTab === "users" ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold" : "bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                )}>
+                  {branchRecruiterUsers.length}
+                </span>
+                {!branchAllowsDirectStaff && <Lock className="h-3 w-3 ml-0.5 text-slate-400" />}
+              </button>
+            </div>
+
+            {assignTab === "users" && selectedUserIds.length > 0 && (
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium hidden sm:inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                {selectedUserIds.length} recruiter{selectedUserIds.length !== 1 ? 's' : ''} selected
+              </span>
+            )}
           </div>
 
           {/* Search Box & Multi-Select Toolbar */}
-          <div className="px-4 pt-2.5 space-y-2">
+          <div className="px-6 pt-3 space-y-2.5">
             <div className="relative">
-              <Icon icon="heroicons:magnifying-glass" className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Icon icon="heroicons:magnifying-glass" className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input
                 placeholder={assignTab === "pods" ? "Search pods by name or lead..." : "Search staff by name, role, or email..."}
                 value={assignSearch}
                 onChange={(e) => setAssignSearch(e.target.value)}
-                className="h-8.5 pl-8 text-xs bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
+                className="h-9 pl-9 text-xs bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 rounded-lg"
                 autoFocus
               />
             </div>
 
             {assignTab === "users" && (
-              <div className="flex items-center justify-between text-xs py-1 px-0.5 border-b border-dashed border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between text-xs py-1.5 px-1 border-b border-dashed border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={handleSelectAllFiltered}
-                    className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1"
+                    className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1.5"
                   >
-                    <CheckSquare className="h-3 w-3" />
+                    <CheckSquare className="h-3.5 w-3.5" />
                     {filteredUsers.length > 0 && filteredUsers.every((u: any) => selectedUserIds.includes(u.id))
                       ? "Deselect All Filtered"
                       : `Select All Filtered (${filteredUsers.length})`}
@@ -2936,22 +2942,22 @@ export default function DataTable({
                     <button
                       type="button"
                       onClick={() => setSelectedUserIds([])}
-                      className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer underline"
                     >
-                      Clear
+                      Clear Selection
                     </button>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{selectedUserIds.length}</strong> selected
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    <strong className="text-blue-600 dark:text-blue-400 font-bold">{selectedUserIds.length}</strong> selected
                   </span>
                   <Button
                     size="sm"
                     disabled={isAssigning || selectedUserIds.length === 0}
                     onClick={() => handleExecuteAssignment("users", selectedUserIds)}
-                    className="h-7 px-3 text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs"
+                    className="h-7.5 px-3.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {isAssigning ? "Assigning..." : `Assign Selected (${selectedUserIds.length})`}
                   </Button>
@@ -2961,15 +2967,15 @@ export default function DataTable({
           </div>
 
           {/* Selection List */}
-          <div className="p-4 flex-1 overflow-y-auto max-h-[300px] space-y-2">
+          <div className="px-6 py-4 flex-1 overflow-y-auto max-h-[340px] space-y-2.5">
             {assignTab === "pods" ? (
               filteredPods.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-400">
-                  <Icon icon="heroicons:squares-plus" className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-1.5" />
-                  <p className="font-semibold text-slate-600 dark:text-slate-300">No recruitment pods found.</p>
-                  <p className="text-[11px] mt-0.5">You can assign to individual recruiters or create pods in Pods Manager.</p>
-                  <Link href="/utility/pods" className="inline-block mt-2">
-                    <Button size="sm" variant="outline" className="text-xs h-7 text-indigo-600">
+                <div className="p-8 text-center text-xs text-slate-400">
+                  <Icon icon="heroicons:squares-plus" className="h-9 w-9 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                  <p className="font-semibold text-slate-600 dark:text-slate-300 text-sm">No recruitment pods found.</p>
+                  <p className="text-xs mt-1">You can assign to individual recruiters or create pods in Pods Manager.</p>
+                  <Link href="/utility/pods" className="inline-block mt-3">
+                    <Button size="sm" variant="outline" className="text-xs h-7.5 text-blue-600 border-blue-200 hover:bg-blue-50">
                       Go to Pods Manager →
                     </Button>
                   </Link>
@@ -2984,22 +2990,22 @@ export default function DataTable({
                     <div
                       key={pod.id}
                       className={cn(
-                        "p-3 rounded-lg border flex items-center justify-between gap-3 text-xs transition-colors",
+                        "p-3.5 sm:px-4 sm:py-3 rounded-xl border flex items-center justify-between gap-4 text-xs transition-colors",
                         isCurrent
-                          ? "border-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/30 dark:border-indigo-800"
-                          : "border-neutral-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850"
+                          ? "border-blue-200 bg-blue-50/40 dark:bg-blue-950/30 dark:border-blue-800/80"
+                          : "border-neutral-200/90 dark:border-slate-800 hover:bg-slate-50/80 dark:hover:bg-slate-850/80"
                       )}
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 dark:text-white truncate">{pod.name}</span>
+                          <span className="font-bold text-slate-900 dark:text-white text-[13px] truncate">{pod.name}</span>
                           {isCurrent && (
-                            <Badge className="text-[9px] bg-indigo-600 text-white font-bold py-0 h-4">
+                            <Badge className="text-[9.5px] bg-blue-600 hover:bg-blue-600 text-white font-semibold py-0 h-4.5 px-2">
                               Current
                             </Badge>
                           )}
                         </div>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
                           Pod Lead: <span className="font-medium text-slate-700 dark:text-slate-300">{pod.podHeadName || "Unassigned"}</span>
                           {pod.members && pod.members.length > 0 && (
                             <span> • {pod.members.length} Member{pod.members.length !== 1 ? 's' : ''}</span>
@@ -3011,10 +3017,10 @@ export default function DataTable({
                         disabled={isAssigning}
                         onClick={() => handleExecuteAssignment("pod", pod.id, pod.name)}
                         className={cn(
-                          "h-7 px-3 text-[11px] font-bold cursor-pointer shrink-0",
+                          "h-7.5 px-3.5 text-xs font-semibold cursor-pointer shrink-0 transition-colors shadow-xs",
                           isCurrent
-                            ? "bg-indigo-100 text-indigo-800 hover:bg-indigo-200 dark:bg-indigo-900 dark:text-indigo-200"
-                            : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                            ? "bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300"
+                            : "bg-blue-600 hover:bg-blue-500 text-white"
                         )}
                       >
                         {isAssigning ? "Assigning..." : isCurrent ? "Re-assign" : "Assign Pod"}
@@ -3025,9 +3031,9 @@ export default function DataTable({
               )
             ) : (
               filteredUsers.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-400">
-                  <Icon icon="heroicons:users" className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-1.5" />
-                  <p className="font-semibold text-slate-600 dark:text-slate-300">No recruiters or staff matching "{assignSearch}".</p>
+                <div className="p-8 text-center text-xs text-slate-400">
+                  <Icon icon="heroicons:users" className="h-9 w-9 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                  <p className="font-semibold text-slate-600 dark:text-slate-300 text-sm">No recruiters or staff matching "{assignSearch}".</p>
                 </div>
               ) : (
                 filteredUsers.map((u: any) => {
@@ -3043,62 +3049,57 @@ export default function DataTable({
                       key={u.id}
                       onClick={() => handleToggleUserSelection(u.id)}
                       className={cn(
-                        "p-2.5 rounded-lg border flex items-center justify-between gap-3 text-xs transition-all cursor-pointer select-none",
+                        "p-3 sm:px-4 sm:py-3 rounded-xl border flex items-center justify-between gap-4 text-xs transition-all cursor-pointer select-none",
                         isSelected
-                          ? "border-indigo-500 bg-indigo-50/80 dark:bg-indigo-950/40 dark:border-indigo-600 shadow-2xs ring-1 ring-indigo-400/50"
+                          ? "border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 dark:border-blue-600 shadow-2xs ring-1 ring-blue-400/40"
                           : isCurrent
-                          ? "border-slate-300 bg-slate-50/70 dark:bg-slate-800/40 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          : "border-neutral-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850"
+                          ? "border-slate-300 bg-slate-50/70 dark:bg-slate-800/40 dark:border-slate-700 hover:bg-slate-100/70 dark:hover:bg-slate-800"
+                          : "border-neutral-200/90 dark:border-slate-800 hover:bg-slate-50/80 dark:hover:bg-slate-850/80"
                       )}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         {/* Checkbox Icon */}
                         <div
                           className={cn(
-                            "h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors border",
+                            "h-4.5 w-4.5 rounded-md flex items-center justify-center shrink-0 transition-colors border",
                             isSelected
-                              ? "bg-indigo-600 border-indigo-600 text-white"
-                              : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-transparent"
+                              ? "bg-blue-600 border-blue-600 text-white shadow-2xs"
+                              : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-transparent hover:border-blue-400"
                           )}
                         >
-                          <Check className="h-3 w-3 stroke-[3]" />
+                          <Check className="h-3.5 w-3.5 stroke-[3]" />
                         </div>
 
                         {/* User Avatar Initials */}
-                        <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-[10.5px] shrink-0 uppercase">
+                        <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-xs shrink-0 uppercase border border-slate-200 dark:border-slate-700">
                           {(u.fullName || u.name || u.email || "U").substring(0, 2)}
                         </div>
 
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-slate-900 dark:text-white truncate">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-slate-900 dark:text-white text-xs truncate">
                               {u.fullName || u.name}
                             </span>
-                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800">
+                            <span className="text-[9.5px] font-mono px-2 py-0.2 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200/80 dark:border-blue-800">
                               {roleLabel}
                             </span>
                             {isCurrent && (
-                              <Badge variant="outline" className="text-[9px] font-semibold text-slate-500 border-slate-300 dark:border-slate-600 py-0 h-4">
+                              <Badge variant="outline" className="text-[9.5px] font-semibold text-slate-500 border-slate-300 dark:border-slate-600 py-0 h-4 px-1.5">
                                 Current
                               </Badge>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-400 font-mono truncate">{u.email}</p>
+                          <p className="text-[11px] text-slate-400 font-mono truncate mt-0.5">{u.email}</p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <Button
                           size="sm"
-                          variant={isSelected ? "default" : "outline"}
+                          variant="outline"
                           disabled={isAssigning}
                           onClick={() => handleExecuteAssignment("users", [u.id], u.fullName || u.name || u.email)}
-                          className={cn(
-                            "h-6.5 px-2 text-[10.5px] font-medium cursor-pointer",
-                            isSelected
-                              ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                              : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          )}
+                          className="h-7 px-2.5 text-[11px] font-medium border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/60 dark:hover:bg-slate-800 cursor-pointer transition-colors"
                           title="Assign only this recruiter"
                         >
                           Assign Solo
@@ -3112,26 +3113,26 @@ export default function DataTable({
           </div>
 
           {/* Footer: Mark Unassigned or Multi-Assign / Cancel */}
-          <DialogFooter className="p-3 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850/50 flex flex-row items-center justify-between sm:justify-between">
+          <DialogFooter className="px-6 py-3.5 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/60 dark:bg-slate-850/60 flex flex-row items-center justify-between sm:justify-between">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               disabled={isAssigning}
               onClick={() => handleExecuteAssignment("unassign", "none", "Unassigned")}
-              className="text-[11px] text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 h-8 cursor-pointer"
+              className="text-xs text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 h-8.5 cursor-pointer font-medium"
             >
               Clear Assignment (Unassigned)
             </Button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               {assignTab === "users" && selectedUserIds.length > 0 && (
                 <Button
                   type="button"
                   size="sm"
                   disabled={isAssigning}
                   onClick={() => handleExecuteAssignment("users", selectedUserIds)}
-                  className="h-8 px-3 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs"
+                  className="h-8.5 px-4 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs"
                 >
                   {isAssigning ? "Assigning..." : `Assign Selected (${selectedUserIds.length})`}
                 </Button>
@@ -3142,7 +3143,7 @@ export default function DataTable({
                 size="sm"
                 disabled={isAssigning}
                 onClick={() => setAssignModalJob(null)}
-                className="text-xs h-8 cursor-pointer"
+                className="text-xs h-8.5 px-4 cursor-pointer font-medium border-slate-200 dark:border-slate-700"
               >
                 Cancel
               </Button>
