@@ -36,6 +36,10 @@ import {
   Building2,
   Calendar,
   RotateCcw,
+  Shield,
+  Crown,
+  Briefcase,
+  Lock,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import {
@@ -66,32 +70,45 @@ import { AddClientModal } from "./add-client-modal";
 export function getAssignedPersonDisplay(job: Job): {
   label: string;
   type: "all" | "pod" | "recruiter" | "unassigned";
+  names?: string[];
+  count?: number;
 } {
   const rawAssigned = (job.assignedTo || "").trim();
   const rawUpper = rawAssigned.toUpperCase();
 
   // 1. Check if assigned to ALL branch recruiters
   if (rawUpper === "ALL" || rawUpper.startsWith("ALL ") || rawUpper === "ALL RECRUITERS") {
-    return { label: "All recruiters", type: "all" };
+    return { label: "All recruiters", type: "all", count: 0 };
   }
 
   // 2. Check if assigned to a specific Recruitment Pod
   if (job.podName && job.podName !== "N/A" && job.podName.toLowerCase() !== "unassigned") {
-    return { label: job.podName, type: "pod" };
+    return { label: job.podName, type: "pod", count: 1 };
   }
 
-  // 3. Check if assigned to a Primary Recruiter
-  if (job.primaryRecruiter && job.primaryRecruiter !== "N/A" && job.primaryRecruiter.toLowerCase() !== "unassigned") {
-    return { label: job.primaryRecruiter, type: "recruiter" };
-  }
-
-  // 4. Check if assignedTo has an explicit recruiter name or custom string
+  // 3. Check if assignedTo has comma-separated recruiters or explicit recruiter name
   if (rawAssigned && rawUpper !== "N/A" && rawUpper !== "UNASSIGNED" && rawUpper !== "NONE") {
-    return { label: rawAssigned, type: "recruiter" };
+    if (rawAssigned.includes(",")) {
+      const names = rawAssigned.split(",").map((s) => s.trim()).filter(Boolean);
+      if (names.length > 1) {
+        return {
+          label: `${names[0]} +${names.length - 1}`,
+          type: "recruiter",
+          names,
+          count: names.length,
+        };
+      }
+    }
+    return { label: rawAssigned, type: "recruiter", names: [rawAssigned], count: 1 };
+  }
+
+  // 4. Check if assigned to a Primary Recruiter
+  if (job.primaryRecruiter && job.primaryRecruiter !== "N/A" && job.primaryRecruiter.toLowerCase() !== "unassigned") {
+    return { label: job.primaryRecruiter, type: "recruiter", names: [job.primaryRecruiter], count: 1 };
   }
 
   // 5. Truly unassigned (not assigned to anyone, pod, or all)
-  return { label: "Unassigned", type: "unassigned" };
+  return { label: "Unassigned", type: "unassigned", count: 0 };
 }
 
 function isJobPostedToday(job: Job): boolean {
@@ -650,6 +667,7 @@ export default function DataTable({
   const [assignModalJob, setAssignModalJob] = useState<Job | null>(null);
   const [assignTab, setAssignTab] = useState<"pods" | "users">("pods");
   const [assignSearch, setAssignSearch] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
 
   // Assignment Context Data
@@ -744,26 +762,154 @@ export default function DataTable({
     return null;
   }, [assignModalJob, branchesList]);
 
+  // ─── ROLE & PERMISSION SCOPING FOR ASSIGNMENT ─────────────────────────
+  const userRoles = useMemo(() => {
+    return (currentUser?.roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
+  }, [currentUser]);
+
+  const userPerms = useMemo(() => {
+    return Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+  }, [currentUser]);
+
+  // Higher roles: Tenant Admin, Super Admin, Branch Admin, Delivery Head
+  const isSuperOrTenantAdmin = useMemo(() => {
+    return (
+      currentUser?.systemRole === "TENANT_ADMIN" ||
+      currentUser?.systemRole === "SUPER_ADMIN" ||
+      userRoles.includes("TENANTADMIN") ||
+      userRoles.includes("SUPERADMIN") ||
+      userPerms.includes("tenant:manage") ||
+      userPerms.includes("tenant:settings")
+    );
+  }, [currentUser, userRoles, userPerms]);
+
+  const isBranchAdmin = useMemo(() => {
+    return (
+      userRoles.includes("BRANCHADMIN") ||
+      userPerms.includes("branch_admin:manage") ||
+      userPerms.includes("branch:assign_user")
+    );
+  }, [userRoles, userPerms]);
+
+  const isDeliveryHead = useMemo(() => {
+    return userRoles.includes("DELIVERYHEAD") || userRoles.includes("DELIVERY_HEAD");
+  }, [userRoles]);
+
+  const isHigherRole = isSuperOrTenantAdmin || isBranchAdmin || isDeliveryHead;
+
+  // Account Manager role
+  const isAccountManager = useMemo(() => {
+    return (
+      userRoles.includes("ACCOUNTMANAGER") ||
+      userRoles.includes("ACCOUNT_MANAGER") ||
+      userRoles.includes("AM")
+    );
+  }, [userRoles]);
+
+  // Pod Head role & active pod detection
+  const myPod = useMemo(() => {
+    if (!currentUser) return null;
+    const uid = currentUser.id || (currentUser as any).dbId;
+    const email = (currentUser.email || "").toLowerCase();
+    return (
+      podsList.find(
+        (p: any) =>
+          p.podHeadId === uid ||
+          (p.podHeadEmail && p.podHeadEmail.toLowerCase() === email) ||
+          p.id === currentUser.podId ||
+          p.id === (currentUser as any).pod_id
+      ) || null
+    );
+  }, [podsList, currentUser]);
+
+  const isPodHead = useMemo(() => {
+    if (isHigherRole) return false;
+    if (
+      userRoles.includes("PODHEAD") ||
+      userRoles.includes("POD_HEAD") ||
+      userRoles.includes("PODLEAD") ||
+      userRoles.includes("POD_LEAD")
+    ) {
+      return true;
+    }
+    const uid = currentUser?.id || (currentUser as any)?.dbId;
+    const email = (currentUser?.email || "").toLowerCase();
+    return podsList.some(
+      (p: any) => p.podHeadId === uid || (p.podHeadEmail && p.podHeadEmail.toLowerCase() === email)
+    );
+  }, [isHigherRole, userRoles, currentUser, podsList]);
+
+  // ─── BRANCH POLICY ENFORCEMENT ─────────────────────────────────────────
+  const branchAllowsPods = useMemo(() => {
+    if (!assignModalTargetBranch) return true;
+    const allowNone = Boolean(assignModalTargetBranch.allowNone ?? assignModalTargetBranch.allow_none);
+    if (allowNone) return false; // allowNone = Direct Assignment Only
+    const allowPods = (assignModalTargetBranch.allowPods ?? assignModalTargetBranch.allow_pods) !== false;
+    return allowPods;
+  }, [assignModalTargetBranch]);
+
+  const branchAllowsDirectStaff = useMemo(() => {
+    if (!assignModalTargetBranch) return true;
+    const allowDirect = assignModalTargetBranch.allowDirect ?? assignModalTargetBranch.allow_direct;
+    if (allowDirect === false) return false;
+    const allowDirectStaff = assignModalTargetBranch.allowDirectStaff ?? assignModalTargetBranch.allow_direct_staff;
+    if (allowDirectStaff === false) return false;
+    return true;
+  }, [assignModalTargetBranch]);
+
+  // ─── SCOPED PODS & USERS (Role Scoping) ─────────────────────────────────
   const targetBranchPods = useMemo(() => {
     const bId = assignModalTargetBranch?.id;
-    if (!bId || bId === "all") return podsList;
-    const filtered = podsList.filter((p: any) => !p.branchId || !p.branch_id || p.branchId === bId || p.branch_id === bId);
-    return filtered.length > 0 ? filtered : podsList;
-  }, [podsList, assignModalTargetBranch]);
+    let list = podsList;
+    if (bId && bId !== "all") {
+      const filtered = podsList.filter(
+        (p: any) => !p.branchId || !p.branch_id || p.branchId === bId || p.branch_id === bId
+      );
+      list = filtered.length > 0 ? filtered : podsList;
+    }
+
+    // Role Scoping: If user is Pod Head (and not higher role), ONLY show their own pod!
+    if (isPodHead && myPod) {
+      return [myPod];
+    }
+    return list;
+  }, [podsList, assignModalTargetBranch, isPodHead, myPod]);
 
   const branchRecruiterUsers = useMemo(() => {
     const bId = assignModalTargetBranch?.id;
-    const scoped = usersList.filter((u: any) => {
-      if (u.isActive === false || u.is_active === false) return false;
-      if (!bId || bId === "all") return true;
-      const userBranchId = u.branchId || u.branch_id;
-      if (userBranchId === bId) return true;
-      const assignedBranches = Array.isArray(u.assignedBranchIds) ? u.assignedBranchIds : (Array.isArray(u.assigned_branch_ids) ? u.assigned_branch_ids : []);
-      if (assignedBranches.includes(bId)) return true;
-      return false;
-    });
-    return scoped.length > 0 ? scoped : usersList.filter((u: any) => u.isActive !== false && u.is_active !== false);
-  }, [usersList, assignModalTargetBranch]);
+    let list = usersList.filter((u: any) => u.isActive !== false && u.is_active !== false);
+    if (bId && bId !== "all") {
+      const scoped = list.filter((u: any) => {
+        const userBranchId = u.branchId || u.branch_id;
+        if (userBranchId === bId) return true;
+        const assignedBranches = Array.isArray(u.assignedBranchIds)
+          ? u.assignedBranchIds
+          : Array.isArray(u.assigned_branch_ids)
+          ? u.assigned_branch_ids
+          : [];
+        if (assignedBranches.includes(bId)) return true;
+        return false;
+      });
+      if (scoped.length > 0) list = scoped;
+    }
+
+    // Role Scoping: If user is Pod Head (and not higher role), ONLY show recruiters in their own pod!
+    if (isPodHead && myPod) {
+      const myPodId = myPod.id;
+      const myPodMemberIds = new Set(
+        (myPod.users || myPod.members || []).map((m: any) => m.id || m.userId).filter(Boolean)
+      );
+      return list.filter(
+        (u: any) =>
+          u.podId === myPodId ||
+          u.pod_id === myPodId ||
+          myPodMemberIds.has(u.id) ||
+          u.id === myPod.podHeadId
+      );
+    }
+
+    return list;
+  }, [usersList, assignModalTargetBranch, isPodHead, myPod]);
 
   const filteredPods = useMemo(() => {
     const q = assignSearch.trim().toLowerCase();
@@ -805,38 +951,105 @@ export default function DataTable({
     setAssignSearch("");
     setIsAssigning(false);
 
-    // Auto-select tab based on current assignment
-    if (job.podId && job.podId !== "none") {
+    // Initial selected user IDs
+    const initialSelected: string[] = [];
+    if (job.primaryRecruiterId) {
+      initialSelected.push(job.primaryRecruiterId);
+    }
+    // Also parse comma-separated names in assignedTo if multiple
+    if (
+      job.assignedTo &&
+      job.assignedTo !== "Unassigned" &&
+      !job.assignedTo.toUpperCase().startsWith("ALL") &&
+      !job.podId
+    ) {
+      const names = job.assignedTo.split(",").map((s) => s.trim().toLowerCase());
+      for (const u of usersList) {
+        const uName = (u.fullName || u.name || "").toLowerCase();
+        if (names.includes(uName) && !initialSelected.includes(u.id)) {
+          initialSelected.push(u.id);
+        }
+      }
+    }
+    setSelectedUserIds(initialSelected);
+
+    // Auto-select tab based on branch policy and current assignment
+    if (!branchAllowsPods) {
+      setAssignTab("users");
+    } else if (!branchAllowsDirectStaff) {
       setAssignTab("pods");
-    } else if (job.primaryRecruiterId || (job.assignedTo && job.assignedTo !== "Unassigned" && !job.assignedTo.toLowerCase().includes("pod"))) {
+    } else if (job.podId && job.podId !== "none") {
+      setAssignTab("pods");
+    } else if (job.primaryRecruiterId || initialSelected.length > 0) {
       setAssignTab("users");
     } else {
       setAssignTab(targetBranchPods.length > 0 ? "pods" : "users");
     }
   };
 
+  const handleToggleUserSelection = (userId: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleSelectAllFiltered = () => {
+    const filteredIds = filteredUsers.map((u: any) => u.id);
+    const allSelected = filteredIds.length > 0 && filteredIds.every((id: string) => selectedUserIds.includes(id));
+    if (allSelected) {
+      setSelectedUserIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
+    } else {
+      setSelectedUserIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+    }
+  };
+
   const handleExecuteAssignment = async (
-    type: "pod" | "user" | "unassign",
-    targetId: string,
-    targetName: string
+    type: "pod" | "users" | "unassign",
+    targetIdOrIds: string | string[],
+    targetName?: string
   ) => {
     if (!assignModalJob) return;
     setIsAssigning(true);
     try {
       const payload: Record<string, any> = {};
+      let displayName = "";
+
       if (type === "pod") {
-        payload.podId = targetId;
-        payload.assignedTo = targetName;
-        payload.podName = targetName;
+        const podId = targetIdOrIds as string;
+        displayName = targetName || "Recruitment Pod";
+        payload.podId = podId;
+        payload.assignedTo = displayName;
+        payload.podName = displayName;
         payload.primaryRecruiter = "N/A";
         payload.primaryRecruiterId = null;
-      } else if (type === "user") {
-        payload.primaryRecruiterId = targetId;
-        payload.assignedTo = targetName;
-        payload.primaryRecruiter = targetName;
-        payload.podId = "none";
-        payload.podName = "";
+      } else if (type === "users") {
+        const userIds = Array.isArray(targetIdOrIds) ? targetIdOrIds : [targetIdOrIds];
+        if (userIds.length === 0) {
+          toast.error("Please select at least one recruiter to assign.");
+          setIsAssigning(false);
+          return;
+        }
+
+        const selectedUsers = usersList.filter((u) => userIds.includes(u.id));
+        const names = selectedUsers.map((u) => u.fullName || u.name || u.email);
+        displayName = names.join(", ");
+
+        payload.primaryRecruiterId = userIds[0];
+        payload.primaryRecruiter = selectedUsers[0]?.fullName || selectedUsers[0]?.name || names[0];
+        payload.assignedTo = displayName;
+
+        // Pod Heads preserve the existing pod mapping so the job remains anchored to their pod
+        if (isPodHead) {
+          if (assignModalJob.podId && assignModalJob.podId !== "none") {
+            payload.podId = assignModalJob.podId;
+            payload.podName = assignModalJob.podName || "";
+          }
+        } else {
+          payload.podId = "none";
+          payload.podName = "";
+        }
       } else {
+        displayName = "Unassigned";
         payload.assignedTo = "Unassigned";
         payload.primaryRecruiter = "N/A";
         payload.primaryRecruiterId = null;
@@ -845,7 +1058,11 @@ export default function DataTable({
       }
 
       await atsApi.jobs.update(assignModalJob.id, payload);
-      toast.success(`Job assigned to ${targetName}`);
+      toast.success(
+        type === "users" && Array.isArray(targetIdOrIds) && targetIdOrIds.length > 1
+          ? `Job assigned to ${targetIdOrIds.length} recruiters (${displayName})`
+          : `Job assigned to ${displayName}`
+      );
 
       if (onUpdateJob) {
         onUpdateJob(assignModalJob.id, payload);
@@ -2029,17 +2246,31 @@ export default function DataTable({
                                 }
                                 if (assignInfo.type === "pod") {
                                   return (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 min-w-0" title={`Assigned Pod: ${assignInfo.label}`}>
-                                      <Users className="h-3 w-3 shrink-0 text-slate-500 dark:text-slate-400" />
-                                      <span className="truncate max-w-[130px]">{assignInfo.label}</span>
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 min-w-0" title={`Assigned Pod: ${assignInfo.label}`}>
+                                      <Users className="h-3 w-3 shrink-0 text-indigo-500 dark:text-indigo-400" />
+                                      <span className="truncate max-w-[130px] font-medium">{assignInfo.label}</span>
                                     </span>
                                   );
                                 }
                                 if (assignInfo.type === "recruiter") {
+                                  const isMulti = (assignInfo.count || 1) > 1;
+                                  const fullTooltip = assignInfo.names && assignInfo.names.length > 0 ? assignInfo.names.join(", ") : assignInfo.label;
                                   return (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 min-w-0" title={`Assigned Recruiter: ${assignInfo.label}`}>
-                                      <User className="h-3 w-3 shrink-0 text-slate-500 dark:text-slate-400" />
-                                      <span className="truncate max-w-[130px]">{assignInfo.label}</span>
+                                    <span
+                                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 min-w-0"
+                                      title={`Assigned Recruiter${isMulti ? "s" : ""}: ${fullTooltip}`}
+                                    >
+                                      {isMulti ? (
+                                        <Users className="h-3 w-3 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                                      ) : (
+                                        <User className="h-3 w-3 shrink-0 text-slate-500 dark:text-slate-400" />
+                                      )}
+                                      <span className="truncate max-w-[110px]">{assignInfo.names ? assignInfo.names[0] : assignInfo.label}</span>
+                                      {isMulti && (
+                                        <span className="ml-0.5 px-1 py-0.2 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[9.5px] font-bold">
+                                          +{assignInfo.count! - 1}
+                                        </span>
+                                      )}
                                     </span>
                                   );
                                 }
@@ -2052,10 +2283,10 @@ export default function DataTable({
                               {hasEditPermission && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); openAssignModal(job, "assignedTo"); }}
-                                  className="text-neutral-400 hover:text-blue-500 hover:bg-neutral-100 dark:hover:bg-slate-800 p-0.5 rounded transition-colors cursor-pointer shrink-0 ml-auto"
-                                  title="Change Assignment"
+                                  className="h-5 w-5 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800 rounded transition-colors cursor-pointer shrink-0 ml-auto"
+                                  title="Assign Staff / Pod (+)"
                                 >
-                                  <Pencil className="h-3 w-3" />
+                                  <Plus className="h-3.5 w-3.5" />
                                 </button>
                               )}
                             </div>
@@ -2450,6 +2681,20 @@ export default function DataTable({
                   </div>
                   <span>Quick Edit</span>
                 </button>
+
+                <button
+                  onClick={() => {
+                    const job = data.find((j) => j.id === contextMenu.jobId);
+                    if (job) openAssignModal(job, "assignedTo");
+                    closeContextMenu();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer font-semibold"
+                >
+                  <div className="h-6 w-6 rounded-md bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-2xs">
+                    <Plus className="h-3.5 w-3.5" />
+                  </div>
+                  <span>Assign Staff / Pod</span>
+                </button>
               </>
             )}
 
@@ -2532,7 +2777,7 @@ export default function DataTable({
 
       {/* Assign Team / Recruiter Modal Dialog */}
       <Dialog open={!!assignModalJob} onOpenChange={(open) => !open && setAssignModalJob(null)}>
-        <DialogContent className="max-w-lg p-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+        <DialogContent className="max-w-xl p-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xl">
           <DialogHeader className="p-4 pb-3 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/70 dark:bg-slate-850/70">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-lg shrink-0 border border-indigo-100 dark:border-indigo-900/50">
@@ -2540,10 +2785,10 @@ export default function DataTable({
               </div>
               <div>
                 <DialogTitle className="text-sm font-bold text-slate-900 dark:text-white">
-                  Assign Team / Recruiter
+                  Assign Team / Recruiters
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
-                  Assign requirement to a recruitment pod or team member
+                  Assign requirement to a recruitment pod or select one or more recruiters
                 </DialogDescription>
               </div>
             </div>
@@ -2575,40 +2820,93 @@ export default function DataTable({
             )}
           </DialogHeader>
 
+          {/* Role Scoping Notice */}
+          {isHigherRole ? (
+            <div className="mx-4 mt-2.5 px-3 py-1.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center gap-2 text-[11px] text-emerald-800 dark:text-emerald-300">
+              <Crown className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span><strong>Leadership Scope:</strong> Full authority to assign any recruitment pod or team member across this branch.</span>
+            </div>
+          ) : isPodHead ? (
+            <div className="mx-4 mt-2.5 px-3 py-1.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex items-center gap-2 text-[11px] text-indigo-800 dark:text-indigo-300">
+              <Shield className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span><strong>Pod Lead Scope:</strong> You can assign requirement to your pod {myPod ? `(${myPod.name})` : ""} or its active recruiters.</span>
+            </div>
+          ) : isAccountManager ? (
+            <div className="mx-4 mt-2.5 px-3 py-1.5 rounded-md bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 flex items-center gap-2 text-[11px] text-sky-800 dark:text-sky-300">
+              <Briefcase className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+              <span><strong>Account Manager Scope:</strong> Assignment options are governed by branch operating policies.</span>
+            </div>
+          ) : null}
+
+          {/* Branch Policy Alert */}
+          {!branchAllowsDirectStaff ? (
+            <div className="mx-4 mt-2 px-3 py-1.5 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-[11px] text-amber-800 dark:text-amber-300">
+              <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span><strong>Branch Policy Notice:</strong> Direct staff assignment is disabled. Requirements must be routed to Recruitment Pods.</span>
+            </div>
+          ) : !branchAllowsPods ? (
+            <div className="mx-4 mt-2 px-3 py-1.5 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-[11px] text-amber-800 dark:text-amber-300">
+              <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span><strong>Branch Policy Notice:</strong> Recruitment Pods are disabled for this branch. Direct recruiter assignments only.</span>
+            </div>
+          ) : null}
+
           {/* Tab Selector: Pods vs Individual Users */}
           <div className="px-4 pt-3 pb-1 flex items-center gap-2 border-b border-neutral-100 dark:border-slate-800">
-            {targetBranchPods.length > 0 && (
-              <button
-                type="button"
-                onClick={() => { setAssignTab("pods"); setAssignSearch(""); }}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
-                  assignTab === "pods"
-                    ? "bg-indigo-600 text-white shadow-xs"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750"
-                )}
-              >
-                <Icon icon="heroicons:squares-plus" className="h-3.5 w-3.5" />
-                Recruitment Pods ({targetBranchPods.length})
-              </button>
-            )}
             <button
               type="button"
-              onClick={() => { setAssignTab("users"); setAssignSearch(""); }}
+              disabled={!branchAllowsPods}
+              onClick={() => {
+                if (branchAllowsPods) {
+                  setAssignTab("pods");
+                  setAssignSearch("");
+                }
+              }}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
-                assignTab === "users"
-                  ? "bg-indigo-600 text-white shadow-xs"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750"
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                !branchAllowsPods
+                  ? "opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400"
+                  : assignTab === "pods"
+                  ? "bg-indigo-600 text-white shadow-xs cursor-pointer"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750 cursor-pointer"
+              )}
+            >
+              <Icon icon="heroicons:squares-plus" className="h-3.5 w-3.5" />
+              Recruitment Pods ({targetBranchPods.length})
+              {!branchAllowsPods && <Lock className="h-3 w-3 ml-0.5 text-slate-400" />}
+            </button>
+
+            <button
+              type="button"
+              disabled={!branchAllowsDirectStaff}
+              onClick={() => {
+                if (branchAllowsDirectStaff) {
+                  setAssignTab("users");
+                  setAssignSearch("");
+                }
+              }}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                !branchAllowsDirectStaff
+                  ? "opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400"
+                  : assignTab === "users"
+                  ? "bg-indigo-600 text-white shadow-xs cursor-pointer"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750 cursor-pointer"
               )}
             >
               <Icon icon="heroicons:user" className="h-3.5 w-3.5" />
               Recruiters & Staff ({branchRecruiterUsers.length})
+              {selectedUserIds.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 text-[10px] rounded-full bg-white/20 text-white font-mono font-bold">
+                  {selectedUserIds.length}
+                </span>
+              )}
+              {!branchAllowsDirectStaff && <Lock className="h-3 w-3 ml-0.5 text-slate-400" />}
             </button>
           </div>
 
-          {/* Search Box */}
-          <div className="px-4 pt-2.5">
+          {/* Search Box & Multi-Select Toolbar */}
+          <div className="px-4 pt-2.5 space-y-2">
             <div className="relative">
               <Icon icon="heroicons:magnifying-glass" className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
               <Input
@@ -2619,10 +2917,51 @@ export default function DataTable({
                 autoFocus
               />
             </div>
+
+            {assignTab === "users" && (
+              <div className="flex items-center justify-between text-xs py-1 px-0.5 border-b border-dashed border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSelectAllFiltered}
+                    className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <CheckSquare className="h-3 w-3" />
+                    {filteredUsers.length > 0 && filteredUsers.every((u: any) => selectedUserIds.includes(u.id))
+                      ? "Deselect All Filtered"
+                      : `Select All Filtered (${filteredUsers.length})`}
+                  </button>
+
+                  {selectedUserIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedUserIds([])}
+                      className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{selectedUserIds.length}</strong> selected
+                  </span>
+                  <Button
+                    size="sm"
+                    disabled={isAssigning || selectedUserIds.length === 0}
+                    onClick={() => handleExecuteAssignment("users", selectedUserIds)}
+                    className="h-7 px-3 text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs"
+                  >
+                    {isAssigning ? "Assigning..." : `Assign Selected (${selectedUserIds.length})`}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Selection List */}
-          <div className="p-4 flex-1 overflow-y-auto max-h-[280px] space-y-2">
+          <div className="p-4 flex-1 overflow-y-auto max-h-[300px] space-y-2">
             {assignTab === "pods" ? (
               filteredPods.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400">
@@ -2692,33 +3031,54 @@ export default function DataTable({
                 </div>
               ) : (
                 filteredUsers.map((u: any) => {
+                  const isSelected = selectedUserIds.includes(u.id);
                   const isCurrent =
                     assignModalJob?.primaryRecruiterId === u.id ||
-                    assignModalJob?.assignedTo?.toLowerCase() === (u.fullName || u.name || "").toLowerCase() ||
-                    assignModalJob?.assignedTo?.toLowerCase() === u.email?.toLowerCase();
+                    assignModalJob?.assignedTo?.toLowerCase().includes((u.fullName || u.name || "").toLowerCase()) ||
+                    assignModalJob?.assignedTo?.toLowerCase().includes((u.email || "").toLowerCase());
                   const roleLabel = getUserRoleLabel(u, assignModalTargetBranch?.id);
+
                   return (
                     <div
                       key={u.id}
+                      onClick={() => handleToggleUserSelection(u.id)}
                       className={cn(
-                        "p-2.5 rounded-lg border flex items-center justify-between gap-3 text-xs transition-colors",
-                        isCurrent
-                          ? "border-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/30 dark:border-indigo-800"
+                        "p-2.5 rounded-lg border flex items-center justify-between gap-3 text-xs transition-all cursor-pointer select-none",
+                        isSelected
+                          ? "border-indigo-500 bg-indigo-50/80 dark:bg-indigo-950/40 dark:border-indigo-600 shadow-2xs ring-1 ring-indigo-400/50"
+                          : isCurrent
+                          ? "border-slate-300 bg-slate-50/70 dark:bg-slate-800/40 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
                           : "border-neutral-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850"
                       )}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
+                        {/* Checkbox Icon */}
+                        <div
+                          className={cn(
+                            "h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors border",
+                            isSelected
+                              ? "bg-indigo-600 border-indigo-600 text-white"
+                              : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-transparent"
+                          )}
+                        >
+                          <Check className="h-3 w-3 stroke-[3]" />
+                        </div>
+
+                        {/* User Avatar Initials */}
                         <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-[10.5px] shrink-0 uppercase">
                           {(u.fullName || u.name || u.email || "U").substring(0, 2)}
                         </div>
+
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-slate-900 dark:text-white truncate">{u.fullName || u.name}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-slate-900 dark:text-white truncate">
+                              {u.fullName || u.name}
+                            </span>
                             <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800">
                               {roleLabel}
                             </span>
                             {isCurrent && (
-                              <Badge className="text-[9px] bg-indigo-600 text-white font-bold py-0 h-4">
+                              <Badge variant="outline" className="text-[9px] font-semibold text-slate-500 border-slate-300 dark:border-slate-600 py-0 h-4">
                                 Current
                               </Badge>
                             )}
@@ -2726,19 +3086,24 @@ export default function DataTable({
                           <p className="text-[11px] text-slate-400 font-mono truncate">{u.email}</p>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        disabled={isAssigning}
-                        onClick={() => handleExecuteAssignment("user", u.id, u.fullName || u.name || u.email)}
-                        className={cn(
-                          "h-7 px-3 text-[11px] font-bold cursor-pointer shrink-0",
-                          isCurrent
-                            ? "bg-indigo-100 text-indigo-800 hover:bg-indigo-200 dark:bg-indigo-900 dark:text-indigo-200"
-                            : "bg-indigo-600 hover:bg-indigo-700 text-white"
-                        )}
-                      >
-                        {isAssigning ? "Assigning..." : isCurrent ? "Re-assign" : "Assign"}
-                      </Button>
+
+                      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          variant={isSelected ? "default" : "outline"}
+                          disabled={isAssigning}
+                          onClick={() => handleExecuteAssignment("users", [u.id], u.fullName || u.name || u.email)}
+                          className={cn(
+                            "h-6.5 px-2 text-[10.5px] font-medium cursor-pointer",
+                            isSelected
+                              ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                              : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                          )}
+                          title="Assign only this recruiter"
+                        >
+                          Assign Solo
+                        </Button>
+                      </div>
                     </div>
                   );
                 })
@@ -2746,7 +3111,7 @@ export default function DataTable({
             )}
           </div>
 
-          {/* Footer: Mark Unassigned or Cancel */}
+          {/* Footer: Mark Unassigned or Multi-Assign / Cancel */}
           <DialogFooter className="p-3 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850/50 flex flex-row items-center justify-between sm:justify-between">
             <Button
               type="button"
@@ -2758,16 +3123,30 @@ export default function DataTable({
             >
               Clear Assignment (Unassigned)
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isAssigning}
-              onClick={() => setAssignModalJob(null)}
-              className="text-xs h-8 cursor-pointer"
-            >
-              Cancel
-            </Button>
+
+            <div className="flex items-center gap-2">
+              {assignTab === "users" && selectedUserIds.length > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={isAssigning}
+                  onClick={() => handleExecuteAssignment("users", selectedUserIds)}
+                  className="h-8 px-3 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs"
+                >
+                  {isAssigning ? "Assigning..." : `Assign Selected (${selectedUserIds.length})`}
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isAssigning}
+                onClick={() => setAssignModalJob(null)}
+                className="text-xs h-8 cursor-pointer"
+              >
+                Cancel
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
