@@ -340,7 +340,7 @@ export default function JobPostingDashboard({
       { id: "businessUnit", label: "Business Unit" },
       { id: "jobStatus", label: "Job Status" },
       { id: "createdBy", label: "Job Created By" },
-      { id: "assignedTo", label: "Assigned To" },
+      { id: "assignedTo", label: "Pods & Recruiters" },
       { id: "client", label: "Client" },
       { id: "endClientName", label: "End Client" },
       { id: "clientJobId", label: "Client Job ID" },

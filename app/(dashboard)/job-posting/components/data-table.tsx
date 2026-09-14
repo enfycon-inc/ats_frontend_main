@@ -22,6 +22,8 @@ import {
   Users,
   User,
   Sparkles,
+  X,
+  Loader2,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
@@ -69,46 +71,119 @@ import { AddClientModal } from "./add-client-modal";
 
 export function getAssignedPersonDisplay(job: Job): {
   label: string;
-  type: "all" | "pod" | "recruiter" | "unassigned";
+  type: "all" | "pod" | "recruiter" | "unassigned" | "both";
   names?: string[];
   count?: number;
+  isUnassigned?: boolean;
+  pods?: {
+    names: string[];
+    count: number;
+    label: string;
+  } | null;
+  recruiters?: {
+    names: string[];
+    count: number;
+    label: string;
+  } | null;
 } {
   const rawAssigned = (job.assignedTo || "").trim();
   const rawUpper = rawAssigned.toUpperCase();
 
   // 1. Check if assigned to ALL branch recruiters
   if (rawUpper === "ALL" || rawUpper.startsWith("ALL ") || rawUpper === "ALL RECRUITERS") {
-    return { label: "All recruiters", type: "all", count: 0 };
+    return { label: "All recruiters", type: "all", count: 0, isUnassigned: false };
   }
 
-  // 2. Check if assigned to a specific Recruitment Pod
-  if (job.podName && job.podName !== "N/A" && job.podName.toLowerCase() !== "unassigned") {
-    return { label: job.podName, type: "pod", count: 1 };
-  }
+  // 2. Extract Pods info
+  let podsInfo: { names: string[]; count: number; label: string } | null = null;
+  const isPodAssigned =
+    (job.podName && job.podName !== "N/A" && job.podName.toLowerCase() !== "unassigned") ||
+    (job.podId && job.podId !== "none" && job.podId !== "off");
 
-  // 3. Check if assignedTo has comma-separated recruiters or explicit recruiter name
-  if (rawAssigned && rawUpper !== "N/A" && rawUpper !== "UNASSIGNED" && rawUpper !== "NONE") {
-    if (rawAssigned.includes(",")) {
-      const names = rawAssigned.split(",").map((s) => s.trim()).filter(Boolean);
-      if (names.length > 1) {
-        return {
-          label: `${names[0]} +${names.length - 1}`,
-          type: "recruiter",
+  if (isPodAssigned) {
+    const podStr = (job.podName && job.podName !== "N/A" && job.podName.toLowerCase() !== "unassigned" ? job.podName : "") || "";
+    if (podStr) {
+      const names = podStr.split(",").map((s) => s.trim()).filter(Boolean);
+      if (names.length > 0) {
+        podsInfo = {
           names,
           count: names.length,
+          label: names.length > 1 ? `${names[0]} +${names.length - 1}` : names[0],
         };
       }
+    } else if (job.podId && job.podId !== "none") {
+      podsInfo = {
+        names: ["Recruitment Pod"],
+        count: 1,
+        label: "Recruitment Pod",
+      };
     }
-    return { label: rawAssigned, type: "recruiter", names: [rawAssigned], count: 1 };
   }
 
-  // 4. Check if assigned to a Primary Recruiter
-  if (job.primaryRecruiter && job.primaryRecruiter !== "N/A" && job.primaryRecruiter.toLowerCase() !== "unassigned") {
-    return { label: job.primaryRecruiter, type: "recruiter", names: [job.primaryRecruiter], count: 1 };
+  // 3. Extract Recruiters info
+  let recruitersInfo: { names: string[]; count: number; label: string } | null = null;
+  const podNamesLower = podsInfo ? podsInfo.names.map((n) => n.toLowerCase()) : [];
+
+  if (rawAssigned && rawUpper !== "N/A" && rawUpper !== "UNASSIGNED" && rawUpper !== "NONE") {
+    const assignedTokens = rawAssigned.split(",").map((s) => s.trim()).filter(Boolean);
+    const nonPodRecruiterNames = assignedTokens.filter(
+      (t) => !podNamesLower.includes(t.toLowerCase())
+    );
+
+    if (nonPodRecruiterNames.length > 0) {
+      recruitersInfo = {
+        names: nonPodRecruiterNames,
+        count: nonPodRecruiterNames.length,
+        label: nonPodRecruiterNames.length > 1 ? `${nonPodRecruiterNames[0]} +${nonPodRecruiterNames.length - 1}` : nonPodRecruiterNames[0],
+      };
+    }
   }
 
-  // 5. Truly unassigned (not assigned to anyone, pod, or all)
-  return { label: "Unassigned", type: "unassigned", count: 0 };
+  if (!recruitersInfo && job.primaryRecruiter && job.primaryRecruiter !== "N/A" && job.primaryRecruiter.toLowerCase() !== "unassigned") {
+    if (!podNamesLower.includes(job.primaryRecruiter.toLowerCase())) {
+      recruitersInfo = {
+        names: [job.primaryRecruiter],
+        count: 1,
+        label: job.primaryRecruiter,
+      };
+    }
+  }
+
+  // Combine outcomes:
+  if (podsInfo && recruitersInfo) {
+    return {
+      label: `${podsInfo.label} • ${recruitersInfo.label}`,
+      type: "both",
+      pods: podsInfo,
+      recruiters: recruitersInfo,
+      count: podsInfo.count + recruitersInfo.count,
+      isUnassigned: false,
+    };
+  }
+
+  if (podsInfo) {
+    return {
+      label: podsInfo.label,
+      type: "pod",
+      names: podsInfo.names,
+      count: podsInfo.count,
+      pods: podsInfo,
+      isUnassigned: false,
+    };
+  }
+
+  if (recruitersInfo) {
+    return {
+      label: recruitersInfo.label,
+      type: "recruiter",
+      names: recruitersInfo.names,
+      count: recruitersInfo.count,
+      recruiters: recruitersInfo,
+      isUnassigned: false,
+    };
+  }
+
+  return { label: "Unassigned", type: "unassigned", count: 0, isUnassigned: true };
 }
 
 function isJobPostedToday(job: Job): boolean {
@@ -668,7 +743,9 @@ export default function DataTable({
   const [assignTab, setAssignTab] = useState<"pods" | "users">("pods");
   const [assignSearch, setAssignSearch] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [selectedPodIds, setSelectedPodIds] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [recruiterFilterMode, setRecruiterFilterMode] = useState<"all" | "podMembers">("all");
 
   // Assignment Context Data
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -921,16 +998,38 @@ export default function DataTable({
     });
   }, [targetBranchPods, assignSearch]);
 
+  const isUserInSelectedPods = useCallback((userId: string, userPodId?: string) => {
+    if (selectedPodIds.length === 0) return false;
+    if (userPodId && selectedPodIds.includes(userPodId)) return true;
+    for (const pid of selectedPodIds) {
+      const pod = targetBranchPods.find((p: any) => p.id === pid) || (podsList || []).find((p: any) => p.id === pid);
+      if (pod) {
+        if (pod.podHeadId === userId) return true;
+        if (Array.isArray(pod.members) && pod.members.some((m: any) => (m.id || m.userId) === userId)) return true;
+        if (Array.isArray(pod.users) && pod.users.some((m: any) => (m.id || m.userId) === userId)) return true;
+      }
+    }
+    return false;
+  }, [selectedPodIds, targetBranchPods, podsList]);
+
   const filteredUsers = useMemo(() => {
     const q = assignSearch.trim().toLowerCase();
-    if (!q) return branchRecruiterUsers;
-    return branchRecruiterUsers.filter((u: any) => {
+    let list = branchRecruiterUsers;
+    if (selectedPodIds.length > 0 && recruiterFilterMode === "podMembers") {
+      list = list.filter((u: any) => isUserInSelectedPods(u.id, u.podId || u.pod_id));
+    }
+    if (!q) return list;
+    return list.filter((u: any) => {
       const name = (u.fullName || u.name || "").toLowerCase();
       const email = (u.email || "").toLowerCase();
       const role = getUserRoleLabel(u, assignModalTargetBranch?.id).toLowerCase();
       return name.includes(q) || email.includes(q) || role.includes(q);
     });
-  }, [branchRecruiterUsers, assignSearch, getUserRoleLabel, assignModalTargetBranch]);
+  }, [branchRecruiterUsers, assignSearch, getUserRoleLabel, assignModalTargetBranch, selectedPodIds, recruiterFilterMode, isUserInSelectedPods]);
+
+  const selectedPodMembersCount = useMemo(() => {
+    return branchRecruiterUsers.filter((u: any) => isUserInSelectedPods(u.id, u.podId || u.pod_id)).length;
+  }, [branchRecruiterUsers, isUserInSelectedPods]);
 
   const openStatusModal = (job: Job) => {
     setStatusModalJob(job);
@@ -950,18 +1049,36 @@ export default function DataTable({
     setAssignModalJob(job);
     setAssignSearch("");
     setIsAssigning(false);
+    setRecruiterFilterMode("all");
 
-    // Initial selected user IDs
+    // Initial selected pod IDs
+    const initialPodIds: string[] = [];
+    if (job.podId && job.podId !== "none" && job.podId !== "off") {
+      const pIds = job.podId.split(",").map((s) => s.trim()).filter(Boolean);
+      initialPodIds.push(...pIds);
+    }
+    const podStr = (job.podName && job.podName !== "N/A" && job.podName.toLowerCase() !== "unassigned") ? job.podName : "";
+    if (podStr) {
+      const podNames = podStr.split(",").map((s) => s.trim().toLowerCase());
+      for (const p of targetBranchPods) {
+        const pName = (p.name || "").toLowerCase();
+        if (podNames.includes(pName) && !initialPodIds.includes(p.id)) {
+          initialPodIds.push(p.id);
+        }
+      }
+    }
+    setSelectedPodIds(initialPodIds);
+
+    // Initial selected user IDs (recruiters)
     const initialSelected: string[] = [];
     if (job.primaryRecruiterId) {
       initialSelected.push(job.primaryRecruiterId);
     }
-    // Also parse comma-separated names in assignedTo if multiple
+
     if (
       job.assignedTo &&
       job.assignedTo !== "Unassigned" &&
-      !job.assignedTo.toUpperCase().startsWith("ALL") &&
-      !job.podId
+      !job.assignedTo.toUpperCase().startsWith("ALL")
     ) {
       const names = job.assignedTo.split(",").map((s) => s.trim().toLowerCase());
       for (const u of usersList) {
@@ -978,12 +1095,28 @@ export default function DataTable({
       setAssignTab("users");
     } else if (!branchAllowsDirectStaff) {
       setAssignTab("pods");
-    } else if (job.podId && job.podId !== "none") {
+    } else if (initialPodIds.length > 0) {
       setAssignTab("pods");
-    } else if (job.primaryRecruiterId || initialSelected.length > 0) {
+    } else if (initialSelected.length > 0) {
       setAssignTab("users");
     } else {
       setAssignTab(targetBranchPods.length > 0 ? "pods" : "users");
+    }
+  };
+
+  const handleTogglePodSelection = (podId: string) => {
+    setSelectedPodIds((prev) =>
+      prev.includes(podId) ? prev.filter((id) => id !== podId) : [...prev, podId]
+    );
+  };
+
+  const handleSelectAllFilteredPods = () => {
+    const filteredIds = filteredPods.map((p: any) => p.id);
+    const allSelected = filteredIds.length > 0 && filteredIds.every((id: string) => selectedPodIds.includes(id));
+    if (allSelected) {
+      setSelectedPodIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
+    } else {
+      setSelectedPodIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
     }
   };
 
@@ -1003,72 +1136,77 @@ export default function DataTable({
     }
   };
 
-  const handleExecuteAssignment = async (
-    type: "pod" | "users" | "unassign",
-    targetIdOrIds: string | string[],
-    targetName?: string
-  ) => {
+  const handleSaveCombinedAssignment = async (override?: {
+    unassignAll?: boolean;
+  }) => {
     if (!assignModalJob) return;
     setIsAssigning(true);
     try {
       const payload: Record<string, any> = {};
-      let displayName = "";
 
-      if (type === "pod") {
-        const podId = targetIdOrIds as string;
-        displayName = targetName || "Recruitment Pod";
-        payload.podId = podId;
-        payload.assignedTo = displayName;
-        payload.podName = displayName;
-        payload.primaryRecruiter = "N/A";
-        payload.primaryRecruiterId = null;
-      } else if (type === "users") {
-        const userIds = Array.isArray(targetIdOrIds) ? targetIdOrIds : [targetIdOrIds];
-        if (userIds.length === 0) {
-          toast.error("Please select at least one recruiter to assign.");
-          setIsAssigning(false);
-          return;
-        }
-
-        const selectedUsers = usersList.filter((u) => userIds.includes(u.id));
-        const names = selectedUsers.map((u) => u.fullName || u.name || u.email);
-        displayName = names.join(", ");
-
-        payload.primaryRecruiterId = userIds[0];
-        payload.primaryRecruiter = selectedUsers[0]?.fullName || selectedUsers[0]?.name || names[0];
-        payload.assignedTo = displayName;
-
-        // Pod Heads preserve the existing pod mapping so the job remains anchored to their pod
-        if (isPodHead) {
-          if (assignModalJob.podId && assignModalJob.podId !== "none") {
-            payload.podId = assignModalJob.podId;
-            payload.podName = assignModalJob.podName || "";
-          }
-        } else {
-          payload.podId = "none";
-          payload.podName = "";
-        }
-      } else {
-        displayName = "Unassigned";
+      if (override?.unassignAll) {
+        payload.podId = "none";
+        payload.podIds = [];
+        payload.podName = "N/A";
         payload.assignedTo = "Unassigned";
         payload.primaryRecruiter = "N/A";
         payload.primaryRecruiterId = null;
-        payload.podId = "none";
-        payload.podName = "";
+      } else {
+        // 1. Pods assignment:
+        if (selectedPodIds.length > 0) {
+          const allPods = [...podsList, ...targetBranchPods];
+          const selectedPods = selectedPodIds.map((id) => allPods.find((p: any) => p.id === id)).filter(Boolean);
+          const podNames = Array.from(new Set(selectedPods.map((p: any) => p.name || "Pod")));
+          payload.podId = selectedPodIds[0];
+          payload.podIds = selectedPodIds;
+          payload.podName = podNames.join(", ");
+        } else {
+          payload.podId = "none";
+          payload.podIds = [];
+          payload.podName = "N/A";
+        }
+
+        // 2. Recruiters assignment:
+        if (selectedUserIds.length > 0) {
+          const selectedUsers = usersList.filter((u) => selectedUserIds.includes(u.id));
+          const recruiterNames = selectedUsers.map((u) => u.fullName || u.name || u.email);
+          payload.assignedTo = recruiterNames.join(", ");
+          payload.primaryRecruiterId = selectedUserIds[0];
+          payload.primaryRecruiter = selectedUsers[0]?.fullName || selectedUsers[0]?.name || recruiterNames[0];
+        } else {
+          payload.assignedTo = "Unassigned";
+          payload.primaryRecruiter = "N/A";
+          payload.primaryRecruiterId = null;
+        }
       }
 
       await atsApi.jobs.update(assignModalJob.id, payload);
-      toast.success(
-        type === "users" && Array.isArray(targetIdOrIds) && targetIdOrIds.length > 1
-          ? `Job assigned to ${targetIdOrIds.length} recruiters (${displayName})`
-          : `Job assigned to ${displayName}`
-      );
 
       if (onUpdateJob) {
-        onUpdateJob(assignModalJob.id, payload);
+        onUpdateJob(assignModalJob.id, {
+          podId: payload.podId,
+          podName: payload.podName,
+          assignedTo: payload.assignedTo,
+          primaryRecruiter: payload.primaryRecruiter,
+          primaryRecruiterId: payload.primaryRecruiterId,
+        } as any);
       }
       if (onRefresh) {
         onRefresh();
+      }
+
+      const summaryParts: string[] = [];
+      if (selectedPodIds.length > 0 && !override?.unassignAll) {
+        summaryParts.push(`${selectedPodIds.length} Pod${selectedPodIds.length > 1 ? "s" : ""}`);
+      }
+      if (selectedUserIds.length > 0 && !override?.unassignAll) {
+        summaryParts.push(`${selectedUserIds.length} Recruiter${selectedUserIds.length > 1 ? "s" : ""}`);
+      }
+
+      if (override?.unassignAll || summaryParts.length === 0) {
+        toast.success("Job marked as Unassigned.");
+      } else {
+        toast.success(`Job successfully assigned to ${summaryParts.join(" & ")}.`);
       }
 
       setAssignModalJob(null);
@@ -1078,6 +1216,17 @@ export default function DataTable({
     } finally {
       setIsAssigning(false);
     }
+  };
+
+  const handleExecuteAssignment = async (
+    type: "pod" | "pods" | "users" | "unassign",
+    _targetIdOrIds?: string | string[],
+    _targetName?: string
+  ) => {
+    if (type === "unassign") {
+      return handleSaveCombinedAssignment({ unassignAll: true });
+    }
+    return handleSaveCombinedAssignment();
   };
 
   // Handle Sort
@@ -2233,7 +2382,7 @@ export default function DataTable({
                               {String(job.primaryRecruiter || "N/A")}
                             </span>
                           ) : colId === "assignedTo" ? (
-                            <div className="flex items-center justify-between gap-1.5 w-full min-w-0">
+                            <div className="flex items-center justify-between gap-1.5 w-full min-w-0 py-0.5">
                               {(() => {
                                 const assignInfo = getAssignedPersonDisplay(job);
                                 if (assignInfo.type === "all") {
@@ -2244,47 +2393,64 @@ export default function DataTable({
                                     </span>
                                   );
                                 }
-                                if (assignInfo.type === "pod") {
+
+                                if (assignInfo.isUnassigned || assignInfo.type === "unassigned") {
                                   return (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 min-w-0" title={`Assigned Pod: ${assignInfo.label}`}>
-                                      <Users className="h-3 w-3 shrink-0 text-indigo-500 dark:text-indigo-400" />
-                                      <span className="truncate max-w-[130px] font-medium">{assignInfo.label}</span>
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-normal text-neutral-400 dark:text-neutral-500 italic shrink-0">
+                                      Unassigned
                                     </span>
                                   );
                                 }
-                                if (assignInfo.type === "recruiter") {
-                                  const isMulti = (assignInfo.count || 1) > 1;
-                                  const fullTooltip = assignInfo.names && assignInfo.names.length > 0 ? assignInfo.names.join(", ") : assignInfo.label;
-                                  return (
-                                    <span
-                                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 min-w-0"
-                                      title={`Assigned Recruiter${isMulti ? "s" : ""}: ${fullTooltip}`}
-                                    >
-                                      {isMulti ? (
-                                        <Users className="h-3 w-3 shrink-0 text-indigo-600 dark:text-indigo-400" />
-                                      ) : (
-                                        <User className="h-3 w-3 shrink-0 text-slate-500 dark:text-slate-400" />
-                                      )}
-                                      <span className="truncate max-w-[110px]">{assignInfo.names ? assignInfo.names[0] : assignInfo.label}</span>
-                                      {isMulti && (
-                                        <span className="ml-0.5 px-1 py-0.2 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[9.5px] font-bold">
-                                          +{assignInfo.count! - 1}
-                                        </span>
-                                      )}
-                                    </span>
-                                  );
-                                }
+
                                 return (
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-normal text-neutral-400 dark:text-neutral-500 italic shrink-0">
-                                    Unassigned
-                                  </span>
+                                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                                    {/* 1. Pod Badge */}
+                                    {assignInfo.pods && (
+                                      <div className="flex items-center gap-1 min-w-0">
+                                        <span
+                                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800 shrink-0 max-w-[155px]"
+                                          title={`Assigned Pod${assignInfo.pods.count > 1 ? "s" : ""}: ${assignInfo.pods.names.join(", ")}`}
+                                        >
+                                          <Icon icon="heroicons:squares-plus" className="h-3 w-3 shrink-0 text-purple-600 dark:text-purple-400" />
+                                          <span className="truncate">{assignInfo.pods.label}</span>
+                                          {assignInfo.pods.count > 1 && (
+                                            <span className="ml-0.5 px-1 py-0.2 rounded bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-200 text-[9px] font-bold">
+                                              +{assignInfo.pods.count - 1}
+                                            </span>
+                                          )}
+                                        </span>
+                                      </div>
+                                    )}
+
+                                    {/* 2. Recruiter Chips */}
+                                    {assignInfo.recruiters && (
+                                      <div className="flex items-center gap-1 flex-wrap min-w-0" title={`Assigned Recruiter(s): ${assignInfo.recruiters.names.join(", ")}`}>
+                                        {assignInfo.recruiters.names.slice(0, 2).map((name, idx) => (
+                                          <span
+                                            key={idx}
+                                            className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800 shrink-0 max-w-[85px] truncate"
+                                          >
+                                            {name}
+                                          </span>
+                                        ))}
+                                        {assignInfo.recruiters.count > 2 && (
+                                          <span
+                                            className="inline-flex items-center px-1 py-0.2 rounded text-[9.5px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shrink-0"
+                                            title={assignInfo.recruiters.names.slice(2).join(", ")}
+                                          >
+                                            +{assignInfo.recruiters.count - 2}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
                                 );
                               })()}
                               {hasEditPermission && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); openAssignModal(job, "assignedTo"); }}
                                   className="h-5 w-5 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800 rounded transition-colors cursor-pointer shrink-0 ml-auto"
-                                  title="Assign Staff / Pod (+)"
+                                  title="Assign Pod / Recruiters (+)"
                                 >
                                   <Plus className="h-3.5 w-3.5" />
                                 </button>
@@ -2777,44 +2943,72 @@ export default function DataTable({
 
       {/* Assign Team / Recruiter Modal Dialog */}
       <Dialog open={!!assignModalJob} onOpenChange={(open) => !open && setAssignModalJob(null)}>
-        <DialogContent className="sm:max-w-2xl md:max-w-[700px] w-full p-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-          <DialogHeader className="px-6 pt-5 pb-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/70 dark:bg-slate-850/70">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl shrink-0 border border-blue-100 dark:border-blue-900/50">
-                <Icon icon="heroicons:user-group" />
+        <DialogContent className="sm:max-w-lg md:max-w-[540px] w-full p-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+          <DialogHeader className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850/70">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-lg shrink-0 border border-blue-100 dark:border-blue-900/50">
+                <Icon icon="heroicons:user-group" className="h-4 w-4" />
               </div>
               <div>
-                <DialogTitle className="text-base font-bold text-slate-900 dark:text-white">
+                <DialogTitle className="text-sm font-bold text-slate-900 dark:text-white">
                   Assign Team / Recruiters
                 </DialogTitle>
-                <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Assign requirement to a recruitment pod or select one or more recruiters
+                <DialogDescription className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Assign requirement to recruitment pods or individual recruiters
                 </DialogDescription>
               </div>
             </div>
 
             {/* Selected Job Info Banner */}
             {assignModalJob && (
-              <div className="mt-3.5 p-3.5 sm:p-4 rounded-xl bg-slate-50/90 dark:bg-slate-850/70 border border-slate-200/80 dark:border-slate-750 flex items-center justify-between gap-4 text-xs">
+              <div className="mt-2.5 p-2.5 rounded-lg bg-slate-50/90 dark:bg-slate-850/70 border border-slate-200/80 dark:border-slate-750 flex items-center justify-between gap-3 text-xs">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-slate-900 dark:text-white text-sm truncate">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-slate-900 dark:text-white text-xs truncate max-w-[280px]" title={assignModalJob.jobTitle || (assignModalJob as any).title}>
                       {assignModalJob.jobTitle || (assignModalJob as any).title}
                     </span>
-                    <span className="text-[10.5px] font-mono px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 font-semibold border border-rose-100 dark:border-rose-900/40">
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 font-semibold border border-rose-100 dark:border-rose-900/40">
                       {assignModalJob.jobCode}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                     Client: <span className="font-medium text-slate-700 dark:text-slate-300">{assignModalJob.client || (assignModalJob as any).clientName || assignModalJob.endClientName || "Direct"}</span>
                     {assignModalTargetBranch?.name ? ` • Branch: ${assignModalTargetBranch.name}` : ""}
                   </p>
                 </div>
-                <div className="text-right shrink-0 pl-2">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-0.5">Currently Assigned</span>
-                  <Badge variant="outline" className="text-xs font-semibold px-2.5 py-0.5 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">
-                    {assignModalJob.assignedTo || "Unassigned"}
-                  </Badge>
+                <div className="text-right shrink-0">
+                  <span className="text-[9.5px] uppercase font-semibold tracking-wider text-slate-400 block mb-0.5">Currently Assigned</span>
+                  {(() => {
+                    const curInfo = getAssignedPersonDisplay(assignModalJob);
+                    if (curInfo.isUnassigned || curInfo.type === "unassigned") {
+                      return (
+                        <Badge variant="outline" className="text-[10.5px] font-normal px-2 py-0.5 text-neutral-400 dark:text-neutral-500 italic border-slate-200 dark:border-slate-700">
+                          Unassigned
+                        </Badge>
+                      );
+                    }
+                    return (
+                      <div className="flex flex-col items-end gap-1">
+                        {curInfo.pods && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/70 max-w-[140px] truncate" title={`Assigned Pods: ${curInfo.pods.names.join(", ")}`}>
+                            <Icon icon="heroicons:squares-plus" className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                            {curInfo.pods.label}
+                          </span>
+                        )}
+                        {curInfo.recruiters && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/70 max-w-[140px] truncate" title={`Assigned Recruiters: ${curInfo.recruiters.names.join(", ")}`}>
+                            <Icon icon="heroicons:user" className="h-2.5 w-2.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                            {curInfo.recruiters.label}
+                          </span>
+                        )}
+                        {curInfo.type === "all" && (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200">
+                            All recruiters
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -2822,28 +3016,28 @@ export default function DataTable({
 
           {/* Pod Head Scope Notice (clean, compact) */}
           {isPodHead && (
-            <div className="mx-6 mt-3 px-3.5 py-2 rounded-lg bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/60 flex items-center gap-2 text-xs text-blue-800 dark:text-blue-300">
-              <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+            <div className="mx-5 mt-2.5 px-3 py-1.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/60 flex items-center gap-2 text-[11.5px] text-blue-800 dark:text-blue-300">
+              <Shield className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
               <span><strong>Pod Lead Scope:</strong> Restricted to your pod {myPod ? `(${myPod.name})` : ""} and active members.</span>
             </div>
           )}
 
           {/* Branch Policy Alert */}
           {!branchAllowsDirectStaff ? (
-            <div className="mx-6 mt-3 px-3.5 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300">
-              <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <div className="mx-5 mt-2.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-[11.5px] text-amber-800 dark:text-amber-300">
+              <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
               <span><strong>Branch Policy Notice:</strong> Direct staff assignment is disabled. Requirements must be routed to Recruitment Pods.</span>
             </div>
           ) : !branchAllowsPods ? (
-            <div className="mx-6 mt-3 px-3.5 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300">
-              <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <div className="mx-5 mt-2.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-[11.5px] text-amber-800 dark:text-amber-300">
+              <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
               <span><strong>Branch Policy Notice:</strong> Recruitment Pods are disabled for this branch. Direct recruiter assignments only.</span>
             </div>
           ) : null}
 
           {/* Tab Selector: Sleek Segmented Pill Navigation */}
-          <div className="px-6 pt-4 pb-2 border-b border-neutral-100 dark:border-slate-800 flex items-center justify-between">
-            <div className="p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 inline-flex items-center gap-1.5 border border-slate-200/60 dark:border-slate-700/60">
+          <div className="px-5 pt-3 pb-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <div className="p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 inline-flex items-center gap-1 border border-slate-200/60 dark:border-slate-700/60">
               <button
                 type="button"
                 disabled={!branchAllowsPods}
@@ -2854,7 +3048,7 @@ export default function DataTable({
                   }
                 }}
                 className={cn(
-                  "flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                  "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all",
                   !branchAllowsPods
                     ? "opacity-50 cursor-not-allowed text-slate-400"
                     : assignTab === "pods"
@@ -2862,10 +3056,10 @@ export default function DataTable({
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 cursor-pointer"
                 )}
               >
-                <Icon icon="heroicons:squares-plus" className="h-4 w-4" />
+                <Icon icon="heroicons:squares-plus" className="h-3.5 w-3.5" />
                 Recruitment Pods
                 <span className={cn(
-                  "px-1.5 py-0.2 rounded-full text-[10.5px] font-mono",
+                  "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
                   assignTab === "pods" ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold" : "bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
                 )}>
                   {targetBranchPods.length}
@@ -2883,7 +3077,7 @@ export default function DataTable({
                   }
                 }}
                 className={cn(
-                  "flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                  "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all",
                   !branchAllowsDirectStaff
                     ? "opacity-50 cursor-not-allowed text-slate-400"
                     : assignTab === "users"
@@ -2891,10 +3085,10 @@ export default function DataTable({
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 cursor-pointer"
                 )}
               >
-                <Icon icon="heroicons:user" className="h-4 w-4" />
+                <Icon icon="heroicons:user" className="h-3.5 w-3.5" />
                 Recruiters & Staff
                 <span className={cn(
-                  "px-1.5 py-0.2 rounded-full text-[10.5px] font-mono",
+                  "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
                   assignTab === "users" ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold" : "bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
                 )}>
                   {branchRecruiterUsers.length}
@@ -2903,63 +3097,220 @@ export default function DataTable({
               </button>
             </div>
 
-            {assignTab === "users" && selectedUserIds.length > 0 && (
-              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium hidden sm:inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-                {selectedUserIds.length} recruiter{selectedUserIds.length !== 1 ? 's' : ''} selected
+            <div className="flex items-center gap-2">
+              {selectedPodIds.length > 0 && (
+                <span className="text-[11px] text-purple-700 dark:text-purple-300 font-semibold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/60 border border-purple-200/70 inline-flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                  {selectedPodIds.length} Pod{selectedPodIds.length !== 1 ? 's' : ''}
+                </span>
+              )}
+              {selectedUserIds.length > 0 && (
+                <span className="text-[11px] text-blue-700 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/70 inline-flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  {selectedUserIds.length} Staff
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Staged Assignment Ribbon */}
+          <div className="mx-5 my-2 p-2 rounded-lg bg-slate-50/80 dark:bg-slate-850/50 border border-slate-200/70 dark:border-slate-800">
+            <div className="flex items-center justify-between text-[11px] mb-1">
+              <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3 text-indigo-500" />
+                <span>Staged Assignment</span>
+                {(selectedPodIds.length > 0 || selectedUserIds.length > 0) && (
+                  <span className="text-[10.5px] text-slate-400 font-normal">
+                    ({selectedPodIds.length} pod{selectedPodIds.length !== 1 ? "s" : ""}, {selectedUserIds.length} recruiter{selectedUserIds.length !== 1 ? "s" : ""})
+                  </span>
+                )}
               </span>
-            )}
+              {(selectedPodIds.length > 0 || selectedUserIds.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => { setSelectedPodIds([]); setSelectedUserIds([]); }}
+                  className="text-[10px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer font-medium"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 min-h-[24px]">
+              {selectedPodIds.length === 0 && selectedUserIds.length === 0 ? (
+                <span className="text-[11px] text-slate-400 italic">No pods or staff selected. Pick from Pods and/or Recruiters tabs below.</span>
+              ) : (
+                <>
+                  {selectedPodIds.map((pId) => {
+                    const pod = [...podsList, ...targetBranchPods].find((p: any) => p.id === pId);
+                    const name = pod?.name || "Pod";
+                    return (
+                      <span
+                        key={pId}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800 animate-in fade-in"
+                      >
+                        <Icon icon="heroicons:squares-plus" className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                        <span className="max-w-[130px] truncate">{name}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleTogglePodSelection(pId); }}
+                          className="hover:text-purple-900 dark:hover:text-white rounded-full ml-0.5 p-0.5 cursor-pointer"
+                          title="Remove pod"
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                  {selectedUserIds.map((uId) => {
+                    const u = usersList.find((usr: any) => usr.id === uId);
+                    const name = u?.fullName || u?.name || u?.email || "Recruiter";
+                    return (
+                      <span
+                        key={uId}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800 animate-in fade-in"
+                      >
+                        <Icon icon="heroicons:user" className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                        <span className="max-w-[120px] truncate">{name}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleToggleUserSelection(uId); }}
+                          className="hover:text-blue-900 dark:hover:text-white rounded-full ml-0.5 p-0.5 cursor-pointer"
+                          title="Remove recruiter"
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </>
+              )}
+            </div>
           </div>
 
           {/* Search Box & Multi-Select Toolbar */}
-          <div className="px-6 pt-3 space-y-2.5">
+          <div className="px-5 pt-1 space-y-2">
             <div className="relative">
-              <Icon icon="heroicons:magnifying-glass" className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Icon icon="heroicons:magnifying-glass" className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
               <Input
                 placeholder={assignTab === "pods" ? "Search pods by name or lead..." : "Search staff by name, role, or email..."}
                 value={assignSearch}
                 onChange={(e) => setAssignSearch(e.target.value)}
-                className="h-9 pl-9 text-xs bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 rounded-lg"
+                className="h-8 pl-8.5 text-xs bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 rounded-lg"
                 autoFocus
               />
             </div>
 
+            {/* Recruiter Tab: Sub-filter toggle (All vs Selected Pod Members Only) */}
+            {assignTab === "users" && selectedPodIds.length > 0 && (
+              <div className="flex items-center gap-1.5 p-1 rounded-md bg-purple-50/50 dark:bg-purple-950/30 border border-purple-200/60 dark:border-purple-900/40 text-[11px]">
+                <span className="text-purple-800 dark:text-purple-300 font-medium px-1">Show:</span>
+                <button
+                  type="button"
+                  onClick={() => setRecruiterFilterMode("all")}
+                  className={cn(
+                    "px-2 py-0.5 rounded text-[10.5px] font-medium transition-all cursor-pointer",
+                    recruiterFilterMode === "all"
+                      ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xs font-semibold"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                  )}
+                >
+                  All Staff ({branchRecruiterUsers.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecruiterFilterMode("podMembers")}
+                  className={cn(
+                    "px-2 py-0.5 rounded text-[10.5px] font-medium transition-all flex items-center gap-1 cursor-pointer",
+                    recruiterFilterMode === "podMembers"
+                      ? "bg-purple-600 text-white shadow-xs font-semibold"
+                      : "text-purple-700 dark:text-purple-300 hover:bg-purple-100/60 dark:hover:bg-purple-900/40"
+                  )}
+                >
+                  <Icon icon="heroicons:squares-plus" className="h-3 w-3" />
+                  Selected Pod Members Only ({selectedPodMembersCount})
+                </button>
+              </div>
+            )}
+
+            {/* Multi-select bar for PODS */}
+            {assignTab === "pods" && (
+              <div className="flex items-center justify-between text-xs py-1 px-0.5 border-b border-dashed border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleSelectAllFilteredPods}
+                    className="text-[11.5px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1.5"
+                  >
+                    <CheckSquare className="h-3.5 w-3.5" />
+                    {filteredPods.length > 0 && filteredPods.every((p: any) => selectedPodIds.includes(p.id))
+                      ? "Deselect All Filtered"
+                      : `Select All (${filteredPods.length})`}
+                  </button>
+
+                  {selectedPodIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPodIds([])}
+                      className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11.5px] text-slate-500 dark:text-slate-400">
+                    <strong className="text-purple-600 dark:text-purple-400 font-bold">{selectedPodIds.length}</strong> selected
+                  </span>
+                  <Button
+                    size="sm"
+                    disabled={isAssigning || (selectedPodIds.length === 0 && selectedUserIds.length === 0)}
+                    onClick={() => handleSaveCombinedAssignment()}
+                    className="h-6.5 px-2.5 text-[11px] font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed rounded-md"
+                  >
+                    {isAssigning ? "Saving..." : selectedUserIds.length > 0 ? `Save (${selectedPodIds.length} Pods + ${selectedUserIds.length} Staff)` : `Assign Pods (${selectedPodIds.length})`}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Multi-select bar for RECRUITERS */}
             {assignTab === "users" && (
-              <div className="flex items-center justify-between text-xs py-1.5 px-1 border-b border-dashed border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between text-xs py-1 px-0.5 border-b border-dashed border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2.5">
                   <button
                     type="button"
                     onClick={handleSelectAllFiltered}
-                    className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1.5"
+                    className="text-[11.5px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1.5"
                   >
                     <CheckSquare className="h-3.5 w-3.5" />
                     {filteredUsers.length > 0 && filteredUsers.every((u: any) => selectedUserIds.includes(u.id))
                       ? "Deselect All Filtered"
-                      : `Select All Filtered (${filteredUsers.length})`}
+                      : `Select All (${filteredUsers.length})`}
                   </button>
 
                   {selectedUserIds.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setSelectedUserIds([])}
-                      className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer underline"
+                      className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer underline"
                     >
-                      Clear Selection
+                      Clear
                     </button>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11.5px] text-slate-500 dark:text-slate-400">
                     <strong className="text-blue-600 dark:text-blue-400 font-bold">{selectedUserIds.length}</strong> selected
                   </span>
                   <Button
                     size="sm"
-                    disabled={isAssigning || selectedUserIds.length === 0}
-                    onClick={() => handleExecuteAssignment("users", selectedUserIds)}
-                    className="h-7.5 px-3.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={isAssigning || (selectedPodIds.length === 0 && selectedUserIds.length === 0)}
+                    onClick={() => handleSaveCombinedAssignment()}
+                    className="h-6.5 px-2.5 text-[11px] font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed rounded-md"
                   >
-                    {isAssigning ? "Assigning..." : `Assign Selected (${selectedUserIds.length})`}
+                    {isAssigning ? "Saving..." : selectedPodIds.length > 0 ? `Save (${selectedPodIds.length} Pods + ${selectedUserIds.length} Staff)` : `Assign Staff (${selectedUserIds.length})`}
                   </Button>
                 </div>
               </div>
@@ -2967,73 +3318,94 @@ export default function DataTable({
           </div>
 
           {/* Selection List */}
-          <div className="px-6 py-4 flex-1 overflow-y-auto max-h-[340px] space-y-2.5">
+          <div className="px-5 py-2 flex-1 overflow-y-auto max-h-[280px] space-y-1.5">
             {assignTab === "pods" ? (
               filteredPods.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-400">
-                  <Icon icon="heroicons:squares-plus" className="h-9 w-9 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-                  <p className="font-semibold text-slate-600 dark:text-slate-300 text-sm">No recruitment pods found.</p>
-                  <p className="text-xs mt-1">You can assign to individual recruiters or create pods in Pods Manager.</p>
-                  <Link href="/utility/pods" className="inline-block mt-3">
-                    <Button size="sm" variant="outline" className="text-xs h-7.5 text-blue-600 border-blue-200 hover:bg-blue-50">
+                <div className="p-6 text-center text-xs text-slate-400">
+                  <Icon icon="heroicons:squares-plus" className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-1.5" />
+                  <p className="font-semibold text-slate-600 dark:text-slate-300 text-xs">No recruitment pods found.</p>
+                  <p className="text-[11px] mt-0.5">You can assign to individual recruiters or create pods in Pods Manager.</p>
+                  <Link href="/utility/pods" className="inline-block mt-2.5">
+                    <Button size="sm" variant="outline" className="text-xs h-7 text-blue-600 border-blue-200 hover:bg-blue-50">
                       Go to Pods Manager →
                     </Button>
                   </Link>
                 </div>
               ) : (
                 filteredPods.map((pod: any) => {
+                  const isSelected = selectedPodIds.includes(pod.id);
                   const isCurrent =
                     assignModalJob?.podId === pod.id ||
                     assignModalJob?.assignedTo?.toLowerCase() === pod.name?.toLowerCase() ||
-                    assignModalJob?.podName?.toLowerCase() === pod.name?.toLowerCase();
+                    assignModalJob?.assignedTo?.toLowerCase().includes(pod.name?.toLowerCase()) ||
+                    assignModalJob?.podName?.toLowerCase() === pod.name?.toLowerCase() ||
+                    assignModalJob?.podName?.toLowerCase().includes(pod.name?.toLowerCase());
+
                   return (
                     <div
                       key={pod.id}
+                      onClick={() => handleTogglePodSelection(pod.id)}
                       className={cn(
-                        "p-3.5 sm:px-4 sm:py-3 rounded-xl border flex items-center justify-between gap-4 text-xs transition-colors",
-                        isCurrent
-                          ? "border-blue-200 bg-blue-50/40 dark:bg-blue-950/30 dark:border-blue-800/80"
+                        "p-2.5 sm:px-3 sm:py-2 rounded-lg border flex items-center justify-between gap-3 text-xs transition-all cursor-pointer select-none",
+                        isSelected
+                          ? "border-purple-500 bg-purple-50/70 dark:bg-purple-950/40 dark:border-purple-600 shadow-2xs ring-1 ring-purple-400/40"
+                          : isCurrent
+                          ? "border-slate-300 bg-slate-50/70 dark:bg-slate-800/40 dark:border-slate-700 hover:bg-slate-100/70 dark:hover:bg-slate-850"
                           : "border-neutral-200/90 dark:border-slate-800 hover:bg-slate-50/80 dark:hover:bg-slate-850/80"
                       )}
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 dark:text-white text-[13px] truncate">{pod.name}</span>
-                          {isCurrent && (
-                            <Badge className="text-[9.5px] bg-blue-600 hover:bg-blue-600 text-white font-semibold py-0 h-4.5 px-2">
-                              Current
-                            </Badge>
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        {/* Checkbox Icon */}
+                        <div
+                          className={cn(
+                            "h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors border",
+                            isSelected
+                              ? "bg-purple-600 border-purple-600 text-white shadow-2xs"
+                              : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-transparent hover:border-purple-400"
                           )}
+                        >
+                          <Check className="h-3 w-3 stroke-[3]" />
                         </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
-                          Pod Lead: <span className="font-medium text-slate-700 dark:text-slate-300">{pod.podHeadName || "Unassigned"}</span>
-                          {pod.members && pod.members.length > 0 && (
-                            <span> • {pod.members.length} Member{pod.members.length !== 1 ? 's' : ''}</span>
-                          )}
-                        </p>
+
+                        {/* Pod Icon Avatar */}
+                        <div className="h-7 w-7 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 border border-indigo-100 dark:border-indigo-900/50">
+                          <Icon icon="heroicons:squares-plus" className="h-4 w-4" />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
+                              {pod.name}
+                            </span>
+                            {isCurrent && (
+                              <Badge variant="outline" className="text-[9.5px] font-semibold text-slate-500 border-slate-300 dark:border-slate-600 py-0 h-4 px-1.5">
+                                Current
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                            Lead: <span className="font-medium text-slate-700 dark:text-slate-300">{pod.podHeadName || "Unassigned"}</span>
+                            {pod.members && pod.members.length > 0 && (
+                              <span> • {pod.members.length} Member{pod.members.length !== 1 ? 's' : ''}</span>
+                            )}
+                          </p>
+                        </div>
                       </div>
-                      <Button
-                        size="sm"
-                        disabled={isAssigning}
-                        onClick={() => handleExecuteAssignment("pod", pod.id, pod.name)}
-                        className={cn(
-                          "h-7.5 px-3.5 text-xs font-semibold cursor-pointer shrink-0 transition-colors shadow-xs",
-                          isCurrent
-                            ? "bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300"
-                            : "bg-blue-600 hover:bg-blue-500 text-white"
-                        )}
-                      >
-                        {isAssigning ? "Assigning..." : isCurrent ? "Re-assign" : "Assign Pod"}
-                      </Button>
+
+                      {isSelected && (
+                        <span className="text-[10.5px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-800 shrink-0">
+                          Selected
+                        </span>
+                      )}
                     </div>
                   );
                 })
               )
             ) : (
               filteredUsers.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-400">
-                  <Icon icon="heroicons:users" className="h-9 w-9 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-                  <p className="font-semibold text-slate-600 dark:text-slate-300 text-sm">No recruiters or staff matching "{assignSearch}".</p>
+                <div className="p-6 text-center text-xs text-slate-400">
+                  <Icon icon="heroicons:users" className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-1.5" />
+                  <p className="font-semibold text-slate-600 dark:text-slate-300 text-xs">No recruiters or staff matching "{assignSearch}".</p>
                 </div>
               ) : (
                 filteredUsers.map((u: any) => {
@@ -3043,58 +3415,65 @@ export default function DataTable({
                     assignModalJob?.assignedTo?.toLowerCase().includes((u.fullName || u.name || "").toLowerCase()) ||
                     assignModalJob?.assignedTo?.toLowerCase().includes((u.email || "").toLowerCase());
                   const roleLabel = getUserRoleLabel(u, assignModalTargetBranch?.id);
+                  const isPodMember = isUserInSelectedPods(u.id, u.podId || u.pod_id);
 
                   return (
                     <div
                       key={u.id}
                       onClick={() => handleToggleUserSelection(u.id)}
                       className={cn(
-                        "p-3 sm:px-4 sm:py-3 rounded-xl border flex items-center justify-between gap-4 text-xs transition-all cursor-pointer select-none",
+                        "p-2.5 sm:px-3 sm:py-2 rounded-lg border flex items-center justify-between gap-3 text-xs transition-all cursor-pointer select-none",
                         isSelected
                           ? "border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 dark:border-blue-600 shadow-2xs ring-1 ring-blue-400/40"
                           : isCurrent
-                          ? "border-slate-300 bg-slate-50/70 dark:bg-slate-800/40 dark:border-slate-700 hover:bg-slate-100/70 dark:hover:bg-slate-800"
+                          ? "border-slate-300 bg-slate-50/70 dark:bg-slate-800/40 dark:border-slate-700 hover:bg-slate-100/70 dark:hover:bg-slate-850"
                           : "border-neutral-200/90 dark:border-slate-800 hover:bg-slate-50/80 dark:hover:bg-slate-850/80"
                       )}
                     >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         {/* Checkbox Icon */}
                         <div
                           className={cn(
-                            "h-4.5 w-4.5 rounded-md flex items-center justify-center shrink-0 transition-colors border",
+                            "h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors border",
                             isSelected
                               ? "bg-blue-600 border-blue-600 text-white shadow-2xs"
                               : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-transparent hover:border-blue-400"
                           )}
                         >
-                          <Check className="h-3.5 w-3.5 stroke-[3]" />
+                          <Check className="h-3 w-3 stroke-[3]" />
                         </div>
 
                         {/* User Avatar Initials */}
-                        <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-xs shrink-0 uppercase border border-slate-200 dark:border-slate-700">
+                        <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-[11px] shrink-0 uppercase border border-slate-200 dark:border-slate-700">
                           {(u.fullName || u.name || u.email || "U").substring(0, 2)}
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-slate-900 dark:text-white text-xs truncate">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
                               {u.fullName || u.name}
                             </span>
-                            <span className="text-[9.5px] font-mono px-2 py-0.2 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200/80 dark:border-blue-800">
+                            <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200/80 dark:border-blue-800">
                               {roleLabel}
                             </span>
+                            {isPodMember && (
+                              <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800 flex items-center gap-0.5" title="Member of currently selected pod">
+                                <Icon icon="heroicons:squares-plus" className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400" />
+                                Pod Member
+                              </span>
+                            )}
                             {isCurrent && (
                               <Badge variant="outline" className="text-[9.5px] font-semibold text-slate-500 border-slate-300 dark:border-slate-600 py-0 h-4 px-1.5">
                                 Current
                               </Badge>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-400 font-mono truncate mt-0.5">{u.email}</p>
+                          <p className="text-[10.5px] text-slate-400 font-mono truncate mt-0.5">{u.email}</p>
                         </div>
                       </div>
 
                       {isSelected && (
-                        <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 shrink-0">
+                        <span className="text-[10.5px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 shrink-0">
                           Selected
                         </span>
                       )}
@@ -3105,40 +3484,54 @@ export default function DataTable({
             )}
           </div>
 
-          {/* Footer: Mark Unassigned or Multi-Assign / Cancel */}
-          <DialogFooter className="px-6 py-3.5 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/60 dark:bg-slate-850/60 flex flex-row items-center justify-between sm:justify-between">
+          {/* Footer: Clear Assignment or Unified Multi-Assign / Cancel */}
+          <DialogFooter className="px-5 py-2.5 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/70 dark:bg-slate-850/70 flex flex-row items-center justify-between sm:justify-between">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               disabled={isAssigning}
-              onClick={() => handleExecuteAssignment("unassign", "none", "Unassigned")}
-              className="text-xs text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 h-8.5 cursor-pointer font-medium"
+              onClick={() => handleSaveCombinedAssignment({ unassignAll: true })}
+              className="text-xs text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 h-8 cursor-pointer font-medium"
             >
-              Clear Assignment (Unassigned)
+              Clear Assignment
             </Button>
 
-            <div className="flex items-center gap-2.5">
-              {assignTab === "users" && selectedUserIds.length > 0 && (
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={isAssigning}
-                  onClick={() => handleExecuteAssignment("users", selectedUserIds)}
-                  className="h-8.5 px-4 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs"
-                >
-                  {isAssigning ? "Assigning..." : `Assign Selected (${selectedUserIds.length})`}
-                </Button>
-              )}
+            <div className="flex items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 disabled={isAssigning}
                 onClick={() => setAssignModalJob(null)}
-                className="text-xs h-8.5 px-4 cursor-pointer font-medium border-slate-200 dark:border-slate-700"
+                className="text-xs h-8 px-3.5 cursor-pointer font-medium border-slate-200 dark:border-slate-700"
               >
                 Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={isAssigning || (selectedPodIds.length === 0 && selectedUserIds.length === 0)}
+                onClick={() => handleSaveCombinedAssignment()}
+                className="h-8 px-4 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isAssigning ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Saving...
+                  </span>
+                ) : (
+                  <span>
+                    Save Assignment
+                    {(selectedPodIds.length > 0 || selectedUserIds.length > 0) && (
+                      <span className="ml-1 opacity-90 font-normal">
+                        ({selectedPodIds.length > 0 ? `${selectedPodIds.length} Pod${selectedPodIds.length > 1 ? "s" : ""}` : ""}
+                        {selectedPodIds.length > 0 && selectedUserIds.length > 0 ? " + " : ""}
+                        {selectedUserIds.length > 0 ? `${selectedUserIds.length} Staff` : ""})
+                      </span>
+                    )}
+                  </span>
+                )}
               </Button>
             </div>
           </DialogFooter>
