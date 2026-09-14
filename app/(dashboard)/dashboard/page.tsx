@@ -89,6 +89,9 @@ export default function DashboardPage() {
       if (updatedFields.priority !== undefined) apiPayload.priority = updatedFields.priority;
       if (updatedFields.clientBillRate !== undefined) apiPayload.clientBillRate = updatedFields.clientBillRate;
       if (updatedFields.payRate !== undefined) apiPayload.payRate = updatedFields.payRate;
+      if (updatedFields.assignedTo !== undefined) apiPayload.assignedTo = updatedFields.assignedTo;
+      if (updatedFields.podId !== undefined) apiPayload.podId = updatedFields.podId;
+      if (updatedFields.primaryRecruiterId !== undefined) apiPayload.primaryRecruiterId = updatedFields.primaryRecruiterId;
 
       await atsApi.jobs.update(jobId, apiPayload);
       toast.success("Job updated successfully.");
@@ -171,7 +174,12 @@ export default function DashboardPage() {
       {systemRole === "SUPER_ADMIN" ? (
         <GlobalAdminDashboardView profile={profile} />
       ) : systemRole === "BRANCH_ADMIN" ? (
-        <BranchAdminDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
+        <BranchAdminDashboardView 
+          profile={profile} 
+          jobs={jobs} 
+          activeJobs={activeJobs} 
+          onUpdateJob={handleUpdateJob} 
+        />
       ) : systemRole === "ADMIN" || systemRole === "TENANT_ADMIN" ? (
         <AdminDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
       ) : systemRole === "ACCOUNT_MANAGER" ? (
@@ -770,11 +778,19 @@ function BranchAdminDashboardView({
   profile,
   jobs,
   activeJobs,
+  onUpdateJob,
 }: {
   profile: any;
   jobs: any[];
   activeJobs: any[];
+  onUpdateJob?: (jobId: string, updatedFields: any) => Promise<void>;
 }) {
+  const [localJobs, setLocalJobs] = useState<any[]>(jobs);
+
+  useEffect(() => {
+    setLocalJobs(jobs);
+  }, [jobs]);
+
   const [activeBranchId, setActiveBranchId] = useState<string | null>(() => {
     if (typeof window !== "undefined") return localStorage.getItem("active_branch_id");
     return profile?.branchId || null;
@@ -794,7 +810,23 @@ function BranchAdminDashboardView({
 
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [branchUsers, setBranchUsers] = useState<any[]>([]);
+  const [pods, setPods] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Assign Team Modal States
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [selectedJobForAssign, setSelectedJobForAssign] = useState<any | null>(null);
+  const [assignSearch, setAssignSearch] = useState("");
+  const [assignTab, setAssignTab] = useState<"pods" | "users">("pods");
+  const [assigning, setAssigning] = useState(false);
+
+  const [branchUsesPods, setBranchUsesPods] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("active_branch_allow_pods");
+      if (stored !== null) return stored === "true";
+    }
+    return true;
+  });
 
   // Synchronize on branch switcher events
   useEffect(() => {
@@ -814,21 +846,28 @@ function BranchAdminDashboardView({
     };
   }, [profile]);
 
-  // Load branch submissions and team roster
+  // Load branch submissions, team roster, and recruitment pods
   useEffect(() => {
     let isMounted = true;
     async function loadBranchData() {
       try {
         setLoading(true);
         const bId = activeBranchId && activeBranchId !== "all" ? activeBranchId : undefined;
-        const [subsRes, usersRes] = await Promise.all([
+        const [subsRes, usersRes, podsRes] = await Promise.all([
           atsApi.submissions.list({ branchId: bId }).catch(() => []),
           atsApi.auth.listUsers().catch(() => []),
+          atsApi.pods.list(bId).catch(() => []),
         ]);
         if (!isMounted) return;
         const subList = subsRes?.data || subsRes || [];
         setSubmissions(subList);
         setBranchUsers(usersRes || []);
+
+        let resolvedPods = podsRes || [];
+        if (resolvedPods.length === 0 && bId) {
+          resolvedPods = await atsApi.pods.list().catch(() => []);
+        }
+        setPods(resolvedPods);
       } catch (err) {
         console.warn("Failed to load branch admin dashboard metrics:", err);
       } finally {
@@ -841,15 +880,15 @@ function BranchAdminDashboardView({
 
   // Branch-scoped jobs filtering
   const branchJobs = useMemo(() => {
-    if (!activeBranchId || activeBranchId === "all") return jobs;
-    return jobs.filter((j: any) => {
+    if (!activeBranchId || activeBranchId === "all") return localJobs;
+    return localJobs.filter((j: any) => {
       const jBranchId = j.branchId || j.branch_id;
       if (jBranchId && jBranchId === activeBranchId) return true;
       if (activeBranchName && j.businessUnit?.toLowerCase() === activeBranchName.toLowerCase()) return true;
       if (j.jobCode && activeBranchName && activeBranchName.toLowerCase().includes("bhubneswar") && j.jobCode.startsWith("BBS")) return true;
       return false;
     });
-  }, [jobs, activeBranchId, activeBranchName]);
+  }, [localJobs, activeBranchId, activeBranchName]);
 
   const branchActiveJobs = useMemo(() => {
     return branchJobs.filter((j: any) => j.jobStatus === "Active" || j.status === "ACTIVE" || j.status === "Active");
@@ -985,6 +1024,98 @@ function BranchAdminDashboardView({
       };
     }).sort((a, b) => b.submissionsCount - a.submissionsCount);
   }, [branchUsers, submissions, activeBranchId]);
+
+  // Recruiter roster for assignments
+  const branchRecruiterUsers = useMemo(() => {
+    const scoped = branchUsers.filter((u: any) => {
+      if (u.isActive === false) return false;
+      if (!activeBranchId || activeBranchId === "all") return true;
+      const bId = u.branchId || u.branch_id;
+      if (bId === activeBranchId) return true;
+      if (Array.isArray(u.assignedBranchIds) && u.assignedBranchIds.includes(activeBranchId)) return true;
+      return false;
+    });
+    return scoped.length > 0 ? scoped : branchUsers.filter((u: any) => u.isActive !== false);
+  }, [branchUsers, activeBranchId]);
+
+  const filteredUsers = useMemo(() => {
+    const q = assignSearch.trim().toLowerCase();
+    if (!q) return branchRecruiterUsers;
+    return branchRecruiterUsers.filter((u: any) => {
+      const name = (u.fullName || u.name || "").toLowerCase();
+      const email = (u.email || "").toLowerCase();
+      const role = (u.roleName || (u.roles && u.roles[0]) || u.systemRole || "").toLowerCase();
+      return name.includes(q) || email.includes(q) || role.includes(q);
+    });
+  }, [branchRecruiterUsers, assignSearch]);
+
+  const filteredPods = useMemo(() => {
+    const q = assignSearch.trim().toLowerCase();
+    if (!q) return pods;
+    return pods.filter((p: any) => {
+      const name = (p.name || "").toLowerCase();
+      const head = (p.podHeadName || "").toLowerCase();
+      return name.includes(q) || head.includes(q);
+    });
+  }, [pods, assignSearch]);
+
+  const handleOpenAssignModal = (job: any) => {
+    setSelectedJobForAssign(job);
+    setAssignSearch("");
+    setAssignTab(pods.length > 0 && branchUsesPods ? "pods" : "users");
+    setIsAssignModalOpen(true);
+  };
+
+  const handleExecuteAssignment = async (
+    type: "pod" | "user" | "unassign",
+    targetId: string,
+    targetName: string
+  ) => {
+    if (!selectedJobForAssign) return;
+    setAssigning(true);
+    try {
+      const payload: Record<string, any> = {};
+      if (type === "pod") {
+        payload.podId = targetId;
+        payload.assignedTo = targetName;
+      } else if (type === "user") {
+        payload.primaryRecruiterId = targetId;
+        payload.assignedTo = targetName;
+        payload.podId = "none";
+      } else {
+        payload.assignedTo = "Unassigned";
+        payload.podId = "none";
+      }
+
+      await atsApi.jobs.update(selectedJobForAssign.id, payload);
+      toast.success(`Job assigned to ${targetName}`);
+
+      setLocalJobs((prev) =>
+        prev.map((j) =>
+          j.id === selectedJobForAssign.id
+            ? {
+                ...j,
+                assignedTo: targetName,
+                podId: type === "pod" ? targetId : undefined,
+                primaryRecruiterId: type === "user" ? targetId : undefined,
+              }
+            : j
+        )
+      );
+
+      if (onUpdateJob) {
+        onUpdateJob(selectedJobForAssign.id, payload).catch(() => {});
+      }
+
+      setIsAssignModalOpen(false);
+      setSelectedJobForAssign(null);
+    } catch (err: any) {
+      console.error("Assignment error:", err);
+      toast.error("Failed to assign job: " + (err.message || "Unknown error"));
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   // Visual Analytics Chart Data
   const activityChartOptions: any = {
@@ -1271,20 +1402,29 @@ function BranchAdminDashboardView({
                   <div key={job.id} className="p-2.5 rounded-lg border border-neutral-150 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-855/50 flex items-center justify-between gap-3 text-xs">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-slate-900 dark:text-white truncate">{job.jobTitle || job.title}</span>
+                        <Link
+                          href={`/job-posting/${job.id}`}
+                          className="font-bold text-slate-900 dark:text-white truncate hover:text-indigo-600 transition-colors"
+                        >
+                          {job.jobTitle || job.title}
+                        </Link>
                         <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300">
                           {job.jobCode}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                        Client: <span className="font-medium text-slate-700 dark:text-slate-300">{job.clientName || job.client || "Direct"}</span> • Assigned: {job.assignedTo || "Unassigned"}
+                        Client: <span className="font-medium text-slate-700 dark:text-slate-300">{job.clientName || job.client || "Direct"}</span> • Assigned: <span className="font-semibold text-slate-700 dark:text-slate-300">{job.assignedTo || "Unassigned"}</span>
                       </p>
                     </div>
-                    <Link href={`/applicants?jobId=${job.id}`}>
-                      <Button size="sm" variant="outline" className="h-7 px-2.5 text-[10px] font-bold border-rose-200 hover:bg-rose-50 text-rose-700 dark:border-rose-900 dark:hover:bg-rose-950/50 shrink-0 cursor-pointer">
-                        Assign Team
-                      </Button>
-                    </Link>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenAssignModal(job)}
+                      className="h-7 px-2.5 text-[10px] font-bold border-rose-200 hover:bg-rose-50 text-rose-700 dark:border-rose-900 dark:hover:bg-rose-950/50 shrink-0 cursor-pointer flex items-center gap-1"
+                    >
+                      <Icon icon="heroicons:user-plus" className="h-3 w-3" />
+                      Assign Team
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -1449,6 +1589,246 @@ function BranchAdminDashboardView({
           </Card>
         </div>
       </div>
+
+      {/* 6. ASSIGN TEAM / RECRUITER MODAL */}
+      <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
+        <DialogContent className="max-w-lg p-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+          <DialogHeader className="p-4 pb-3 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/70 dark:bg-slate-850/70">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-lg shrink-0 border border-indigo-100 dark:border-indigo-900/50">
+                <Icon icon="heroicons:user-group" />
+              </div>
+              <div>
+                <DialogTitle className="text-sm font-bold text-slate-900 dark:text-white">
+                  Assign Team / Recruiter
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+                  Assign requirement to a recruitment pod or team member
+                </DialogDescription>
+              </div>
+            </div>
+
+            {/* Selected Job Info Banner */}
+            {selectedJobForAssign && (
+              <div className="mt-3 p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 flex items-center justify-between gap-2 text-xs">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="font-bold text-slate-900 dark:text-white truncate">
+                      {selectedJobForAssign.jobTitle || selectedJobForAssign.title}
+                    </span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300">
+                      {selectedJobForAssign.jobCode}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                    Client: {selectedJobForAssign.clientName || selectedJobForAssign.client || "Direct"}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-[10px] text-slate-400 block">Current:</span>
+                  <Badge variant="outline" className="text-[10px] font-semibold">
+                    {selectedJobForAssign.assignedTo || "Unassigned"}
+                  </Badge>
+                </div>
+              </div>
+            )}
+          </DialogHeader>
+
+          {/* Tab Selector: Pods vs Individual Users */}
+          <div className="px-4 pt-3 pb-1 flex items-center gap-2 border-b border-neutral-100 dark:border-slate-800">
+            {branchUsesPods && (
+              <button
+                type="button"
+                onClick={() => { setAssignTab("pods"); setAssignSearch(""); }}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                  assignTab === "pods"
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750"
+                )}
+              >
+                <Icon icon="heroicons:squares-plus" className="h-3.5 w-3.5" />
+                Recruitment Pods ({pods.length})
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => { setAssignTab("users"); setAssignSearch(""); }}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                assignTab === "users"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750"
+              )}
+            >
+              <Icon icon="heroicons:user" className="h-3.5 w-3.5" />
+              Recruiters & Staff ({branchRecruiterUsers.length})
+            </button>
+          </div>
+
+          {/* Search Box */}
+          <div className="px-4 pt-2.5">
+            <div className="relative">
+              <Icon icon="heroicons:magnifying-glass" className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                placeholder={assignTab === "pods" ? "Search pods by name or lead..." : "Search staff by name, role, or email..."}
+                value={assignSearch}
+                onChange={(e) => setAssignSearch(e.target.value)}
+                className="h-8.5 pl-8 text-xs bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* Selection List */}
+          <div className="p-4 flex-1 overflow-y-auto max-h-[280px] space-y-2">
+            {assignTab === "pods" ? (
+              filteredPods.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400">
+                  <Icon icon="heroicons:squares-plus" className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-1.5" />
+                  <p className="font-semibold text-slate-600 dark:text-slate-300">No recruitment pods found.</p>
+                  <p className="text-[11px] mt-0.5">You can assign to individual recruiters or create pods in Pods Manager.</p>
+                  <Link href="/utility/pods" className="inline-block mt-2">
+                    <Button size="sm" variant="outline" className="text-xs h-7 text-indigo-600">
+                      Go to Pods Manager →
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                filteredPods.map((pod: any) => {
+                  const isCurrent =
+                    selectedJobForAssign?.podId === pod.id ||
+                    selectedJobForAssign?.assignedTo?.toLowerCase() === pod.name?.toLowerCase();
+                  return (
+                    <div
+                      key={pod.id}
+                      className={cn(
+                        "p-3 rounded-lg border flex items-center justify-between gap-3 text-xs transition-colors",
+                        isCurrent
+                          ? "border-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/30 dark:border-indigo-800"
+                          : "border-neutral-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850"
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 dark:text-white truncate">{pod.name}</span>
+                          {isCurrent && (
+                            <Badge className="text-[9px] bg-indigo-600 text-white font-bold py-0 h-4">
+                              Current
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                          Pod Lead: <span className="font-medium text-slate-700 dark:text-slate-300">{pod.podHeadName || "Unassigned"}</span>
+                          {pod.members && pod.members.length > 0 && (
+                            <span> • {pod.members.length} Member{pod.members.length !== 1 ? 's' : ''}</span>
+                          )}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        disabled={assigning}
+                        onClick={() => handleExecuteAssignment("pod", pod.id, pod.name)}
+                        className={cn(
+                          "h-7 px-3 text-[11px] font-bold cursor-pointer shrink-0",
+                          isCurrent
+                            ? "bg-indigo-100 text-indigo-800 hover:bg-indigo-200 dark:bg-indigo-900 dark:text-indigo-200"
+                            : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                        )}
+                      >
+                        {assigning ? "Assigning..." : isCurrent ? "Re-assign" : "Assign Pod"}
+                      </Button>
+                    </div>
+                  );
+                })
+              )
+            ) : (
+              filteredUsers.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400">
+                  <Icon icon="heroicons:users" className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-1.5" />
+                  <p className="font-semibold text-slate-600 dark:text-slate-300">No recruiters or staff matching "{assignSearch}".</p>
+                </div>
+              ) : (
+                filteredUsers.map((u: any) => {
+                  const isCurrent =
+                    selectedJobForAssign?.primaryRecruiterId === u.id ||
+                    selectedJobForAssign?.assignedTo?.toLowerCase() === (u.fullName || u.name || "").toLowerCase() ||
+                    selectedJobForAssign?.assignedTo?.toLowerCase() === u.email?.toLowerCase();
+                  const roleLabel = u.roleName || (u.roles && u.roles[0]) || u.systemRole || "Staff";
+                  return (
+                    <div
+                      key={u.id}
+                      className={cn(
+                        "p-2.5 rounded-lg border flex items-center justify-between gap-3 text-xs transition-colors",
+                        isCurrent
+                          ? "border-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/30 dark:border-indigo-800"
+                          : "border-neutral-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-[10.5px] shrink-0 uppercase">
+                          {(u.fullName || u.name || u.email || "U").substring(0, 2)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-slate-900 dark:text-white truncate">{u.fullName || u.name}</span>
+                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800">
+                              {roleLabel}
+                            </span>
+                            {isCurrent && (
+                              <Badge className="text-[9px] bg-indigo-600 text-white font-bold py-0 h-4">
+                                Current
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 font-mono truncate">{u.email}</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        disabled={assigning}
+                        onClick={() => handleExecuteAssignment("user", u.id, u.fullName || u.name || u.email)}
+                        className={cn(
+                          "h-7 px-3 text-[11px] font-bold cursor-pointer shrink-0",
+                          isCurrent
+                            ? "bg-indigo-100 text-indigo-800 hover:bg-indigo-200 dark:bg-indigo-900 dark:text-indigo-200"
+                            : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                        )}
+                      >
+                        {assigning ? "Assigning..." : isCurrent ? "Re-assign" : "Assign"}
+                      </Button>
+                    </div>
+                  );
+                })
+              )
+            )}
+          </div>
+
+          {/* Footer: Mark Unassigned or Cancel */}
+          <DialogFooter className="p-3 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850/50 flex flex-row items-center justify-between sm:justify-between">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={assigning}
+              onClick={() => handleExecuteAssignment("unassign", "none", "Unassigned")}
+              className="text-[11px] text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 h-8 cursor-pointer"
+            >
+              Clear Assignment (Unassigned)
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={assigning}
+              onClick={() => setIsAssignModalOpen(false)}
+              className="text-xs h-8 cursor-pointer"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
