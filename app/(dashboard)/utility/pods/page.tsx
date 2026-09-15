@@ -377,8 +377,10 @@ export default function PodsPage() {
   }
 
   // ── Derived data ────────────────────────────────────────────────────
-  // Pod Lead Candidates: ONLY users assigned roles created from the POD_LEAD template
-  // who are not already leading another pod (a user can lead only one pod at a time)
+  // Pod Lead Candidates: any user whose role archetype is RECRUITER or POD_LEAD (by systemRole),
+  // who is not already leading another pod (a user can lead only one pod at a time).
+  // The role can be named anything ("Team Lead", "Pod Head", etc.) — what matters is
+  // the underlying systemRole / base archetype from the custom_roles table.
   const recruiterUsersForHead = allUsers.filter((u) => {
     const matchBranch =
       !podBranchId ||
@@ -389,35 +391,49 @@ export default function PodsPage() {
 
     if (!matchBranch) return false;
 
-    // At a time a pod lead can be pod lead of a single pod only.
-    // If they are currently the head of another pod, exclude them from the dropdown.
+    // Exclude users already heading another pod (one pod per lead at a time)
     const isHeadOfAnotherPod = pods.some(
       (p) => p.podHeadId === u.id && (!selectedPod || p.id !== selectedPod.id)
     );
     if (isHeadOfAnotherPod) return false;
 
+    // Resolve the user's role archetype by looking up their roleId in the roles list.
+    // The roles list contains { id, systemRole, name } — we use systemRole, NOT name.
     const userRoleObj = roles.find((r) => r.id === u.roleId);
-    const baseArchetype = (
+    const systemRoleArchetype = (
       userRoleObj?.systemRole ||
       userRoleObj?.replacesSystemRole ||
       u.systemRole ||
-      (u.roles && u.roles[0]) ||
-      u.roleName ||
       ""
     ).toUpperCase();
 
-    const perms: string[] = Array.isArray(u.permissions) ? u.permissions : [];
-    const hasSourcingPermission = perms.includes("submission:create") || perms.includes("candidate:create") || perms.includes("submission:view");
+    // Fallback: check raw role strings stored on the user
+    const rawRoles: string[] = Array.isArray(u.roles) ? u.roles.map((r: string) => r.toUpperCase()) : [];
 
-    const isRecruiterTemplate =
-      hasSourcingPermission ||
-      baseArchetype === "RECRUITER" ||
-      baseArchetype === "POD_LEAD" ||
-      u.roles?.includes("RECRUITER") ||
-      u.roles?.includes("POD_LEAD") ||
+    // Accept any user whose archetype is RECRUITER or POD_LEAD (dynamic names OK)
+    const isRecruiterOrPodLeadArchetype =
+      systemRoleArchetype === "RECRUITER" ||
+      systemRoleArchetype === "POD_LEAD" ||
+      rawRoles.includes("RECRUITER") ||
+      rawRoles.includes("POD_LEAD") ||
       (selectedPod && selectedPod.podHeadId === u.id);
 
-    return isRecruiterTemplate && !u.roles?.includes("ADMIN") && !u.roles?.includes("SUPER_ADMIN");
+    // Exclude higher-privilege roles
+    const isHigherPrivilege =
+      rawRoles.includes("ADMIN") ||
+      rawRoles.includes("SUPER_ADMIN") ||
+      rawRoles.includes("TENANT_ADMIN") ||
+      rawRoles.includes("BRANCH_ADMIN") ||
+      rawRoles.includes("DELIVERY_HEAD") ||
+      rawRoles.includes("ACCOUNT_MANAGER") ||
+      systemRoleArchetype === "ADMIN" ||
+      systemRoleArchetype === "SUPER_ADMIN" ||
+      systemRoleArchetype === "TENANT_ADMIN" ||
+      systemRoleArchetype === "BRANCH_ADMIN" ||
+      systemRoleArchetype === "DELIVERY_HEAD" ||
+      systemRoleArchetype === "ACCOUNT_MANAGER";
+
+    return isRecruiterOrPodLeadArchetype && !isHigherPrivilege;
   });
 
   const formatDisplayRoleName = (roleName?: string) => {
@@ -910,17 +926,17 @@ export default function PodsPage() {
                   >
                     <option value="">— None (Unassigned) —</option>
                     {recruiterUsersForHead.length === 0 ? (
-                      <option disabled value="">(No available staff with Pod Lead role in this branch)</option>
+                      <option disabled value="">(No eligible staff found in this branch)</option>
                     ) : (
                       recruiterUsersForHead.map((u) => (
                         <option key={u.id} value={u.id}>
-                          {u.fullName} ({formatDisplayRoleName(u.roleName)}) — {u.email}
+                          {u.fullName} ({u.roleName || "Recruiter"}) — {u.email}
                         </option>
                       ))
                     )}
                   </select>
                   <p className="text-[10.5px] text-default-450 leading-relaxed">
-                    💡 Only staff assigned to roles created from the <strong>POD_LEAD</strong> template who are not already leading another pod are eligible as Pod Lead.
+                    💡 Recruiters not already leading another pod are eligible. When assigned, they will automatically receive the branch's team lead role.
                   </p>
                 </div>
 
