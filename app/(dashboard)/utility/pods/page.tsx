@@ -14,6 +14,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 
@@ -92,6 +105,7 @@ export default function PodsPage() {
   const [podName, setPodName] = useState("");
   const [podBranchId, setPodBranchId] = useState("");
   const [podHeadId, setPodHeadId] = useState("");
+  const [podHeadOpen, setPodHeadOpen] = useState(false);
   const [podDescription, setPodDescription] = useState("");
   const [selectedRecruiterIds, setSelectedRecruiterIds] = useState<string[]>([]);
   const [recruiterSearch, setRecruiterSearch] = useState<string>("");
@@ -926,37 +940,82 @@ export default function PodsPage() {
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
                     Assign Pod Lead (Team Lead)
                   </label>
-                  <Select
-                    value={podHeadId}
-                    onValueChange={(value) => setPodHeadId(value === "unassigned" ? "" : value)}
-                  >
-                    <SelectTrigger className="w-full text-xs font-semibold border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/30 dark:bg-slate-800 text-neutral-900 dark:text-white h-auto py-2">
-                      <SelectValue placeholder="— None (Unassigned) —" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned" className="text-xs italic text-neutral-500">
-                        — None (Unassigned) —
-                      </SelectItem>
-                      {recruiterUsersForHead.length === 0 ? (
-                        <div className="p-2 text-xs text-neutral-400 italic">
-                          (No eligible staff found in this branch)
-                        </div>
-                      ) : (
-                        recruiterUsersForHead.map((u) => (
-                          <SelectItem key={u.id} value={u.id} className="cursor-pointer">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-neutral-900 dark:text-neutral-100">
-                                {u.fullName} <span className="font-normal text-neutral-500 text-[10px]">({u.roleName || "Recruiter"})</span>
+                  <Popover open={podHeadOpen} onOpenChange={setPodHeadOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={podHeadOpen}
+                        className="w-full justify-between h-auto py-2 px-3 text-xs font-semibold border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/30 dark:bg-slate-800 text-neutral-900 dark:text-white hover:bg-indigo-50/50 dark:hover:bg-slate-800/80"
+                      >
+                        {podHeadId && recruiterUsersForHead.find(u => u.id === podHeadId) ? (
+                          <div className="flex flex-col text-left truncate">
+                            <span className="font-bold text-neutral-900 dark:text-neutral-100">
+                              {recruiterUsersForHead.find(u => u.id === podHeadId)?.fullName}{" "}
+                              <span className="font-normal text-neutral-500 text-[10px]">
+                                ({recruiterUsersForHead.find(u => u.id === podHeadId)?.roleName || "Recruiter"})
                               </span>
-                              <span className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                                {u.email}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                            </span>
+                            <span className="text-[10px] text-neutral-500 font-normal">
+                              {recruiterUsersForHead.find(u => u.id === podHeadId)?.email}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="font-normal text-neutral-500">— None (Unassigned) —</span>
+                        )}
+                        <Icon icon="heroicons:chevron-up-down" className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search recruiters..." className="h-9 text-xs" />
+                        <CommandList>
+                          <CommandEmpty>No eligible staff found.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="unassigned"
+                              onSelect={() => {
+                                setPodHeadId("");
+                                setPodHeadOpen(false);
+                              }}
+                              className="text-xs italic text-neutral-500 cursor-pointer"
+                            >
+                              — None (Unassigned) —
+                              {podHeadId === "" && (
+                                <Icon icon="heroicons:check" className="ml-auto h-4 w-4 text-indigo-600" />
+                              )}
+                            </CommandItem>
+                            {recruiterUsersForHead.map((u) => (
+                              <CommandItem
+                                key={u.id}
+                                value={`${u.fullName} ${u.email} ${u.roleName || ""}`}
+                                onSelect={() => {
+                                  setPodHeadId(u.id);
+                                  setPodHeadOpen(false);
+                                }}
+                                className="cursor-pointer"
+                              >
+                                <div className="flex flex-col flex-1 truncate">
+                                  <span className="font-bold text-neutral-900 dark:text-neutral-100">
+                                    {u.fullName}{" "}
+                                    <span className="font-normal text-neutral-500 text-[10px]">
+                                      ({u.roleName || "Recruiter"})
+                                    </span>
+                                  </span>
+                                  <span className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate">
+                                    {u.email}
+                                  </span>
+                                </div>
+                                {podHeadId === u.id && (
+                                  <Icon icon="heroicons:check" className="ml-auto h-4 w-4 text-indigo-600 shrink-0" />
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   <p className="text-[10.5px] text-default-450 leading-relaxed">
                     💡 Recruiters not already leading another pod are eligible. When assigned, they will automatically receive the branch's team lead role.
                   </p>
