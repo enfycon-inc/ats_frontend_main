@@ -52,6 +52,10 @@ export interface Job {
   approvedBy?: string | null;
   approvedAt?: string | null;
   rejectionReason?: string | null;
+  isCoSourced?: boolean;
+  sharedBranchIds?: string[];
+  marginSplitAmPct?: number | null;
+  marginSplitRecPct?: number | null;
 }
 
 /**
@@ -113,6 +117,10 @@ export function mapApiJobToJob(api: any): Job {
     approvedBy: api.approvedBy || null,
     approvedAt: api.approvedAt || null,
     rejectionReason: api.rejectionReason || null,
+    isCoSourced: !!api.isCoSourced,
+    sharedBranchIds: api.sharedBranchIds || [],
+    marginSplitAmPct: api.marginSplitAmPct || null,
+    marginSplitRecPct: api.marginSplitRecPct || null,
   };
 }
 

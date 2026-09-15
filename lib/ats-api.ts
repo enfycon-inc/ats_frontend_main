@@ -870,6 +870,10 @@ export interface JobPayload {
   shiftTiming?: string;
   timingSnapshotAt?: string;
   rejectionReason?: string | null;
+  isCoSourced?: boolean;
+  sharedBranchIds?: string[];
+  marginSplitAmPct?: number | null;
+  marginSplitRecPct?: number | null;
 }
 
 export interface CandidateMatch {
