@@ -87,9 +87,9 @@ const SYSTEM_ARCHETYPES = [
     key: "POD_LEAD",
     label: "Pod Lead Template",
     badge: "Team Lead",
-    desc: "Recruitment pod leadership, candidate screening gate, requisition approvals, and team routing.",
+    desc: "Recruitment pod leadership, candidate screening gate, and team routing. Cannot approve or reject job requisitions.",
     perms: [
-      "job:view", "job:edit", "job:approve", "job:reject",
+      "job:view",
       "candidate:view", "candidate:create",
       "submission:view", "submission:create", "submission:internal_screening", "submission:schedule_interview", "submission:edit",
       "client:view", "pod:view", "pod:edit", "report:view"
