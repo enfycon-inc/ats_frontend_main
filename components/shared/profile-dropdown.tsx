@@ -164,23 +164,23 @@ export default function ProfileDropdown() {
   const branchSpecificRoles: string[] = (activeBranchId && (currentUser as any)?.branchRoles?.[activeBranchId]) || [];
   const effectiveRoles = (branchSpecificRoles.length > 0 ? branchSpecificRoles : userRoles).filter((r: string) => !isTechnicalKeycloakRole(r));
 
-  // Always include live systemRole so it's visible in the switch-dashboard dropdown,
-  // even if the stale session hasn't been refreshed after a pod promotion.
+  // Use the live systemRole from /me as the primary role key.
+  // This prevents custom role names (e.g. 'Recruiter One (Pod Lead)') from being
+  // used as the dashboard key and accidentally resolving back to 'Recruiter' label
+  // after availableRoles loads and getDynamicRoleLabel re-evaluates.
   const liveSystemRole: string | null = (currentUser as any)?.systemRole || null;
   const userAssignedRoles: string[] = useMemo(() => {
-    const base: string[] = (effectiveRoles && effectiveRoles.length > 0)
-      ? effectiveRoles
-      : ((session as any)?.user?.roles && (session as any)?.user?.roles.length > 0
-          ? (session as any).user.roles.filter((r: string) => !isTechnicalKeycloakRole(r))
-          : (systemRole && !isTechnicalKeycloakRole(systemRole) ? [systemRole] : []));
-    // Inject live systemRole if not already present (e.g. after pod promotion without re-login)
     if (liveSystemRole && !isTechnicalKeycloakRole(liveSystemRole)) {
-      const liveUpper = liveSystemRole.toUpperCase();
-      const alreadyPresent = base.some(r => r.toUpperCase() === liveUpper);
-      if (!alreadyPresent) return [liveSystemRole, ...base];
+      return [liveSystemRole];
     }
-    return base;
-  }, [effectiveRoles, session, systemRole, liveSystemRole]);
+    if (effectiveRoles && effectiveRoles.length > 0) {
+      return effectiveRoles;
+    }
+    if ((session as any)?.user?.roles?.length > 0) {
+      return (session as any).user.roles.filter((r: string) => !isTechnicalKeycloakRole(r));
+    }
+    return systemRole && !isTechnicalKeycloakRole(systemRole) ? [systemRole] : [];
+  }, [liveSystemRole, effectiveRoles, session, systemRole]);
 
   const isUserAdmin = useMemo(() => {
     const sRole = (systemRole || "").toUpperCase();

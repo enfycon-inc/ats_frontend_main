@@ -1009,11 +1009,26 @@ function ProfileDropdownNav() {
   const branchSpecificRoles: string[] = (activeBranchId && (currentUser as any)?.branchRoles?.[activeBranchId]) || [];
   const effectiveRoles = (branchSpecificRoles.length > 0 ? branchSpecificRoles : userRoles).filter((r: string) => !isTechnicalKeycloakRole(r));
 
-  const userAssignedRoles: string[] = (effectiveRoles && effectiveRoles.length > 0)
-    ? effectiveRoles
-    : ((session as any)?.user?.roles && (session as any)?.user?.roles.length > 0
-        ? (session as any).user.roles.filter((r: string) => !isTechnicalKeycloakRole(r))
-        : (systemRole && !isTechnicalKeycloakRole(systemRole) ? [systemRole] : []));
+  // Build the roles list for the dashboard switcher.
+  // Priority: live systemRole from /me > branchRoles > session roles.
+  // We use systemRole (e.g. 'POD_LEAD') rather than the custom role display name
+  // (e.g. 'Recruiter One (Pod Lead)') as the primary key so getDynamicRoleLabel
+  // resolves to the correct archetype label regardless of how the role is named.
+  const liveSystemRole: string | null = (currentUser as any)?.systemRole || null;
+  const userAssignedRoles: string[] = useMemo(() => {
+    // If we have a live systemRole from /me, use it as the primary entry
+    if (liveSystemRole && !isTechnicalKeycloakRole(liveSystemRole)) {
+      return [liveSystemRole];
+    }
+    // Fallback to branch-scoped or effective roles
+    if (effectiveRoles && effectiveRoles.length > 0) {
+      return effectiveRoles;
+    }
+    if ((session as any)?.user?.roles?.length > 0) {
+      return (session as any).user.roles.filter((r: string) => !isTechnicalKeycloakRole(r));
+    }
+    return systemRole && !isTechnicalKeycloakRole(systemRole) ? [systemRole] : [];
+  }, [liveSystemRole, effectiveRoles, session, systemRole]);
 
   const isUserAdmin = useMemo(() => {
     const sRole = (systemRole || "").toUpperCase();
