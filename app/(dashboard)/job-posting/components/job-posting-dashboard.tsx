@@ -560,7 +560,7 @@ export default function JobPostingDashboard({
                 : "text-default-500 hover:text-default-800"
             }`}
           >
-            Branch Jobs / Jobs in branch
+            Branch Jobs
           </button>
           <button
             onClick={() => setDashboardTab("shared")}

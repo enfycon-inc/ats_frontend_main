@@ -1000,7 +1000,7 @@ export default function JobDetailPage() {
                 onClick={() => setDelegateModalOpen(true)}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 cursor-pointer"
               >
-                <Share2 className="h-3.5 w-3.5" /> Delegate Job
+                <Share2 className="h-3.5 w-3.5" /> Share with Branch
               </Button>
             )}
           </div>

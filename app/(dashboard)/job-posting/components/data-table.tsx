@@ -68,6 +68,7 @@ import { atsApi } from "@/lib/ats-api";
 import { Job } from "../data/mock-jobs";
 import AddCandidateModal from "@/components/dashboard/AddCandidateModal";
 import { AddClientModal } from "./add-client-modal";
+import { DelegateJobModal } from "@/components/shared/delegate-job-modal";
 
 export function getAssignedPersonDisplay(job: Job): {
   label: string;
@@ -359,6 +360,12 @@ export default function DataTable({
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
     return permissions.includes("job:create") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("ADMIN");
+  }, [currentUser]);
+
+  const hasDelegatePermission = useMemo(() => {
+    if (!currentUser) return false;
+    const permissions = currentUser.permissions || [];
+    return permissions.includes("job:delegate") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("BRANCH_ADMIN");
   }, [currentUser]);
 
   const hasApprovePermission = useMemo(() => {
@@ -737,6 +744,8 @@ export default function DataTable({
   const [statusModalJob, setStatusModalJob] = useState<Job | null>(null);
   const [statusModalValue, setStatusModalValue] = useState("");
   const [statusModalComment, setStatusModalComment] = useState("");
+
+  const [delegateModalJob, setDelegateModalJob] = useState<Job | null>(null);
 
   // Assigned To / Primary Recruiter Modal States
   const [assignModalJob, setAssignModalJob] = useState<Job | null>(null);
@@ -2641,6 +2650,18 @@ export default function DataTable({
                                     </>
                                   )}
 
+                                  {hasDelegatePermission && (
+                                    <DropdownMenuItem
+                                      onClick={() => setDelegateModalJob(job)}
+                                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-colors"
+                                    >
+                                      <div className="h-6 w-6 rounded-md bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                        <Icon icon="heroicons:share" className="h-3.5 w-3.5" />
+                                      </div>
+                                      <span className="font-semibold">Share with Branch</span>
+                                    </DropdownMenuItem>
+                                  )}
+
                                   {hasCreatePermission && (
                                       <DropdownMenuItem
                                         onClick={() => router.push(`/job-posting/new?cloneFrom=${job.id}`)}
@@ -2835,6 +2856,22 @@ export default function DataTable({
             <div className="px-2.5 pt-1 pb-1 text-[9.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
               Management
             </div>
+
+            {hasDelegatePermission && (
+              <button
+                onClick={() => {
+                  const job = data.find((j) => j.id === contextMenu.jobId);
+                  if (job) setDelegateModalJob(job);
+                  closeContextMenu();
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-colors cursor-pointer font-semibold"
+              >
+                <div className="h-6 w-6 rounded-md bg-purple-100 dark:bg-purple-950/80 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 shadow-2xs">
+                  <Icon icon="heroicons:share" className="h-3.5 w-3.5" />
+                </div>
+                <span>Share with Branch</span>
+              </button>
+            )}
 
             {hasEditPermission && (
               <>
@@ -3891,6 +3928,21 @@ export default function DataTable({
           toast.success(`Client "${newClientName}" added and assigned!`);
         }}
       />
+
+      {/* Delegate Job Modal */}
+      {delegateModalJob && (
+        <DelegateJobModal
+          isOpen={!!delegateModalJob}
+          onClose={() => setDelegateModalJob(null)}
+          jobId={delegateModalJob.id}
+          jobCode={delegateModalJob.jobCode}
+          jobTitle={delegateModalJob.jobTitle}
+          onSuccess={() => {
+            setDelegateModalJob(null);
+            if (onRefresh) onRefresh();
+          }}
+        />
+      )}
     </div>
   );
 }
