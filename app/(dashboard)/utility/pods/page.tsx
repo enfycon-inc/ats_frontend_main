@@ -33,10 +33,40 @@ interface Pod {
 
 type ModalMode = "create" | "edit" | null;
 
+function checkIsTenantAdmin(user: any): boolean {
+  if (!user) return false;
+  const sysRole = (user.systemRole || "").toUpperCase();
+  const roles: string[] = Array.isArray(user.roles) ? user.roles.map((r: string) => r.toUpperCase()) : [];
+  const perms: string[] = Array.isArray(user.permissions) ? user.permissions : [];
+  return (
+    roles.includes("ADMIN") ||
+    roles.includes("SUPER_ADMIN") ||
+    sysRole === "ADMIN" ||
+    sysRole === "SUPER_ADMIN" ||
+    perms.includes("tenant:settings") ||
+    perms.includes("tenant:manage")
+  );
+}
+
+function getUserAssignedBranchIds(user: any): string[] {
+  if (!user) return [];
+  const list = [
+    user.branchId,
+    user.branch_id,
+    ...(Array.isArray(user.assignedBranchIds) ? user.assignedBranchIds : []),
+    ...(Array.isArray(user.assigned_branch_ids) ? user.assigned_branch_ids : []),
+  ].filter(Boolean);
+  return Array.from(new Set(list));
+}
+
 export default function PodsPage() {
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isTenantAdmin, setIsTenantAdmin] = useState<boolean>(false);
+  const [allowedBranchIds, setAllowedBranchIds] = useState<string[]>([]);
 
   const [pods, setPods] = useState<Pod[]>([]);
   const [availableRecruiters, setAvailableRecruiters] = useState<any[]>([]);
@@ -61,24 +91,49 @@ export default function PodsPage() {
 
   useEffect(() => {
     const user = atsApi.auth.getCurrentUser();
+    setCurrentUser(user);
+    const tenantAdmin = checkIsTenantAdmin(user);
+    setIsTenantAdmin(tenantAdmin);
+    const allowedBranches = getUserAssignedBranchIds(user);
+    setAllowedBranchIds(allowedBranches);
+
+    const userRoles = Array.isArray(user?.roles) ? user.roles.map((r: string) => r.toUpperCase()) : [];
+    const userPerms = Array.isArray(user?.permissions) ? user.permissions : [];
+    const sysRole = (user?.systemRole || "").toUpperCase();
+
     const canAccess =
-      user?.roles?.includes("ADMIN") ||
-      user?.roles?.includes("SUPER_ADMIN") ||
-      user?.roles?.includes("BRANCH_ADMIN") ||
-      user?.permissions?.includes("pod:view") ||
-      user?.permissions?.includes("user:manage");
+      tenantAdmin ||
+      userRoles.includes("BRANCH_ADMIN") ||
+      sysRole === "BRANCH_ADMIN" ||
+      userPerms.includes("pod:view") ||
+      userPerms.includes("pod:create") ||
+      userPerms.includes("user:manage");
 
     setHasAccess(!!canAccess);
+
     if (canAccess) {
-      const storedBranch = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
-      if (storedBranch) setSelectedBranchFilter(storedBranch);
-      loadData(storedBranch || "all");
+      let initialBranch = "all";
+      if (!tenantAdmin) {
+        initialBranch = user?.branchId || allowedBranches[0] || "";
+      } else {
+        const storedBranch = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+        if (storedBranch) initialBranch = storedBranch;
+      }
+
+      setSelectedBranchFilter(initialBranch);
+      loadData(initialBranch, user, tenantAdmin, allowedBranches);
 
       const handleBranchChanged = () => {
         const updatedBranch = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
-        if (updatedBranch) {
-          setSelectedBranchFilter(updatedBranch);
-          loadData(updatedBranch);
+        if (tenantAdmin) {
+          const b = updatedBranch || "all";
+          setSelectedBranchFilter(b);
+          loadData(b, user, tenantAdmin, allowedBranches);
+        } else {
+          if (updatedBranch && allowedBranches.includes(updatedBranch)) {
+            setSelectedBranchFilter(updatedBranch);
+            loadData(updatedBranch, user, tenantAdmin, allowedBranches);
+          }
         }
       };
       window.addEventListener("branchChanged", handleBranchChanged);
@@ -88,10 +143,29 @@ export default function PodsPage() {
     }
   }, []);
 
-  const loadData = async (branchFilter = selectedBranchFilter) => {
+  const loadData = async (
+    branchFilter = selectedBranchFilter,
+    userParam?: any,
+    isTenantParam?: boolean,
+    allowedBranchesParam?: string[]
+  ) => {
     try {
       setLoading(true);
-      const bid = branchFilter !== "all" ? branchFilter : undefined;
+      const user = userParam !== undefined ? userParam : (currentUser || atsApi.auth.getCurrentUser());
+      const tenantAdmin = isTenantParam !== undefined ? isTenantParam : checkIsTenantAdmin(user);
+      const allowedIds = allowedBranchesParam !== undefined ? allowedBranchesParam : getUserAssignedBranchIds(user);
+
+      let effectiveBranchFilter = branchFilter;
+      if (!tenantAdmin) {
+        if (!effectiveBranchFilter || effectiveBranchFilter === "all" || !allowedIds.includes(effectiveBranchFilter)) {
+          effectiveBranchFilter = user?.branchId || allowedIds[0] || "";
+        }
+        if (selectedBranchFilter !== effectiveBranchFilter) {
+          setSelectedBranchFilter(effectiveBranchFilter);
+        }
+      }
+
+      const bid = effectiveBranchFilter && effectiveBranchFilter !== "all" ? effectiveBranchFilter : undefined;
       const [podsData, availRecruitersData, usersData, branchesData, rolesData] = await Promise.all([
         atsApi.pods.list(bid),
         atsApi.pods.getAvailableRecruiters(bid),
@@ -99,10 +173,43 @@ export default function PodsPage() {
         atsApi.branches.list().catch(() => []),
         atsApi.auth.listRoles(bid, true).catch(() => []),
       ]);
+
+      let visibleBranches = branchesData || [];
+      if (!tenantAdmin) {
+        visibleBranches = visibleBranches.filter((b: any) =>
+          allowedIds.includes(b.id) ||
+          (user?.branchId && b.id === user.branchId) ||
+          (user?.branchName && b.name.toLowerCase() === user.branchName.toLowerCase())
+        );
+        if (visibleBranches.length === 0 && (user?.branchId || user?.branchName)) {
+          visibleBranches = [{
+            id: user?.branchId || allowedIds[0] || "assigned-branch",
+            name: user?.branchName || "My Branch Office"
+          }];
+        }
+      }
+
+      setBranches(visibleBranches);
       setPods(podsData || []);
       setAvailableRecruiters(availRecruitersData || []);
-      setAllUsers((usersData || []).filter((u: any) => u.isActive));
-      setBranches(branchesData || []);
+
+      let activeUsers = (usersData || []).filter((u: any) => u.isActive !== false && u.is_active !== false);
+      if (!tenantAdmin) {
+        activeUsers = activeUsers.filter((u: any) => {
+          const userBranch = u.branchId || u.branch_id;
+          const uAssigned: string[] = Array.isArray(u.assignedBranchIds)
+            ? u.assignedBranchIds
+            : Array.isArray(u.assigned_branch_ids)
+            ? u.assigned_branch_ids
+            : [];
+          return (
+            (userBranch && allowedIds.includes(userBranch)) ||
+            uAssigned.some((id) => allowedIds.includes(id)) ||
+            (u.branchName && user?.branchName && u.branchName.toLowerCase() === user.branchName.toLowerCase())
+          );
+        });
+      }
+      setAllUsers(activeUsers);
       setRoles(rolesData || []);
     } catch (err: any) {
       toast.error("Failed to load recruitment pods: " + err.message);
@@ -118,7 +225,12 @@ export default function PodsPage() {
 
   const openCreateModal = () => {
     setPodName("");
-    const defaultBranch = (selectedBranchFilter !== "all" ? selectedBranchFilter : null) || (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null) || branches[0]?.id || "";
+    let defaultBranch = "";
+    if (!isTenantAdmin) {
+      defaultBranch = branches[0]?.id || currentUser?.branchId || allowedBranchIds[0] || "";
+    } else {
+      defaultBranch = (selectedBranchFilter !== "all" ? selectedBranchFilter : null) || branches[0]?.id || "";
+    }
     setPodBranchId(defaultBranch);
     setPodHeadId("");
     setPodDescription("");
@@ -131,7 +243,13 @@ export default function PodsPage() {
   const openEditModal = (pod: Pod) => {
     setSelectedPod(pod);
     setPodName(pod.name);
-    setPodBranchId(pod.branchId || branches[0]?.id || "");
+    let effectiveBranch = pod.branchId || "";
+    if (!isTenantAdmin) {
+      effectiveBranch = branches[0]?.id || currentUser?.branchId || allowedBranchIds[0] || pod.branchId || "";
+    } else if (!effectiveBranch) {
+      effectiveBranch = branches[0]?.id || "";
+    }
+    setPodBranchId(effectiveBranch);
     setPodHeadId(pod.podHeadId || "");
     setPodDescription(pod.description || "");
     setSelectedRecruiterIds(pod.members.map((m) => m.id));
@@ -159,7 +277,7 @@ export default function PodsPage() {
       });
       toast.success(`Recruitment pod "${podName}" created successfully!`);
       closeModal();
-      await loadData();
+      await loadData(selectedBranchFilter);
     } catch (err: any) {
       toast.error("Failed to create pod: " + err.message);
     } finally {
@@ -182,7 +300,7 @@ export default function PodsPage() {
       });
       toast.success(`Recruitment pod "${podName}" updated successfully!`);
       closeModal();
-      await loadData();
+      await loadData(selectedBranchFilter);
     } catch (err: any) {
       toast.error("Failed to update pod: " + err.message);
     } finally {
@@ -197,7 +315,7 @@ export default function PodsPage() {
       await atsApi.pods.delete(id);
       toast.success(`Pod "${name}" deleted successfully.`);
       if (selectedPod?.id === id) closeModal();
-      await loadData();
+      await loadData(selectedBranchFilter);
     } catch (err: any) {
       toast.error("Failed to delete pod: " + err.message);
     } finally {
@@ -209,10 +327,12 @@ export default function PodsPage() {
     if (!confirm("Reset the round-robin cycle? All pods will become available for assignment again.")) return;
     try {
       setSubmitting(true);
-      const bid = selectedBranchFilter !== "all" ? selectedBranchFilter : undefined;
+      const bid = (!isTenantAdmin && branches[0]?.id)
+        ? branches[0].id
+        : (selectedBranchFilter !== "all" ? selectedBranchFilter : undefined);
       await atsApi.pods.resetCycle(bid);
       toast.success("Round-robin cycle reset successfully!");
-      await loadData();
+      await loadData(selectedBranchFilter);
     } catch (err: any) {
       toast.error("Failed to reset cycle: " + err.message);
     } finally {
@@ -376,8 +496,26 @@ export default function PodsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Branch Scope Dropdown */}
-          {branches.length > 0 && (
+          {/* Branch Scope: Dropdown for Tenant Admins / Multi-branch, or Locked Badge for single-branch staff / Branch Admin */}
+          {isTenantAdmin ? (
+            branches.length > 0 && (
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-default-250 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
+                <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
+                <select
+                  value={selectedBranchFilter}
+                  onChange={(e) => handleBranchFilterChange(e.target.value)}
+                  className="bg-transparent text-xs font-bold text-default-800 dark:text-white outline-none cursor-pointer"
+                >
+                  <option value="all">All Branches ({pods.length})</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )
+          ) : branches.length > 1 ? (
             <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-default-250 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
               <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
               <select
@@ -385,13 +523,22 @@ export default function PodsPage() {
                 onChange={(e) => handleBranchFilterChange(e.target.value)}
                 className="bg-transparent text-xs font-bold text-default-800 dark:text-white outline-none cursor-pointer"
               >
-                <option value="all">All Branches ({pods.length})</option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
                   </option>
                 ))}
               </select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/80 rounded-lg px-3 py-1.5 shadow-2xs">
+              <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
+              <span className="text-xs font-bold text-indigo-900 dark:text-indigo-200">
+                {branches[0]?.name || currentUser?.branchName || "My Branch Office"}
+              </span>
+              <span className="text-[9px] uppercase tracking-wider bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold px-1.5 py-0.5 rounded">
+                Branch Office
+              </span>
             </div>
           )}
 
@@ -447,7 +594,7 @@ export default function PodsPage() {
               <thead>
                 <tr className="bg-default-50/70 dark:bg-slate-800/40 border-b border-default-150">
                   <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Pod Name</th>
-                  {selectedBranchFilter === "all" && (
+                  {isTenantAdmin && selectedBranchFilter === "all" && (
                     <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Branch Office</th>
                   )}
                   <th className="py-3.5 px-4 text-[10px] font-bold uppercase tracking-wider text-default-600">Pod Lead</th>
@@ -460,7 +607,7 @@ export default function PodsPage() {
               <tbody className="divide-y divide-default-100 text-xs">
                 {pods.length === 0 ? (
                   <tr>
-                    <td colSpan={selectedBranchFilter === "all" ? 7 : 6} className="py-16 text-center text-default-500 font-semibold italic">
+                    <td colSpan={isTenantAdmin && selectedBranchFilter === "all" ? 7 : 6} className="py-16 text-center text-default-500 font-semibold italic">
                       <div className="flex flex-col items-center gap-3">
                         <div className="h-12 w-12 rounded-full bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 flex items-center justify-center">
                           <Icon icon="heroicons:users" className="h-6 w-6" />
@@ -503,8 +650,8 @@ export default function PodsPage() {
                         </div>
                       </td>
 
-                      {/* Branch Office (Only if All Branches selected) */}
-                      {selectedBranchFilter === "all" && (
+                      {/* Branch Office (Only if Tenant Admin has All Branches selected) */}
+                      {isTenantAdmin && selectedBranchFilter === "all" && (
                         <td className="py-4 px-4 whitespace-nowrap">
                           <span className="inline-flex items-center gap-1 text-xs font-semibold text-default-800 dark:text-default-200">
                             <Icon icon="heroicons:building-office" className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
@@ -726,18 +873,30 @@ export default function PodsPage() {
                       <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
                         Branch Office <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        value={podBranchId}
-                        onChange={(e) => setPodBranchId(e.target.value)}
-                        className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                        required
-                      >
-                        {branches.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
+                      {!isTenantAdmin && branches.length <= 1 ? (
+                        <div className="w-full text-xs font-semibold border border-neutral-200 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-100/70 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
+                            {branches[0]?.name || currentUser?.branchName || "My Branch Office"}
+                          </span>
+                          <span className="text-[10px] uppercase font-bold text-neutral-500 bg-neutral-200 dark:bg-slate-700 px-2 py-0.5 rounded">
+                            Locked
+                          </span>
+                        </div>
+                      ) : (
+                        <select
+                          value={podBranchId}
+                          onChange={(e) => setPodBranchId(e.target.value)}
+                          className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                          required
+                        >
+                          {branches.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   )}
                 </div>
