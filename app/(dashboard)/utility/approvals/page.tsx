@@ -510,13 +510,13 @@ export default function ApprovalsPage() {
                                   onClick={() => handleMarketChange(user.id, "US")}
                                   className={`px-2.5 py-1 rounded text-xs font-semibold ${selectedMarket === "US" ? "bg-indigo-600 text-white" : "text-default-500"}`}
                                 >
-                                  🇺🇸 US
+                                  US
                                 </button>
                                 <button
                                   onClick={() => handleMarketChange(user.id, "IN")}
                                   className={`px-2.5 py-1 rounded text-xs font-semibold ${selectedMarket === "IN" ? "bg-emerald-600 text-white" : "text-default-500"}`}
                                 >
-                                  🇮🇳 IN
+                                  IN
                                 </button>
                               </div>
                             </td>
@@ -593,13 +593,13 @@ export default function ApprovalsPage() {
                                   onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
                                   className={`px-2.5 py-1 rounded text-xs font-semibold ${tenant.defaultMarket === "US" ? "bg-indigo-600 text-white" : "text-default-500"}`}
                                 >
-                                  🇺🇸 US
+                                  US
                                 </button>
                                 <button
                                   onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
                                   className={`px-2.5 py-1 rounded text-xs font-semibold ${tenant.defaultMarket === "IN" ? "bg-emerald-600 text-white" : "text-default-500"}`}
                                 >
-                                  🇮🇳 IN
+                                  IN
                                 </button>
                               </div>
                             </td>
@@ -1091,7 +1091,7 @@ export default function ApprovalsPage() {
                         : "text-default-500"
                     }`}
                   >
-                    🇺🇸 US IT Staffing
+                    US IT Staffing
                   </button>
                   <button
                     type="button"
@@ -1102,7 +1102,7 @@ export default function ApprovalsPage() {
                         : "text-default-500"
                     }`}
                   >
-                    🇮🇳 Indian Staffing
+                    Indian Staffing
                   </button>
                 </div>
               </div>

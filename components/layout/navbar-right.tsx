@@ -923,7 +923,7 @@ function ProfileDropdownNav() {
   const userName = currentUser?.fullName || (session as any)?.user?.name || "Mrutyunjay Rout";
   const userAvatar = currentUser?.avatar || (session as any)?.user?.image || null;
   const userRoles = currentUser?.roles || (session as any)?.user?.roles || [];
-  const systemRole = (session as any)?.user?.systemRole || userRoles[0];
+  const systemRole = (currentUser as any)?.systemRole || (session as any)?.user?.systemRole || userRoles[0];
 
   const userInitials = useMemo(() => {
     if (!userName) return "U";

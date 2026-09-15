@@ -80,7 +80,8 @@ export default function ProfileDropdown() {
   const userName = currentUser?.fullName || (session as any)?.user?.name || "Mrutyunjay Rout";
   const userAvatar = currentUser?.avatar || (session as any)?.user?.image || null;
   const userRoles = currentUser?.roles || (session as any)?.user?.roles || [];
-  const systemRole = (session as any)?.user?.systemRole || userRoles[0];
+  // Prefer live systemRole from /me endpoint (stays accurate after pod lead promotion without re-login)
+  const systemRole = (currentUser as any)?.systemRole || (session as any)?.user?.systemRole || userRoles[0];
 
   const userInitials = useMemo(() => {
     if (!userName) return "U";
@@ -163,11 +164,23 @@ export default function ProfileDropdown() {
   const branchSpecificRoles: string[] = (activeBranchId && (currentUser as any)?.branchRoles?.[activeBranchId]) || [];
   const effectiveRoles = (branchSpecificRoles.length > 0 ? branchSpecificRoles : userRoles).filter((r: string) => !isTechnicalKeycloakRole(r));
 
-  const userAssignedRoles: string[] = (effectiveRoles && effectiveRoles.length > 0)
-    ? effectiveRoles
-    : ((session as any)?.user?.roles && (session as any)?.user?.roles.length > 0
-        ? (session as any).user.roles.filter((r: string) => !isTechnicalKeycloakRole(r))
-        : (systemRole && !isTechnicalKeycloakRole(systemRole) ? [systemRole] : []));
+  // Always include live systemRole so it's visible in the switch-dashboard dropdown,
+  // even if the stale session hasn't been refreshed after a pod promotion.
+  const liveSystemRole: string | null = (currentUser as any)?.systemRole || null;
+  const userAssignedRoles: string[] = useMemo(() => {
+    const base: string[] = (effectiveRoles && effectiveRoles.length > 0)
+      ? effectiveRoles
+      : ((session as any)?.user?.roles && (session as any)?.user?.roles.length > 0
+          ? (session as any).user.roles.filter((r: string) => !isTechnicalKeycloakRole(r))
+          : (systemRole && !isTechnicalKeycloakRole(systemRole) ? [systemRole] : []));
+    // Inject live systemRole if not already present (e.g. after pod promotion without re-login)
+    if (liveSystemRole && !isTechnicalKeycloakRole(liveSystemRole)) {
+      const liveUpper = liveSystemRole.toUpperCase();
+      const alreadyPresent = base.some(r => r.toUpperCase() === liveUpper);
+      if (!alreadyPresent) return [liveSystemRole, ...base];
+    }
+    return base;
+  }, [effectiveRoles, session, systemRole, liveSystemRole]);
 
   const isUserAdmin = useMemo(() => {
     const sRole = (systemRole || "").toUpperCase();

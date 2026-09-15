@@ -396,7 +396,6 @@ export default function PodsPage() {
     );
     if (isHeadOfAnotherPod) return false;
 
-    // Check if the user's role was created from the POD_LEAD template
     const userRoleObj = roles.find((r) => r.id === u.roleId);
     const baseArchetype = (
       userRoleObj?.systemRole ||
@@ -407,12 +406,18 @@ export default function PodsPage() {
       ""
     ).toUpperCase();
 
-    const isPodLeadTemplate =
+    const perms: string[] = Array.isArray(u.permissions) ? u.permissions : [];
+    const hasSourcingPermission = perms.includes("submission:create") || perms.includes("candidate:create") || perms.includes("submission:view");
+
+    const isRecruiterTemplate =
+      hasSourcingPermission ||
+      baseArchetype === "RECRUITER" ||
       baseArchetype === "POD_LEAD" ||
+      u.roles?.includes("RECRUITER") ||
       u.roles?.includes("POD_LEAD") ||
       (selectedPod && selectedPod.podHeadId === u.id);
 
-    return isPodLeadTemplate && !u.roles?.includes("ADMIN") && !u.roles?.includes("SUPER_ADMIN");
+    return isRecruiterTemplate && !u.roles?.includes("ADMIN") && !u.roles?.includes("SUPER_ADMIN");
   });
 
   const formatDisplayRoleName = (roleName?: string) => {
