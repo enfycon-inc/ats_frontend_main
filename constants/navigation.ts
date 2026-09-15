@@ -101,9 +101,14 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
   },
   {
     id: "submissions-tracker",
-    label: "Submissions Tracker",
+    label: "Recruitment",
     href: "/utility/submissions",
     icon: ClipboardList,
+    children: [
+      { label: "My Submissions", href: "/utility/submissions?view=my" },
+      { label: "Pod Submissions", href: "/utility/submissions?view=pod" },
+      { label: "All Submissions", href: "/utility/submissions?view=all" },
+    ],
   },
   {
     id: "placements",

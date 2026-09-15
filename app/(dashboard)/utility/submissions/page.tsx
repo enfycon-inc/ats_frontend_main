@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card } from "@/components/ui/card";
@@ -828,6 +829,9 @@ let cachedSubmissionsState: {
 } | null = null;
 
 export default function SubmissionsPage() {
+  const searchParams = useSearchParams();
+  const viewParam = searchParams.get('view') || 'all';
+
   const [loading, setLoading] = useState(() => !cachedSubmissionsState);
   const [submitting, setSubmitting] = useState(false);
   const [submissions, setSubmissions] = useState<Submission[]>(() => cachedSubmissionsState?.submissions || []);
@@ -939,7 +943,7 @@ export default function SubmissionsPage() {
     const user = atsApi.auth.getCurrentUser();
     setCurrentUser(user);
     loadData(false);
-  }, []);
+  }, [viewParam]);
 
   const loadData = async (showLoading: boolean | any = true) => {
     try {
@@ -968,6 +972,7 @@ export default function SubmissionsPage() {
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         finalStatus: statusFilter || undefined,
+        view: viewParam,
       }).then((data) => {
         let list = data?.data || data || [];
         if (searchQuery.trim()) {
@@ -1547,11 +1552,11 @@ export default function SubmissionsPage() {
         <SiteBreadcrumb />
 
         {/* HEADER */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-default-100 pb-5 mt-2">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-default-100 pb-5 mt-2">
           <div>
             <h1 className="text-2xl font-bold text-default-900 flex items-center gap-2">
               <Icon icon="heroicons:clipboard-document-list" className="text-indigo-600 h-7 w-7" />
-              Submissions Tracker
+              {viewParam === 'my' ? 'My Submissions' : viewParam === 'pod' ? 'Pod Submissions' : viewParam === 'all' ? 'All Submissions' : 'Submissions Tracker'}
             </h1>
             <p className="text-sm text-default-600 mt-1">
               Monitor candidate submissions, schedule client interview rounds, and approve internal submissions.
