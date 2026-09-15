@@ -7,6 +7,13 @@ import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 
@@ -919,22 +926,37 @@ export default function PodsPage() {
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
                     Assign Pod Lead (Team Lead)
                   </label>
-                  <select
+                  <Select
                     value={podHeadId}
-                    onChange={(e) => setPodHeadId(e.target.value)}
-                    className="w-full text-xs font-semibold border border-indigo-200 dark:border-indigo-900/60 rounded-lg p-2.5 bg-indigo-50/30 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                    onValueChange={(value) => setPodHeadId(value === "unassigned" ? "" : value)}
                   >
-                    <option value="">— None (Unassigned) —</option>
-                    {recruiterUsersForHead.length === 0 ? (
-                      <option disabled value="">(No eligible staff found in this branch)</option>
-                    ) : (
-                      recruiterUsersForHead.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.fullName} ({u.roleName || "Recruiter"}) — {u.email}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                    <SelectTrigger className="w-full text-xs font-semibold border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/30 dark:bg-slate-800 text-neutral-900 dark:text-white h-auto py-2">
+                      <SelectValue placeholder="— None (Unassigned) —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned" className="text-xs italic text-neutral-500">
+                        — None (Unassigned) —
+                      </SelectItem>
+                      {recruiterUsersForHead.length === 0 ? (
+                        <div className="p-2 text-xs text-neutral-400 italic">
+                          (No eligible staff found in this branch)
+                        </div>
+                      ) : (
+                        recruiterUsersForHead.map((u) => (
+                          <SelectItem key={u.id} value={u.id} className="cursor-pointer">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-neutral-900 dark:text-neutral-100">
+                                {u.fullName} <span className="font-normal text-neutral-500 text-[10px]">({u.roleName || "Recruiter"})</span>
+                              </span>
+                              <span className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                                {u.email}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                   <p className="text-[10.5px] text-default-450 leading-relaxed">
                     💡 Recruiters not already leading another pod are eligible. When assigned, they will automatically receive the branch's team lead role.
                   </p>
