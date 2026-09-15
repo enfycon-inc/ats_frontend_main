@@ -91,7 +91,7 @@ export default function SharedJobsTable({ onRefresh, branchUsesPods }: { onRefre
                   <tr key={job.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2 mb-1">
-                        <Link href={\/job-posting/\\} className="font-semibold text-sm text-indigo-600 hover:underline">
+                        <Link href={`/job-posting/${job.id}`} className="font-semibold text-sm text-indigo-600 hover:underline">
                           {job.jobTitle}
                         </Link>
                         <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 text-[9px] border-purple-200">
@@ -133,7 +133,7 @@ export default function SharedJobsTable({ onRefresh, branchUsesPods }: { onRefre
                       </div>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <Link href={\/job-posting/\\}>
+                      <Link href={`/job-posting/${job.id}`}>
                         <Button size="sm" variant="outline" className="text-[11px] h-7 gap-1">
                           View Details <ExternalLink className="h-3 w-3" />
                         </Button>
