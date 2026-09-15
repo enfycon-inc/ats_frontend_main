@@ -48,7 +48,7 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
       const res = await atsApi.branches.list();
       // Filter out the current user's branch (we don't want to delegate to ourselves)
       // For now, list all branches. The backend prevents delegating to the same branch.
-      setBranches(res.data || []);
+      setBranches(res || []);
     } catch (err) {
       console.error("Failed to load branches", err);
     } finally {
