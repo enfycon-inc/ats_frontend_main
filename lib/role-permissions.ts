@@ -208,7 +208,8 @@ export function getActiveRolePermissions(
         "job:assign", "job:assign_recruiter", "job:assign_pod",
         "candidate:create", "candidate:view",
         "submission:create", "submission:view", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
-        "branch_admin:manage", "user:manage", "pod:view", "pod:edit",
+        "branch_admin:manage", "user:manage",
+        "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
         "client:view", "placement:view", "report:view"
       ];
     case "DELIVERY_HEAD":

@@ -122,7 +122,8 @@ const SYSTEM_ARCHETYPES = [
       "candidate:create", "candidate:view",
       "submission:create", "submission:view", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
       "client:view", "client:create", "client:direct_add", "client:edit", "client:approve", "client:reject",
-      "branch_admin:manage", "user:manage", "pod:view", "pod:edit",
+      "branch_admin:manage", "user:manage",
+      "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
       "placement:view", "placement:create", "report:view"
     ]
   },
