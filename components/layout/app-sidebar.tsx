@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { PRIMARY_NAV_ITEMS, MORE_NAV_ITEMS, GLOBAL_ADMIN_NAV_ITEMS, GLOBAL_ADMIN_MORE_ITEMS } from "@/constants/navigation";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { NavbarLogo } from "./navbar-logo";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
@@ -27,7 +27,14 @@ import { getFilteredPrimaryNav, getFilteredMoreNav, CustomRoleDefinition } from 
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
+
+  const checkActive = (href: string) => {
+    if (!href) return false;
+    const currentUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "");
+    return currentUrl === href;
+  };
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
 
@@ -100,7 +107,7 @@ export function AppSidebar() {
                         <SidebarMenuSub>
                           {item.children.map((subItem) => (
                             <SidebarMenuSubItem key={subItem.label}>
-                              <SidebarMenuSubButton asChild isActive={pathname === subItem.href}>
+                              <SidebarMenuSubButton asChild isActive={checkActive(subItem.href)}>
                                 <Link href={subItem.href}>
                                   <span>{subItem.label}</span>
                                 </Link>
@@ -113,7 +120,7 @@ export function AppSidebar() {
                   </Collapsible>
                 ) : (
                   <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
+                    <SidebarMenuButton asChild tooltip={item.label} isActive={checkActive(item.href)}>
                       <Link href={item.href}>
                         {item.icon && <item.icon />}
                         <span>{item.label}</span>
@@ -150,7 +157,7 @@ export function AppSidebar() {
                         <SidebarMenuSub>
                           {item.children.map((subItem) => (
                             <SidebarMenuSubItem key={subItem.label}>
-                              <SidebarMenuSubButton asChild isActive={pathname === subItem.href}>
+                              <SidebarMenuSubButton asChild isActive={checkActive(subItem.href)}>
                                 <Link href={subItem.href}>
                                   <span>{subItem.label}</span>
                                 </Link>
@@ -163,7 +170,7 @@ export function AppSidebar() {
                   </Collapsible>
                 ) : (
                   <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
+                    <SidebarMenuButton asChild tooltip={item.label} isActive={checkActive(item.href)}>
                       <Link href={item.href}>
                         {item.icon && <item.icon />}
                         <span>{item.label}</span>
