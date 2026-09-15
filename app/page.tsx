@@ -1,16 +1,11 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import LoginForm from "@/components/auth/login-form";
 import Social from "@/components/auth/social";
-import { atsApi } from "@/lib/ats-api";
-import { signIn } from "next-auth/react";
-import toast from "react-hot-toast";
-import { getCurrentSubdomain, getBaseDomain, getTenantIdentifier } from "@/utils/subdomain-helper";
-import { Loader2, ShieldCheck, User, Users, Briefcase, Settings } from "lucide-react";
 
 function Logo() {
   const { theme } = useTheme();
@@ -37,130 +32,10 @@ function Copyright() {
   return <>Copyright {currentYear}, Enfycon All Rights Reserved.</>;
 }
 
-const personas = [
-  {
-    role: "Global Admin",
-    email: "admin@enfycon.com",
-    desc: "Oversees all companies, tenants, approvals, and global parameters.",
-    icon: ShieldCheck,
-    color: "border-rose-200 dark:border-rose-800/30 bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400"
-  },
-  {
-    role: "Tenant Admin",
-    email: "deb@deb.com",
-    desc: "Company admin (manages staff, custom roles, pods, and workspace settings).",
-    icon: Settings,
-    color: "border-amber-200 dark:border-amber-800/30 bg-amber-50/50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400"
-  },
-  {
-    role: "Account Manager",
-    email: "debam@deb.com",
-    desc: "Tracks requirements, clients, and monitors candidate submissions.",
-    icon: Briefcase,
-    color: "border-emerald-200 dark:border-emerald-800/30 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400"
-  },
-  {
-    role: "Pod Lead",
-    email: "debrec1@deb.com",
-    desc: "Delivery leader (manages pods, assigns recruiters, tracks requisitions).",
-    icon: Users,
-    color: "border-indigo-200 dark:border-indigo-800/30 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400"
-  },
-  {
-    role: "Recruiter",
-    email: "debrec2@deb.com",
-    desc: "Sourcing agent (submits candidates, manages resume pipelines).",
-    icon: User,
-    color: "border-blue-200 dark:border-blue-800/30 bg-blue-50/50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400"
-  }
-];
 
 export default function RootPage() {
-  const [activeTab, setActiveTab] = useState<"sandbox" | "login">("sandbox");
-  const [isLoggingIn, startLoginTransition] = useTransition();
-  const [loginEmail, setLoginEmail] = useState<string | null>(null);
 
-  /**
-   * Poll /api/auth/session until the NextAuth cookie is committed, then navigate.
-   * Prevents the dashboard layout from seeing no session and bouncing back to login.
-   */
-  const navigateAfterLogin = async (destination: string) => {
-    const MAX_ATTEMPTS = 12;
-    const POLL_INTERVAL_MS = 250;
-    for (let i = 0; i < MAX_ATTEMPTS; i++) {
-      try {
-        const res = await fetch("/api/auth/session", { cache: "no-store" });
-        if (res.ok) {
-          const session = await res.json();
-          if (session?.user) {
-            window.location.href = destination;
-            return;
-          }
-        }
-      } catch {
-        // network hiccup — keep trying
-      }
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-    }
-    window.location.href = destination;
-  };
 
-  const handleQuickLogin = async (email: string, roleName: string) => {
-    setLoginEmail(email);
-    startLoginTransition(async () => {
-      try {
-        // 1. Sync with NestJS Backend API to retrieve/store JWT token
-        let syncRes;
-        try {
-          syncRes = await atsApi.auth.login(email, "enfycon123");
-        } catch (apiErr: any) {
-          toast.error(apiErr.message || `Backend authentication failed for ${roleName}.`);
-          return;
-        }
-
-        // 2. Sign in with NextAuth credentials provider
-        const signInRes = await signIn("credentials", {
-          redirect: false,
-          email: email,
-          password: "enfycon123",
-          subdomain: getTenantIdentifier(),
-          callbackUrl: "/dashboard",
-        });
-
-        if (signInRes?.error) {
-          toast.error("NextAuth authentication failed.");
-          return;
-        }
-
-        toast.success(`Successfully logged in as ${roleName}!`);
-
-        // 3. Subdomain Redirection logic
-        const isSuperAdmin = syncRes?.user?.roles?.includes("SUPER_ADMIN") || (syncRes?.user as any)?.systemRole === "SUPER_ADMIN";
-        const userTenantDomain = syncRes?.user?.tenantDomain;
-        const currentSubdomain = getCurrentSubdomain();
-        const base = getBaseDomain();
-        const protocol = window.location.protocol;
-
-        let dest: string;
-        if (isSuperAdmin) {
-          dest = currentSubdomain ? `${protocol}//${base}/dashboard` : "/dashboard";
-        } else if (userTenantDomain && userTenantDomain !== "enfy" && userTenantDomain !== "www" && currentSubdomain !== userTenantDomain) {
-          // Tenant user logging in -> redirect to tenant subdomain with SSO token
-          const tokenParam = syncRes?.accessToken ? `?sso_token=${encodeURIComponent(syncRes.accessToken)}` : "";
-          window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login${tokenParam}`;
-          return;
-        } else if (currentSubdomain === "enfy") {
-          dest = `${protocol}//${base}/dashboard`;
-        } else {
-          dest = "/dashboard";
-        }
-
-        await navigateAfterLogin(dest);
-      } catch (err: any) {
-        toast.error(err.message || "Failed to sign in.");
-      }
-    });
-  };
 
   return (
     <>
@@ -223,70 +98,9 @@ export default function RootPage() {
                   </div>
                 </div>
 
-                {/* Tab selector */}
-                <div className="flex p-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl mb-6 border border-slate-200/50 dark:border-slate-700/50">
-                  <button 
-                    onClick={() => setActiveTab("sandbox")}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      activeTab === "sandbox" 
-                        ? "bg-white dark:bg-slate-700 text-indigo-650 dark:text-indigo-300 shadow-sm border border-slate-250/20" 
-                        : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
-                    }`}
-                  >
-                    Demo Sandbox
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab("login")}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      activeTab === "login" 
-                        ? "bg-white dark:bg-slate-700 text-indigo-650 dark:text-indigo-300 shadow-sm border border-slate-250/20" 
-                        : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
-                    }`}
-                  >
-                    Credentials Login
-                  </button>
-                </div>
-
-                {activeTab === "sandbox" ? (
-                  <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-                    <div className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 select-none">
-                      Select a role to login automatically:
-                    </div>
-                    {personas.map((p) => {
-                      const Icon = p.icon;
-                      const isLoadingThis = isLoggingIn && loginEmail === p.email;
-                      return (
-                        <button
-                          key={p.email}
-                          disabled={isLoggingIn}
-                          onClick={() => handleQuickLogin(p.email, p.role)}
-                          className={`w-full text-left flex items-start gap-4 p-3.5 rounded-xl border border-slate-150 dark:border-slate-850 bg-white dark:bg-slate-900 hover:border-indigo-300 dark:hover:border-indigo-900 hover:shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50 select-none group`}
-                        >
-                          <div className={`p-2.5 rounded-lg border transition-all shrink-0 ${p.color} group-hover:scale-105`}>
-                            {isLoadingThis ? (
-                              <Loader2 className="h-5 w-5 animate-spin" />
-                            ) : (
-                              <Icon className="h-5 w-5" />
-                            )}
-                          </div>
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-default-850 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{p.role}</span>
-                              <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">({p.email})</span>
-                            </div>
-                            <p className="text-[11px] leading-normal text-slate-500 dark:text-slate-400 font-medium">
-                              {p.desc}
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <React.Suspense fallback={<div className="text-center py-6 text-xs text-slate-400">Loading form...</div>}>
-                    <LoginForm />
-                  </React.Suspense>
-                )}
+                <React.Suspense fallback={<div className="text-center py-6 text-xs text-slate-400">Loading form...</div>}>
+                  <LoginForm />
+                </React.Suspense>
 
                 {/* Actions Buttons */}
                 <div className="md:max-w-[345px] mx-auto mt-8 w-full space-y-3">
