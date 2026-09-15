@@ -193,7 +193,7 @@ export function getActiveRolePermissions(
     case "TENANT_ADMIN":
       return [
         "job:create", "job:edit", "job:view", "job:publish_direct", "job:approve", "job:reject",
-        "job:assign", "job:assign_recruiter", "job:assign_pod",
+        "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
         "candidate:create", "candidate:view",
         "submission:view", "submission:create", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
         "tenant:settings", "user:manage",
@@ -205,7 +205,7 @@ export function getActiveRolePermissions(
     case "BRANCH_ADMIN":
       return [
         "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
-        "job:assign", "job:assign_recruiter", "job:assign_pod",
+        "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
         "candidate:create", "candidate:view",
         "submission:create", "submission:view", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
         "branch_admin:manage", "user:manage",

@@ -118,7 +118,7 @@ const SYSTEM_ARCHETYPES = [
     desc: "Branch administrative authority, client approval & management, staff role configuration, and branch recruitment oversight.",
     perms: [
       "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
-      "job:assign", "job:assign_recruiter", "job:assign_pod",
+      "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
       "submission:create", "submission:view", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
       "client:view", "client:create", "client:direct_add", "client:edit", "client:approve", "client:reject",
@@ -134,7 +134,7 @@ const SYSTEM_ARCHETYPES = [
     desc: "Full company administration privileges across jobs, clients (create, direct add, approve, reject, delete), candidates, pods, users, and branch offices.",
     perms: [
       "job:create", "job:edit", "job:view", "job:publish_direct", "job:approve", "job:reject",
-      "job:assign", "job:assign_recruiter", "job:assign_pod",
+      "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
       "submission:view", "submission:create", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
       "client:view", "client:create", "client:direct_add", "client:edit", "client:approve", "client:reject", "client:delete",
