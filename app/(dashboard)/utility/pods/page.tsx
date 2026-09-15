@@ -447,17 +447,17 @@ export default function PodsPage() {
     if (!roleName) return "Recruiter";
     switch (roleName.toUpperCase()) {
       case "ACCOUNT_MANAGER":
-        return "Account Manager (System Role)";
+        return "Account Manager";
       case "POD_LEAD":
-        return "Pod Lead (System Role)";
+        return "Pod Lead";
       case "RECRUITER":
-        return "Recruiter (System Role)";
+        return "Recruiter";
       case "DELIVERY_HEAD":
-        return "Delivery Head (System Role)";
+        return "Delivery Head";
       case "BRANCH_ADMIN":
-        return "Branch Admin (System Role)";
+        return "Branch Admin";
       case "ADMIN":
-        return "Admin (System Role)";
+        return "Admin";
       default:
         return roleName;
     }
