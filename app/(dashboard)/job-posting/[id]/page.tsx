@@ -41,6 +41,7 @@ import {
   UserCheck,
   FileDown,
   ExternalLink,
+  Share2,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ import { atsApi } from "@/lib/ats-api";
 import { mapApiJobToJob, type Job } from "../data/mock-jobs";
 import toast from "react-hot-toast";
 import { ScheduleInterviewModal } from "@/components/interviews/schedule-interview-modal";
+import { DelegateJobModal } from "@/components/shared/delegate-job-modal";
 import { getActiveRolePermissions, resolveActiveSystemRole, CustomRoleDefinition } from "@/lib/role-permissions";
 
 const TIER_STYLES: Record<string, { chip: string; label: string; text: string }> = {
@@ -586,6 +588,7 @@ export default function JobDetailPage() {
   // Job Approval / Rejection states
   const [approveModalOpen, setApproveModalOpen] = useState(false);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [delegateModalOpen, setDelegateModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -990,6 +993,15 @@ export default function JobDetailPage() {
                   <Pencil className="h-3.5 w-3.5" /> Edit Job
                 </Button>
               </Link>
+            )}
+            {effectivePerms.includes("job:delegate") && (
+              <Button 
+                size="sm" 
+                onClick={() => setDelegateModalOpen(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 cursor-pointer"
+              >
+                <Share2 className="h-3.5 w-3.5" /> Delegate Job
+              </Button>
             )}
           </div>
         </CardContent>
@@ -2404,6 +2416,16 @@ export default function JobDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* DELEGATE JOB MODAL */}
+      <DelegateJobModal
+        isOpen={delegateModalOpen}
+        onClose={() => setDelegateModalOpen(false)}
+        jobId={job.id}
+        jobCode={job.jobCode}
+        jobTitle={job.jobTitle}
+        onSuccess={loadData}
+      />
     </div>
   );
 }

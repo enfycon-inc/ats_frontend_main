@@ -2274,6 +2274,7 @@ export default function DataTable({
                               // Only show NEW badge if active and posted within 1 day; otherwise no status chip here (JOB STATUS column already displays status)
                               const statusLabel = isRecent ? "NEW" : null;
                               const statusClasses = "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/40";
+                              const isCoSourced = (job as any).isCoSourced || ((job as any).sharedBranchIds && (job as any).sharedBranchIds.length > 0);
 
                               const rawPriority = String(job.priority || (job as any).urgency || "Warm").toUpperCase();
                               const isHot = rawPriority.includes("HOT") || rawPriority.includes("HIGH") || rawPriority.includes("URGENT");
@@ -2292,6 +2293,11 @@ export default function DataTable({
                                       {job.jobTitle}
                                     </span>
                                   </Link>
+                                  {isCoSourced && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border select-none leading-none shrink-0 bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800">
+                                      Co-Sourced
+                                    </span>
+                                  )}
                                   {statusLabel && (
                                     <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border select-none leading-none shrink-0", statusClasses)}>
                                       {statusLabel}

@@ -1002,6 +1002,31 @@ const jobs = {
       body: JSON.stringify({ text }),
     });
   },
+
+  async delegate(id: string, payload: { targetBranchId: string; slaDaysTarget?: number; marginSplitAmPct?: number; marginSplitRecPct?: number; notes?: string }): Promise<any> {
+    return apiFetch(`/api/jobs/${id}/delegate`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getDelegations(type: 'incoming' | 'outgoing' | 'all' = 'all'): Promise<any[]> {
+    return apiFetch(`/api/jobs/delegations?type=${type}`);
+  },
+
+  async acceptDelegation(requestId: string, payload: { assignedPodId?: string }): Promise<any> {
+    return apiFetch(`/api/jobs/delegations/${requestId}/accept`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async rejectDelegation(requestId: string, payload: { notes?: string }): Promise<any> {
+    return apiFetch(`/api/jobs/delegations/${requestId}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
 };
 
 const candidates = {

@@ -6,6 +6,7 @@ import { mockJobs, mockJobsIN, mapApiJobToJob, Job } from "../data/mock-jobs";
 import { atsApi } from "@/lib/ats-api";
 import { resolveActiveSystemRole } from "@/lib/role-permissions";
 import DataTable from "./data-table";
+import SharedJobsTable from "./shared-jobs-table";
 import FilterDrawer, { SelectedFilters } from "./filter-drawer";
 import ColumnDrawer from "./column-drawer";
 import { Badge } from "@/components/ui/badge";
@@ -193,6 +194,7 @@ export default function JobPostingDashboard({
   }, [isRecruiter, filterParam, initialStatusFilter]);
 
   const [activeView, setActiveView] = useState(initialActiveView);
+  const [dashboardTab, setDashboardTab] = useState<"branch" | "shared">("branch");
 
   useEffect(() => {
     setActiveView(initialActiveView);
@@ -548,8 +550,31 @@ export default function JobPostingDashboard({
   }, []);
 
   return (
-    <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
-      {priorityParam && (
+      <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
+        <div className="flex bg-default-100 dark:bg-slate-800 p-1 rounded-lg border border-default-250 w-fit mb-2">
+          <button
+            onClick={() => setDashboardTab("branch")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
+              dashboardTab === "branch"
+                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                : "text-default-500 hover:text-default-800"
+            }`}
+          >
+            Branch Jobs / Jobs in branch
+          </button>
+          <button
+            onClick={() => setDashboardTab("shared")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
+              dashboardTab === "shared"
+                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                : "text-default-500 hover:text-default-800"
+            }`}
+          >
+            Shared Jobs
+          </button>
+        </div>
+
+        {priorityParam && (
         <div className="flex items-center justify-between px-3.5 py-1.5 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 rounded-lg text-xs">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-slate-700 dark:text-slate-300">Filtered by Priority:</span>
@@ -572,7 +597,7 @@ export default function JobPostingDashboard({
           <Loader2 className="h-8 w-8 text-primary animate-spin" />
           <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">Loading requirement pipelines...</p>
         </div>
-      ) : (
+      ) : dashboardTab === "branch" ? (
         <DataTable
           data={jobsData}
           selectedColumns={activeSelectedColumns}
@@ -588,6 +613,11 @@ export default function JobPostingDashboard({
           onSelectView={handleSelectView}
           onUpdateJob={handleUpdateJob}
           onReorderColumns={handleReorderColumns}
+        />
+      ) : (
+        <SharedJobsTable
+          onRefresh={handleRefresh}
+          branchUsesPods={branchUsesPods}
         />
       )}
 

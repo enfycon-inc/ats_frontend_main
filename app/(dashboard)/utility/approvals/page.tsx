@@ -14,6 +14,7 @@ import toast from "react-hot-toast";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { getBaseDomain } from "@/utils/subdomain-helper";
+import { CrossBranchApprovalsView } from "./cross-branch-approvals";
 
 interface PendingUser {
   id: string;
@@ -49,13 +50,17 @@ export default function ApprovalsPage() {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState<"pending" | "tenants">(initialTab === "pending" ? "pending" : "tenants");
+  const [isBranchAdmin, setIsBranchAdmin] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<"pending" | "tenants" | "cross-branch">(initialTab === "cross-branch" ? "cross-branch" : (initialTab === "pending" ? "pending" : "tenants"));
 
   useEffect(() => {
     if (initialTab === "pending") {
       setActiveTab("pending");
     } else if (initialTab === "tenants") {
       setActiveTab("tenants");
+    } else if (initialTab === "cross-branch") {
+      setActiveTab("cross-branch");
     }
   }, [initialTab]);
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
@@ -119,9 +124,15 @@ export default function ApprovalsPage() {
     const hasAdminRole = override 
       ? override === "SUPER_ADMIN" 
       : ((user as any)?.roles?.includes("SUPER_ADMIN") || (user as any)?.systemRole === "SUPER_ADMIN");
+    
+    const hasBranchAdmin = override
+      ? override === "BRANCH_ADMIN"
+      : ((user as any)?.roles?.includes("BRANCH_ADMIN") || (user as any)?.systemRole === "BRANCH_ADMIN");
+    
     setIsAdmin(!!hasAdminRole);
+    setIsBranchAdmin(!!hasBranchAdmin);
 
-    if (hasAdminRole) {
+    if (hasAdminRole || hasBranchAdmin) {
       loadData();
     } else {
       setLoading(false);
@@ -321,7 +332,7 @@ export default function ApprovalsPage() {
     );
   }
 
-  if (!isAdmin) {
+  if (!isAdmin && !isBranchAdmin) {
     return (
       <div>
         <SiteBreadcrumb />
@@ -332,7 +343,7 @@ export default function ApprovalsPage() {
             </div>
             <h2 className="text-xl font-bold text-red-500 mb-2">Access Denied</h2>
             <p className="text-sm text-default-600">
-              You must have **Administrator** privileges to view the registration and market assignment dashboard.
+              You must have <strong>Administrator</strong> or <strong>Branch Admin</strong> privileges to view this dashboard.
             </p>
           </CardContent>
         </Card>
@@ -366,33 +377,50 @@ export default function ApprovalsPage() {
           </Button>
 
           <div className="flex bg-default-100 dark:bg-slate-800 p-1 rounded-lg border border-default-250 w-fit">
-            <button
-              onClick={() => setActiveTab("pending")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer relative ${
-                activeTab === "pending"
-                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                  : "text-default-500 hover:text-default-800"
-              }`}
-            >
-              <Icon icon="heroicons:user-plus" className="h-4 w-4" />
-              Pending Approvals ({totalPendingCount})
-              {totalPendingCount > 0 && (
-                <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-amber-500 rounded-full animate-pulse">
-                  {totalPendingCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("tenants")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
-                activeTab === "tenants"
-                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                  : "text-default-500 hover:text-default-800"
-              }`}
-            >
-              <Icon icon="heroicons:building-office-2" className="h-4 w-4" />
-              Active Tenants ({activeTenants.length})
-            </button>
+            {isAdmin && (
+              <>
+                <button
+                  onClick={() => setActiveTab("pending")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer relative ${
+                    activeTab === "pending"
+                      ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                      : "text-default-500 hover:text-default-800"
+                  }`}
+                >
+                  <Icon icon="heroicons:user-plus" className="h-4 w-4" />
+                  Pending Approvals ({totalPendingCount})
+                  {totalPendingCount > 0 && (
+                    <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-amber-500 rounded-full animate-pulse">
+                      {totalPendingCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab("tenants")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
+                    activeTab === "tenants"
+                      ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                      : "text-default-500 hover:text-default-800"
+                  }`}
+                >
+                  <Icon icon="heroicons:building-office-2" className="h-4 w-4" />
+                  Active Tenants ({activeTenants.length})
+                </button>
+              </>
+            )}
+            {isBranchAdmin && (
+              <button
+                onClick={() => setActiveTab("cross-branch")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
+                  activeTab === "cross-branch"
+                    ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                    : "text-default-500 hover:text-default-800"
+                }`}
+              >
+                <Icon icon="heroicons:arrows-right-left" className="h-4 w-4" />
+                Cross-Branch Requests
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -629,7 +657,7 @@ export default function ApprovalsPage() {
               )}
             </CardContent>
           </Card>
-        ) : (
+        ) : activeTab === "tenants" ? (
           /* ========================================================
              ACTIVE TENANTS & MARKETS DIRECTORY VIEW
              ======================================================== */
@@ -794,7 +822,9 @@ export default function ApprovalsPage() {
               )}
             </CardContent>
           </Card>
-        )}
+        ) : activeTab === "cross-branch" ? (
+          <CrossBranchApprovalsView />
+        ) : null}
       </div>
 
       {/* Tenant Details & Users Modal */}
