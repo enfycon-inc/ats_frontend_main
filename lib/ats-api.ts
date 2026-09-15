@@ -144,6 +144,8 @@ async function fetchSessionToken(): Promise<string | null> {
             permissions: session.user.permissions || [],
             systemRole: session.user.systemRole || 'RECRUITER',
             podId: session.user.podId || null,
+            branchId: session.user.branchId || (session.user as any).branch_id || null,
+            assignedBranchIds: session.user.assignedBranchIds || (session.user as any).assigned_branch_ids || [],
           });
         }
         return token;

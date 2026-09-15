@@ -530,17 +530,7 @@ export default function PodsPage() {
                 ))}
               </select>
             </div>
-          ) : (
-            <div className="flex items-center gap-2 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/80 rounded-lg px-3 py-1.5 shadow-2xs">
-              <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
-              <span className="text-xs font-bold text-indigo-900 dark:text-indigo-200">
-                {branches[0]?.name || currentUser?.branchName || "My Branch Office"}
-              </span>
-              <span className="text-[9px] uppercase tracking-wider bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold px-1.5 py-0.5 rounded">
-                Branch Office
-              </span>
-            </div>
-          )}
+          ) : null}
 
           <Button
             onClick={handleResetRR}
