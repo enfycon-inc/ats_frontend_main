@@ -112,7 +112,7 @@ export function CrossBranchApprovalsView() {
                       AM: {req.marginSplitAmPct ?? 0}% / REC: {req.marginSplitRecPct ?? 0}%
                     </td>
                     <td className="py-3.5 px-6 text-xs text-default-700">
-                      {req.slaDaysTarget ? \\ Days\ : "N/A"}
+                      {req.slaDaysTarget ? `${req.slaDaysTarget} Days` : "N/A"}
                     </td>
                     <td className="py-3.5 px-6 text-right space-x-2">
                       <Button
