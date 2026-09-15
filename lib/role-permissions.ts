@@ -234,7 +234,7 @@ export function getActiveRolePermissions(
       ];
     case "POD_LEAD":
       return [
-        "job:view", "job:edit", "job:approve", "job:reject",
+        "job:view",
         "candidate:view", "candidate:create",
         "submission:view", "submission:create", "submission:internal_screening", "submission:schedule_interview", "submission:edit",
         "pod:view", "pod:edit", "report:view"

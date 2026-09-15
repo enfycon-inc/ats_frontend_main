@@ -521,8 +521,8 @@ export default function JobDetailPage() {
 
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
-    return effectivePerms.includes("job:edit") || isAdmin || isAM || isPodLead;
-  }, [currentUser, effectivePerms, isAdmin, isAM, isPodLead]);
+    return effectivePerms.includes("job:edit") || isAdmin || isAM;
+  }, [currentUser, effectivePerms, isAdmin, isAM]);
 
   // Submission Review Dialog states
   const [selectedSub, setSelectedSub] = useState<any>(null);
