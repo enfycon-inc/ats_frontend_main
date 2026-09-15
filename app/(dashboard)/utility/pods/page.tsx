@@ -378,7 +378,7 @@ export default function PodsPage() {
 
   // ── Derived data ────────────────────────────────────────────────────
   // Pod Lead Candidates: ONLY users assigned roles created from the POD_LEAD template
-  // (or currently assigned as head of the selected pod)
+  // who are not already leading another pod (a user can lead only one pod at a time)
   const recruiterUsersForHead = allUsers.filter((u) => {
     const matchBranch =
       !podBranchId ||
@@ -388,6 +388,13 @@ export default function PodsPage() {
       (Array.isArray(u.assigned_branch_ids) && u.assigned_branch_ids.includes(podBranchId));
 
     if (!matchBranch) return false;
+
+    // At a time a pod lead can be pod lead of a single pod only.
+    // If they are currently the head of another pod, exclude them from the dropdown.
+    const isHeadOfAnotherPod = pods.some(
+      (p) => p.podHeadId === u.id && (!selectedPod || p.id !== selectedPod.id)
+    );
+    if (isHeadOfAnotherPod) return false;
 
     // Check if the user's role was created from the POD_LEAD template
     const userRoleObj = roles.find((r) => r.id === u.roleId);
@@ -864,14 +871,9 @@ export default function PodsPage() {
                         Branch Office <span className="text-red-500">*</span>
                       </label>
                       {!isTenantAdmin && branches.length <= 1 ? (
-                        <div className="w-full text-xs font-semibold border border-neutral-200 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-100/70 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 flex items-center justify-between">
-                          <span className="flex items-center gap-2">
-                            <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
-                            {branches[0]?.name || currentUser?.branchName || "My Branch Office"}
-                          </span>
-                          <span className="text-[10px] uppercase font-bold text-neutral-500 bg-neutral-200 dark:bg-slate-700 px-2 py-0.5 rounded">
-                            Locked
-                          </span>
+                        <div className="w-full text-xs font-semibold border border-neutral-200 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-100/70 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
+                          <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
+                          <span>{branches[0]?.name || currentUser?.branchName || "My Branch Office"}</span>
                         </div>
                       ) : (
                         <select
@@ -903,7 +905,7 @@ export default function PodsPage() {
                   >
                     <option value="">— None (Unassigned) —</option>
                     {recruiterUsersForHead.length === 0 ? (
-                      <option disabled value="">(No staff with Pod Lead role in this branch)</option>
+                      <option disabled value="">(No available staff with Pod Lead role in this branch)</option>
                     ) : (
                       recruiterUsersForHead.map((u) => (
                         <option key={u.id} value={u.id}>
@@ -913,7 +915,7 @@ export default function PodsPage() {
                     )}
                   </select>
                   <p className="text-[10.5px] text-default-450 leading-relaxed">
-                    💡 Only staff assigned to roles created from the <strong>POD_LEAD</strong> template in this branch are eligible as Pod Lead.
+                    💡 Only staff assigned to roles created from the <strong>POD_LEAD</strong> template who are not already leading another pod are eligible as Pod Lead.
                   </p>
                 </div>
 
