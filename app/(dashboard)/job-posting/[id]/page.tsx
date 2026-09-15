@@ -994,7 +994,7 @@ export default function JobDetailPage() {
                 </Button>
               </Link>
             )}
-            {effectivePerms.includes("job:delegate") && (
+            {(effectivePerms.includes("job:delegate") || activeSystemRole === "BRANCH_ADMIN" || isAdmin) && (
               <Button 
                 size="sm" 
                 onClick={() => setDelegateModalOpen(true)}
