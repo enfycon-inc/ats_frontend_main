@@ -366,14 +366,14 @@ export function getFilteredPrimaryNav(
 
   return PRIMARY_NAV_ITEMS.filter((item) => allowedIds.has(item.id)).map((item) => {
     if (item.id === "job-posting") {
-      if (sysRole === "RECRUITER") {
+      if (sysRole === "RECRUITER" || sysRole === "POD_LEAD") {
         return {
           ...item,
-          label: "Assigned Jobs",
+          label: "Jobs",
           children: [
-            { label: "All Assigned Jobs", href: "/job-posting" },
-            { label: "Assigned to Me", href: "/job-posting?filter=direct" },
-            { label: "My Pod Jobs", href: "/job-posting?filter=pod" },
+            { label: "All Jobs", href: "/job-posting" },
+            { label: "My Jobs", href: "/job-posting?filter=direct" },
+            { label: "Pod Jobs", href: "/job-posting?filter=pod" },
           ],
         };
       }

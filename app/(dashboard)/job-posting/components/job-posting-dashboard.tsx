@@ -88,7 +88,7 @@ export default function JobPostingDashboard({
     return resolveActiveSystemRole(currentUser.roles, [], currentUser);
   }, [currentUser]);
 
-  const isRecruiter = systemRole === "RECRUITER";
+  const isRecruiter = systemRole === "RECRUITER" || systemRole === "POD_LEAD";
   const isAccountManager = systemRole === "ACCOUNT_MANAGER";
 
   const hasEditPermission = useMemo(() => {
@@ -162,11 +162,11 @@ export default function JobPostingDashboard({
   }, [selectedColumns, hasEditPermission]);
 
   // View Labels and Saved Views based on Role
-  const defaultViewLabel = isRecruiter ? "All Assigned Jobs" : "All Jobs";
+  const defaultViewLabel = isRecruiter ? "All Jobs" : "All Jobs";
 
   const roleDefaultSavedViews = useMemo(() => {
     if (isRecruiter) {
-      return ["Assigned to Me", "My Pod Jobs"];
+      return ["My Jobs", "Pod Jobs"];
     }
     if (isAccountManager) {
       return ["Active Jobs", "Unassigned Jobs", "Draft Jobs"];
@@ -182,9 +182,9 @@ export default function JobPostingDashboard({
 
   const initialActiveView = useMemo(() => {
     if (isRecruiter) {
-      if (filterParam === "direct") return "Assigned to Me";
-      if (filterParam === "pod") return "My Pod Jobs";
-      return "All Assigned Jobs";
+      if (filterParam === "direct") return "My Jobs";
+      if (filterParam === "pod") return "Pod Jobs";
+      return "All Jobs";
     }
     if (filterParam === "unassigned") return "Unassigned Jobs";
     if (initialStatusFilter === "Active") return "Active Jobs";
@@ -424,7 +424,7 @@ export default function JobPostingDashboard({
     if (viewName === "All Jobs" || viewName === "All Assigned Jobs") {
       setJobsData(baseData);
       setCurrentFilters({ businessUnit: "All selected", predefined: [] });
-    } else if (viewName === "Assigned to Me") {
+    } else if (viewName === "My Jobs" || viewName === "Assigned to Me") {
       const myJobs = baseData.filter(
         (job) =>
           job.primaryRecruiterId === currentUser?.id ||
@@ -432,7 +432,7 @@ export default function JobPostingDashboard({
           job.recruitmentManagerId === currentUser?.id
       );
       setJobsData(myJobs);
-    } else if (viewName === "My Pod Jobs") {
+    } else if (viewName === "Pod Jobs" || viewName === "My Pod Jobs") {
       const userPodId = (currentUser as any)?.podId;
       const podJobs = baseData.filter(
         (job) => userPodId && job.podId === userPodId
