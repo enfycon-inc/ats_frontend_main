@@ -365,13 +365,7 @@ export default function DataTable({
   const hasDelegatePermission = useMemo(() => {
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
-    const sysRole = (currentUser as any).systemRole;
-    return permissions.includes("job:delegate") || 
-           currentUser.roles?.includes("SUPER_ADMIN") || 
-           currentUser.roles?.includes("BRANCH_ADMIN") || 
-           sysRole === "BRANCH_ADMIN" || 
-           sysRole === "SUPER_ADMIN" || 
-           sysRole === "ADMIN";
+    return permissions.includes("job:delegate");
   }, [currentUser]);
 
   const hasApprovePermission = useMemo(() => {
