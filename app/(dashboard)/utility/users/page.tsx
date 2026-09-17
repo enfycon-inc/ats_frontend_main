@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
+import { getSelectedMemberRoleIds } from "@/lib/member-role-selection";
 
 interface UserItem {
   id: string;
@@ -667,7 +668,7 @@ export default function UserManagementPage() {
         if (createdUser) {
           await atsApi.auth.updateUserDetail(createdUser.id, {
             branchId: primaryBranchId || undefined,
-            roles: selectedRoles,
+            assignedRoleIds: getSelectedMemberRoleIds(addForm, rolesList),
           });
         }
       } catch (syncErr) {
@@ -708,7 +709,7 @@ export default function UserManagementPage() {
 
     try {
       setSubmitting(true);
-      const finalRoles = Array.isArray(editForm.roles) ? editForm.roles : [];
+      const finalRoles = getSelectedMemberRoleIds(editForm, rolesList);
 
       await atsApi.auth.updateUserDetail(selectedUser.id, {
         fullName: trimmedName,
@@ -2253,7 +2254,7 @@ export default function UserManagementPage() {
                   return (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
                       {branchRolesForEdit.map((r) => {
-                        const isChecked = editForm.roles.includes(r.id);
+                        const isChecked = editForm.roles.some((x) => x.toLowerCase() === r.id.toLowerCase() || x.toLowerCase() === r.name.toLowerCase());
                         return (
                           <label
                             key={r.id || r.name}
@@ -2268,8 +2269,8 @@ export default function UserManagementPage() {
                               checked={isChecked}
                               onChange={(e) => {
                                 const checked = e.target.checked;
-                                let nextRoles = editForm.roles.filter((x) => x !== r.id);
-                                if (checked) nextRoles.push(r.id);
+                                let nextRoles = editForm.roles.filter((x) => x.toLowerCase() !== r.id.toLowerCase() && x.toLowerCase() !== r.name.toLowerCase());
+                                if (checked) nextRoles.push(r.name);
                                 setEditForm({ ...editForm, roles: nextRoles });
                               }}
                               className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
