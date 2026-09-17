@@ -195,7 +195,6 @@ export const MORE_NAV_ITEMS: NavItem[] = [
   { id: "integrations", label: "Integrations", href: "/integrations", icon: Globe },
   { id: "tenant-management", label: "Tenant Management", href: "/utility/approvals", icon: Building2 },
   { id: "user-management", label: "Users & Teams", href: "/utility/users", icon: Users },
-  { id: "branch-management", label: "Branch & Office Locations", href: "/utility/branches", icon: MapPin },
   { id: "role-management", label: "Role Management", href: "/utility/roles-permissions", icon: UserCheck },
   { id: "pod-management", label: "Recruitment Pods", href: "/utility/pods", icon: Users },
   { id: "dictionaries", label: "Master Dictionaries", href: "/utility/dictionaries", icon: Database },

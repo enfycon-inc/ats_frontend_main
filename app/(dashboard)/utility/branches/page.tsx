@@ -142,6 +142,13 @@ export default function BranchManagementPage() {
   // PURE GRANULAR PERMISSION-BASED CAPABILITIES
   // Branch Admin has branch_admin:manage but is explicitly NOT allowed to create or delete branches
   const canCreateBranch = userPermissions.includes('branch:create') || userPermissions.includes('tenant:settings');
+  const canEditBranchFunc = (branchId: string) => {
+    if (userPermissions.includes('tenant:settings') || userPermissions.includes('tenant:manage') || overrideRole === 'SUPER_ADMIN' || overrideRole === 'ADMIN' || overrideRole === 'TENANT_ADMIN') return true;
+    if (userPermissions.includes('branch:edit') || userPermissions.includes('branch_admin:manage')) {
+      return sessionUser?.branchId === branchId;
+    }
+    return false;
+  };
   const canEditBranch = userPermissions.includes('branch:edit') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('tenant:settings');
   const canDeleteBranch = userPermissions.includes('branch:delete') || userPermissions.includes('tenant:settings');
   const canAssignManager = userPermissions.includes('branch:assign_manager') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('user:manage') || userPermissions.includes('tenant:settings');
@@ -928,7 +935,7 @@ export default function BranchManagementPage() {
                       <tr key={b.id} className="hover:bg-neutral-50/50 dark:hover:bg-slate-800/20 transition-colors">
                         <td className="py-3.5 px-4 font-semibold text-neutral-900 dark:text-white">
                           <div>
-                            {canEditBranch ? (
+                            {canEditBranchFunc(b.id) ? (
                               <button
                                 onClick={() => openEditModal(b)}
                                 className="font-bold text-xs text-neutral-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 text-left transition-colors cursor-pointer block"
@@ -1020,7 +1027,7 @@ export default function BranchManagementPage() {
                               <MessageSquare className="h-3 w-3" /> Remarks
                             </Button>
 
-                            {canEditBranch && (
+                            {canEditBranchFunc(b.id) && (
                               <Button
                                 onClick={() => openEditModal(b)}
                                 size="sm"
@@ -1114,7 +1121,7 @@ export default function BranchManagementPage() {
                               <MessageSquare className="h-3 w-3 mr-1" /> Stage Remarks
                             </Button>
 
-                            {canEditBranch && (
+                            {canEditBranchFunc(b.id) && (
                               <Button
                                 onClick={() => openEditModal(b)}
                                 size="sm"
@@ -1336,7 +1343,7 @@ export default function BranchManagementPage() {
                     <MessageSquare className="h-3 w-3 mr-1" /> Remarks
                   </Button>
 
-                  {canEditBranch && (
+                  {canEditBranchFunc(b.id) && (
                     <Button
                       onClick={() => openEditModal(b)}
                       variant="outline"
@@ -3026,7 +3033,7 @@ export default function BranchManagementPage() {
                                     Global
                                   </span>
                                 )}
-                                {(rem.branchId ? canEditBranch : isGlobalAdmin) && (
+                                {(rem.branchId ? canEditBranchFunc(rem.branchId) : isGlobalAdmin) && (
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteBranchRemark(rem.id)}
@@ -3136,7 +3143,7 @@ export default function BranchManagementPage() {
                                     Global
                                   </span>
                                 )}
-                                {(rem.branchId ? canEditBranch : isGlobalAdmin) && (
+                                {(rem.branchId ? canEditBranchFunc(rem.branchId) : isGlobalAdmin) && (
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteBranchRemark(rem.id)}
