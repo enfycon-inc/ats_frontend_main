@@ -347,7 +347,16 @@ export default function ProfileDropdown() {
       });
     }
 
-    return options;
+    const finalOptions = options.filter((opt) => {
+      const isReplaced = options.some(other => 
+        other.replacesSystemRole && 
+        (other.replacesSystemRole.toUpperCase() === opt.key.toUpperCase() || 
+         other.replacesSystemRole.toUpperCase() === opt.name.toUpperCase())
+      );
+      return !isReplaced;
+    });
+
+    return finalOptions;
   }, [userAssignedRoles, availableRoles, activeBranchId, getDynamicRoleLabel, systemRole]);
 
   const handleSwitchRole = (roleName: string | null) => {

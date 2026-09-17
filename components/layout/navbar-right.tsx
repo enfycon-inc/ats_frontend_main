@@ -1205,7 +1205,17 @@ function ProfileDropdownNav() {
       });
     }
 
-    return options;
+    // Filter out base system roles if a custom role overrides them
+    const finalOptions = options.filter((opt) => {
+      const isReplaced = options.some(other => 
+        other.replacesSystemRole && 
+        (other.replacesSystemRole.toUpperCase() === opt.key.toUpperCase() || 
+         other.replacesSystemRole.toUpperCase() === opt.name.toUpperCase())
+      );
+      return !isReplaced;
+    });
+
+    return finalOptions;
   }, [userAssignedRoles, availableRoles, activeBranchId, getDynamicRoleLabel, systemRole]);
 
   const STANDARD_PERSPECTIVES = useMemo(() => new Set([
