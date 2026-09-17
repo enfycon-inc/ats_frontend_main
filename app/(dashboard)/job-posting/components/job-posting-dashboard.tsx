@@ -98,6 +98,40 @@ export default function JobPostingDashboard({
     return permissions.includes("job:edit") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("ADMIN");
   }, [currentUser]);
 
+  const userPermissions = useMemo<string[]>(() => {
+    return Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+  }, [currentUser]);
+
+  const userRoles = useMemo<string[]>(() => {
+    return Array.isArray(currentUser?.roles)
+      ? currentUser.roles.map((r: string) => r.toUpperCase().replace(/[\s\-_]/g, ""))
+      : [];
+  }, [currentUser]);
+
+  // Management / governance roles with branch-wide or cross-branch delegation oversight
+  const canManageBranchJobs = useMemo(() => {
+    if (!currentUser) return false;
+    const hasAdminPerm =
+      userPermissions.includes("branch_admin:manage") ||
+      userPermissions.includes("job:view_all_branches") ||
+      userPermissions.includes("job:delegate") ||
+      userPermissions.includes("tenant:settings") ||
+      userPermissions.includes("tenant:manage");
+
+    const hasAdminRole =
+      userRoles.includes("SUPERADMIN") ||
+      userRoles.includes("ADMIN") ||
+      userRoles.includes("TENANTADMIN") ||
+      userRoles.includes("BRANCHADMIN") ||
+      userRoles.includes("DELIVERYHEAD") ||
+      systemRole === "BRANCH_ADMIN" ||
+      systemRole === "DELIVERY_HEAD" ||
+      systemRole === "ADMIN" ||
+      systemRole === "SUPER_ADMIN";
+
+    return Boolean(hasAdminPerm || hasAdminRole);
+  }, [currentUser, userPermissions, userRoles, systemRole]);
+
   // Load and verify active branch's pod system capability
   useEffect(() => {
     async function checkBranchPodSupport() {
@@ -203,6 +237,13 @@ export default function JobPostingDashboard({
     const user = atsApi.auth.getCurrentUser();
     setCurrentBranchId(activeBranchId || user?.branchId || null);
   }, []);
+
+  // Ensure recruiters and account managers stay on unified 'all' jobs view
+  useEffect(() => {
+    if (!canManageBranchJobs && dashboardTab !== "all") {
+      setDashboardTab("all");
+    }
+  }, [canManageBranchJobs, dashboardTab]);
 
 
   useEffect(() => {
@@ -586,38 +627,40 @@ export default function JobPostingDashboard({
 
   return (
     <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
-      <div className="flex bg-default-100 dark:bg-slate-800 p-1 rounded-lg border border-default-250 w-fit mb-2">
-        <button
-          onClick={() => setDashboardTab("all")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
-            dashboardTab === "all"
-              ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
-              : "text-default-500 hover:text-default-800"
-          }`}
-        >
-          All Jobs
-        </button>
-        <button
-          onClick={() => setDashboardTab("branch")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
-            dashboardTab === "branch"
-              ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
-              : "text-default-500 hover:text-default-800"
-          }`}
-        >
-          Branch Jobs
-        </button>
-        <button
-          onClick={() => setDashboardTab("shared")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
-            dashboardTab === "shared"
-              ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
-              : "text-default-500 hover:text-default-800"
-          }`}
-        >
-          Shared Jobs
-        </button>
-      </div>
+      {canManageBranchJobs && (
+        <div className="flex bg-default-100 dark:bg-slate-800 p-1 rounded-lg border border-default-250 w-fit mb-2">
+          <button
+            onClick={() => setDashboardTab("all")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
+              dashboardTab === "all"
+                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                : "text-default-500 hover:text-default-800"
+            }`}
+          >
+            All Jobs
+          </button>
+          <button
+            onClick={() => setDashboardTab("branch")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
+              dashboardTab === "branch"
+                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                : "text-default-500 hover:text-default-800"
+            }`}
+          >
+            Branch Jobs
+          </button>
+          <button
+            onClick={() => setDashboardTab("shared")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
+              dashboardTab === "shared"
+                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                : "text-default-500 hover:text-default-800"
+            }`}
+          >
+            Shared Jobs
+          </button>
+        </div>
+      )}
 
       {priorityParam && (
         <div className="flex items-center justify-between px-3.5 py-1.5 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 rounded-lg text-xs">
@@ -644,7 +687,7 @@ export default function JobPostingDashboard({
         </div>
       ) : (
         <>
-          {dashboardTab === "shared" && <PendingDelegationRequests onRefresh={handleRefresh} />}
+          {canManageBranchJobs && dashboardTab === "shared" && <PendingDelegationRequests onRefresh={handleRefresh} />}
           <DataTable
             data={displayJobs}
             selectedColumns={activeSelectedColumns}
