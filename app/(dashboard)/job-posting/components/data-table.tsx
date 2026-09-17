@@ -991,10 +991,10 @@ export default function DataTable({
     const bId = assignModalTargetBranch?.id;
     let list = usersList.filter((u: any) => u.isActive !== false && u.is_active !== false);
 
-    // Filter to only users who act as Recruiters (RECRUITER, POD_LEAD, DELIVERY_HEAD)
+    // Filter to only users who act as Recruiters (RECRUITER, POD_LEAD)
     list = list.filter((u: any) => {
       const rawSystemRole = u.systemRole || u.system_role;
-      if (rawSystemRole && ['RECRUITER', 'POD_LEAD', 'DELIVERY_HEAD'].includes(rawSystemRole.toUpperCase())) {
+      if (rawSystemRole && ['RECRUITER', 'POD_LEAD'].includes(rawSystemRole.toUpperCase())) {
          return true;
       }
       const userRoles = u.roles || [];
@@ -1004,7 +1004,7 @@ export default function DataTable({
       });
       return userSysRoles.some((sr: any) => {
          const upper = typeof sr === 'string' ? sr.toUpperCase() : '';
-         return ['RECRUITER', 'POD_LEAD', 'DELIVERY_HEAD'].includes(upper);
+         return ['RECRUITER', 'POD_LEAD'].includes(upper);
       });
     });
 
