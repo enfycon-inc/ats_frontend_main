@@ -776,7 +776,11 @@ export default function BranchManagementPage() {
     }
   };
 
-  const filteredBranches = branches.filter((b) =>
+  const visibleBranches = isGlobalAdmin 
+    ? branches 
+    : branches.filter(b => b.id === sessionUser?.branchId);
+
+  const filteredBranches = visibleBranches.filter((b) =>
     (b.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
     (b.city || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
     (b.code || "").toLowerCase().includes(searchQuery.toLowerCase())

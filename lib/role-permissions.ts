@@ -504,7 +504,7 @@ export function getFilteredMoreNav(
           subChildren.push({ label: "Global Remarks Templates", href: "/utility/global-remarks" });
         }
         if (isAdmin || permissions.includes("branch_admin:manage") || permissions.includes("branch:edit") || permissions.includes("branch:view")) {
-          subChildren.push({ label: "Branch Settings", href: "/utility/branches" });
+          subChildren.push({ label: "Branch Settings", href: "/settings/branch" });
         }
         subChildren.push({ label: "Sound & Tone Preferences", href: "/utility/settings-notifications" });
         return {

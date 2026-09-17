@@ -907,7 +907,7 @@ function TenantAdminSettingsView(props: any) {
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => { window.location.href = "/utility/branches"; }}
+                onClick={() => { window.location.href = "/settings/branch"; }}
                 className="h-8 text-xs font-bold px-3 gap-1 bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
               >
                 Manage Branch Policies →

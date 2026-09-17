@@ -1517,7 +1517,7 @@ export default function UserManagementPage() {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                      onClick={() => window.location.href = "/utility/branches"}
+                      onClick={() => window.location.href = "/settings/branch"}
                       className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-800 dark:text-neutral-200 font-medium"
                     >
                       <Building2 className="h-3.5 w-3.5 text-neutral-500" /> Manage Office Branches
@@ -1567,7 +1567,7 @@ export default function UserManagementPage() {
                 </Button>
               )}
               {branchFilter !== "ALL" && (
-                <a href="/utility/branches">
+                <a href="/settings/branch">
                   <Button size="sm" className="text-xs h-8 bg-indigo-600 hover:bg-indigo-700 text-white font-medium">
                     Assign Staff to Branch →
                   </Button>
