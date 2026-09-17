@@ -456,7 +456,7 @@ export default function BulkUploadPage() {
 
                     <div>
                       {item.status === "completed" && item.candidate_id && (
-                        <Link href={`/applicants/${item.candidate_id}`} target="_blank">
+                        <Link href={`/applicants/CAN-${String(item.candidate_id).padStart(6, '0')}`} target="_blank">
                           <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50">
                             View <ExternalLink className="h-3 w-3 ml-1" />
                           </Button>

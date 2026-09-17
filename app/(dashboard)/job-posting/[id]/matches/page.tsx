@@ -495,7 +495,7 @@ function MatchCard({ rank, m, job, submittedIds, onSubmitClick }: { rank: number
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-bold text-neutral-900 dark:text-white truncate">
               <Link
-                href={`/applicants/APP-${m.candidateId}`}
+                href={`/applicants/CAN-${String(m.candidateId).padStart(6, '0')}`}
                 className="hover:text-violet-650 dark:hover:text-violet-400 hover:underline transition-colors"
               >
                 {m.fullName || "Unnamed candidate"}

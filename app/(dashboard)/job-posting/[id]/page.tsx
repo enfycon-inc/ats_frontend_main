@@ -1230,7 +1230,7 @@ export default function JobDetailPage() {
                               </div>
                               <div className="min-w-0">
                                 <Link
-                                  href={`/applicants/${sub.candidateId}`}
+                                  href={`/applicants/CAN-${String(sub.candidateId).padStart(6, '0')}`}
                                   className="font-bold text-neutral-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline flex items-center gap-1"
                                 >
                                   <span>{sub.candidateName}</span>

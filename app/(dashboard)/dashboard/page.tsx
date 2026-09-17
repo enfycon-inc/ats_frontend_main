@@ -1344,7 +1344,7 @@ function BranchAdminDashboardView({
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <Link
-                          href={`/applicants/${sub.candidateId || sub.candidate_id || sub.id}`}
+                          href={`/applicants/CAN-${String(sub.candidateId || sub.candidate_id || sub.id).padStart(6, '0')}`}
                           className="font-bold text-slate-900 dark:text-white truncate hover:text-indigo-600 transition-colors"
                         >
                           {sub.candidateName || "Candidate"}
@@ -1357,7 +1357,7 @@ function BranchAdminDashboardView({
                         {sub.jobTitle} • Sourced by <span className="font-medium text-slate-700 dark:text-slate-300">{sub.recruiterName || "Recruiter"}</span>
                       </p>
                     </div>
-                    <Link href={`/applicants/${sub.candidateId || sub.candidate_id || sub.id}`}>
+                    <Link href={`/applicants/CAN-${String(sub.candidateId || sub.candidate_id || sub.id).padStart(6, '0')}`}>
                       <Button size="sm" className="h-7 px-2.5 text-[10px] font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 cursor-pointer">
                         Review Candidate
                       </Button>

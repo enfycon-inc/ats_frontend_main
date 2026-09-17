@@ -1,0 +1,1 @@
+const fs = require("fs"); console.log(fs.readFileSync("c:/Users/deb/enfyProjects/ATS_DOCKERREPO/ats_frontend_main/app/(dashboard)/job-posting/[id]/page.tsx", "utf8").split("\\n").slice(1230, 1236).join("\\n"));
