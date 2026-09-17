@@ -991,6 +991,23 @@ export default function DataTable({
     const bId = assignModalTargetBranch?.id;
     let list = usersList.filter((u: any) => u.isActive !== false && u.is_active !== false);
 
+    // Filter to only users who act as Recruiters (RECRUITER, POD_LEAD, DELIVERY_HEAD)
+    list = list.filter((u: any) => {
+      const rawSystemRole = u.systemRole || u.system_role;
+      if (rawSystemRole && ['RECRUITER', 'POD_LEAD', 'DELIVERY_HEAD'].includes(rawSystemRole.toUpperCase())) {
+         return true;
+      }
+      const userRoles = u.roles || [];
+      const userSysRoles = userRoles.map((r: string) => {
+        const match = rolesList.find((cr: any) => cr.name === r || cr.id === r);
+        return match?.systemRole || r;
+      });
+      return userSysRoles.some((sr: any) => {
+         const upper = typeof sr === 'string' ? sr.toUpperCase() : '';
+         return ['RECRUITER', 'POD_LEAD', 'DELIVERY_HEAD'].includes(upper);
+      });
+    });
+
     // Co-source scoping: if the job is shared (co-sourced) and the current user's branch is NOT
     // the job owner, restrict recruiter list to only the user's own branch — shared branches
     // should not see recruiters from the owner or other shared branches.
