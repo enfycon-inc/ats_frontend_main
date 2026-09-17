@@ -1016,18 +1016,32 @@ function ProfileDropdownNav() {
   // resolves to the correct archetype label regardless of how the role is named.
   const liveSystemRole: string | null = (currentUser as any)?.systemRole || null;
   const userAssignedRoles: string[] = useMemo(() => {
-    // If we have a live systemRole from /me, use it as the primary entry
+    const roles = new Set<string>();
+    
+    // Add primary system role if exists
     if (liveSystemRole && !isTechnicalKeycloakRole(liveSystemRole)) {
-      return [liveSystemRole];
+      roles.add(liveSystemRole);
     }
-    // Fallback to branch-scoped or effective roles
+    
+    // Add all branch-scoped or effective roles
     if (effectiveRoles && effectiveRoles.length > 0) {
-      return effectiveRoles;
+      effectiveRoles.forEach((r: string) => {
+        if (!isTechnicalKeycloakRole(r)) roles.add(r);
+      });
     }
+    
+    // Add any extra roles from session
     if ((session as any)?.user?.roles?.length > 0) {
-      return (session as any).user.roles.filter((r: string) => !isTechnicalKeycloakRole(r));
+      (session as any).user.roles.forEach((r: string) => {
+        if (!isTechnicalKeycloakRole(r)) roles.add(r);
+      });
     }
-    return systemRole && !isTechnicalKeycloakRole(systemRole) ? [systemRole] : [];
+    
+    if (roles.size === 0 && systemRole && !isTechnicalKeycloakRole(systemRole)) {
+      roles.add(systemRole);
+    }
+    
+    return Array.from(roles);
   }, [liveSystemRole, effectiveRoles, session, systemRole]);
 
   const isUserAdmin = useMemo(() => {
@@ -1042,17 +1056,10 @@ function ProfileDropdownNav() {
   const currentActiveRole = overrideRole || (isUserAdmin ? "ADMIN" : (userAssignedRoles[0] || "RECRUITER"));
   const displayRole = getDynamicRoleLabel(currentActiveRole);
 
-  // Format subtitle showing ONLY actual assigned roles (e.g. "BDM" or "Admin + Recruiter")
+  // Format subtitle showing ONLY the active / switched role, as requested by user
   const rolesSubtitle = useMemo(() => {
-    const cleanRoles = userAssignedRoles
-      .map((r) => getDynamicRoleLabel(r))
-      .filter((v, i, a) => a.indexOf(v) === i);
-
-    if (cleanRoles.length > 0) {
-      return cleanRoles.join(" + ");
-    }
     return displayRole || "User";
-  }, [userAssignedRoles, displayRole, getDynamicRoleLabel]);
+  }, [displayRole]);
 
   // Role icon and color styling resolver
   const getRoleIconAndColor = (roleStr: string) => {
@@ -1253,6 +1260,10 @@ function ProfileDropdownNav() {
       setOverrideRole(roleName);
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new CustomEvent("overrideRoleChanged", { detail: { role: roleName } }));
+      
+      // Immediately redirect to the main dashboard when switching roles
+      // to ensure the user doesn't stay on a page they no longer have permission for.
+      window.location.href = "/dashboard";
     }
     setOpen(false);
   };

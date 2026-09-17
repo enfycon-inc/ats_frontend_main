@@ -349,7 +349,27 @@ export default function DataTable({
   const router = useRouter();
 
   // User details & permission controls
-  const currentUser = useMemo(() => atsApi.auth.getCurrentUser(), []);
+  const [currentUser, setCurrentUser] = useState(() => atsApi.auth.getCurrentUser());
+  const [activeBranchId, setActiveBranchId] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null);
+
+  useEffect(() => {
+    let disposed = false;
+    const refreshAccess = () => {
+      setActiveBranchId(localStorage.getItem("active_branch_id"));
+      atsApi.auth.me().then((profile) => {
+        if (!disposed) setCurrentUser(profile);
+      }).catch(() => {});
+    };
+    refreshAccess();
+    window.addEventListener("focus", refreshAccess);
+    window.addEventListener("branchChanged", refreshAccess);
+    return () => {
+      disposed = true;
+      window.removeEventListener("focus", refreshAccess);
+      window.removeEventListener("branchChanged", refreshAccess);
+    };
+  }, []);
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
@@ -362,11 +382,17 @@ export default function DataTable({
     return permissions.includes("job:create") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("ADMIN");
   }, [currentUser]);
 
+
   const hasDelegatePermission = useMemo(() => {
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
     return permissions.includes("job:delegate");
   }, [currentUser]);
+
+  // The branch the currently logged-in user is actively operating as
+  const currentUserBranchId = activeBranchId && activeBranchId !== "ALL"
+    ? activeBranchId : currentUser?.branchId;
+
 
   const hasApprovePermission = useMemo(() => {
     if (!currentUser) return false;
@@ -964,7 +990,25 @@ export default function DataTable({
   const branchRecruiterUsers = useMemo(() => {
     const bId = assignModalTargetBranch?.id;
     let list = usersList.filter((u: any) => u.isActive !== false && u.is_active !== false);
-    if (bId && bId !== "all") {
+
+    // Co-source scoping: if the job is shared (co-sourced) and the current user's branch is NOT
+    // the job owner, restrict recruiter list to only the user's own branch — shared branches
+    // should not see recruiters from the owner or other shared branches.
+    const isCoSourcedJob = assignModalJob?.isCoSourced || (assignModalJob?.sharedBranchIds && assignModalJob.sharedBranchIds.length > 0);
+    const isSharedBranchViewing = isCoSourcedJob && assignModalJob?.branchId !== currentUserBranchId;
+
+    if (isSharedBranchViewing && currentUserBranchId) {
+      list = list.filter((u: any) => {
+        const userBranchId = u.branchId || u.branch_id;
+        if (userBranchId === currentUserBranchId) return true;
+        const assignedBranches = Array.isArray(u.assignedBranchIds)
+          ? u.assignedBranchIds
+          : Array.isArray(u.assigned_branch_ids)
+          ? u.assigned_branch_ids
+          : [];
+        return assignedBranches.includes(currentUserBranchId);
+      });
+    } else if (bId && bId !== "all") {
       const scoped = list.filter((u: any) => {
         const userBranchId = u.branchId || u.branch_id;
         if (userBranchId === bId) return true;
@@ -995,7 +1039,8 @@ export default function DataTable({
     }
 
     return list;
-  }, [usersList, assignModalTargetBranch, isPodHead, myPod]);
+  }, [usersList, assignModalTargetBranch, assignModalJob, currentUserBranchId, isPodHead, myPod]);
+
 
   const filteredPods = useMemo(() => {
     const q = assignSearch.trim().toLowerCase();
@@ -2567,7 +2612,7 @@ export default function DataTable({
                             )}
 
                             {/* Section 2: Management Actions */}
-                            {hasEditPermission && (
+                            {(hasEditPermission || hasCreatePermission || (hasDelegatePermission && job.branchId === currentUserBranchId)) && (
                               <>
                                 {job.jobStatus !== "Draft" && <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />}
 
@@ -2576,7 +2621,7 @@ export default function DataTable({
                                     Job Actions
                                   </div>
 
-                                  {(job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL") && (
+                                  {hasEditPermission && (job.jobStatus === "Pending Approval" || job.approvalStatus === "PENDING_APPROVAL") && (
                                     <>
                                       <DropdownMenuItem
                                         onClick={async () => {
@@ -2622,7 +2667,7 @@ export default function DataTable({
                                     </>
                                   )}
 
-                                  {job.jobStatus === "Draft" && (
+                                  {hasEditPermission && job.jobStatus === "Draft" && (
                                     <DropdownMenuItem
                                       onClick={() => {
                                         if (onUpdateJob) onUpdateJob(job.id, { jobStatus: "Active" });
@@ -2650,7 +2695,7 @@ export default function DataTable({
                                     </>
                                   )}
 
-                                  {hasDelegatePermission && (
+                                  {hasDelegatePermission && job.branchId === currentUserBranchId && (
                                     <DropdownMenuItem
                                       onClick={() => setDelegateModalJob(job)}
                                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-colors"
@@ -2658,7 +2703,7 @@ export default function DataTable({
                                       <div className="h-6 w-6 rounded-md bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 shadow-2xs">
                                         <Icon icon="heroicons:share" className="h-3.5 w-3.5" />
                                       </div>
-                                      <span className="font-semibold">Share with Branch</span>
+                                      <span className="font-semibold">Delegate Job</span>
                                     </DropdownMenuItem>
                                   )}
 
@@ -2857,7 +2902,7 @@ export default function DataTable({
               Management
             </div>
 
-            {hasDelegatePermission && (
+            {hasDelegatePermission && data.find(j => j.id === contextMenu.jobId)?.branchId === currentUserBranchId && (
               <button
                 onClick={() => {
                   const job = data.find((j) => j.id === contextMenu.jobId);
@@ -2869,7 +2914,7 @@ export default function DataTable({
                 <div className="h-6 w-6 rounded-md bg-purple-100 dark:bg-purple-950/80 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 shadow-2xs">
                   <Icon icon="heroicons:share" className="h-3.5 w-3.5" />
                 </div>
-                <span>Share with Branch</span>
+                <span>Delegate Job</span>
               </button>
             )}
 

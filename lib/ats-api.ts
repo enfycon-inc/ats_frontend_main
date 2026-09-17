@@ -473,7 +473,7 @@ const auth = {
     });
   },
 
-  async updateUserDetail(userId: string, data: { fullName?: string; email?: string; password?: string; branchId?: string; assignedBranchIds?: string[]; branchRoles?: Record<string, string[]>; businessUnitId?: string; roles?: string[]; jobReviewerId?: string | null }): Promise<any> {
+  async updateUserDetail(userId: string, data: { fullName?: string; email?: string; password?: string; branchId?: string; assignedBranchIds?: string[]; branchRoles?: Record<string, string[]>; businessUnitId?: string; roles?: string[]; assignedRoleIds?: string[]; jobReviewerId?: string | null }): Promise<any> {
     return apiFetch<any>(`/api/auth/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

@@ -6,7 +6,7 @@ import { mockJobs, mockJobsIN, mapApiJobToJob, Job } from "../data/mock-jobs";
 import { atsApi } from "@/lib/ats-api";
 import { resolveActiveSystemRole } from "@/lib/role-permissions";
 import DataTable from "./data-table";
-import SharedJobsTable from "./shared-jobs-table";
+import { PendingDelegationRequests } from "./pending-delegation-requests";
 import FilterDrawer, { SelectedFilters } from "./filter-drawer";
 import ColumnDrawer from "./column-drawer";
 import { Badge } from "@/components/ui/badge";
@@ -194,7 +194,16 @@ export default function JobPostingDashboard({
   }, [isRecruiter, filterParam, initialStatusFilter]);
 
   const [activeView, setActiveView] = useState(initialActiveView);
-  const [dashboardTab, setDashboardTab] = useState<"branch" | "shared">("branch");
+  const [dashboardTab, setDashboardTab] = useState<"all" | "branch" | "shared">("all");
+
+  // Track active branch ID as state so tab filters reactively update
+  const [currentBranchId, setCurrentBranchId] = useState<string | null>(null);
+  useEffect(() => {
+    const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+    const user = atsApi.auth.getCurrentUser();
+    setCurrentBranchId(activeBranchId || user?.branchId || null);
+  }, []);
+
 
   useEffect(() => {
     setActiveView(initialActiveView);
@@ -519,29 +528,55 @@ export default function JobPostingDashboard({
     }
   }, [fetchJobs]);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setCurrentFilters({ businessUnit: "All selected", predefined: [] });
     setActiveView(defaultViewLabel);
+    setIsLoading(true);
     fetchJobs();
     toast.success("Jobs list reloaded.");
-  };
+  }, [fetchJobs, defaultViewLabel]);
 
   // Productivity Metrics
+
+  const displayJobs = useMemo(() => {
+    if (dashboardTab === "all") return jobsData;
+    if (dashboardTab === "branch") {
+      // Branch Jobs: all jobs owned by this branch (whether co-sourced or not)
+      return jobsData.filter(j => j.branchId === currentBranchId);
+    }
+    if (dashboardTab === "shared") {
+      // Shared Jobs: jobs owned by ANOTHER branch but shared/delegated to this branch
+      return jobsData.filter(j => 
+        j.branchId !== currentBranchId && 
+        Array.isArray(j.sharedBranchIds) && 
+        j.sharedBranchIds.includes(currentBranchId as string)
+      );
+    }
+    return jobsData;
+  }, [jobsData, dashboardTab, currentBranchId]);
+
+
+
+
   const stats = useMemo(() => {
-    const total = jobsData.length;
-    const active = jobsData.filter((j) => j.jobStatus === "Active").length;
-    const closed = jobsData.filter((j) => j.jobStatus === "Closed" || j.jobStatus === "Close").length;
-    const totalSubmissions = jobsData.reduce(
-      (sum, j) => sum + j.submissionsCount,
+    const total = displayJobs.length;
+    const active = displayJobs.filter((j) => j.jobStatus === "Active").length;
+    const closed = displayJobs.filter((j) => j.jobStatus === "Closed" || j.jobStatus === "Close").length;
+    const totalSubmissions = displayJobs.reduce(
+      (sum, job) => sum + (job.submissionsCount || 0),
       0
     );
-    const avgAging = Math.round(
-      jobsData.reduce((sum, j) => sum + j.agingDays, 0) / (total || 1)
-    );
-    const slaAlerts = jobsData.filter((j) => j.agingDays > 30).length;
+    const avgAging =
+      displayJobs.length > 0
+        ? Math.round(
+            displayJobs.reduce((sum, job) => sum + job.agingDays, 0) /
+            displayJobs.length
+          )
+        : 0;
+    const slaAlerts = displayJobs.filter((j) => j.agingDays > 30).length;
 
     return { total, active, closed, totalSubmissions, avgAging, slaAlerts };
-  }, [jobsData]);
+  }, [displayJobs]);
 
   const handleReorderColumns = useCallback((newCols: string[]) => {
     setSelectedColumns(newCols);
@@ -550,31 +585,41 @@ export default function JobPostingDashboard({
   }, []);
 
   return (
-      <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
-        <div className="flex bg-default-100 dark:bg-slate-800 p-1 rounded-lg border border-default-250 w-fit mb-2">
-          <button
-            onClick={() => setDashboardTab("branch")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
-              dashboardTab === "branch"
-                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                : "text-default-500 hover:text-default-800"
-            }`}
-          >
-            Branch Jobs
-          </button>
-          <button
-            onClick={() => setDashboardTab("shared")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
-              dashboardTab === "shared"
-                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                : "text-default-500 hover:text-default-800"
-            }`}
-          >
-            Shared Jobs
-          </button>
-        </div>
+    <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
+      <div className="flex bg-default-100 dark:bg-slate-800 p-1 rounded-lg border border-default-250 w-fit mb-2">
+        <button
+          onClick={() => setDashboardTab("all")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
+            dashboardTab === "all"
+              ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+              : "text-default-500 hover:text-default-800"
+          }`}
+        >
+          All Jobs
+        </button>
+        <button
+          onClick={() => setDashboardTab("branch")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
+            dashboardTab === "branch"
+              ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+              : "text-default-500 hover:text-default-800"
+          }`}
+        >
+          Branch Jobs
+        </button>
+        <button
+          onClick={() => setDashboardTab("shared")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition cursor-pointer ${
+            dashboardTab === "shared"
+              ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+              : "text-default-500 hover:text-default-800"
+          }`}
+        >
+          Shared Jobs
+        </button>
+      </div>
 
-        {priorityParam && (
+      {priorityParam && (
         <div className="flex items-center justify-between px-3.5 py-1.5 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 rounded-lg text-xs">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-slate-700 dark:text-slate-300">Filtered by Priority:</span>
@@ -597,28 +642,26 @@ export default function JobPostingDashboard({
           <Loader2 className="h-8 w-8 text-primary animate-spin" />
           <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">Loading requirement pipelines...</p>
         </div>
-      ) : dashboardTab === "branch" ? (
-        <DataTable
-          data={jobsData}
-          selectedColumns={activeSelectedColumns}
-          allColumns={allColumns}
-          branchUsesPods={branchUsesPods}
-          onOpenFilters={() => setIsFilterOpen(true)}
-          onOpenColumns={() => setIsColumnOpen(true)}
-          onRefresh={handleRefresh}
-          onSaveView={handleSaveView}
-          savedViews={savedViews}
-          activeView={activeView}
-          defaultViewLabel={defaultViewLabel}
-          onSelectView={handleSelectView}
-          onUpdateJob={handleUpdateJob}
-          onReorderColumns={handleReorderColumns}
-        />
       ) : (
-        <SharedJobsTable
-          onRefresh={handleRefresh}
-          branchUsesPods={branchUsesPods}
-        />
+        <>
+          {dashboardTab === "shared" && <PendingDelegationRequests onRefresh={handleRefresh} />}
+          <DataTable
+            data={displayJobs}
+            selectedColumns={activeSelectedColumns}
+            allColumns={allColumns}
+            branchUsesPods={branchUsesPods}
+            onOpenFilters={() => setIsFilterOpen(true)}
+            onOpenColumns={() => setIsColumnOpen(true)}
+            onRefresh={handleRefresh}
+            onSaveView={handleSaveView}
+            savedViews={savedViews}
+            activeView={activeView}
+            defaultViewLabel={defaultViewLabel}
+            onSelectView={handleSelectView}
+            onUpdateJob={handleUpdateJob}
+            onReorderColumns={handleReorderColumns}
+          />
+        </>
       )}
 
       {/* Slide-over Filter Panel */}

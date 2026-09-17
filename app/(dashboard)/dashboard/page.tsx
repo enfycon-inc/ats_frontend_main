@@ -118,7 +118,7 @@ export default function DashboardPage() {
     );
   }
 
-  const rawRole = overrideRole || (profile?.roles && profile.roles.length > 0 ? profile.roles[0] : profile?.systemRole);
+  const rawRole = overrideRole || profile?.systemRole || (profile?.roles && profile.roles.length > 0 ? profile.roles[0] : "RECRUITER");
   const systemRole = resolveActiveSystemRole(rawRole, availableRoles, profile);
 
   const roleName = overrideRole 
@@ -149,7 +149,9 @@ export default function DashboardPage() {
             </span>
           </div>
           <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Monitor active jobs, review candidates, and track team progress.
+            {roleName === systemRole 
+              ? `Monitor active jobs, review candidates, and track team progress.`
+              : `Viewing dashboard as ${roleName}.`}
           </p>
         </div>
 

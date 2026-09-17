@@ -24,9 +24,8 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
   const [error, setError] = useState<string | null>(null);
 
   const [targetBranchId, setTargetBranchId] = useState("");
+  const [noOfPositions, setNoOfPositions] = useState("");
   const [slaDaysTarget, setSlaDaysTarget] = useState("");
-  const [marginSplitAmPct, setMarginSplitAmPct] = useState("");
-  const [marginSplitRecPct, setMarginSplitRecPct] = useState("");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
@@ -34,9 +33,8 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
       loadBranches();
       // Reset state
       setTargetBranchId("");
+      setNoOfPositions("");
       setSlaDaysTarget("");
-      setMarginSplitAmPct("");
-      setMarginSplitRecPct("");
       setNotes("");
       setError(null);
     }
@@ -62,6 +60,10 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
       setError("Please select a target branch.");
       return;
     }
+    if (!noOfPositions || parseInt(noOfPositions) < 1) {
+      setError("Number of positions is required and must be at least 1.");
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -69,9 +71,7 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
       await atsApi.jobs.delegate(jobId, {
         targetBranchId,
         slaDaysTarget: slaDaysTarget ? parseInt(slaDaysTarget) : undefined,
-        marginSplitAmPct: marginSplitAmPct ? parseInt(marginSplitAmPct) : undefined,
-        marginSplitRecPct: marginSplitRecPct ? parseInt(marginSplitRecPct) : undefined,
-        notes: notes || undefined,
+        notes: [`Positions requested: ${parseInt(noOfPositions)}`, notes.trim()].filter(Boolean).join("\n"),
       });
       onSuccess();
       onClose();
@@ -82,9 +82,11 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
     }
   };
 
+  const isFormValid = !!targetBranchId && !!noOfPositions && parseInt(noOfPositions) >= 1;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
             <Share2 className="h-5 w-5" /> Delegate Job (Co-Source)
@@ -110,58 +112,44 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
               </SelectTrigger>
               <SelectContent>
                 {branches.map(b => (
-                  <SelectItem key={b.id} value={b.id}>{b.name} ({b.code})</SelectItem>
+                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-neutral-700">Margin Split (AM %) <span className="text-neutral-400 font-normal">(Optional)</span></Label>
-              <Input 
-                type="number" 
-                min="0" 
-                max="100" 
-                placeholder="e.g. 50" 
-                value={marginSplitAmPct} 
-                onChange={(e) => setMarginSplitAmPct(e.target.value)} 
-                className="text-xs h-9" 
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-neutral-700">Margin Split (Rec %) <span className="text-neutral-400 font-normal">(Optional)</span></Label>
-              <Input 
-                type="number" 
-                min="0" 
-                max="100" 
-                placeholder="e.g. 50" 
-                value={marginSplitRecPct} 
-                onChange={(e) => setMarginSplitRecPct(e.target.value)} 
-                className="text-xs h-9" 
-              />
-            </div>
+          <div className="space-y-2">
+            <Label className="text-xs font-bold text-neutral-700">No. of Positions <span className="text-red-500">*</span></Label>
+            <Input
+              type="number"
+              min="1"
+              placeholder="e.g. 2"
+              value={noOfPositions}
+              onChange={(e) => setNoOfPositions(e.target.value)}
+              className="text-xs h-9"
+              required
+            />
           </div>
 
           <div className="space-y-2">
             <Label className="text-xs font-bold text-neutral-700">SLA Target (Days) <span className="text-neutral-400 font-normal">(Optional)</span></Label>
-            <Input 
-              type="number" 
-              min="1" 
-              placeholder="Days to deliver profiles" 
-              value={slaDaysTarget} 
-              onChange={(e) => setSlaDaysTarget(e.target.value)} 
-              className="text-xs h-9" 
+            <Input
+              type="number"
+              min="1"
+              placeholder="Days to deliver profiles"
+              value={slaDaysTarget}
+              onChange={(e) => setSlaDaysTarget(e.target.value)}
+              className="text-xs h-9"
             />
           </div>
 
           <div className="space-y-2">
             <Label className="text-xs font-bold text-neutral-700">Notes / Instructions <span className="text-neutral-400 font-normal">(Optional)</span></Label>
-            <Textarea 
-              rows={3} 
-              placeholder="Any specific instructions for the target branch..." 
-              value={notes} 
-              onChange={(e) => setNotes(e.target.value)} 
+            <Textarea
+              rows={3}
+              placeholder="Any specific instructions for the target branch..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
               className="text-xs resize-none"
             />
           </div>
@@ -170,7 +158,7 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
             <Button type="button" variant="outline" onClick={onClose} size="sm" className="text-xs h-9">
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting || !targetBranchId} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9">
+            <Button type="submit" disabled={submitting || !isFormValid} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Share2 className="h-4 w-4 mr-2" />}
               Send Delegation Request
             </Button>
@@ -180,3 +168,5 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
     </Dialog>
   );
 }
+
+

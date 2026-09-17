@@ -132,6 +132,10 @@ export default function ApprovalsPage() {
     setIsAdmin(!!hasAdminRole);
     setIsBranchAdmin(!!hasBranchAdmin);
 
+    if (!hasAdminRole && hasBranchAdmin && activeTab !== "cross-branch") {
+      setActiveTab("cross-branch");
+    }
+
     if (hasAdminRole || hasBranchAdmin) {
       loadData();
     } else {

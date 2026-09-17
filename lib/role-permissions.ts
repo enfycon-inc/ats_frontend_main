@@ -443,6 +443,7 @@ export function getFilteredMoreNav(
   } else if (isBranchAdmin) {
     allowedIds.add("user-management");
     allowedIds.add("pod-management");
+    allowedIds.add("tenant-management");
   } else if (isDeliveryHead) {
     allowedIds.add("pod-management");
   } else if (isPodLead) {
@@ -506,6 +507,16 @@ export function getFilteredMoreNav(
           ...item,
           children: subChildren,
         };
+      }
+
+      if (item.id === "tenant-management") {
+        if (!isAdmin && isBranchAdmin) {
+          return {
+            ...item,
+            label: "Cross-Branch Approvals",
+            children: [] // Hide the 'Pending Approvals' and 'Active Tenants' submenus
+          };
+        }
       }
 
       return item;
