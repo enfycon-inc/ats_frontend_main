@@ -2958,7 +2958,7 @@ export default function DataTable({
                   <div className="h-6 w-6 rounded-md bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-2xs">
                     <Plus className="h-3.5 w-3.5" />
                   </div>
-                  <span>Assign Staff / Pod</span>
+                  <span>Assign Recruiters / Pods</span>
                 </button>
               </>
             )}
@@ -3040,7 +3040,7 @@ export default function DataTable({
         </div>
       )}
 
-      {/* Assign Team / Recruiter Modal Dialog */}
+      {/* Assign Recruiters Modal Dialog */}
       <Dialog open={!!assignModalJob} onOpenChange={(open) => !open && setAssignModalJob(null)}>
         <DialogContent className="sm:max-w-lg md:max-w-[540px] w-full p-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xl">
           <DialogHeader className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850/70">
@@ -3050,10 +3050,10 @@ export default function DataTable({
               </div>
               <div>
                 <DialogTitle className="text-sm font-bold text-slate-900 dark:text-white">
-                  Assign Team / Recruiters
+                  Assign Recruiters
                 </DialogTitle>
                 <DialogDescription className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Assign requirement to recruitment pods or individual recruiters
+                  Assign requirement to pods or individual recruiters
                 </DialogDescription>
               </div>
             </div>
@@ -3125,7 +3125,7 @@ export default function DataTable({
           {!branchAllowsDirectStaff ? (
             <div className="mx-5 mt-2.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-[11.5px] text-amber-800 dark:text-amber-300">
               <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span><strong>Branch Policy Notice:</strong> Direct staff assignment is disabled. Requirements must be routed to Recruitment Pods.</span>
+              <span><strong>Branch Policy Notice:</strong> Direct recruiter assignment is disabled. Requirements must be routed to Recruitment Pods.</span>
             </div>
           ) : !branchAllowsPods ? (
             <div className="mx-5 mt-2.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-[11.5px] text-amber-800 dark:text-amber-300">
@@ -3156,7 +3156,7 @@ export default function DataTable({
                 )}
               >
                 <Icon icon="heroicons:squares-plus" className="h-3.5 w-3.5" />
-                Recruitment Pods
+                Pods
                 <span className={cn(
                   "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
                   assignTab === "pods" ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold" : "bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
@@ -3185,7 +3185,7 @@ export default function DataTable({
                 )}
               >
                 <Icon icon="heroicons:user" className="h-3.5 w-3.5" />
-                Recruiters & Staff
+                Recruiters
                 <span className={cn(
                   "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
                   assignTab === "users" ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold" : "bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
@@ -3206,7 +3206,7 @@ export default function DataTable({
               {selectedUserIds.length > 0 && (
                 <span className="text-[11px] text-blue-700 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/70 inline-flex items-center gap-1">
                   <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                  {selectedUserIds.length} Staff
+                  {selectedUserIds.length} Recruiters
                 </span>
               )}
             </div>
@@ -3234,9 +3234,9 @@ export default function DataTable({
                 </button>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 min-h-[24px]">
+            <div className="flex flex-wrap items-center gap-1.5 min-h-[24px] max-h-[85px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
               {selectedPodIds.length === 0 && selectedUserIds.length === 0 ? (
-                <span className="text-[11px] text-slate-400 italic">No pods or staff selected. Pick from Pods and/or Recruiters tabs below.</span>
+                <span className="text-[11px] text-slate-400 italic">No pods or recruiters selected. Pick from Pods and/or Recruiters tabs below.</span>
               ) : (
                 <>
                   {selectedPodIds.map((pId) => {
@@ -3291,7 +3291,7 @@ export default function DataTable({
             <div className="relative">
               <Icon icon="heroicons:magnifying-glass" className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
               <Input
-                placeholder={assignTab === "pods" ? "Search pods by name or lead..." : "Search staff by name, role, or email..."}
+                placeholder={assignTab === "pods" ? "Search pods by name or lead..." : "Search recruiters by name, role, or email..."}
                 value={assignSearch}
                 onChange={(e) => setAssignSearch(e.target.value)}
                 className="h-8 pl-8.5 text-xs bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 rounded-lg"
@@ -3313,7 +3313,7 @@ export default function DataTable({
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
                   )}
                 >
-                  All Staff ({branchRecruiterUsers.length})
+                  All Recruiters ({branchRecruiterUsers.length})
                 </button>
                 <button
                   type="button"
@@ -3367,7 +3367,7 @@ export default function DataTable({
                     onClick={() => handleSaveCombinedAssignment()}
                     className="h-6.5 px-2.5 text-[11px] font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed rounded-md"
                   >
-                    {isAssigning ? "Saving..." : selectedUserIds.length > 0 ? `Save (${selectedPodIds.length} Pods + ${selectedUserIds.length} Staff)` : `Assign Pods (${selectedPodIds.length})`}
+                    {isAssigning ? "Saving..." : selectedUserIds.length > 0 ? `Save (${selectedPodIds.length} Pods + ${selectedUserIds.length} Recruiters)` : `Assign Pods (${selectedPodIds.length})`}
                   </Button>
                 </div>
               </div>
@@ -3409,7 +3409,7 @@ export default function DataTable({
                     onClick={() => handleSaveCombinedAssignment()}
                     className="h-6.5 px-2.5 text-[11px] font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed rounded-md"
                   >
-                    {isAssigning ? "Saving..." : selectedPodIds.length > 0 ? `Save (${selectedPodIds.length} Pods + ${selectedUserIds.length} Staff)` : `Assign Staff (${selectedUserIds.length})`}
+                    {isAssigning ? "Saving..." : selectedPodIds.length > 0 ? `Save (${selectedPodIds.length} Pods + ${selectedUserIds.length} Recruiters)` : `Assign Recruiters (${selectedUserIds.length})`}
                   </Button>
                 </div>
               </div>
@@ -3504,7 +3504,7 @@ export default function DataTable({
               filteredUsers.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400">
                   <Icon icon="heroicons:users" className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-1.5" />
-                  <p className="font-semibold text-slate-600 dark:text-slate-300 text-xs">No recruiters or staff matching "{assignSearch}".</p>
+                  <p className="font-semibold text-slate-600 dark:text-slate-300 text-xs">No recruiters matching "{assignSearch}".</p>
                 </div>
               ) : (
                 filteredUsers.map((u: any) => {
@@ -3626,7 +3626,7 @@ export default function DataTable({
                       <span className="ml-1 opacity-90 font-normal">
                         ({selectedPodIds.length > 0 ? `${selectedPodIds.length} Pod${selectedPodIds.length > 1 ? "s" : ""}` : ""}
                         {selectedPodIds.length > 0 && selectedUserIds.length > 0 ? " + " : ""}
-                        {selectedUserIds.length > 0 ? `${selectedUserIds.length} Staff` : ""})
+                        {selectedUserIds.length > 0 ? `${selectedUserIds.length} Recruiters` : ""})
                       </span>
                     )}
                   </span>
