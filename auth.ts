@@ -78,7 +78,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   roles: u.roles || [],
                   accessToken: credentials.token as string,
                   tenantDomain: u.tenantDomain || u.tenant_domain || (u.tenant && (u.tenant.domain || u.tenant.tenantDomain)) || "",
-                  systemRole: u.systemRole || "RECRUITER",
+                  systemRole: u.systemRole || "",
                   podId: u.podId || u.pod_id || null,
                   branchId: u.branchId || u.branch_id || null,
                   branchName: u.branchName || u.branch_name || null,
@@ -108,7 +108,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 roles: u.roles || [],
                 accessToken: credentials.token as string,
                 tenantDomain: u.tenantDomain || u.tenant_domain || (u.tenant && (u.tenant.domain || u.tenant.tenantDomain)) || "",
-                systemRole: u.systemRole || "RECRUITER",
+                systemRole: u.systemRole || "",
                 podId: u.podId || u.pod_id || null,
                 branchId: u.branchId || u.branch_id || null,
                 branchName: u.branchName || u.branch_name || null,
@@ -235,7 +235,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               (user as any).roles = data.user.roles || [];
               (user as any).accessToken = data.accessToken;
               (user as any).tenantDomain = data.user.tenantDomain || "";
-              (user as any).systemRole = data.user.systemRole || "RECRUITER";
+              (user as any).systemRole = data.user.systemRole || "";
               (user as any).podId = data.user.podId || null;
               (user as any).branchId = data.user.branchId || null;
               (user as any).branchName = data.user.branchName || null;

@@ -143,86 +143,116 @@ export default function ProfileDropdown() {
   const getDynamicRoleLabel = (roleStr: string): string => {
     if (!roleStr) return "User";
     if (isTechnicalKeycloakRole(roleStr)) return "Recruiter";
+
+    // Lookup in availableRoles by role UUID or name
+    const found = availableRoles.find(
+      (r) => r.id === roleStr || r.name?.toUpperCase() === roleStr.toUpperCase()
+    );
+    if (found) {
+      return found.name;
+    }
+
     const upper = roleStr.toUpperCase();
     if (systemRoleLabels[upper]) {
       return systemRoleLabels[upper];
     }
-    const customRole = availableRoles.find(
-      (r) => r.name?.toUpperCase() === upper || r.id === roleStr
-    );
-    if (customRole) {
-      return customRole.name;
-    }
-    if (upper === "BDM") return "BDM";
-    if (upper === "ACCOUNT_MANAGER" || upper === "BD_MANAGER" || upper === "BD MANAGER") {
-      return "Account Manager";
-    }
     return roleStr.replace(/_/g, " ");
   };
 
-  const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
-  const branchSpecificRoles: string[] = (activeBranchId && (currentUser as any)?.branchRoles?.[activeBranchId]) || [];
-  const effectiveRoles = (branchSpecificRoles.length > 0 ? branchSpecificRoles : userRoles).filter((r: string) => !isTechnicalKeycloakRole(r));
+  // Single branch architecture: collect all assigned role UUIDs
+  const assignedRoleIds: string[] = useMemo(() => {
+    const ids = new Set<string>();
+    if (currentUser?.roleId) ids.add(currentUser.roleId);
+    if (Array.isArray(currentUser?.assignedRoleIds)) {
+      currentUser.assignedRoleIds.forEach((id: string) => {
+        if (id && typeof id === "string") ids.add(id);
+      });
+    }
+    return Array.from(ids);
+  }, [currentUser]);
 
-  // Use the live systemRole from /me as the primary role key.
-  // This prevents custom role names (e.g. 'Recruiter One (Pod Lead)') from being
-  // used as the dashboard key and accidentally resolving back to 'Recruiter' label
-  // after availableRoles loads and getDynamicRoleLabel re-evaluates.
-  const liveSystemRole: string | null = (currentUser as any)?.systemRole || null;
-  const userAssignedRoles: string[] = useMemo(() => {
-    if (liveSystemRole && !isTechnicalKeycloakRole(liveSystemRole)) {
-      return [liveSystemRole];
+  // Resolve assigned role objects directly by UUID from availableRoles
+  const userAssignedRoleObjs = useMemo(() => {
+    if (!availableRoles || availableRoles.length === 0) return [];
+
+    // 1. Primary: match by exact role UUID
+    const matchedByUuid = assignedRoleIds
+      .map((id) => availableRoles.find((r) => r.id === id))
+      .filter((r: any): r is any => Boolean(r));
+
+    if (matchedByUuid.length > 0) return matchedByUuid;
+
+    // 2. Fallback: match by role names (for legacy token sessions)
+    const legacyNames = currentUser?.roles || (session as any)?.user?.roles || [];
+    const matchedByName = legacyNames
+      .map((name: string) => {
+        const u = typeof name === "string" ? name.trim().toUpperCase() : "";
+        return availableRoles.find(
+          (r) => r.name?.toUpperCase() === u || r.systemRole?.toUpperCase() === u
+        );
+      })
+      .filter((r: any): r is any => Boolean(r));
+
+    if (matchedByName.length > 0) return matchedByName;
+
+    // 3. Fallback: single live system role
+    if (currentUser?.systemRole) {
+      const sys = currentUser.systemRole.toUpperCase();
+      const matchedSys = availableRoles.find(
+        (r) => r.systemRole?.toUpperCase() === sys || r.name?.toUpperCase() === sys
+      );
+      if (matchedSys) return [matchedSys];
     }
-    if (effectiveRoles && effectiveRoles.length > 0) {
-      return effectiveRoles;
-    }
-    if ((session as any)?.user?.roles?.length > 0) {
-      return (session as any).user.roles.filter((r: string) => !isTechnicalKeycloakRole(r));
-    }
-    return systemRole && !isTechnicalKeycloakRole(systemRole) ? [systemRole] : [];
-  }, [liveSystemRole, effectiveRoles, session, systemRole]);
+
+    return [];
+  }, [assignedRoleIds, availableRoles, currentUser, session]);
 
   const isUserAdmin = useMemo(() => {
-    const sRole = (systemRole || "").toUpperCase();
+    const sRole = (currentUser?.systemRole || systemRole || "").toUpperCase();
     if (sRole === "ADMIN" || sRole === "SUPER_ADMIN" || sRole === "TENANT_ADMIN") return true;
-    return userAssignedRoles.some((r) => {
-      const u = r.toUpperCase();
-      return u === "ADMIN" || u === "SUPER_ADMIN" || u === "TENANT_ADMIN";
+    return userAssignedRoleObjs.some((r: any) => {
+      const u = (r.systemRole || r.name || "").toUpperCase();
+      return u.includes("ADMIN");
     });
-  }, [systemRole, userAssignedRoles]);
+  }, [currentUser, systemRole, userAssignedRoleObjs]);
 
-  const currentActiveRole = overrideRole || (isUserAdmin ? "ADMIN" : (userAssignedRoles[0] || "RECRUITER"));
-  const displayRole = getDynamicRoleLabel(currentActiveRole);
+  // Role icon and color styling resolver based on canonical system archetype
+  const getRoleIconAndColor = (roleObjOrStr?: any) => {
+    const rawSys = typeof roleObjOrStr === "object"
+      ? (roleObjOrStr?.systemRole || roleObjOrStr?.name || "")
+      : (roleObjOrStr || "");
+    const u = rawSys.toUpperCase().replace(/[\s\-_]/g, "");
 
-  const rolesSubtitle = useMemo(() => {
-    const cleanRoles = userAssignedRoles
-      .map((r) => getDynamicRoleLabel(r))
-      .filter((v, i, a) => a.indexOf(v) === i);
-
-    if (cleanRoles.length > 0) {
-      return cleanRoles.join(" + ");
-    }
-    return displayRole || "User";
-  }, [userAssignedRoles, displayRole, getDynamicRoleLabel]);
-
-  // Role icon and color styling resolver
-  const getRoleIconAndColor = (roleStr: string) => {
-    const u = (roleStr || "").toUpperCase().replace(/[\s\-_]/g, "");
-
-    // Recruiter / TA / Sourcing
-    if (u === "RECRUITER" || u.includes("RECRUIT") || u.includes("SOURC") || u === "TA") {
+    // Admin / Super Admin / Branch Admin
+    if (u.includes("ADMIN")) {
       return {
-        Icon: Home,
+        Icon: ShieldCheck,
         colorClass:
-          "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/40",
+          "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/40",
+      };
+    }
+    // Account Manager / BDM / Client
+    if (u === "ACCOUNTMANAGER" || u === "BDM" || u.includes("ACCOUNT")) {
+      return {
+        Icon: Briefcase,
+        colorClass:
+          "bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-200/80 dark:border-teal-800/40",
       };
     }
     // Delivery Head / Operations
-    if (u === "DELIVERYHEAD" || u.includes("DELIVERY") || u.includes("OPERATION")) {
+    if (u === "DELIVERYHEAD" || u.includes("DELIVERY")) {
       return {
         Icon: Home,
         colorClass:
           "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/40",
+      };
+    }
+    // Pod Lead / Team Lead
+    if (u === "PODLEAD" || u.includes("POD")) {
+      return {
+        Icon: Home,
+        colorClass:
+          "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200/80 dark:border-purple-800/40",
       };
     }
     // Sense
@@ -233,62 +263,27 @@ export default function ProfileDropdown() {
           "bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 border border-sky-200/80 dark:border-sky-800/40",
       };
     }
-    // Account Manager / BDM / Business Development / Sales / Client
-    if (
-      u === "ACCOUNTMANAGER" ||
-      u === "BDM" ||
-      u.includes("ACCOUNT") ||
-      u.includes("BUSINESSDEVELOPMENT") ||
-      u.includes("SALES")
-    ) {
-      return {
-        Icon: Briefcase,
-        colorClass:
-          "bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-200/80 dark:border-teal-800/40",
-      };
-    }
     // Finance / Payroll
-    if (u === "FINANCEADMIN" || u.includes("FINANCE") || u.includes("PAYROLL")) {
+    if (u === "FINANCEADMIN" || u.includes("FINANCE")) {
       return {
         Icon: CreditCard,
         colorClass:
           "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/40",
       };
     }
-    // Pod Lead / Team Lead
-    if (u === "PODLEAD" || u.includes("POD") || u.includes("LEAD")) {
-      return {
-        Icon: Home,
-        colorClass:
-          "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200/80 dark:border-purple-800/40",
-      };
-    }
-    // Admin / Super Admin
-    if (
-      u === "ADMIN" ||
-      u === "SUPERADMIN" ||
-      u === "GLOBALADMIN" ||
-      u === "TENANTADMIN" ||
-      u.includes("ADMIN")
-    ) {
-      return {
-        Icon: ShieldCheck,
-        colorClass:
-          "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/40",
-      };
-    }
-    // Fallback custom
+    // Recruiter / TA / Sourcing (default)
     return {
       Icon: Home,
       colorClass:
-        "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80",
+        "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/40",
     };
   };
 
-  // Build the list of dashboard perspectives showing ONLY actual assigned roles (no dummy roles)
+  // Build the list of dashboard perspectives showing actual assigned roles
   const dashboardRoleOptions = useMemo(() => {
     const seen = new Set<string>();
     const options: {
+      id: string;
       key: string;
       name: string;
       Icon: any;
@@ -296,68 +291,80 @@ export default function ProfileDropdown() {
       replacesSystemRole?: string;
     }[] = [];
 
-    for (const uRole of userAssignedRoles) {
-      if (!uRole || typeof uRole !== "string") continue;
-      if (isTechnicalKeycloakRole(uRole)) continue;
+    for (const role of userAssignedRoleObjs) {
+      if (!role || seen.has(role.id)) continue;
+      seen.add(role.id);
 
-      const uUpper = uRole.trim().toUpperCase();
+      const { Icon, colorClass } = getRoleIconAndColor(role);
+      options.push({
+        id: role.id,
+        key: role.name || role.systemRole,
+        name: role.name,
+        Icon,
+        colorClass,
+        replacesSystemRole: role.systemRole || role.replacesSystemRole || undefined,
+      });
+    }
 
-      const customRole =
-        availableRoles.find(
-          (r) =>
-            !r.isSystem &&
-            ((!activeBranchId || !r.branchId || r.branchId === activeBranchId) &&
-              (r.name?.toUpperCase() === uUpper ||
-                r.id === uRole ||
-                (r.systemRole && r.systemRole.toUpperCase() === uUpper)))
-        ) ||
-        availableRoles.find(
-          (r) =>
-            !r.isSystem &&
-            (r.name?.toUpperCase() === uUpper ||
-              r.id === uRole ||
-              (r.systemRole && r.systemRole.toUpperCase() === uUpper))
-        );
-
-      const name = getDynamicRoleLabel(uRole);
-      const key = customRole?.name || uRole;
-      const dedupeKey = name.trim().toUpperCase();
-
-      if (!seen.has(dedupeKey)) {
-        seen.add(dedupeKey);
-        const { Icon, colorClass } = getRoleIconAndColor(name);
+    // If options could not be resolved from availableRoles yet, fallback to live user data
+    if (options.length === 0) {
+      const fallbackRole = (currentUser as any)?.systemRole || currentUser?.roleName || "RECRUITER";
+      if (!isTechnicalKeycloakRole(fallbackRole)) {
+        const name = getDynamicRoleLabel(fallbackRole);
+        const { Icon, colorClass } = getRoleIconAndColor(fallbackRole);
         options.push({
-          key,
+          id: currentUser?.roleId || fallbackRole,
+          key: fallbackRole,
           name,
           Icon,
           colorClass,
-          replacesSystemRole: customRole?.systemRole || customRole?.replacesSystemRole || undefined,
         });
       }
     }
 
-    if (options.length === 0 && systemRole && !isTechnicalKeycloakRole(systemRole)) {
-      const name = getDynamicRoleLabel(systemRole);
-      const { Icon, colorClass } = getRoleIconAndColor(name);
-      options.push({
-        key: systemRole,
-        name,
-        Icon,
-        colorClass,
-      });
-    }
+    return options;
+  }, [userAssignedRoleObjs, currentUser, availableRoles]);
 
-    const finalOptions = options.filter((opt) => {
-      const isReplaced = options.some(other => 
-        other.replacesSystemRole && 
-        (other.replacesSystemRole.toUpperCase() === opt.key.toUpperCase() || 
-         other.replacesSystemRole.toUpperCase() === opt.name.toUpperCase())
+  const activeRoleOption = useMemo(() => {
+    if (overrideRole) {
+      return (
+        dashboardRoleOptions.find(
+          (opt) =>
+            opt.id === overrideRole ||
+            opt.key === overrideRole ||
+            opt.name.toUpperCase() === overrideRole.toUpperCase()
+        ) || null
       );
-      return !isReplaced;
-    });
+    }
+    return (
+      dashboardRoleOptions.find((opt) => opt.id === currentUser?.roleId) ||
+      dashboardRoleOptions[0] ||
+      null
+    );
+  }, [overrideRole, dashboardRoleOptions, currentUser]);
 
-    return finalOptions;
-  }, [userAssignedRoles, availableRoles, activeBranchId, getDynamicRoleLabel, systemRole]);
+  const displayRole = activeRoleOption?.name || (currentUser?.roleName ? getDynamicRoleLabel(currentUser.roleName) : "Admin");
+
+  // Show combined titles if multiple roles assigned (e.g. "Account Manager + Pod Lead")
+  const rolesSubtitle = useMemo(() => {
+    if (userAssignedRoleObjs.length > 0) {
+      const uniqueNames = Array.from(new Set(userAssignedRoleObjs.map((r: any) => r.name)));
+      return uniqueNames.join(" + ");
+    }
+    return displayRole || "User";
+  }, [userAssignedRoleObjs, displayRole]);
+
+  const isItemActive = (key: string, id?: string) => {
+    if (overrideRole) {
+      const oNorm = overrideRole.toUpperCase().replace(/[\s\-_]/g, "");
+      const kNorm = key.toUpperCase().replace(/[\s\-_]/g, "");
+      if (overrideRole === id || overrideRole === key || oNorm === kNorm) return true;
+      return false;
+    }
+    if (id && currentUser?.roleId && id === currentUser.roleId) return true;
+    if (activeRoleOption && (activeRoleOption.id === id || activeRoleOption.key === key)) return true;
+    return false;
+  };
 
   const handleSwitchRole = (roleName: string | null) => {
     if (typeof window !== "undefined") {
@@ -385,7 +392,6 @@ export default function ProfileDropdown() {
       if (typeof window !== "undefined") {
         localStorage.removeItem("ats_access_token");
         localStorage.removeItem("ats_current_user");
-        localStorage.removeItem("active_branch_id");
         localStorage.removeItem("override_role");
       }
 
@@ -402,15 +408,6 @@ export default function ProfileDropdown() {
     } finally {
       setLogoutLoading(false);
     }
-  };
-
-  const isItemActive = (key: string) => {
-    const currentNorm = (overrideRole || (isUserAdmin ? "ADMIN" : (systemRole || "RECRUITER"))).toUpperCase().replace(/[\s\-_]/g, "");
-    const keyNorm = key.toUpperCase().replace(/[\s\-_]/g, "");
-    if (currentNorm === keyNorm) return true;
-    if (keyNorm === "ADMIN" && (currentNorm === "SUPERADMIN" || currentNorm === "TENANTADMIN")) return true;
-    if (keyNorm === "RECRUITER" && (!overrideRole && systemRole === "RECRUITER")) return true;
-    return false;
   };
 
   return (
@@ -516,11 +513,11 @@ export default function ProfileDropdown() {
 
           <div className="max-h-[220px] overflow-y-auto space-y-0.5 pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
             {dashboardRoleOptions.map((opt) => {
-              const isActive = isItemActive(opt.key);
+              const isActive = isItemActive(opt.key, opt.id);
               const OptionIcon = opt.Icon;
               return (
                 <button
-                  key={opt.key}
+                  key={opt.id || opt.key}
                   type="button"
                   onClick={() => handleSwitchRole(opt.key)}
                   className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] transition-all duration-150 cursor-pointer text-left group ${
