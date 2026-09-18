@@ -8,17 +8,35 @@ function load(file) {
   const source = fs.readFileSync(path.join(__dirname, '../lib', file + '.ts'), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   const module = { exports: {} };
-  const localRequire = name => name === './role-permissions' ? load('role-permissions') : {};
+  const localRequire = name => name.startsWith('./') ? load(name.slice(2)) : {};
   new Function('require', 'module', 'exports', compiled)(localRequire, module, module.exports);
   return module.exports;
 }
 const { getDashboardRoleSelection: select } = load('dashboard-role');
+const { saveDashboardRole, getSavedDashboardRole } = load('dashboard-preference');
 const roles = [
   { id: 'recruiter', name: 'Recruiter', systemRole: 'RECRUITER' },
   { id: 'admin', name: 'Branch Admin', systemRole: 'BRANCH_ADMIN' },
   { id: 'bdm', name: 'BDM', systemRole: 'ACCOUNT_MANAGER' },
 ];
 const profile = { roleId: 'admin', assignedRoleIds: ['recruiter', 'admin', 'bdm'], roleName: 'Branch Admin', systemRole: 'RECRUITER' };
+
+test('saved preference survives session cleanup and is isolated by account and workspace', () => {
+  const data = new Map();
+  global.window = {};
+  global.localStorage = { getItem: key => data.get(key) || null, setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key) };
+  try {
+    const user = { ...profile, id: 'a', tenantId: 'one', roleId: 'recruiter' };
+    assert.equal(select(user, roles).active.id, 'recruiter');
+    saveDashboardRole(user, 'bdm');
+    localStorage.removeItem('override_role');
+    localStorage.removeItem('ats_current_user');
+    assert.equal(select(user, roles).active.id, 'bdm');
+    assert.equal(getSavedDashboardRole({ id: 'b', tenantId: 'one' }), null);
+    assert.equal(getSavedDashboardRole({ id: 'a', tenantId: 'two' }), null);
+    assert.equal(select({ ...user, assignedRoleIds: ['recruiter'] }, roles).active.id, 'recruiter');
+  } finally { delete global.window; delete global.localStorage; }
+});
 
 test('first login uses the selected role ID for both label and dashboard, irrespective of array order or stale systemRole', () => {
   const result = select(profile, roles);

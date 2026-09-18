@@ -32,6 +32,7 @@ import { ModeToggle } from "@/components/shared/mode-toggle";
 import { atsApi } from "@/lib/ats-api";
 import { isRoleAdmin } from "@/lib/role-permissions";
 import { getDashboardRoleSelection } from "@/lib/dashboard-role";
+import { getSavedDashboardRole, saveDashboardRole } from "@/lib/dashboard-preference";
 import { OfficeClock } from "./office-clock";
 
 // ─── Shared icon button base ─────────────────────────────────────────────────
@@ -892,9 +893,9 @@ function ProfileDropdownNav() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setOverrideRole(localStorage.getItem("override_role"));
+      setOverrideRole(getSavedDashboardRole(liveUser));
       const handleStorage = () => {
-        setOverrideRole(localStorage.getItem("override_role"));
+        setOverrideRole(getSavedDashboardRole(liveUser));
       };
       window.addEventListener("storage", handleStorage);
       window.addEventListener("overrideRoleChanged", handleStorage);
@@ -903,7 +904,7 @@ function ProfileDropdownNav() {
         window.removeEventListener("overrideRoleChanged", handleStorage);
       };
     }
-  }, []);
+  }, [liveUser]);
 
   useEffect(() => {
     atsApi.auth.listRoles(undefined, true).then(data => {
@@ -1187,6 +1188,7 @@ function ProfileDropdownNav() {
   };
 
   const handleSwitchRole = (roleName: string | null) => {
+    saveDashboardRole(currentUser, roleName);
     if (typeof window !== "undefined") {
       if (roleName) {
         localStorage.setItem("override_role", roleName);

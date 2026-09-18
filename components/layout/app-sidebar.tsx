@@ -24,6 +24,7 @@ import { useEffect, useState, useMemo } from "react";
 import { atsApi } from "@/lib/ats-api";
 import { getFilteredPrimaryNav, getFilteredMoreNav, CustomRoleDefinition } from "@/lib/role-permissions";
 import { getDashboardRoleSelection } from "@/lib/dashboard-role";
+import { getSavedDashboardRole } from "@/lib/dashboard-preference";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -51,9 +52,9 @@ export function AppSidebar() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setOverrideRole(localStorage.getItem("override_role"));
+      setOverrideRole(getSavedDashboardRole(liveProfile));
       const handleStorage = () => {
-        setOverrideRole(localStorage.getItem("override_role"));
+        setOverrideRole(getSavedDashboardRole(liveProfile));
       };
       window.addEventListener("storage", handleStorage);
       window.addEventListener("overrideRoleChanged", handleStorage);
@@ -62,7 +63,7 @@ export function AppSidebar() {
         window.removeEventListener("overrideRoleChanged", handleStorage);
       };
     }
-  }, []);
+  }, [liveProfile]);
 
   const userProfile = liveProfile;
   const { active } = getDashboardRoleSelection(userProfile, availableRoles, overrideRole);

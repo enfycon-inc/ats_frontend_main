@@ -10,6 +10,7 @@ import { NavbarLogo } from "./navbar-logo";
 import { NavbarSearch } from "./navbar-search";
 import { getFilteredPrimaryNav, getFilteredMoreNav, CustomRoleDefinition } from "@/lib/role-permissions";
 import { getDashboardRoleSelection } from "@/lib/dashboard-role";
+import { getSavedDashboardRole } from "@/lib/dashboard-preference";
 
 export function TopNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -29,9 +30,9 @@ export function TopNavbar() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setOverrideRole(localStorage.getItem("override_role"));
+      setOverrideRole(getSavedDashboardRole(liveProfile));
       const handleStorage = () => {
-        setOverrideRole(localStorage.getItem("override_role"));
+        setOverrideRole(getSavedDashboardRole(liveProfile));
       };
       window.addEventListener("storage", handleStorage);
       window.addEventListener("overrideRoleChanged", handleStorage);
@@ -40,7 +41,7 @@ export function TopNavbar() {
         window.removeEventListener("overrideRoleChanged", handleStorage);
       };
     }
-  }, []);
+  }, [liveProfile]);
   
   const user = liveProfile;
   const { active } = getDashboardRoleSelection(user, availableRoles, overrideRole);

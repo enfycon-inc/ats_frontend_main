@@ -31,6 +31,8 @@ test('role switching updates subscribers and navigates without reloading the doc
     localStorage: { setItem: (key, value) => saved.set(key, value), removeItem: key => saved.delete(key) },
     router: { push: route => routes.push(route) },
     setOverrideRole: value => states.push(value),
+    currentUser: { id: 'user', tenantId: 'tenant' },
+    saveDashboardRole: (profile, role) => { assert.equal(profile.id, 'user'); },
     setOpen: value => assert.equal(value, false),
     Event, CustomEvent,
   });

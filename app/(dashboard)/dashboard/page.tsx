@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { atsApi } from "@/lib/ats-api";
 import { CustomRoleDefinition } from "@/lib/role-permissions";
 import { getDashboardRoleSelection } from "@/lib/dashboard-role";
+import { getSavedDashboardRole } from "@/lib/dashboard-preference";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
@@ -44,10 +45,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const override = localStorage.getItem("override_role");
+      const override = getSavedDashboardRole(profile);
       setOverrideRole(override);
       const handleStorage = () => {
-        setOverrideRole(localStorage.getItem("override_role"));
+        setOverrideRole(getSavedDashboardRole(profile));
       };
       window.addEventListener("storage", handleStorage);
       window.addEventListener("overrideRoleChanged", handleStorage);
@@ -56,7 +57,7 @@ export default function DashboardPage() {
         window.removeEventListener("overrideRoleChanged", handleStorage);
       };
     }
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
     async function loadData() {
