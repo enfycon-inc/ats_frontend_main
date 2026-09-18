@@ -2,7 +2,6 @@
 
 import { Menu, X } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { useSession } from "next-auth/react";
 import { atsApi } from "@/lib/ats-api";
 import { MobileNavbar } from "./mobile-navbar";
 import { NavbarMenu } from "./navbar-menu";
@@ -10,19 +9,22 @@ import { NavbarRight } from "./navbar-right";
 import { NavbarLogo } from "./navbar-logo";
 import { NavbarSearch } from "./navbar-search";
 import { getFilteredPrimaryNav, getFilteredMoreNav, CustomRoleDefinition } from "@/lib/role-permissions";
+import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 
 export function TopNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { data: session } = useSession();
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
+  const [liveProfile, setLiveProfile] = useState<any>(null);
 
   useEffect(() => {
-    atsApi.auth.listRoles().then(data => {
-      if (Array.isArray(data) && data.length > 0) {
-        setAvailableRoles(data);
-      }
+    let cancelled = false;
+    Promise.all([atsApi.auth.me(), atsApi.auth.listRoles(undefined, true)]).then(([profile, roles]) => {
+      if (cancelled) return;
+      setAvailableRoles(Array.isArray(roles) ? roles : []);
+      setLiveProfile(profile);
     }).catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -40,16 +42,16 @@ export function TopNavbar() {
     }
   }, []);
   
-  const currentUser = typeof window !== 'undefined' ? atsApi.auth.getCurrentUser() : null;
-  const user = session?.user || currentUser;
-  const activeRoleName = overrideRole || (user as any)?.systemRole || (user as any)?.roles?.[0] || "RECRUITER";
+  const user = liveProfile;
+  const { active } = getDashboardRoleSelection(user, availableRoles, overrideRole);
+  const activeRoleName = active.id || active.name;
 
   const navItems = useMemo(() => {
-    return getFilteredPrimaryNav(activeRoleName, availableRoles, user);
+    return user ? getFilteredPrimaryNav(activeRoleName, availableRoles, user) : [];
   }, [activeRoleName, availableRoles, user]);
 
   const navMoreItems = useMemo(() => {
-    return getFilteredMoreNav(activeRoleName, availableRoles, user);
+    return user ? getFilteredMoreNav(activeRoleName, availableRoles, user) : [];
   }, [activeRoleName, availableRoles, user]);
 
   return (

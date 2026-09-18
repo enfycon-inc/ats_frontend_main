@@ -25,11 +25,13 @@ import {
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import userImg from "@/public/assets/images/user.png";
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { atsApi } from "@/lib/ats-api";
 import { isRoleAdmin } from "@/lib/role-permissions";
+import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 import { OfficeClock } from "./office-clock";
 
 // ─── Shared icon button base ─────────────────────────────────────────────────
@@ -862,6 +864,7 @@ function AppsLauncherDropdown() {
 
 // ─── Profile dropdown (Enfysync Styled) ───────────────────────────────────────
 function ProfileDropdownNav() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const { data: session } = useSession();
@@ -1133,14 +1136,14 @@ function ProfileDropdownNav() {
       replacesSystemRole?: string;
     }[] = [];
 
-    for (const role of userAssignedRoleObjs) {
+    for (const role of getDashboardRoleSelection(currentUser, availableRoles, overrideRole).options) {
       if (!role || seen.has(role.id)) continue;
       seen.add(role.id);
 
       const { Icon, colorClass } = getRoleIconAndColor(role);
       options.push({
         id: role.id,
-        key: role.name || role.systemRole,
+        key: role.id,
         name: role.name,
         Icon,
         colorClass,
@@ -1150,12 +1153,13 @@ function ProfileDropdownNav() {
 
     // If options could not be resolved from availableRoles yet, fallback to live user data
     if (options.length === 0) {
-      const fallbackRole = (currentUser as any)?.systemRole || currentUser?.roleName || "RECRUITER";
+      const fallback = getDashboardRoleSelection(currentUser, availableRoles, overrideRole).active;
+      const fallbackRole = fallback.name;
       if (!isTechnicalKeycloakRole(fallbackRole)) {
         const name = getDynamicRoleLabel(fallbackRole);
         const { Icon, colorClass } = getRoleIconAndColor(fallbackRole);
         options.push({
-          id: currentUser?.roleId || fallbackRole,
+          id: fallback.id || fallbackRole,
           key: fallbackRole,
           name,
           Icon,
@@ -1165,27 +1169,13 @@ function ProfileDropdownNav() {
     }
 
     return options;
-  }, [userAssignedRoleObjs, currentUser, availableRoles]);
+  }, [currentUser, availableRoles, overrideRole]);
 
   const activeRoleOption = useMemo(() => {
-    if (overrideRole) {
-      return (
-        dashboardRoleOptions.find(
-          (opt) =>
-            opt.id === overrideRole ||
-            opt.key === overrideRole ||
-            opt.name.toUpperCase() === overrideRole.toUpperCase()
-        ) || null
-      );
-    }
-    return (
-      dashboardRoleOptions.find((opt) => opt.id === currentUser?.roleId) ||
-      dashboardRoleOptions[0] ||
-      null
-    );
-  }, [overrideRole, dashboardRoleOptions, currentUser]);
+    return getDashboardRoleSelection(currentUser, availableRoles, overrideRole).active;
+  }, [overrideRole, availableRoles, currentUser]);
 
-  const displayRole = activeRoleOption?.name || (currentUser?.roleName ? getDynamicRoleLabel(currentUser.roleName) : "Admin");
+  const displayRole = rolesLoaded && liveUserLoaded ? activeRoleOption.name : "Loading…";
 
   // Format subtitle showing ONLY the active / switched role, as requested by user
   const rolesSubtitle = useMemo(() => {
@@ -1193,15 +1183,7 @@ function ProfileDropdownNav() {
   }, [displayRole]);
 
   const isItemActive = (key: string, id?: string) => {
-    if (overrideRole) {
-      const oNorm = overrideRole.toUpperCase().replace(/[\s\-_]/g, "");
-      const kNorm = key.toUpperCase().replace(/[\s\-_]/g, "");
-      if (overrideRole === id || overrideRole === key || oNorm === kNorm) return true;
-      return false;
-    }
-    if (id && currentUser?.roleId && id === currentUser.roleId) return true;
-    if (activeRoleOption && (activeRoleOption.id === id || activeRoleOption.key === key)) return true;
-    return false;
+    return id ? activeRoleOption.id === id : activeRoleOption.name === key;
   };
 
   const handleSwitchRole = (roleName: string | null) => {
@@ -1215,9 +1197,8 @@ function ProfileDropdownNav() {
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new CustomEvent("overrideRoleChanged", { detail: { role: roleName } }));
       
-      // Immediately redirect to the main dashboard when switching roles
-      // to ensure the user doesn't stay on a page they no longer have permission for.
-      window.location.href = "/dashboard";
+      // Keep the shared layout mounted so the sidebar retains its loaded data.
+      router.push("/dashboard");
     }
     setOpen(false);
   };
@@ -1366,7 +1347,7 @@ function ProfileDropdownNav() {
                 <button
                   key={opt.id || opt.key}
                   type="button"
-                  onClick={() => handleSwitchRole(opt.key)}
+                  onClick={() => handleSwitchRole(opt.id)}
                   className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] transition-all duration-150 cursor-pointer text-left group ${
                     isActive
                       ? "bg-slate-100/90 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold"

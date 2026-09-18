@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { atsApi } from "@/lib/ats-api";
-import { resolveActiveSystemRole, CustomRoleDefinition } from "@/lib/role-permissions";
+import { CustomRoleDefinition } from "@/lib/role-permissions";
+import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
@@ -31,13 +32,14 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
+  const [rolesLoaded, setRolesLoaded] = useState(false);
 
   useEffect(() => {
-    atsApi.auth.listRoles().then(data => {
+    atsApi.auth.listRoles(undefined, true).then(data => {
       if (Array.isArray(data) && data.length > 0) {
         setAvailableRoles(data);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setRolesLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -109,7 +111,7 @@ export default function DashboardPage() {
 
 
 
-  if (loading) {
+  if (loading || !rolesLoaded) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
@@ -118,12 +120,8 @@ export default function DashboardPage() {
     );
   }
 
-  const rawRole = overrideRole || profile?.systemRole || (profile?.roles && profile.roles.length > 0 ? profile.roles[0] : "RECRUITER");
-  const systemRole = resolveActiveSystemRole(rawRole, availableRoles, profile);
-
-  const roleName = overrideRole 
-    ? overrideRole.replace("_", " ").toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())
-    : (profile?.roleName || "Recruiter");
+  const { active, systemRole } = getDashboardRoleSelection(profile, availableRoles, overrideRole);
+  const roleName = active.name;
   const isAlias = roleName.toUpperCase().trim() !== systemRole;
 
   // Metric calculation helpers

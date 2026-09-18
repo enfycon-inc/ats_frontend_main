@@ -20,15 +20,14 @@ import { NavbarLogo } from "./navbar-logo";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
 import { SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton } from "@/components/ui/sidebar";
-import { useSession } from "next-auth/react";
 import { useEffect, useState, useMemo } from "react";
 import { atsApi } from "@/lib/ats-api";
 import { getFilteredPrimaryNav, getFilteredMoreNav, CustomRoleDefinition } from "@/lib/role-permissions";
+import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { data: session } = useSession();
 
   const checkActive = (href: string) => {
     if (!href) return false;
@@ -37,13 +36,17 @@ export function AppSidebar() {
   };
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
+  const [liveProfile, setLiveProfile] = useState<any>(null);
 
   useEffect(() => {
-    atsApi.auth.listRoles().then(data => {
-      if (Array.isArray(data) && data.length > 0) {
-        setAvailableRoles(data);
-      }
+    let cancelled = false;
+    Promise.all([atsApi.auth.me(), atsApi.auth.listRoles(undefined, true)]).then(([profile, roles]) => {
+      if (cancelled) return;
+      // Commit together: never render a temporary menu from incomplete role data.
+      setAvailableRoles(Array.isArray(roles) ? roles : []);
+      setLiveProfile(profile);
     }).catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -61,19 +64,16 @@ export function AppSidebar() {
     }
   }, []);
 
-  const activeRoleName = useMemo(() => {
-    const sessionUser = (session as any)?.user;
-    return overrideRole || sessionUser?.systemRole || sessionUser?.roles?.[0] || "RECRUITER";
-  }, [session, overrideRole]);
-
-  const userProfile = (session as any)?.user;
+  const userProfile = liveProfile;
+  const { active } = getDashboardRoleSelection(userProfile, availableRoles, overrideRole);
+  const activeRoleName = active.id || active.name;
 
   const filteredPrimaryNav = useMemo(() => {
-    return getFilteredPrimaryNav(activeRoleName, availableRoles, userProfile);
+    return userProfile ? getFilteredPrimaryNav(activeRoleName, availableRoles, userProfile) : [];
   }, [activeRoleName, availableRoles, userProfile]);
 
   const filteredMoreNav = useMemo(() => {
-    return getFilteredMoreNav(activeRoleName, availableRoles, userProfile);
+    return userProfile ? getFilteredMoreNav(activeRoleName, availableRoles, userProfile) : [];
   }, [activeRoleName, availableRoles, userProfile]);
 
   return (
