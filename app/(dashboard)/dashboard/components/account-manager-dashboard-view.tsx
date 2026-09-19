@@ -265,3 +265,36 @@ function AccountManagerDashboardView({
 }
 
 // ─── POD LEAD / TEAM HEAD DASHBOARD VIEW ──────────────────────────────────────
+
+function DashboardJobStatusSelect({
+  status,
+  onChange,
+}: {
+  status: string;
+  onChange: (newStatus: string) => void;
+}) {
+  return (
+    <select
+      value={status}
+      onChange={(e) => onChange(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      className={cn(
+        "text-[10.5px] font-semibold px-2 py-0.5 rounded-sm border shadow-none bg-white dark:bg-slate-900 cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500",
+        status === "Active"
+          ? "text-green-700 border-green-200 bg-green-50 dark:text-green-400 dark:border-green-800/30"
+          : status === "Close" || status === "Closed"
+          ? "text-red-700 border-red-200 bg-red-50 dark:text-red-400 dark:border-red-800/30"
+          : status === "Filled"
+          ? "text-blue-700 border-blue-200 bg-blue-50 dark:text-blue-400 dark:border-blue-800/30"
+          : "text-amber-700 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-800/30"
+      )}
+    >
+      <option value="Active">Active</option>
+      <option value="Hold">Hold</option>
+      <option value="Filled">Filled</option>
+      <option value="Closed">Closed</option>
+    </select>
+  );
+}
+
+// ─── ACCOUNT MANAGER (BDM) DASHBOARD VIEW ────────────────────────────────────
