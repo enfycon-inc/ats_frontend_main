@@ -503,7 +503,7 @@ export function getFilteredMoreNav(
         if (isAdmin || permissions.includes("tenant:settings") || permissions.includes("tenant:manage") || permissions.includes("system:admin")) {
           subChildren.push({ label: "Global Remarks Templates", href: "/utility/global-remarks" });
         }
-        if (isAdmin || permissions.includes("branch_admin:manage") || permissions.includes("branch:edit") || permissions.includes("branch:view")) {
+        if (!isAdmin && (permissions.includes("branch_admin:manage") || permissions.includes("branch:edit") || permissions.includes("branch:view"))) {
           subChildren.push({ label: "Branch Settings", href: "/settings/branch" });
         }
         subChildren.push({ label: "Sound & Tone Preferences", href: "/utility/settings-notifications" });
