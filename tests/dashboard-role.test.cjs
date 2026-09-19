@@ -60,6 +60,13 @@ test('duplicate display names are distinguished by ID', () => {
   assert.equal(result.systemRole, 'DELIVERY_HEAD');
 });
 
+test('the configured primary survives omission from the branch management catalog', () => {
+  const user = { roleId: 'owner', assignedRoleIds: ['owner', 'recruiter'], roleName: 'Workspace Owner', systemRole: 'ADMIN' };
+  const result = select(user, [roles[0]], null, false);
+  assert.equal(result.active.id, 'owner');
+  assert.equal(result.systemRole, 'ADMIN');
+});
+
 test('sidebar hydration uses the server-selected role despite different browser storage', () => {
   global.window = {};
   global.localStorage = { getItem: () => 'recruiter' };

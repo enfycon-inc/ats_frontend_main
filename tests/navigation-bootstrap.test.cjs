@@ -33,3 +33,16 @@ test('failed bootstrap does not serialize partial or unauthenticated navigation'
   const noToken = loader(() => assert.fail('Missing credentials must not start a request'));
   assert.equal(await noToken('https://api.example.test', ''), null);
 });
+
+test('assigned role metadata from the profile does not depend on the branch-filtered role catalog', async () => {
+  const profile = { id: 'admin', permissions: ['tenant:settings'], assignedRoles: [
+    { id: 'tenant-admin-id', name: 'Workspace Owner', systemRole: 'ADMIN' },
+  ] };
+  const load = loader(async url => {
+    if (!url.endsWith('/me')) throw new Error('Role catalog unavailable');
+    return { ok: true, json: async () => profile };
+  });
+  assert.deepEqual(await load('https://api.example.test', 'token'), {
+    profile, roles: profile.assignedRoles, overrideRole: null,
+  });
+});

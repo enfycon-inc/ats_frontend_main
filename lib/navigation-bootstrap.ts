@@ -6,19 +6,33 @@ export type NavigationBootstrap = {
   overrideRole: string | null;
 };
 
+// The profile contains the member's exact assignments. The management catalog
+// intentionally hides replaced system roles and roles outside the active branch.
+export async function loadDashboardNavigation(
+  getProfile: () => Promise<any>,
+  getLegacyRoles: () => Promise<CustomRoleDefinition[]>,
+): Promise<NavigationBootstrap> {
+  const profile = await getProfile();
+  if (!profile?.id) throw new Error("Workspace profile is unavailable");
+  const roles = Array.isArray(profile.assignedRoles) ? profile.assignedRoles : await getLegacyRoles();
+  if (!Array.isArray(roles)) throw new Error("Workspace roles are unavailable");
+  return { profile, roles, overrideRole: null };
+}
+
 // Request-local data only: never cache one member's navigation for another.
 export async function loadNavigationBootstrap(base: string, token: string): Promise<NavigationBootstrap | null> {
   if (!token) return null;
   try {
-    const responses = await Promise.all([
-      "/api/auth/me", "/api/auth/rbac/roles?includeSystem=true",
-    ].map(path => fetch(`${base.replace(/\/$/, "")}${path}`, {
+    const signal = AbortSignal.timeout(8000);
+    const get = async (path: string) => {
+      const response = await fetch(`${base.replace(/\/$/, "")}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
-      signal: AbortSignal.timeout(8000),
-    })));
-    if (responses.some(response => !response.ok)) return null;
-    const [profile, roles] = await Promise.all(responses.map(response => response.json()));
-    return profile?.id && Array.isArray(roles) ? { profile, roles, overrideRole: null } : null;
+      signal,
+      });
+      if (!response.ok) throw new Error("Workspace access could not be loaded");
+      return response.json();
+    };
+    return await loadDashboardNavigation(() => get("/api/auth/me"), () => get("/api/auth/rbac/roles?includeSystem=true"));
   } catch { return null; }
 }
