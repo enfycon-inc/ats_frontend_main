@@ -57,7 +57,8 @@ export function DashboardProvider({ initialNavigation = null, children }: {
           setOverrideRole(getSavedDashboardRole(snapshot.profile));
           setState({ snapshot, status: "ready", error: null });
           return;
-        } catch {
+        } catch (err) {
+          console.error("DashboardContext Error:", err);
           if (cancelled) return;
           if (attempt === 1) setState({ snapshot: null, status: "error", error: "Could not load your workspace access. Please try again." });
         } finally {
