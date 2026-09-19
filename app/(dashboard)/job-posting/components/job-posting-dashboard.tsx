@@ -132,6 +132,18 @@ export default function JobPostingDashboard({
     return Boolean(hasAdminPerm || hasAdminRole);
   }, [currentUser, userPermissions, userRoles, systemRole]);
 
+  const showBranchTabs = useMemo(() => {
+    if (!canManageBranchJobs) return false;
+    const isGlobalAdmin = 
+      systemRole === "SUPER_ADMIN" || 
+      systemRole === "ADMIN" || 
+      systemRole === "TENANT_ADMIN" ||
+      userRoles.includes("SUPERADMIN") ||
+      userRoles.includes("ADMIN") ||
+      userRoles.includes("TENANTADMIN");
+    return !isGlobalAdmin;
+  }, [canManageBranchJobs, systemRole, userRoles]);
+
   // Load and verify active branch's pod system capability
   useEffect(() => {
     async function checkBranchPodSupport() {
@@ -240,10 +252,10 @@ export default function JobPostingDashboard({
 
   // Ensure recruiters and account managers stay on unified 'all' jobs view
   useEffect(() => {
-    if (!canManageBranchJobs && dashboardTab !== "all") {
+    if (!showBranchTabs && dashboardTab !== "all") {
       setDashboardTab("all");
     }
-  }, [canManageBranchJobs, dashboardTab]);
+  }, [showBranchTabs, dashboardTab]);
 
 
   useEffect(() => {
@@ -627,7 +639,7 @@ export default function JobPostingDashboard({
 
   return (
     <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
-      {canManageBranchJobs && (
+      {showBranchTabs && (
         <div className="flex bg-default-100 dark:bg-slate-800 p-1 rounded-lg border border-default-250 w-fit mb-2">
           <button
             onClick={() => setDashboardTab("all")}
@@ -687,7 +699,7 @@ export default function JobPostingDashboard({
         </div>
       ) : (
         <>
-          {canManageBranchJobs && dashboardTab === "shared" && <PendingDelegationRequests onRefresh={handleRefresh} />}
+          {showBranchTabs && dashboardTab === "shared" && <PendingDelegationRequests onRefresh={handleRefresh} />}
           <DataTable
             data={displayJobs}
             selectedColumns={activeSelectedColumns}
