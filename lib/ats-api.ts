@@ -1359,6 +1359,9 @@ const submissions = {
 };
 
 const branches = {
+  async delegationTargets(): Promise<any[]> {
+    return apiFetch<any[]>('/api/branches/delegation-targets');
+  },
   async list(): Promise<any[]> {
     return apiFetch<any[]>('/api/branches');
   },

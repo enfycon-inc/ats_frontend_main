@@ -24,9 +24,10 @@ import { useEffect, useState, useMemo } from "react";
 import { atsApi } from "@/lib/ats-api";
 import { getFilteredPrimaryNav, getFilteredMoreNav, CustomRoleDefinition } from "@/lib/role-permissions";
 import { getDashboardRoleSelection } from "@/lib/dashboard-role";
-import { getSavedDashboardRole } from "@/lib/dashboard-preference";
+import { getSavedDashboardRole, saveDashboardRole } from "@/lib/dashboard-preference";
+import type { NavigationBootstrap } from "@/lib/navigation-bootstrap";
 
-export function AppSidebar() {
+export function AppSidebar({ initialNavigation = null }: { initialNavigation?: NavigationBootstrap | null }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -35,11 +36,12 @@ export function AppSidebar() {
     const currentUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "");
     return currentUrl === href;
   };
-  const [overrideRole, setOverrideRole] = useState<string | null>(null);
-  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
-  const [liveProfile, setLiveProfile] = useState<any>(null);
+  const [overrideRole, setOverrideRole] = useState<string | null>(initialNavigation?.overrideRole ?? null);
+  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>(initialNavigation?.roles ?? []);
+  const [liveProfile, setLiveProfile] = useState<any>(initialNavigation?.profile ?? null);
 
   useEffect(() => {
+    if (initialNavigation) return;
     let cancelled = false;
     Promise.all([atsApi.auth.me(), atsApi.auth.listRoles(undefined, true)]).then(([profile, roles]) => {
       if (cancelled) return;
@@ -48,11 +50,14 @@ export function AppSidebar() {
       setLiveProfile(profile);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, []);
+  }, [initialNavigation]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setOverrideRole(getSavedDashboardRole(liveProfile));
+      const savedRole = getSavedDashboardRole(liveProfile);
+      // Migrate existing browser-only preferences for subsequent server renders.
+      if (savedRole) saveDashboardRole(liveProfile, savedRole);
+      setOverrideRole(savedRole ?? initialNavigation?.overrideRole ?? null);
       const handleStorage = () => {
         setOverrideRole(getSavedDashboardRole(liveProfile));
       };
@@ -66,7 +71,7 @@ export function AppSidebar() {
   }, [liveProfile]);
 
   const userProfile = liveProfile;
-  const { active } = getDashboardRoleSelection(userProfile, availableRoles, overrideRole);
+  const { active } = getDashboardRoleSelection(userProfile, availableRoles, overrideRole, false);
   const activeRoleName = active.id || active.name;
 
   const filteredPrimaryNav = useMemo(() => {

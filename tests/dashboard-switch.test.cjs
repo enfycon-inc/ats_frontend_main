@@ -51,6 +51,7 @@ for (const file of ['app-sidebar.tsx', 'top-navbar.tsx']) {
     const commits = [];
     const profile = { roleId: 'assigned-role-id' };
     const run = callback(`components/layout/${file}`, node => ts.isCallExpression(node) && node.expression.getText() === 'useEffect', {
+      initialNavigation: null,
       atsApi: { auth: { me: () => Promise.resolve(profile), listRoles: () => new Promise(resolve => { resolveRoles = resolve; }) } },
       setLiveProfile: value => commits.push(['profile', value]),
       setAvailableRoles: value => commits.push(['roles', value]),
@@ -65,3 +66,13 @@ for (const file of ['app-sidebar.tsx', 'top-navbar.tsx']) {
     cleanup();
   });
 }
+
+test('a server-populated sidebar keeps its data and does not start another initial fetch', () => {
+  const run = callback('components/layout/app-sidebar.tsx', node => ts.isCallExpression(node) && node.expression.getText() === 'useEffect', {
+    initialNavigation: { profile: { id: 'user' }, roles: [{ id: 'primary' }], overrideRole: 'primary' },
+    atsApi: { auth: { me: () => assert.fail('Unexpected profile refetch'), listRoles: () => assert.fail('Unexpected roles refetch') } },
+    setLiveProfile: () => assert.fail('Must preserve the initial profile'),
+    setAvailableRoles: () => assert.fail('Must preserve initial role definitions'),
+  });
+  run();
+});

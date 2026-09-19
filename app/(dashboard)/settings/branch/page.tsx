@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/hover-card";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
-import { useSession } from "next-auth/react";
 import { useSocket } from "@/contexts/SocketContext";
 
 const SYSTEM_INTERNAL_ROLES = new Set([
@@ -100,50 +99,17 @@ function formatTime12(timeStr?: string) {
 }
 
 export default function BranchManagementPage() {
-  const { data: session } = useSession();
-  const sessionUser = (session as any)?.user;
+  const [sessionUser, setLiveProfile] = useState<any>(null);
   const { isUserOnline } = useSocket();
   
-  const [overrideRole, setOverrideRole] = useState<string | null>(null);
-  const [availableRoles, setAvailableRoles] = useState<any[]>([]);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setOverrideRole(localStorage.getItem("override_role"));
-      const handleStorage = () => {
-        setOverrideRole(localStorage.getItem("override_role"));
-      };
-      window.addEventListener("storage", handleStorage);
-      window.addEventListener("overrideRoleChanged", handleStorage);
-      return () => {
-        window.removeEventListener("storage", handleStorage);
-        window.removeEventListener("overrideRoleChanged", handleStorage);
-      };
-    }
-  }, []);
-
-  const userPermissions = useMemo(() => {
-    const directPerms = Array.isArray(sessionUser?.permissions) ? sessionUser.permissions : [];
-    const activeRoleKey = overrideRole || sessionUser?.systemRole || sessionUser?.roles?.[0];
-    if (activeRoleKey && availableRoles.length > 0) {
-      const activeRoleObj = availableRoles.find(
-        (r: any) =>
-          r.name?.toUpperCase() === activeRoleKey.toUpperCase() ||
-          r.systemRole?.toUpperCase() === activeRoleKey.toUpperCase() ||
-          r.id === activeRoleKey
-      );
-      if (activeRoleObj && Array.isArray(activeRoleObj.permissions)) {
-        return Array.from(new Set([...directPerms, ...activeRoleObj.permissions]));
-      }
-    }
-    return directPerms;
-  }, [sessionUser, overrideRole, availableRoles]);
+  const userPermissions: string[] = Array.isArray(sessionUser?.permissions) ? sessionUser.permissions : [];
 
   // PURE GRANULAR PERMISSION-BASED CAPABILITIES
   // Branch Admin has branch_admin:manage but is explicitly NOT allowed to create or delete branches
   const canCreateBranch = userPermissions.includes('branch:create') || userPermissions.includes('tenant:settings');
   const canEditBranchFunc = (branchId: string) => {
-    if (userPermissions.includes('tenant:settings') || userPermissions.includes('tenant:manage') || overrideRole === 'SUPER_ADMIN' || overrideRole === 'ADMIN' || overrideRole === 'TENANT_ADMIN') return true;
+    if (userPermissions.some(p => ['tenant:settings', 'tenant:manage', 'platform:manage'].includes(p))) return true;
     if (userPermissions.includes('branch:edit') || userPermissions.includes('branch_admin:manage')) {
       return sessionUser?.branchId === branchId;
     }
@@ -154,17 +120,13 @@ export default function BranchManagementPage() {
   const canAssignManager = userPermissions.includes('branch:assign_manager') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('user:manage') || userPermissions.includes('tenant:settings');
   const canAssignUserRoles = userPermissions.includes('branch:assign_user') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('user:manage') || userPermissions.includes('tenant:settings');
   const canManageBranches = canCreateBranch || canDeleteBranch;
-  const isGlobalAdmin =
-    userPermissions.includes('system:admin') ||
-    sessionUser?.roles?.some((r: string) => String(r).toUpperCase() === 'SUPER_ADMIN') ||
-    String(sessionUser?.systemRole || '').toUpperCase() === 'SUPER_ADMIN' ||
-    String(overrideRole || '').toUpperCase() === 'SUPER_ADMIN';
+  const isGlobalAdmin = userPermissions.includes('system:admin') || userPermissions.includes('platform:manage');
+  const isTenantManager = userPermissions.some(p => ['tenant:settings', 'tenant:manage', 'platform:manage'].includes(p));
+  const ownBranchSettings = !isTenantManager;
   const canManageGlobalRemarks =
     userPermissions.includes('tenant:settings') ||
     userPermissions.includes('tenant:manage') ||
-    userPermissions.includes('system:admin') ||
-    sessionUser?.roles?.some((r: string) => ['ADMIN', 'SUPER_ADMIN', 'TENANT_ADMIN'].includes(String(r).toUpperCase())) ||
-    ['ADMIN', 'TENANT_ADMIN'].includes(String(overrideRole || '').toUpperCase());
+    userPermissions.includes('system:admin') || userPermissions.includes('platform:manage');
 
   const [branches, setBranches] = useState<any[]>([]);
   const [hierarchyData, setHierarchyData] = useState<any>(null);
@@ -261,17 +223,21 @@ export default function BranchManagementPage() {
   const loadBranchesAndHierarchy = async () => {
     try {
       setLoading(true);
+      const profile = await atsApi.auth.me() as any;
+      setLiveProfile(profile);
+      const tenantManager = (profile.permissions || []).some((p: string) => ['tenant:settings', 'tenant:manage', 'platform:manage'].includes(p));
       const [listData, hierData, rolesData] = await Promise.all([
-        atsApi.branches.list().catch(() => []),
-        atsApi.branches.getHierarchy().catch(() => null),
+        tenantManager ? atsApi.branches.list() : profile.branchId ? atsApi.branches.get(profile.branchId).then(branch => [branch]) : Promise.resolve([]),
+        tenantManager ? atsApi.branches.getHierarchy().catch(() => null) : Promise.resolve(null),
         atsApi.auth.listRoles().catch(() => []),
       ]);
       setBranches(listData || []);
       setHierarchyData(hierData);
       setTenantRoles(rolesData || []);
-      setAvailableRoles(rolesData || []);
+      if (!tenantManager && listData?.[0]) await openEditModal(listData[0]);
     } catch (err: any) {
       console.error("Failed to load branches:", err);
+      setFormError(err.message || 'Unable to load branch settings.');
     } finally {
       setLoading(false);
     }
@@ -776,7 +742,7 @@ export default function BranchManagementPage() {
     }
   };
 
-  const visibleBranches = isGlobalAdmin 
+  const visibleBranches = isTenantManager 
     ? branches 
     : branches.filter(b => b.id === sessionUser?.branchId);
 
@@ -796,6 +762,15 @@ export default function BranchManagementPage() {
 
   return (
     <div className="p-6 w-full max-w-full space-y-6">
+      {ownBranchSettings && (
+        <div className="flex items-center justify-between gap-4">
+          <div><h1 className="text-xl font-bold">Branch Settings</h1><p className="text-xs text-neutral-500 mt-1">{selectedBranch?.name || 'Your assigned branch'} — operating hours, job routing, and stage remarks.</p></div>
+          {selectedBranch && canEditBranchFunc(selectedBranch.id) && <Button variant="outline" onClick={() => openBranchRemarksModal(selectedBranch)}><MessageSquare className="h-4 w-4 mr-2" />Add / Manage Remarks</Button>}
+        </div>
+      )}
+      {loading && <p className="text-xs text-neutral-500">Loading branch settings...</p>}
+      {!loading && ownBranchSettings && !selectedBranch && <p role="alert" className="text-sm text-neutral-600">{formError || 'No branch is assigned to your account.'}</p>}
+      {!loading && isTenantManager && <>
       
       {/* HEADER SECTION */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-xl border border-neutral-200 dark:border-slate-800 shadow-sm">
@@ -1377,6 +1352,7 @@ export default function BranchManagementPage() {
       )}
 
       {/* CREATE BRANCH MODAL */}
+      </>}
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[90vh] flex flex-col">
@@ -1598,9 +1574,9 @@ export default function BranchManagementPage() {
       )}
 
       {/* EDIT BRANCH MODAL */}
-      {isEditOpen && selectedBranch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl lg:max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95 my-auto">
+      {!loading && (isEditOpen || ownBranchSettings) && selectedBranch && (
+        <div className={ownBranchSettings ? '' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto'}>
+          <div className={ownBranchSettings ? 'bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl w-full overflow-hidden' : 'bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl lg:max-w-5xl max-h-[92vh] flex flex-col overflow-hidden my-auto'}>
             {/* Modal Header */}
             <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-200/80 dark:border-slate-800 bg-neutral-50/80 dark:bg-slate-850 shrink-0">
               <div className="flex items-center gap-3">
@@ -1609,23 +1585,24 @@ export default function BranchManagementPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    Edit Branch Details &amp; Routing Policy
+                    {ownBranchSettings ? 'Branch Details & Routing Policy' : 'Edit Branch Details & Routing Policy'}
                   </h3>
                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
                     Configure office location parameters, recruiter assignment strategies, and job approval rules.
                   </p>
                 </div>
               </div>
-              <button
+              {!ownBranchSettings && <button
                 onClick={() => setIsEditOpen(false)}
                 className="h-8 w-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 dark:hover:bg-slate-800 transition-colors"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </button>}
             </div>
 
             {/* Modal Scrollable Body */}
             <form onSubmit={handleUpdateBranch} className="flex flex-col flex-1 overflow-hidden">
+              <fieldset disabled={!canEditBranchFunc(selectedBranch.id) || isSubmittingBranch} className="contents">
               <div className="p-6 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
                 {formError && (
                   <div className="p-3 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-xs font-semibold rounded-lg border border-red-200 dark:border-red-900/60 flex items-center gap-2">
@@ -2191,10 +2168,10 @@ export default function BranchManagementPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsEditOpen(false)}
+                  onClick={() => ownBranchSettings ? openEditModal(selectedBranch) : setIsEditOpen(false)}
                   className="h-9 text-xs font-semibold px-5 rounded-lg border-neutral-300 dark:border-slate-700"
                 >
-                  Cancel
+                  {ownBranchSettings ? 'Reset Changes' : 'Cancel'}
                 </Button>
                 <Button
                   type="submit"
@@ -2208,10 +2185,11 @@ export default function BranchManagementPage() {
                       Updating...
                     </>
                   ) : (
-                    "Update Branch"
+                    "Save Settings"
                   )}
                 </Button>
               </div>
+              </fieldset>
             </form>
           </div>
         </div>

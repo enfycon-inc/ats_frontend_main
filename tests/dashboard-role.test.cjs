@@ -13,7 +13,7 @@ function load(file) {
   return module.exports;
 }
 const { getDashboardRoleSelection: select } = load('dashboard-role');
-const { saveDashboardRole, getSavedDashboardRole } = load('dashboard-preference');
+const { saveDashboardRole, getSavedDashboardRole, dashboardPreferenceCookie } = load('dashboard-preference');
 const roles = [
   { id: 'recruiter', name: 'Recruiter', systemRole: 'RECRUITER' },
   { id: 'admin', name: 'Branch Admin', systemRole: 'BRANCH_ADMIN' },
@@ -58,4 +58,26 @@ test('duplicate display names are distinguished by ID', () => {
   const custom = [...roles, { id: 'custom', name: 'BDM', systemRole: 'DELIVERY_HEAD' }];
   const result = select({ ...profile, assignedRoleIds: [...profile.assignedRoleIds, 'custom'] }, custom, 'custom');
   assert.equal(result.systemRole, 'DELIVERY_HEAD');
+});
+
+test('sidebar hydration uses the server-selected role despite different browser storage', () => {
+  global.window = {};
+  global.localStorage = { getItem: () => 'recruiter' };
+  try {
+    const user = { ...profile, id: 'user', tenantId: 'tenant' };
+    assert.equal(select(user, roles, 'bdm', false).active.id, 'bdm');
+  } finally { delete global.window; delete global.localStorage; }
+});
+
+test('saved dashboard choices are available to secure server rendering under the same scoped cookie', () => {
+  global.window = { location: { protocol: 'https:' } };
+  global.document = { cookie: '' };
+  global.localStorage = { setItem() {}, removeItem() {} };
+  try {
+    const user = { id: 'member', tenantId: 'workspace' };
+    saveDashboardRole(user, 'role-id');
+    assert.equal(document.cookie, `${dashboardPreferenceCookie(user)}=role-id; Path=/; Max-Age=31536000; SameSite=Lax; Secure`);
+    saveDashboardRole(user, null);
+    assert.match(document.cookie, /Max-Age=0/);
+  } finally { delete global.window; delete global.document; delete global.localStorage; }
 });

@@ -43,7 +43,7 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
   const loadBranches = async () => {
     setLoading(true);
     try {
-      const res = await atsApi.branches.list();
+      const res = await atsApi.branches.delegationTargets();
       // Filter out the current user's branch (we don't want to delegate to ourselves)
       // For now, list all branches. The backend prevents delegating to the same branch.
       setBranches(res || []);

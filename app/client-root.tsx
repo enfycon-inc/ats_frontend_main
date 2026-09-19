@@ -4,6 +4,7 @@ import Footer from "@/components/layout/footer";
 import ThemeCustomizer from "@/components/theme-customizer/theme-customizer";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ReactNode, useEffect, useMemo, useState } from "react";
+import type { NavigationBootstrap } from "@/lib/navigation-bootstrap";
 import { useRadixScrollLockFix } from "@/hooks/use-radix-scroll-lock-fix";
 import { Toaster } from "react-hot-toast";
 import { usePathname } from "next/navigation";
@@ -22,8 +23,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 export function ClientRoot({
   children,
   defaultOpen = true,
+  initialNavigation = null,
 }: {
   defaultOpen?: boolean; 
+  initialNavigation?: NavigationBootstrap | null;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -127,7 +130,7 @@ export function ClientRoot({
           <NotificationProvider>
             <NotificationListener />
             <SidebarProvider defaultOpen={defaultOpen}>
-              <AppSidebar />
+              <AppSidebar initialNavigation={initialNavigation} />
               <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-y-auto max-h-screen h-screen">
                 <header className="sticky top-0 z-40 flex h-[46px] min-h-[46px] shrink-0 items-center gap-2 border-b border-[#1a4fa0] dark:border-[#0f2d6b] bg-[#1a4fa0] dark:bg-[#0f2d6b] px-4 shadow-sm">
                   <SidebarTrigger className="-ml-1 text-white hover:bg-white/10 hover:text-white" />

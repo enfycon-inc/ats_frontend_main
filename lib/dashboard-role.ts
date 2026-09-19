@@ -2,8 +2,8 @@ import { CustomRoleDefinition, resolveActiveSystemRole } from "./role-permission
 import { getSavedDashboardRole } from "./dashboard-preference";
 
 // A dashboard perspective is presentation only. API permissions remain authoritative.
-export function getDashboardRoleSelection(profile: any, roles: CustomRoleDefinition[], override?: string | null) {
-  override = getSavedDashboardRole(profile) || override;
+export function getDashboardRoleSelection(profile: any, roles: CustomRoleDefinition[], override?: string | null, readBrowserPreference = true) {
+  if (readBrowserPreference) override = getSavedDashboardRole(profile) || override;
   const ids: string[] = Array.isArray(profile?.assignedRoleIds) ? profile.assignedRoleIds : [];
   const assignedIds = new Set(ids.length ? ids : [profile?.roleId].filter(Boolean));
   let options = roles.filter(role => assignedIds.has(role.id));

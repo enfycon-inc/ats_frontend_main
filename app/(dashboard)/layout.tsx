@@ -2,7 +2,10 @@ import { ClientRoot } from "@/app/client-root";
 import { auth } from "@/auth";
 import { SessionProvider } from "next-auth/react";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
+import { getApiBase } from "@/lib/ats-api";
+import { loadNavigationBootstrap } from "@/lib/navigation-bootstrap";
+import { dashboardPreferenceCookie } from "@/lib/dashboard-preference";
 import { getBaseDomain, getCurrentSubdomain } from "@/utils/subdomain-helper";
 
 // Fetch session with a safe timeout so a slow auth provider never hangs the route
@@ -63,9 +66,19 @@ export default async function DashboardLayout({
     redirect("/auth/login");
   }
 
+  const initialNavigation = await loadNavigationBootstrap(getApiBase(), (session as any)?.user?.accessToken || "");
+  const cookieStore = await cookies();
+  if (initialNavigation) {
+    const key = dashboardPreferenceCookie(initialNavigation.profile);
+    const saved = key ? cookieStore.get(key)?.value : null;
+    if (saved) {
+      try { initialNavigation.overrideRole = decodeURIComponent(saved); } catch { /* Ignore malformed preferences. */ }
+    }
+  }
+
   return (
     <SessionProvider session={session}>
-      <ClientRoot>{children}</ClientRoot>
+      <ClientRoot initialNavigation={initialNavigation} defaultOpen={cookieStore.get("sidebar_state")?.value !== "false"}>{children}</ClientRoot>
     </SessionProvider>
   );
 }
