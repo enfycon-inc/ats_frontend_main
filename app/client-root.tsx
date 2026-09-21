@@ -114,17 +114,17 @@ export function ClientRoot({
     (pathname?.startsWith("/clients") && !pathname.endsWith("/new"));
 
   // Main content block used by both layouts
-  // Height offset: 46px (TopNavbar) + 40px (SitePageHeader) = 86px
+  // Height offset: 46px (TopNavbar) + 50px (SitePageHeader) = 96px
   const MainContent = (
     <>
       {isViewportLocked ? (
-        <div className="flex flex-col h-[calc(100vh-86px)] max-h-[calc(100vh-86px)] overflow-hidden min-w-0 max-w-full">
+        <div className="flex flex-col h-[calc(100vh-96px)] max-h-[calc(100vh-96px)] overflow-hidden min-w-0 max-w-full">
           <div className="dashboard-body bg-neutral-50 dark:bg-[#1e2734] md:p-3 p-2 flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
             {children}
           </div>
         </div>
       ) : (
-        <div className="flex flex-col min-w-0 max-w-full overflow-x-hidden min-h-[calc(100vh-86px)] bg-neutral-50 dark:bg-[#1e2734]">
+        <div className="flex flex-col min-w-0 max-w-full overflow-x-hidden min-h-[calc(100vh-96px)] bg-neutral-50 dark:bg-[#1e2734]">
           <div className="dashboard-body md:p-6 p-4 flex-1 min-w-0 flex flex-col">
             {children}
           </div>
@@ -155,7 +155,7 @@ export function ClientRoot({
                     <NavbarRight />
                   </div>
                 </header>
-                <Suspense fallback={<div className="h-[40px] min-h-[40px] bg-white dark:bg-[#151c24] border-b border-neutral-200/80 dark:border-slate-800/80 shrink-0" />}>
+                <Suspense fallback={<div className="h-[50px] min-h-[50px] bg-white dark:bg-[#151c24] border-b border-slate-200/70 dark:border-slate-800/70 shrink-0" />}>
                   <SitePageHeader />
                 </Suspense>
                 {MainContent}

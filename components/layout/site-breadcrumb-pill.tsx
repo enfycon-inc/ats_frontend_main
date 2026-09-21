@@ -52,18 +52,18 @@ export function SiteBreadcrumbPill({
     <nav
       aria-label="Breadcrumb"
       className={cn(
-        "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-50/80 hover:bg-slate-50 dark:bg-slate-900/90 border border-slate-200/90 dark:border-slate-800 shadow-2xs text-xs font-medium text-slate-500 dark:text-slate-400 max-w-full overflow-x-auto select-none transition-colors",
+        "flex items-center gap-1.5 sm:gap-2 text-xs md:text-sm select-none",
         className
       )}
     >
-      {/* Unified Root Link: Home Icon + ATS */}
+      {/* Unified Root Link: Home Icon + ATS (EnfySync Reference) */}
       <Link
         href="/dashboard"
-        className="inline-flex items-center gap-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors shrink-0 group"
+        className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors shrink-0 group"
         title="Go to ATS Dashboard"
       >
-        <Home className="h-3.5 w-3.5 text-slate-400 group-hover:text-indigo-600 dark:text-slate-500 dark:group-hover:text-indigo-400 transition-colors" />
-        <span className="font-medium text-xs">ATS</span>
+        <Home className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300 transition-colors" />
+        <span className="font-normal text-xs md:text-[13px]">ATS</span>
       </Link>
 
       {/* Subsequent Breadcrumb Segments */}
@@ -72,12 +72,12 @@ export function SiteBreadcrumbPill({
 
         return (
           <React.Fragment key={`${crumb.label}-${idx}`}>
-            <ChevronRight className="h-3 w-3 text-slate-300 dark:text-slate-600 shrink-0 mx-0.5" />
+            <ChevronRight className="h-3.5 w-3.5 text-slate-400/80 dark:text-slate-500 shrink-0 mx-0.5" />
 
-            <div className="shrink-0">
+            <div className="shrink-0 flex items-center">
               {isLast ? (
                 <span
-                  className="font-semibold text-slate-700 dark:text-slate-200 truncate max-w-[200px] inline-block align-bottom"
+                  className="font-normal text-slate-700 dark:text-slate-200 truncate max-w-[240px] text-xs md:text-[13px]"
                   title={crumb.label}
                   aria-current="page"
                 >
@@ -86,13 +86,13 @@ export function SiteBreadcrumbPill({
               ) : crumb.href ? (
                 <Link
                   href={crumb.href}
-                  className="hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition-colors truncate max-w-[140px] inline-block align-bottom"
+                  className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors truncate max-w-[180px] text-xs md:text-[13px]"
                   title={crumb.label}
                 >
                   {crumb.label}
                 </Link>
               ) : (
-                <span className="text-slate-500 dark:text-slate-400 truncate max-w-[140px] inline-block align-bottom">
+                <span className="text-slate-500 dark:text-slate-400 truncate max-w-[180px] text-xs md:text-[13px]">
                   {crumb.label}
                 </span>
               )}
@@ -101,13 +101,12 @@ export function SiteBreadcrumbPill({
         );
       })}
 
-      {/* Subtle Divider and Refresh Button */}
-      <div className="h-3 w-[1px] bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0" />
+      {/* Refresh Button - separated with generous margin, exactly like EnfySync */}
       <button
         type="button"
         onClick={handleRefresh}
         title="Reload current page data"
-        className="p-0.5 rounded-full hover:bg-slate-200/60 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer shrink-0"
+        className="ml-3 sm:ml-4 p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
       >
         <RotateCw
           className={cn(
