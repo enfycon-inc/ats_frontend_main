@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/sidebar";
 import { PRIMARY_NAV_ITEMS, MORE_NAV_ITEMS, GLOBAL_ADMIN_NAV_ITEMS, GLOBAL_ADMIN_MORE_ITEMS } from "@/constants/navigation";
 import Link from "next/link";
+
 import { usePathname, useSearchParams } from "next/navigation";
 import { NavbarLogo } from "./navbar-logo";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -38,30 +39,45 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
     return currentUrl === href;
   };
   const [overrideRole, setOverrideRole] = useState<string | null>(initialNavigation?.overrideRole ?? null);
-  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>(initialNavigation?.roles ?? []);
-  const [liveProfile, setLiveProfile] = useState<any>(initialNavigation?.profile ?? null);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(!initialNavigation?.profile);
+  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>(() => {
+    if (initialNavigation?.roles && initialNavigation.roles.length > 0) return initialNavigation.roles;
+    if (typeof window !== "undefined") {
+      const cached = atsApi.auth.getCurrentUser();
+      if (Array.isArray(cached?.assignedRoles) && cached.assignedRoles.length > 0) {
+        return cached.assignedRoles;
+      }
+    }
+    return [];
+  });
+  const [liveProfile, setLiveProfile] = useState<any>(() => {
+    if (initialNavigation?.profile) return initialNavigation.profile;
+    if (typeof window !== "undefined") {
+      return atsApi.auth.getCurrentUser();
+    }
+    return null;
+  });
+  const [isLoadingProfile, setIsLoadingProfile] = useState(() => {
+    if (initialNavigation?.profile) return false;
+    if (typeof window !== "undefined" && atsApi.auth.getCurrentUser()) return false;
+    return true;
+  });
 
   useEffect(() => {
-    if (initialNavigation) return;
+    if (initialNavigation?.profile) return;
     let cancelled = false;
     Promise.all([atsApi.auth.me(), atsApi.auth.listRoles(undefined, true)]).then(([profile, roles]) => {
       if (cancelled) return;
-      // Commit together: never render a temporary menu from incomplete role data.
       setAvailableRoles(Array.isArray(roles) ? roles : []);
-      setLiveProfile(profile);
-        setIsLoadingProfile(false);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-    }, [initialNavigation]);
-
-    useEffect(() => {
-      if (!initialNavigation && !liveProfile) {
-        // Fallback timeout to stop showing skeletons if network completely fails
-        const t = setTimeout(() => setIsLoadingProfile(false), 5000);
-        return () => clearTimeout(t);
+      if (profile) {
+        setLiveProfile(profile);
+        try { localStorage.setItem("ats_current_user", JSON.stringify(profile)); } catch {}
       }
-    }, [initialNavigation, liveProfile]);
+      setIsLoadingProfile(false);
+    }).catch(() => {
+      if (!cancelled) setIsLoadingProfile(false);
+    });
+    return () => { cancelled = true; };
+  }, [initialNavigation]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -96,6 +112,9 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
     return userProfile ? getFilteredMoreNav(activeRoleName, availableRoles, userProfile) : [];
   }, [activeRoleName, availableRoles, userProfile]);
 
+  const isPrimaryLoading = isLoadingProfile || filteredPrimaryNav.length === 0;
+  const isMoreLoading = isLoadingProfile || filteredMoreNav.length === 0;
+
   return (
     <Sidebar collapsible="icon" className="border-r border-default-200 dark:border-slate-800">
       <SidebarHeader className="h-[46px] min-h-[46px] max-h-[46px] px-3 bg-[#1a4fa0] dark:bg-[#0f2d6b] border-b border-[#1545a0]/40 dark:border-[#0a2050]/60 flex items-center justify-center group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:h-[46px] transition-colors">
@@ -104,10 +123,10 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
       
       <SidebarContent>
         <SidebarGroup>
-          {!isLoadingProfile && <SidebarGroupLabel>Main Navigation</SidebarGroupLabel>}
+          {!isPrimaryLoading && <SidebarGroupLabel>Main Navigation</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>
-              {isLoadingProfile ? Array.from({ length: 5 }).map((_, i) => (
+              {isPrimaryLoading ? Array.from({ length: 5 }).map((_, i) => (
                   <SidebarMenuItem key={`skel-${i}`}>
                     <div className="flex items-center gap-3 px-3 py-2">
                       <Skeleton className="h-5 w-5 rounded-md bg-default-200 dark:bg-slate-800" />
@@ -161,10 +180,10 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
         </SidebarGroup>
 
         <SidebarGroup>
-          {!isLoadingProfile && <SidebarGroupLabel>More Options</SidebarGroupLabel>}
+          {!isMoreLoading && <SidebarGroupLabel>More Options</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>
-              {isLoadingProfile ? Array.from({ length: 3 }).map((_, i) => (
+              {isMoreLoading ? Array.from({ length: 3 }).map((_, i) => (
                   <SidebarMenuItem key={`skel-more-${i}`}>
                     <div className="flex items-center gap-3 px-3 py-2">
                       <Skeleton className="h-5 w-5 rounded-md bg-default-200 dark:bg-slate-800" />
