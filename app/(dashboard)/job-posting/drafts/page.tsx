@@ -1,4 +1,5 @@
 import JobPostingDashboard from "../components/job-posting-dashboard";
+import JobPostingSkeleton from "../components/job-posting-skeleton";
 import { Suspense } from "react";
 
 export const metadata = {
@@ -8,7 +9,7 @@ export const metadata = {
 
 export default function DraftJobsPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-xs text-neutral-400">Loading Draft Jobs...</div>}>
+    <Suspense fallback={<JobPostingSkeleton />}>
       <JobPostingDashboard initialStatusFilter="Draft" />
     </Suspense>
   );

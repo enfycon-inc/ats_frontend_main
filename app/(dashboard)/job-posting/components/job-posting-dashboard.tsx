@@ -9,6 +9,7 @@ import DataTable from "./data-table";
 import { PendingDelegationRequests } from "./pending-delegation-requests";
 import FilterDrawer, { SelectedFilters } from "./filter-drawer";
 import ColumnDrawer from "./column-drawer";
+import JobPostingSkeleton from "./job-posting-skeleton";
 import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
 import {
@@ -637,6 +638,10 @@ export default function JobPostingDashboard({
     toast.success("Column order updated!");
   }, []);
 
+  if (isLoading) {
+    return <JobPostingSkeleton />;
+  }
+
   return (
     <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
       {showBranchTabs && (
@@ -692,15 +697,8 @@ export default function JobPostingDashboard({
         </div>
       )}
       {/* Main Table Content */}
-      {isLoading ? (
-        <div className="flex-1 flex flex-col items-center justify-center min-h-[40vh] gap-3">
-          <Loader2 className="h-8 w-8 text-primary animate-spin" />
-          <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">Loading requirement pipelines...</p>
-        </div>
-      ) : (
-        <>
-          {showBranchTabs && dashboardTab === "shared" && <PendingDelegationRequests onRefresh={handleRefresh} />}
-          <DataTable
+      {showBranchTabs && dashboardTab === "shared" && <PendingDelegationRequests onRefresh={handleRefresh} />}
+      <DataTable
             data={displayJobs}
             selectedColumns={activeSelectedColumns}
             allColumns={allColumns}
@@ -716,8 +714,6 @@ export default function JobPostingDashboard({
             onUpdateJob={handleUpdateJob}
             onReorderColumns={handleReorderColumns}
           />
-        </>
-      )}
 
       {/* Slide-over Filter Panel */}
       <FilterDrawer
