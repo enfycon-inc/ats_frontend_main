@@ -1360,7 +1360,7 @@ export default function DataTable({
     // 3. Created By Filter (role-agnostic, multi-tenant compatible)
     
     if (selectedBranch !== "All") {
-      filtered = filtered.filter((j) => {
+      result = result.filter((j) => {
         const branch = j.businessUnit || j.branchName;
         return branch === selectedBranch;
       });
