@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useMemo, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
@@ -945,6 +944,14 @@ export default function SubmissionsPage() {
     loadData(false);
   }, [viewParam]);
 
+  useEffect(() => {
+    const handleAppRefresh = () => {
+      loadData(true);
+    };
+    window.addEventListener("app:refresh", handleAppRefresh);
+    return () => window.removeEventListener("app:refresh", handleAppRefresh);
+  }, [viewParam]);
+
   const loadData = async (showLoading: boolean | any = true) => {
     try {
       const shouldShowLoading = typeof showLoading === "boolean" ? showLoading : true;
@@ -1549,8 +1556,6 @@ export default function SubmissionsPage() {
     <div className="relative min-h-screen">
       {/* Main View Area */}
       <div className={`transition-all duration-300 ${panelOpen ? "pr-[440px]" : ""}`}>
-        <SiteBreadcrumb />
-
         {/* HEADER */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-default-100 pb-5 mt-2">
           <div>

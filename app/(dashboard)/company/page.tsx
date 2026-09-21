@@ -34,7 +34,6 @@ import {
   Target
 } from "lucide-react";
 import toast from "react-hot-toast";
-import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { getBaseDomain } from "@/utils/subdomain-helper";
 import { isRoleAdmin, resolveActiveSystemRole, CustomRoleDefinition } from "@/lib/role-permissions";
 import { EmailDispatchCard } from "@/components/company/email-dispatch-card";
@@ -381,8 +380,6 @@ export default function CompanySettingsPage() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-neutral-100 dark:bg-[#1e2734]">
-      <SiteBreadcrumb />
-
       {/* Role-Specific Settings View Rendering */}
       {systemRole === "ADMIN" || systemRole === "TENANT_ADMIN" || systemRole === "SUPER_ADMIN" ? (
         <TenantAdminSettingsView

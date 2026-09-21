@@ -1,60 +1,25 @@
-'use client';
-import React from 'react'
-import Link from 'next/link';
-import { usePathname, useRouter } from "next/navigation";
-import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Icon } from "@/components/ui/icon"
-import { ReactNode } from "react";
+"use client";
 
+import React, { ReactNode } from "react";
+import { SiteBreadcrumbPill } from "./layout/site-breadcrumb-pill";
+import { SitePageHeader } from "./layout/site-page-header";
+
+/**
+ * SiteBreadcrumb is now superseded by the global SitePageHeader rendered in client-root.tsx.
+ * To maintain 100% backward compatibility with legacy page calls, if children are passed,
+ * they will be rendered in a flex container; otherwise it renders null to prevent duplicate breadcrumbs.
+ */
 const SiteBreadcrumb = ({ children }: { children?: ReactNode }) => {
-    const location = usePathname();
-    const locations = location.split('/').filter(path => path)
+  if (!children) {
+    return null;
+  }
 
-    return (
-        <div className="flex justify-between gap-3 items-center mb-6">
-            <div className="flex-1">
-                <Breadcrumb>
-                    <BreadcrumbList>
-
-                        <BreadcrumbItem>
-                            <Link href="/dashboard">
-                                <Icon icon="heroicons:house" className="h-5 w-5" />
-                            </Link>
-                        </BreadcrumbItem>
-                        <BreadcrumbSeparator />
-
-                        {
-                            locations.map((link, index) => {
-                                let href = `/${locations.slice(0, index + 1).join('/')}`
-                                let itemLink = link
-                                const isLast = index === locations.length - 1;
-                                return (
-                                    <React.Fragment key={index}>
-                                        <BreadcrumbItem className='capitalize'>
-                                            {isLast ? (
-                                                itemLink
-                                            ) : (
-                                                <Link href={href}>{itemLink}</Link>
-                                            )}
-                                        </BreadcrumbItem>
-                                        {locations.length !== index + 1 && <BreadcrumbSeparator />}
-                                    </React.Fragment>
-                                )
-                            })
-                        }
-                    </BreadcrumbList>
-                </Breadcrumb>
-            </div>
-            <div className="flex-none flex gap-2">{children}</div>
-        </div>
-    );
+  return (
+    <div className="flex justify-end gap-2 items-center mb-4">
+      {children}
+    </div>
+  );
 };
 
+export { SiteBreadcrumbPill, SitePageHeader };
 export default SiteBreadcrumb;

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -280,7 +279,6 @@ export default function DictionariesPage() {
       {/* ── Breadcrumb & Header ────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <SiteBreadcrumb />
           <h1 className="text-xl font-extrabold text-neutral-800 dark:text-neutral-100 flex items-center gap-2 mt-1">
             <Database className="h-5 w-5 text-primary" />
             Master Dictionary & Normalization Manager

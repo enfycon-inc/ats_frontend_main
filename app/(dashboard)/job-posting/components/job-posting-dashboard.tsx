@@ -590,6 +590,14 @@ export default function JobPostingDashboard({
     toast.success("Jobs list reloaded.");
   }, [fetchJobs, defaultViewLabel]);
 
+  useEffect(() => {
+    const handleAppRefresh = () => {
+      fetchJobs();
+    };
+    window.addEventListener("app:refresh", handleAppRefresh);
+    return () => window.removeEventListener("app:refresh", handleAppRefresh);
+  }, [fetchJobs]);
+
   // Productivity Metrics
 
   const displayJobs = useMemo(() => {

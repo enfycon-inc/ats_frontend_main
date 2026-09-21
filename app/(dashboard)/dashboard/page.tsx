@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
-import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
@@ -107,6 +106,15 @@ export default function DashboardPage() {
     loadData();
     return () => { cancelled = true; };
   }, [status, profile?.id, profile?.tenantId, canViewJobs, jobsRequest]);
+
+  useEffect(() => {
+    const handleAppRefresh = () => {
+      reload();
+      setJobsRequest((v) => v + 1);
+    };
+    window.addEventListener("app:refresh", handleAppRefresh);
+    return () => window.removeEventListener("app:refresh", handleAppRefresh);
+  }, [reload]);
 
   const handleUpdateJob = async (jobId: string, updatedFields: Partial<any>) => {
     // 1. Optimistic update
@@ -218,12 +226,8 @@ export default function DashboardPage() {
   const activeJobs = jobs.filter(j => j.jobStatus === "Active");
   const highPriorityJobs = activeJobs.filter(j => j.priority === "Hot" || j.priority === "High" || j.priority === "Urgent");
 
-
-
   return (
     <div className="space-y-6">
-      <SiteBreadcrumb />
-
       {/* Workspace Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
         <div>

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
-import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
@@ -327,7 +326,6 @@ export default function ApprovalsPage() {
   if (loading) {
     return (
       <div>
-        <SiteBreadcrumb />
         <div className="flex flex-col items-center justify-center min-h-[300px]">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
           <p className="mt-4 text-sm text-default-500">Loading configurations...</p>
@@ -339,7 +337,6 @@ export default function ApprovalsPage() {
   if (!isAdmin && !isBranchAdmin) {
     return (
       <div>
-        <SiteBreadcrumb />
         <Card className="border border-red-500/20 bg-red-950/10 max-w-2xl mx-auto mt-10">
           <CardContent className="p-8 text-center">
             <div className="inline-flex h-12 w-12 rounded-full bg-red-500/10 text-red-500 items-center justify-center text-2xl mb-4">
@@ -357,8 +354,6 @@ export default function ApprovalsPage() {
 
   return (
     <div>
-      <SiteBreadcrumb />
-      
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-default-900 flex items-center gap-2">

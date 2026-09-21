@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -83,8 +82,6 @@ function IntegrationCard({
 export default function IntegrationsHubPage() {
   return (
     <div className="space-y-6 pb-12">
-      <SiteBreadcrumb />
-
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 rounded-2xl shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1.5 z-10">

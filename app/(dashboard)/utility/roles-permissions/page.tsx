@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
-import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
@@ -707,7 +706,6 @@ export default function RolesPermissionsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <SiteBreadcrumb />
         <div className="flex flex-col items-center justify-center min-h-[400px]">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
           <p className="mt-4 text-xs font-semibold text-default-500">Loading custom role registry...</p>
@@ -719,7 +717,6 @@ export default function RolesPermissionsPage() {
   if (!isAdmin) {
     return (
       <div>
-        <SiteBreadcrumb />
         <Card className="border border-red-500/20 bg-red-950/10 max-w-2xl mx-auto mt-10">
           <CardContent className="p-8 text-center">
             <div className="inline-flex h-12 w-12 rounded-full bg-red-500/10 text-red-500 items-center justify-center text-2xl mb-4">
@@ -737,8 +734,6 @@ export default function RolesPermissionsPage() {
 
   return (
     <div className="space-y-5">
-      <SiteBreadcrumb />
-
       {/* ─── PAGE HEADER & TOOLBAR ─────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-default-150 pb-5">
         <div>
