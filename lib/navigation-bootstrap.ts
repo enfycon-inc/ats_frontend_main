@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { CustomRoleDefinition } from "./role-permissions";
 
 export type NavigationBootstrap = {
@@ -20,7 +21,7 @@ export async function loadDashboardNavigation(
 }
 
 // Request-local data only: never cache one member's navigation for another.
-export async function loadNavigationBootstrap(base: string, token: string): Promise<NavigationBootstrap | null> {
+export const loadNavigationBootstrap = cache(async function(base: string, token: string): Promise<NavigationBootstrap | null> {
   if (!token) return null;
   try {
     const signal = AbortSignal.timeout(8000);
@@ -35,4 +36,4 @@ export async function loadNavigationBootstrap(base: string, token: string): Prom
     };
     return await loadDashboardNavigation(() => get("/api/auth/me"), () => get("/api/auth/rbac/roles?includeSystem=true"));
   } catch { return null; }
-}
+});
