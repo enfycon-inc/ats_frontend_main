@@ -120,7 +120,7 @@ export default function AdminDashboardView({ profile, jobs, activeJobs }: { prof
               </div>
               <div>
                 <p className="text-xs font-bold text-default-500 uppercase tracking-wider mb-1">Global Active Jobs</p>
-                <div className="text-2xl font-black text-slate-900 dark:text-white">{activeJobs.length}</div>
+                <div className="text-2xl font-black text-slate-900 dark:text-white">{isLoadingBranches ? <Skeleton className="h-8 w-12" /> : activeJobs.length}</div>
               </div>
             </div>
           </CardContent>
@@ -135,7 +135,7 @@ export default function AdminDashboardView({ profile, jobs, activeJobs }: { prof
               <div>
                 <p className="text-xs font-bold text-default-500 uppercase tracking-wider mb-1">Staff / Seat Usage</p>
                 <div className="text-2xl font-black text-slate-900 dark:text-white">
-                  {users.length > 0 ? users.length : (isLoadingBranches ? <Skeleton className="h-8 w-16 inline-block" /> : "0")} <span className="text-sm font-semibold text-default-400">/ {seatLimit}</span>
+                  {isLoadingBranches ? <Skeleton className="h-8 w-24 inline-block" /> : <>{users.length > 0 ? users.length : "0"} <span className="text-sm font-semibold text-default-400">/ {seatLimit}</span></>}
                 </div>
               </div>
             </div>
@@ -151,7 +151,7 @@ export default function AdminDashboardView({ profile, jobs, activeJobs }: { prof
               <div>
                 <p className="text-xs font-bold text-default-500 uppercase tracking-wider mb-1">Total Pipeline</p>
                 <div className="text-2xl font-black text-slate-900 dark:text-white">
-                  {jobs.reduce((acc, job) => acc + (job.submissionsCount || 0), 0)}
+                  {isLoadingBranches ? <Skeleton className="h-8 w-12" /> : jobs.reduce((acc, job) => acc + (job.submissionsCount || 0), 0)}
                 </div>
               </div>
             </div>
