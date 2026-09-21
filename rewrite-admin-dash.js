@@ -1,4 +1,8 @@
 
+const fs = require("fs");
+const path = require("path");
+
+const content = `
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -6,7 +10,6 @@ import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { atsApi } from "@/lib/ats-api";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -23,7 +26,7 @@ export default function AdminDashboardView({ profile, jobs, activeJobs }: { prof
     let cancelled = false;
     // Fetch users and branches in the background for global metrics
     Promise.all([
-      atsApi.auth.listUsers().catch(() => []),
+      atsApi.auth.fetchUsers().catch(() => []),
       atsApi.branches.list().catch(() => [])
     ]).then(([u, b]) => {
       if (!cancelled) {
@@ -254,20 +257,20 @@ export default function AdminDashboardView({ profile, jobs, activeJobs }: { prof
                     </td>
                     <td className="p-3">
                       <div className="font-semibold text-indigo-600 dark:text-indigo-400 text-[13px]">{job.jobTitle || "Untitled"}</div>
-                      <div className="text-[10px] text-default-500 font-mono mt-0.5">{job.jobCode || "--"}</div>
+                      <div className="text-[10px] text-default-500 font-mono mt-0.5">{job.jobCode || "?""}</div>
                     </td>
-                    <td className="p-3 text-default-700 text-xs">{job.client || "--"}</td>
+                    <td className="p-3 text-default-700 text-xs">{job.client || "?""}</td>
                     <td className="p-3">
                       <span className={cn(
                         "text-[10px] px-2 py-0.5 rounded-full font-bold",
                         job.jobStatus === "Active" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
                         "bg-default-100 text-default-600 dark:bg-slate-800 dark:text-default-300"
                       )}>
-                        {job.jobStatus || "--"}
+                        {job.jobStatus || "?""}
                       </span>
                     </td>
                     <td className="p-3 text-default-500 text-xs">
-                      {job.createdOn ? new Date(job.createdOn).toLocaleDateString() : "--"}
+                      {job.createdOn ? new Date(job.createdOn).toLocaleDateString() : "?""}
                     </td>
                   </tr>
                 ))
@@ -279,3 +282,8 @@ export default function AdminDashboardView({ profile, jobs, activeJobs }: { prof
     </div>
   );
 }
+`;
+
+fs.writeFileSync(path.join(__dirname, "app/(dashboard)/dashboard/components/admin-dashboard-view.tsx"), content);
+console.log("Written completely new admin-dashboard-view.tsx!");
+
