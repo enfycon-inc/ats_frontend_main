@@ -17,7 +17,8 @@ const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 export default function AdminDashboardView({ profile, jobs, activeJobs }: { profile: any; jobs: any[]; activeJobs: any[] }) {
   const [users, setUsers] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
-  const [seatLimit, setSeatLimit] = useState<number | string>("Unlimited");
+  const [isLoadingBranches, setIsLoadingBranches] = useState(true);
+  const seatLimit = profile?.userLimit || "Unlimited";
 
   useEffect(() => {
     let cancelled = false;
@@ -29,14 +30,11 @@ export default function AdminDashboardView({ profile, jobs, activeJobs }: { prof
       if (!cancelled) {
         setUsers(Array.isArray(u) ? u : []);
         setBranches(Array.isArray(b) ? b : []);
+        setIsLoadingBranches(false);
       }
     });
     
-    // Attempt to fetch tenant profile to get seat limit
-    atsApi.fetch("/api/auth/tenant-profile").then(res => {
-      if (!cancelled && res && res.seatLimit) setSeatLimit(res.seatLimit);
-    }).catch(() => {});
-    
+        
     return () => { cancelled = true; };
   }, []);
 
@@ -105,7 +103,7 @@ export default function AdminDashboardView({ profile, jobs, activeJobs }: { prof
               </div>
               <div>
                 <p className="text-xs font-bold text-default-500 uppercase tracking-wider mb-1">Active Branches</p>
-                <div className="text-2xl font-black text-slate-900 dark:text-white">{branches.length || branchMetrics.length}</div>
+                <div className="text-2xl font-black text-slate-900 dark:text-white">{isLoadingBranches ? "--" : branches.length}</div>
               </div>
             </div>
           </CardContent>
