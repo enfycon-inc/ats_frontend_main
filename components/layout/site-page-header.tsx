@@ -27,8 +27,10 @@ export function SitePageHeader({ className, customTitle }: SitePageHeaderProps) 
   const handleBack = () => {
     if (routeInfo.backHref) {
       router.push(routeInfo.backHref);
-    } else {
+    } else if (typeof window !== "undefined" && window.history.length > 1) {
       router.back();
+    } else {
+      router.push("/dashboard");
     }
   };
 
@@ -41,17 +43,17 @@ export function SitePageHeader({ className, customTitle }: SitePageHeaderProps) 
     >
       {/* Left side: Back Button & Page Title with EnfySync typography */}
       <div className="flex items-center gap-2.5 min-w-0">
-        {routeInfo.showBackButton && !isDashboard ? (
+        {!isDashboard && (
           <button
             type="button"
             onClick={handleBack}
-            className="p-1.5 -ml-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            className="p-1.5 -ml-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
             title="Go back"
             aria-label="Go back"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-        ) : null}
+        )}
 
         <h1 className="text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight truncate max-w-[280px] sm:max-w-[420px] md:max-w-[600px]">
           {displayTitle}

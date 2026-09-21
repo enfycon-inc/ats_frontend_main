@@ -58,7 +58,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Job Posting", href: "/job-posting" },
         { label, isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -187,7 +188,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Recruitment", href: "/utility/submissions" },
         { label: subTitle, isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -200,7 +202,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Candidates", href: "/applicants" },
         { label: "All Candidates", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -238,7 +241,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Candidates", href: "/applicants" },
         { label: "Pipeline", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/applicants",
     };
   }
 
@@ -318,7 +322,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Clients", href: "/clients" },
         { label: "All Clients", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -414,7 +419,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Placements", href: "/placements" },
         { label: "Active Placements", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -466,7 +472,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Talent Bench", href: "/talent-bench" },
         { label: "Bench Candidates", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -505,7 +512,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Vendors", href: "/vendors" },
         { label: "Vendor List", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -544,7 +552,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Onboarding", href: "/onboarding" },
         { label: "New Hires", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -570,7 +579,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Reports", href: "/reports" },
         { label: "Recruitment Analytics", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -598,7 +608,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Management", href: "/management/branch" },
         { label: "Branch Management", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -610,7 +621,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Management", href: "/utility/approvals" },
         { label: "Tenant Approvals", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -622,7 +634,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Management", href: "/utility/users" },
         { label: "Users & Teams", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -634,7 +647,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Management", href: "/utility/roles-permissions" },
         { label: "Roles & Permissions", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -646,7 +660,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Management", href: "/utility/pods" },
         { label: "Recruitment Pods", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -658,7 +673,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Management", href: "/utility/dictionaries" },
         { label: "Master Dictionaries", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -671,7 +687,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Operations", href: "/utility/notifications" },
         { label: "Activity Stream", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -683,7 +700,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Operations", href: "/utility/audit-logs" },
         { label: "Audit Logs", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -696,7 +714,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Settings", href: "/company" },
         { label: "Company & Workspace", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -748,7 +767,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Tools", href: "/email" },
         { label: "Mass Mail", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -760,7 +780,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Tools", href: "/calendar" },
         { label: "Calendar", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -772,7 +793,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Tools", href: "/documents" },
         { label: "Documents", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -784,7 +806,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Tools", href: "/database" },
         { label: "Candidate Database", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -797,7 +820,8 @@ export function getRouteBreadcrumbInfo(
         { label: "Integrations", href: "/integrations" },
         { label: "Overview", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
@@ -823,7 +847,8 @@ export function getRouteBreadcrumbInfo(
         { label: "User", href: "/view-profile" },
         { label: "Profile", isCurrent: true },
       ],
-      showBackButton: false,
+      showBackButton: true,
+      backHref: "/dashboard",
     };
   }
 
