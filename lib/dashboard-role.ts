@@ -17,18 +17,26 @@ export function getDashboardRoleSelection(profile: any, roles: CustomRoleDefinit
     options.find(role => role.name.toLowerCase() === override?.toLowerCase());
     
   const fallback = options.find(r => {
-    const sys = resolveActiveSystemRole(r.systemRole || r.replacesSystemRole || r.name, roles, profile);
+    const sys = resolveActiveSystemRole(r.systemRole || (r as any).replacesSystemRole || r.name, roles, profile);
     return sys === "SUPER_ADMIN" || sys === "ADMIN" || sys === "TENANT_ADMIN";
   }) || options[0];
 
-  const active = selected || primary || fallback || {
+  // When options is empty (roles haven't loaded yet), build a synthetic role
+  // directly from the profile's DB-sourced fields so the sidebar renders the
+  // correct layout immediately — no UUID lookup needed.
+  const syntheticFallback = {
     id: profile?.roleId || "",
-    name: profile?.roleName || "User",
-    systemRole: profile?.systemRole,
+    name: profile?.roleName || profile?.systemRole || "User",
+    // Ensure systemRole is always populated from the profile so the sidebar
+    // can resolve the correct menu without needing availableRoles to be loaded.
+    systemRole: profile?.systemRole || undefined,
   };
+
+  const active = selected || primary || fallback || syntheticFallback;
   return {
     options,
     active,
-    systemRole: resolveActiveSystemRole(active.systemRole || active.replacesSystemRole || active.name, roles, profile),
+    systemRole: resolveActiveSystemRole(active.systemRole || (active as any).replacesSystemRole || active.name, roles, profile),
   };
 }
+
