@@ -1555,14 +1555,13 @@ function SandboxSwitcher() {
 }
 
 function BranchSwitcher() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
   const { data: session } = useSession();
-  const [overrideRole, setOverrideRole] = useState<string | null>(() => {
+  const [activeBranch, setActiveBranch] = useState<string>("Domestic Branch");
+
+  const [overrideRole] = useState<string | null>(() => {
     if (typeof window !== "undefined") return localStorage.getItem("override_role");
     return null;
   });
-  const [activeBranch, setActiveBranch] = useState<string>("Domestic Branch");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -1580,284 +1579,46 @@ function BranchSwitcher() {
       }
     }
   }, []);
-  const [branches, setBranches] = useState<any[]>([]);
-  const cachedAllBranchesRef = useRef<any[]>([]);
-
-  const filterAndSetBranches = (allBranches: any[], roleOverride: string | null, userObj: any) => {
-    const sysRole = roleOverride || userObj?.systemRole || (userObj?.roles && userObj.roles[0]) || "RECRUITER";
-    const isTenantAdmin = sysRole === "ADMIN" || sysRole === "SUPER_ADMIN";
-
-    const assignedIds: string[] = Array.isArray(userObj?.assignedBranchIds) && userObj.assignedBranchIds.length > 0
-      ? userObj.assignedBranchIds
-      : userObj?.branchId ? [userObj.branchId] : [];
-
-    let allowedBranches = allBranches;
-    if (!isTenantAdmin) {
-      if (assignedIds.length > 0) {
-        allowedBranches = allBranches.filter((b: any) =>
-          assignedIds.includes(b.id) ||
-          (userObj?.branchId && b.id === userObj.branchId) ||
-          (userObj?.branchName && b.name.toLowerCase() === userObj.branchName.toLowerCase())
-        );
-      } else if (userObj?.branchId) {
-        allowedBranches = allBranches.filter((b: any) => b.id === userObj.branchId);
-      } else {
-        allowedBranches = allBranches.slice(0, 1);
-      }
-    }
-    setBranches(allowedBranches);
-    return allowedBranches;
-  };
-
-  useEffect(() => {
-    const handleRole = () => {
-      if (typeof window !== "undefined") {
-        const newRole = localStorage.getItem("override_role");
-        setOverrideRole(newRole);
-        if (cachedAllBranchesRef.current.length > 0) {
-          const user = atsApi.auth.getCurrentUser() || (session as any)?.user;
-          filterAndSetBranches(cachedAllBranchesRef.current, newRole, user);
-        }
-      }
-    };
-    window.addEventListener("overrideRoleChanged", handleRole);
-    return () => window.removeEventListener("overrideRoleChanged", handleRole);
-  }, [session]);
-
-  useEffect(() => {
-    loadLiveBranches();
-  }, []);
-
-  const loadLiveBranches = async () => {
-    let currentUser = atsApi.auth.getCurrentUser() || (session as any)?.user;
-
-    if (currentUser?.id) {
-      try {
-        const freshProfile = await atsApi.auth.getProfile(currentUser.id);
-        if (freshProfile) {
-          currentUser = { ...currentUser, ...freshProfile };
-          if (typeof window !== "undefined") {
-            atsApi.auth.setCurrentUser(currentUser);
-          }
-        }
-      } catch (e) {
-        // Fall back to cached user
-      }
-    }
-
-    const fallbackBranchName = currentUser?.branchName || "Domestic Branch";
-
-    try {
-      const data = await atsApi.branches.list();
-      if (Array.isArray(data) && data.length > 0) {
-        cachedAllBranchesRef.current = data;
-        const allowedBranches = filterAndSetBranches(data, overrideRole, currentUser);
-
-        let match = null;
-
-        const savedId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
-        if (savedId === "all") {
-          setActiveBranch("All Branches");
-          return;
-        }
-        if (savedId) {
-          match = allowedBranches.find((b: any) => b.id === savedId);
-        }
-
-        if (!match) {
-          const savedName = typeof window !== "undefined" ? localStorage.getItem("active_branch_name") : null;
-          if (savedName) {
-            match = allowedBranches.find((b: any) => b.name === savedName);
-          }
-        }
-
-        if (!match && currentUser?.branchId) {
-          match = allowedBranches.find((b: any) => b.id === currentUser.branchId);
-        }
-
-        if (!match && currentUser?.branchName) {
-          match = allowedBranches.find((b: any) => b.name?.toLowerCase() === currentUser.branchName.toLowerCase());
-        }
-
-        if (!match) {
-          match = allowedBranches[0];
-        }
-
-        if (match) {
-          setActiveBranch(match.name);
-          if (typeof window !== "undefined") {
-            const prevSavedId = localStorage.getItem("active_branch_id");
-            localStorage.setItem("active_branch_id", match.id);
-            localStorage.setItem("active_branch_name", match.name);
-            localStorage.setItem("active_branch_market", match.market || "INDIA");
-            localStorage.setItem("active_branch_timezone", match.timezone || (match.market === "US" ? "America/New_York" : "Asia/Kolkata"));
-            localStorage.setItem("active_branch_start_time", match.workStartTime || match.work_start_time || (match.market === "US" ? "09:00 AM" : "09:30 AM"));
-            localStorage.setItem("active_branch_end_time", match.workEndTime || match.work_end_time || (match.market === "US" ? "06:00 PM" : "06:30 PM"));
-            localStorage.setItem("active_branch_allow_pods", String(match.allowPods ?? (match.podsCount > 0 && match.allowPods !== false)));
-            if (prevSavedId && prevSavedId !== match.id) {
-              window.dispatchEvent(new Event("branchChanged"));
-            }
-          }
-        }
-      } else {
-        setActiveBranch(fallbackBranchName);
-      }
-    } catch (err) {
-      console.warn("Could not fetch branches:", err);
-      setActiveBranch(fallbackBranchName);
-    }
-  };
 
   const currentUser = typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null;
   const systemRole = overrideRole || currentUser?.systemRole || (session as any)?.user?.systemRole || "RECRUITER";
-  const perms: string[] = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
-  const isTenantAdmin = systemRole === "ADMIN" || systemRole === "SUPER_ADMIN" || perms.includes("tenant:settings") || perms.includes("tenant:manage");
-
-  // Rule: Only Tenant Admin or users assigned to multiple branches can switch branch context.
-  const canSwitchBranch = isTenantAdmin || branches.length > 1;
+  const perms = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+  const isTenantAdmin = systemRole === "ADMIN" || systemRole === "SUPER_ADMIN" || systemRole === "TENANT_ADMIN" || perms.includes("tenant:settings") || perms.includes("tenant:manage");
 
   useEffect(() => {
-    const handle = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    if (open) document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [open]);
-
-  const handleSelectBranch = (b: any) => {
-    if (typeof window !== "undefined") {
-      if (b.id === "all") {
+    if (isTenantAdmin && typeof window !== "undefined") {
+      const currentId = localStorage.getItem("active_branch_id");
+      if (currentId !== "all") {
         localStorage.setItem("active_branch_id", "all");
         localStorage.setItem("active_branch_name", "All Branches");
-        localStorage.removeItem("active_branch_market");
-        localStorage.removeItem("active_branch_timezone");
-        localStorage.removeItem("active_branch_start_time");
-        localStorage.removeItem("active_branch_end_time");
-        localStorage.removeItem("active_branch_allow_pods");
         window.dispatchEvent(new Event("branchChanged"));
-        setActiveBranch("All Branches");
-        window.location.reload();
-        setOpen(false);
-        return;
+        setTimeout(() => window.location.reload(), 50);
       }
-      localStorage.setItem("active_branch_id", b.id);
-      localStorage.setItem("active_branch_name", b.name);
-      localStorage.setItem("active_branch_market", b.market || "INDIA");
-      localStorage.setItem("active_branch_timezone", b.timezone || (b.market === "US" ? "America/New_York" : "Asia/Kolkata"));
-      localStorage.setItem("active_branch_start_time", b.workStartTime || b.work_start_time || (b.market === "US" ? "09:00 AM" : "09:30 AM"));
-      localStorage.setItem("active_branch_end_time", b.workEndTime || b.work_end_time || (b.market === "US" ? "06:00 PM" : "06:30 PM"));
-      localStorage.setItem("active_branch_allow_pods", String(b.allowPods ?? (b.podsCount > 0 && b.allowPods !== false)));
-      window.dispatchEvent(new Event("branchChanged"));
-      setActiveBranch(b.name);
-      window.location.reload();
     }
-    setOpen(false);
-  };
+  }, [isTenantAdmin]);
 
-  if (!canSwitchBranch) {
-    return (
-      <div 
-        title="Your branch context is assigned to your home office. Contact Tenant Admin for multi-branch access."
-        className="
-          flex items-center gap-1.5
-          h-7 px-2.5 rounded-lg
-          text-[11px] font-bold tracking-wide
-          bg-white/10 text-white/90
-          border border-white/15 shadow-2xs
-          cursor-default select-none
-        "
-      >
-        <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-indigo-200" />
-        <span suppressHydrationWarning>Office: {activeBranch}</span>
-      </div>
-    );
-  }
+  if (isTenantAdmin) return null;
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="
-          flex items-center gap-1.5
-          h-7 px-2.5 rounded-lg
-          text-[11px] font-bold tracking-wide
-          bg-white/12 hover:bg-white/20 text-white
-          transition-all duration-150
-          cursor-pointer whitespace-nowrap select-none
-          shadow-2xs border border-white/20 backdrop-blur-xs
-        "
-      >
-        <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-indigo-200" />
-        <span suppressHydrationWarning>Office: {activeBranch}</span>
-        <ChevronDown className={`w-3 h-3 text-indigo-200 opacity-90 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && (
-        <div
-          role="menu"
-          aria-label="Select Active Branch Context"
-          className="
-            absolute top-full right-0 mt-1.5 z-[350]
-            w-[230px]
-            bg-white dark:bg-slate-900
-            border border-neutral-200 dark:border-slate-800
-            rounded-xl shadow-xl shadow-black/20
-            py-1.5 overflow-hidden
-            animate-in fade-in-0 slide-in-from-top-2
-          "
-        >
-          {isTenantAdmin && (
-            <button
-              onClick={() => handleSelectBranch({ id: "all", name: "All Branches", city: "All Locations", market: "GLOBAL" })}
-              role="menuitem"
-              className={`
-                w-full text-left px-3 py-2 text-[12px] transition-all cursor-pointer flex justify-between items-center border-b border-neutral-100 dark:border-slate-800
-                ${activeBranch === "All Branches"
-                  ? "bg-indigo-50/90 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 font-bold border-l-2 border-indigo-600 dark:border-indigo-400"
-                  : "text-neutral-700 dark:text-slate-200 hover:bg-neutral-50 dark:hover:bg-slate-800/80 font-medium"
-                }
-              `}
-            >
-              <div className="flex flex-col">
-                <span className="font-bold">🌐 All Branches</span>
-                <span className="text-[9.5px] text-neutral-400 font-normal">Company-wide view</span>
-              </div>
-              {activeBranch === "All Branches" && (
-                <span className="h-2 w-2 rounded-full bg-indigo-600 dark:bg-indigo-400 shrink-0" />
-              )}
-            </button>
-          )}
-
-          {branches.map((b) => (
-            <button
-              key={b.id}
-              onClick={() => handleSelectBranch(b)}
-              role="menuitem"
-              className={`
-                w-full text-left px-3 py-2 text-[12px] transition-all cursor-pointer flex justify-between items-center
-                ${activeBranch === b.name
-                  ? "bg-indigo-50/90 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 font-bold border-l-2 border-indigo-600 dark:border-indigo-400"
-                  : "text-neutral-700 dark:text-slate-200 hover:bg-neutral-50 dark:hover:bg-slate-800/80 font-medium"
-                }
-              `}
-            >
-              <div className="flex flex-col">
-                <span className="font-bold">🏢 {b.name}</span>
-                <span className="text-[9.5px] text-neutral-400 font-normal">{b.city} • {b.market === "US" ? "US IT" : "Domestic India"}</span>
-              </div>
-              {activeBranch === b.name && (
-                <span className="h-2 w-2 rounded-full bg-indigo-600 dark:bg-indigo-400 shrink-0" />
-              )}
-            </button>
-          ))}
-        </div>
-      )}
+    <div 
+      title="Your branch context is fixed to your assigned home office."
+      className="
+        flex items-center gap-1.5
+        h-7 px-2.5 rounded-lg
+        text-[11px] font-bold tracking-wide
+        bg-white/10 text-white/90
+        border border-white/15 shadow-2xs
+        cursor-default select-none
+      "
+    >
+      <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-indigo-200" />
+      <span suppressHydrationWarning>Office: {activeBranch}</span>
     </div>
   );
 }
 
-// ─── Exported Right Section ───────────────────────────────────────────────────
-export function NavbarRight() {
+  // ---------------------------
+  export function NavbarRight() {
   return (
     <div className="flex items-center gap-1.5">
       <OfficeClock />
