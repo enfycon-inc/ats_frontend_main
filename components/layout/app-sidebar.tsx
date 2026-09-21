@@ -107,8 +107,8 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
               {isLoadingProfile ? Array.from({ length: 5 }).map((_, i) => (
                   <SidebarMenuItem key={`skel-${i}`}>
                     <div className="flex items-center gap-3 px-3 py-2">
-                      <Skeleton className="h-5 w-5 rounded-md bg-white/10 dark:bg-white/5" />
-                      <Skeleton className="h-4 w-32 rounded bg-white/10 dark:bg-white/5" />
+                      <Skeleton className="h-5 w-5 rounded-md bg-default-200 dark:bg-slate-800" />
+                      <Skeleton className="h-4 w-32 rounded bg-default-200 dark:bg-slate-800" />
                     </div>
                   </SidebarMenuItem>
                 )) : filteredPrimaryNav.map((item) => (
@@ -164,8 +164,8 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
               {isLoadingProfile ? Array.from({ length: 3 }).map((_, i) => (
                   <SidebarMenuItem key={`skel-more-${i}`}>
                     <div className="flex items-center gap-3 px-3 py-2">
-                      <Skeleton className="h-5 w-5 rounded-md bg-white/10 dark:bg-white/5" />
-                      <Skeleton className="h-4 w-24 rounded bg-white/10 dark:bg-white/5" />
+                      <Skeleton className="h-5 w-5 rounded-md bg-default-200 dark:bg-slate-800" />
+                      <Skeleton className="h-4 w-24 rounded bg-default-200 dark:bg-slate-800" />
                     </div>
                   </SidebarMenuItem>
                 )) : filteredMoreNav.map((item) => (
