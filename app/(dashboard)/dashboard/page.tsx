@@ -26,13 +26,59 @@ import {
 } from "@/components/ui/dialog";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
-import GlobalAdminDashboardView from "./components/global-admin-dashboard-view";
-import BranchAdminDashboardView from "./components/branch-admin-dashboard-view";
-import AdminDashboardView from "./components/admin-dashboard-view";
-import AccountManagerDashboardView from "./components/account-manager-dashboard-view";
-import PodLeadDashboardView from "./components/pod-lead-dashboard-view";
-import DeliveryHeadDashboardView from "./components/delivery-head-dashboard-view";
-import RecruiterDashboardView from "./components/recruiter-dashboard-view";
+
+// ─── Lazy-loaded dashboard views ─────────────────────────────────────────────
+// Each role's view is its own JS chunk. Only the chunk for the active user's
+// role is downloaded, saving ~150-250 KB of parse time for every other user.
+const DashboardViewSkeleton = () => (
+  <div className="space-y-6 animate-pulse">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="bg-white dark:bg-slate-900 border border-default-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/20" />
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-3 w-24 rounded bg-default-100 dark:bg-slate-800" />
+              <Skeleton className="h-6 w-12 rounded-md bg-default-200 dark:bg-slate-700" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-default-200 dark:border-slate-800 rounded-xl p-5 h-[400px]">
+        <Skeleton className="h-6 w-48 rounded mb-6 bg-default-100 dark:bg-slate-800" />
+        <div className="space-y-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded bg-default-50 dark:bg-slate-800/50" />)}</div>
+      </div>
+      <div className="lg:col-span-1 bg-white dark:bg-slate-900 border border-default-200 dark:border-slate-800 rounded-xl p-5 h-[400px]">
+        <Skeleton className="h-6 w-32 rounded mb-6 bg-default-100 dark:bg-slate-800" />
+        <Skeleton className="h-[250px] w-full rounded bg-default-50 dark:bg-slate-800/50" />
+      </div>
+    </div>
+  </div>
+);
+
+const GlobalAdminDashboardView = dynamic(() => import("./components/global-admin-dashboard-view"), {
+  ssr: false, loading: () => <DashboardViewSkeleton />,
+});
+const BranchAdminDashboardView = dynamic(() => import("./components/branch-admin-dashboard-view"), {
+  ssr: false, loading: () => <DashboardViewSkeleton />,
+});
+const AdminDashboardView = dynamic(() => import("./components/admin-dashboard-view"), {
+  ssr: false, loading: () => <DashboardViewSkeleton />,
+});
+const AccountManagerDashboardView = dynamic(() => import("./components/account-manager-dashboard-view"), {
+  ssr: false, loading: () => <DashboardViewSkeleton />,
+});
+const PodLeadDashboardView = dynamic(() => import("./components/pod-lead-dashboard-view"), {
+  ssr: false, loading: () => <DashboardViewSkeleton />,
+});
+const DeliveryHeadDashboardView = dynamic(() => import("./components/delivery-head-dashboard-view"), {
+  ssr: false, loading: () => <DashboardViewSkeleton />,
+});
+const RecruiterDashboardView = dynamic(() => import("./components/recruiter-dashboard-view"), {
+  ssr: false, loading: () => <DashboardViewSkeleton />,
+});
 
 export default function DashboardPage() {
   const { profile, selection, status, error, reload } = useDashboardContext();

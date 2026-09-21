@@ -12,13 +12,27 @@ import { useSession } from "next-auth/react";
 
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
-import { NavbarRight } from "@/components/layout/navbar-right";
 import { TopNavbar } from "@/components/layout/top-navbar";
-import { GlobalErrorModal } from "@/components/shared/global-error-modal";
 import { SocketProvider } from "@/contexts/SocketContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
-import NotificationListener from "@/components/notifications/NotificationListener";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import dynamic from "next/dynamic";
+
+// Lazy-loaded: these components fire multiple API calls on mount and are not
+// needed for the first paint. Deferring them lets the sidebar and page content
+// render first, then the navbar dropdowns hydrate in the background.
+const NavbarRight = dynamic(
+  () => import("@/components/layout/navbar-right").then(m => ({ default: m.NavbarRight })),
+  { ssr: false, loading: () => <div className="flex items-center gap-1.5 h-8 w-40" /> }
+);
+const NotificationListener = dynamic(
+  () => import("@/components/notifications/NotificationListener"),
+  { ssr: false }
+);
+const GlobalErrorModal = dynamic(
+  () => import("@/components/shared/global-error-modal").then(m => ({ default: m.GlobalErrorModal })),
+  { ssr: false }
+);
 
 export function ClientRoot({
   children,
