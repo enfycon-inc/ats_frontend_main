@@ -101,7 +101,7 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
       
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Main Navigation</SidebarGroupLabel>
+          {!isLoadingProfile && <SidebarGroupLabel>Main Navigation</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>
               {isLoadingProfile ? Array.from({ length: 5 }).map((_, i) => (
@@ -158,7 +158,7 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>More Options</SidebarGroupLabel>
+          {!isLoadingProfile && <SidebarGroupLabel>More Options</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>
               {isLoadingProfile ? Array.from({ length: 3 }).map((_, i) => (
