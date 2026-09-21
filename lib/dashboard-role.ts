@@ -15,7 +15,13 @@ export function getDashboardRoleSelection(profile: any, roles: CustomRoleDefinit
   // Names are accepted for old saved switches; new switches persist exact IDs.
   const selected = options.find(role => role.id === override) ||
     options.find(role => role.name.toLowerCase() === override?.toLowerCase());
-  const active = selected || primary || options[0] || {
+    
+  const fallback = options.find(r => {
+    const sys = resolveActiveSystemRole(r.systemRole || r.replacesSystemRole || r.name, roles, profile);
+    return sys === "SUPER_ADMIN" || sys === "ADMIN" || sys === "TENANT_ADMIN";
+  }) || options[0];
+
+  const active = selected || primary || fallback || {
     id: profile?.roleId || "",
     name: profile?.roleName || "User",
     systemRole: profile?.systemRole,
