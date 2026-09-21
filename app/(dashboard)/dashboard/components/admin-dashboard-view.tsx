@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { atsApi } from "@/lib/ats-api";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -103,7 +104,9 @@ export default function AdminDashboardView({ profile, jobs, activeJobs }: { prof
               </div>
               <div>
                 <p className="text-xs font-bold text-default-500 uppercase tracking-wider mb-1">Active Branches</p>
-                <div className="text-2xl font-black text-slate-900 dark:text-white">{isLoadingBranches ? "--" : branches.length}</div>
+                <div className="text-2xl font-black text-slate-900 dark:text-white">
+                  {isLoadingBranches ? <Skeleton className="h-8 w-12" /> : branches.length}
+                </div>
               </div>
             </div>
           </CardContent>
@@ -132,7 +135,7 @@ export default function AdminDashboardView({ profile, jobs, activeJobs }: { prof
               <div>
                 <p className="text-xs font-bold text-default-500 uppercase tracking-wider mb-1">Staff / Seat Usage</p>
                 <div className="text-2xl font-black text-slate-900 dark:text-white">
-                  {users.length > 0 ? users.length : "--"} <span className="text-sm font-semibold text-default-400">/ {seatLimit}</span>
+                  {users.length > 0 ? users.length : (isLoadingBranches ? <Skeleton className="h-8 w-16 inline-block" /> : "0")} <span className="text-sm font-semibold text-default-400">/ {seatLimit}</span>
                 </div>
               </div>
             </div>

@@ -1,4 +1,5 @@
 "use client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import {
   Sidebar,
@@ -39,6 +40,7 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
   const [overrideRole, setOverrideRole] = useState<string | null>(initialNavigation?.overrideRole ?? null);
   const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>(initialNavigation?.roles ?? []);
   const [liveProfile, setLiveProfile] = useState<any>(initialNavigation?.profile ?? null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(!initialNavigation?.profile);
 
   useEffect(() => {
     if (initialNavigation) return;
@@ -48,9 +50,18 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
       // Commit together: never render a temporary menu from incomplete role data.
       setAvailableRoles(Array.isArray(roles) ? roles : []);
       setLiveProfile(profile);
+        setIsLoadingProfile(false);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [initialNavigation]);
+    }, [initialNavigation]);
+
+    useEffect(() => {
+      if (!initialNavigation && !liveProfile) {
+        // Fallback timeout to stop showing skeletons if network completely fails
+        const t = setTimeout(() => setIsLoadingProfile(false), 5000);
+        return () => clearTimeout(t);
+      }
+    }, [initialNavigation, liveProfile]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -93,7 +104,14 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
           <SidebarGroupLabel>Main Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {filteredPrimaryNav.map((item) => (
+              {isLoadingProfile ? Array.from({ length: 5 }).map((_, i) => (
+                  <SidebarMenuItem key={`skel-${i}`}>
+                    <div className="flex items-center gap-3 px-3 py-2">
+                      <Skeleton className="h-5 w-5 rounded-md bg-white/10 dark:bg-white/5" />
+                      <Skeleton className="h-4 w-32 rounded bg-white/10 dark:bg-white/5" />
+                    </div>
+                  </SidebarMenuItem>
+                )) : filteredPrimaryNav.map((item) => (
                 item.children ? (
                   <Collapsible
                     key={item.id}
@@ -143,7 +161,14 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
           <SidebarGroupLabel>More Options</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {filteredMoreNav.map((item) => (
+              {isLoadingProfile ? Array.from({ length: 3 }).map((_, i) => (
+                  <SidebarMenuItem key={`skel-more-${i}`}>
+                    <div className="flex items-center gap-3 px-3 py-2">
+                      <Skeleton className="h-5 w-5 rounded-md bg-white/10 dark:bg-white/5" />
+                      <Skeleton className="h-4 w-24 rounded bg-white/10 dark:bg-white/5" />
+                    </div>
+                  </SidebarMenuItem>
+                )) : filteredMoreNav.map((item) => (
                 item.children && item.children.length > 0 ? (
                   <Collapsible
                     key={item.id}
