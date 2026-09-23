@@ -801,22 +801,80 @@ export default function RolesPermissionsPage() {
 
       {/* ─── TABLE FILTER / SEARCH BAR ─────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 flex-wrap bg-white dark:bg-slate-900 p-3 rounded-xl border border-neutral-200 dark:border-slate-800 shadow-2xs">
-        <div className="relative flex-1 min-w-[240px] max-w-md">
-          <Icon icon="heroicons:magnifying-glass" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
-          <Input
-            placeholder="Search roles by name, archetype, branch, author..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 text-xs h-9 bg-neutral-50 dark:bg-slate-800 border-neutral-200 dark:border-slate-700"
-          />
+        <div className="relative flex-1 min-w-[240px] max-w-md flex items-center gap-2">
+          <div className="relative flex-1">
+            <Icon icon="heroicons:magnifying-glass" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+            <Input
+              placeholder="Search roles..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 text-xs h-9 bg-neutral-50 dark:bg-slate-800 border-neutral-200 dark:border-slate-700"
+            />
+          </div>
+          {!isBranchAdmin && (
+            <select
+              value={selectedBranchFilter}
+              onChange={(e) => handleBranchFilterChange(e.target.value)}
+              className="text-xs h-9 px-2 rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+            >
+              <option value="all">All Branches</option>
+              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          )}
+          <select
+            value={unitFilter}
+            onChange={(e) => setUnitFilter(e.target.value)}
+            className="text-xs h-9 px-2 rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+          >
+            <option value="all">All Units</option>
+            {businessUnits.filter(bu => selectedBranchFilter === "all" || bu.branchId === selectedBranchFilter).map(bu => <option key={bu.id} value={bu.id}>{bu.name}</option>)}
+          </select>
+          <select
+            value={archFilter}
+            onChange={(e) => setArchFilter(e.target.value)}
+            className="text-xs h-9 px-2 rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+          >
+            <option value="all">All Archetypes</option>
+            {SYSTEM_ARCHETYPES.map(arch => <option key={arch.key} value={arch.key}>{arch.label}</option>)}
+          </select>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-medium text-neutral-500">
-          <span>Showing <strong>{filteredRoles.length}</strong> of <strong>{customRolesList.length}</strong> custom roles</span>
+        <div className="flex items-center gap-4">
+          {selectedRoleIds.length > 0 && (
+            <div className="flex items-center gap-2 border-r border-neutral-200 dark:border-slate-700 pr-4">
+              <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                {selectedRoleIds.length} Selected
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-8 text-[11px] border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20 px-2 cursor-pointer"
+                onClick={() => {
+                  if(confirm(`Are you sure you want to delete ${selectedRoleIds.length} roles?`)) {
+                    setSubmitting(true);
+                    Promise.all(selectedRoleIds.map(id => atsApi.auth.deleteCustomRole(id)))
+                      .then(() => {
+                        toast.success(`Deleted ${selectedRoleIds.length} roles successfully!`);
+                        setSelectedRoleIds([]);
+                        loadData();
+                      })
+                      .catch(err => toast.error("Failed to delete some roles: " + err.message))
+                      .finally(() => setSubmitting(false));
+                  }
+                }}
+              >
+                <Icon icon="heroicons:trash" className="h-3.5 w-3.5 mr-1" />
+                Bulk Delete
+              </Button>
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-xs font-medium text-neutral-500">
+            <span>Showing <strong>{filteredRoles.length}</strong> of <strong>{customRolesList.length}</strong> custom roles</span>
+          </div>
         </div>
       </div>
 
-      {/* ─── UNIVERSAL ROLES TABLE ─────────────────────────────────────── */}
+      {/* ??? UNIVERSAL ROLES TABLE ??????????????????????????????????? */}
       <Card className="border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden rounded-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -872,7 +930,21 @@ export default function RolesPermissionsPage() {
                       key={role.id}
                       className="hover:bg-neutral-50/60 dark:hover:bg-slate-800/30 transition-colors group"
                     >
-                      {/* 1. ROLE NAME */}
+                        <td className="py-3.5 px-4 text-center">
+                          <input
+                            type="checkbox"
+                            className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            checked={selectedRoleIds.includes(role.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRoleIds([...selectedRoleIds, role.id]);
+                              } else {
+                                setSelectedRoleIds(selectedRoleIds.filter(id => id !== role.id));
+                              }
+                            }}
+                          />
+                        </td>
+                        {/* 1. ROLE NAME */}
                       <td className="py-3.5 px-4 font-semibold text-neutral-900 dark:text-neutral-100 whitespace-nowrap">
                         <div>
                           <div
@@ -900,6 +972,13 @@ export default function RolesPermissionsPage() {
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                           {role.branchName || "Default Office"}
+                        </span>
+                      </td>
+
+                      {/* 3.5. BUSINESS UNIT */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                          {role.businessUnitName || "-"}
                         </span>
                       </td>
 
@@ -1110,6 +1189,27 @@ export default function RolesPermissionsPage() {
                 )}
 
                 {/* Role Name */}
+                {branches.length > 0 && (
+                  <div className="space-y-1.5 col-span-1 md:col-span-2">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                      Target Business Unit <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={newRoleBusinessUnitId}
+                      onChange={(e) => setNewRoleBusinessUnitId(e.target.value)}
+                      className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                      required
+                    >
+                      <option value="">-- Select Unit --</option>
+                      {businessUnits.filter(bu => !newRoleBranchId || bu.branchId === newRoleBranchId).map((bu) => (
+                        <option key={bu.id} value={bu.id}>
+                          {bu.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
                     Custom Role Name <span className="text-red-500">*</span>
@@ -1442,6 +1542,27 @@ export default function RolesPermissionsPage() {
                 )}
 
                 {/* Role Name */}
+                {branches.length > 0 && (
+                  <div className="space-y-1.5 col-span-1 md:col-span-2">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                      Target Business Unit <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={editRoleBusinessUnitId}
+                      onChange={(e) => setEditRoleBusinessUnitId(e.target.value)}
+                      className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                      required
+                    >
+                      <option value="">-- Select Unit --</option>
+                      {businessUnits.filter(bu => !editRoleBranchId || bu.branchId === editRoleBranchId).map((bu) => (
+                        <option key={bu.id} value={bu.id}>
+                          {bu.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
                     Custom Role Name <span className="text-red-500">*</span>
