@@ -23,6 +23,7 @@ interface CustomRole {
   name: string;
   description: string;
   branchId?: string | null;
+  businessUnitId?: string | null;
   branchName?: string | null;
   isSystem: boolean;
   systemRole?: string;
@@ -168,6 +169,7 @@ export default function RolesPermissionsPage() {
 
   const [roles, setRoles] = useState<CustomRole[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
+  const [businessUnits, setBusinessUnits] = useState<any[]>([]);
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [users, setUsers] = useState<TenantUser[]>([]);
@@ -213,6 +215,7 @@ export default function RolesPermissionsPage() {
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleDesc, setNewRoleDesc] = useState("");
   const [newRoleBranchId, setNewRoleBranchId] = useState("");
+  const [newRoleBusinessUnitId, setNewRoleBusinessUnitId] = useState("");
   const [newRoleSystemRole, setNewRoleSystemRole] = useState("RECRUITER");
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>(SYSTEM_ARCHETYPES[0].perms);
 
@@ -221,6 +224,7 @@ export default function RolesPermissionsPage() {
   const [editRoleName, setEditRoleName] = useState("");
   const [editRoleDesc, setEditRoleDesc] = useState("");
   const [editRoleBranchId, setEditRoleBranchId] = useState("");
+  const [editRoleBusinessUnitId, setEditRoleBusinessUnitId] = useState("");
   const [editRoleSystemRole, setEditRoleSystemRole] = useState("RECRUITER");
   const [editRolePermissions, setEditRolePermissions] = useState<string[]>([]);
 
@@ -302,12 +306,15 @@ export default function RolesPermissionsPage() {
     try {
       setLoading(true);
       const bid = branchFilter !== "all" ? branchFilter : undefined;
-      const [rolesData, permsData, usersData, branchesData] = await Promise.all([
+      const [rolesData, permsData, usersData, branchesData, businessUnitsData] = await Promise.all([
         atsApi.auth.listRoles(bid, true),
         atsApi.auth.listAllPermissions(),
         atsApi.auth.listUsers(),
         atsApi.branches.list().catch(() => []),
+        atsApi.businessUnits.list().catch(() => []),
       ]);
+
+      setBusinessUnits(businessUnitsData || []);
 
       setRoles(rolesData || []);
       setPermissions(permsData || []);
@@ -517,6 +524,7 @@ export default function RolesPermissionsPage() {
     setEditRoleName(role.name);
     setEditRoleDesc(role.description || "");
     setEditRoleBranchId(role.branchId || branches[0]?.id || "");
+    setEditRoleBusinessUnitId(role.businessUnitId || "");
     const sysRole = role.systemRole || "RECRUITER";
     setEditRoleSystemRole(sysRole);
     const allowed = getSystemRoleAllowedPermissions(sysRole);
