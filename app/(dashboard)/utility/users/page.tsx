@@ -30,6 +30,7 @@ interface UserItem {
   roleName: string;
   roles?: string[];
   branchId: string | null;
+  businessUnitId?: string | null;
   assignedBranchIds?: string[];
   branchRoles?: Record<string, string[]>;
   branchName: string | null;
@@ -297,6 +298,7 @@ export default function UserManagementPage() {
   const [loading, setLoading] = useState(() => !cachedUsersData);
   const [users, setUsers] = useState<UserItem[]>(() => cachedUsersData?.users || []);
   const [branches, setBranches] = useState<any[]>(() => cachedUsersData?.branches || []);
+  const [businessUnits, setBusinessUnits] = useState<any[]>([]);
   const [rolesList, setRolesList] = useState<any[]>(() => cachedUsersData?.rolesList || []);
   const [profile, setProfile] = useState<any>(() => cachedUsersData?.profile || null);
 
@@ -516,7 +518,8 @@ export default function UserManagementPage() {
     confirmPassword: "",
     roles: [] as string[],
     branchId: "",
-    sendEmailInvite: false,
+      businessUnitId: "",
+      sendEmailInvite: false,
   });
 
   // Debounced Email availability state
@@ -563,8 +566,9 @@ export default function UserManagementPage() {
     lastName: "",
     email: "",
     branchId: "",
-    jobReviewerId: "",
-    roles: [] as string[],
+      businessUnitId: "",
+      jobReviewerId: "",
+      roles: [] as string[],
   });
 
   // Password Reset Form
@@ -582,9 +586,10 @@ export default function UserManagementPage() {
       if (shouldShowLoading && !cachedUsersData) {
         setLoading(true);
       }
-      const [usersData, branchesData, rolesData, profileData] = await Promise.all([
+      const [usersData, branchesData, businessUnitsData, rolesData, profileData] = await Promise.all([
         atsApi.auth.listUsers().then((u) => { if (u) setUsers(u); return u; }).catch(() => []),
         atsApi.branches.list().then((b) => { if (b) setBranches(b); return b; }).catch(() => []),
+          atsApi.businessUnits.list().then((bu) => { if (bu) setBusinessUnits(bu); return bu; }).catch(() => []),
         atsApi.auth.listRoles(undefined, true).then((r) => { if (r) setRolesList(r); return r; }).catch(() => []),
         atsApi.auth.me().then((p) => { if (p) setProfile(p); return p; }).catch(() => null),
       ]);
@@ -656,6 +661,7 @@ export default function UserManagementPage() {
         role: selectedRoles[0] || undefined,
         roles: selectedRoles,
         branchId: primaryBranchId || undefined,
+              businessUnitId: addForm.businessUnitId || undefined,
         tenantId: tenantId,
         isApproved: true,
         sendEmailInvite: true,
@@ -668,6 +674,7 @@ export default function UserManagementPage() {
         if (createdUser) {
           await atsApi.auth.updateUserDetail(createdUser.id, {
             branchId: primaryBranchId || undefined,
+              businessUnitId: addForm.businessUnitId || undefined,
             assignedRoleIds: getSelectedMemberRoleIds(addForm, rolesList),
           });
         }
@@ -685,6 +692,7 @@ export default function UserManagementPage() {
         confirmPassword: "",
         roles: [],
         branchId: branches[0]?.id || "",
+        businessUnitId: "",
         sendEmailInvite: false,
       });
       loadData();
@@ -1215,8 +1223,9 @@ export default function UserManagementPage() {
       password: "",
       confirmPassword: "",
       roles: [],
-      branchId: defaultBranchId,
-      sendEmailInvite: false,
+        branchId: defaultBranchId,
+        businessUnitId: "",
+        sendEmailInvite: false,
     });
     setShowPassword(false);
     setShowConfirmPassword(false);
@@ -1245,6 +1254,7 @@ export default function UserManagementPage() {
       lastName: lName,
       email: user.email || "",
       branchId: user.branchId || "",
+      businessUnitId: user.businessUnitId || (user as any).business_unit_id || "",
       jobReviewerId: user.jobReviewerId || (user as any).job_reviewer_id || "",
       roles: [...rawRoles],
     });
@@ -1947,6 +1957,40 @@ export default function UserManagementPage() {
                     </select>
                   )}
                 </div>
+              </div>
+
+              {/* Business Unit Selection */}
+              <div className="space-y-1 mb-4">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Target Business Unit (Optional)</label>
+                <select
+                  value={addForm.businessUnitId}
+                  onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
+                  className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
+                >
+                  <option value="">-- No Unit Assigned (Branch Admin) --</option>
+                  {businessUnits
+                    .filter((bu) => !addForm.branchId || bu.branchId === addForm.branchId)
+                    .map((bu) => (
+                      <option key={bu.id} value={bu.id}>{bu.name}</option>
+                    ))}
+                </select>
+              </div>
+
+              {/* Business Unit Selection */}
+              <div className="space-y-1 mb-4">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Target Business Unit (Optional)</label>
+                <select
+                  value={editForm.businessUnitId}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
+                  className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
+                >
+                  <option value="">-- No Unit Assigned (Branch Admin) --</option>
+                  {businessUnits
+                    .filter((bu) => !editForm.branchId || bu.branchId === editForm.branchId)
+                    .map((bu) => (
+                      <option key={bu.id} value={bu.id}>{bu.name}</option>
+                    ))}
+                </select>
               </div>
 
               {/* CUSTOM ROLE SELECTION (STRICTLY ISOLATED PER SELECTED BRANCH) */}
