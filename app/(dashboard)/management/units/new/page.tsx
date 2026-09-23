@@ -189,7 +189,7 @@ function CreateUnitContent() {
       return;
     }
     if (!formData.name.trim()) {
-      setFormError("Operating Unit Name is required.");
+      setFormError("Branch Unit Name is required.");
       return;
     }
     if (!formData.code.trim()) {
@@ -222,11 +222,11 @@ function CreateUnitContent() {
 
       await atsApi.businessUnits.create(payload);
       const targetBranchId = formData.branchId;
-      toast.success(`Operating Unit "${formData.name}" established successfully!`);
+      toast.success(`Branch Unit "${formData.name}" established successfully!`);
       router.push(targetBranchId ? `/management/units?branchId=${targetBranchId}` : "/management/units");
     } catch (err: any) {
       console.error("Create unit error:", err);
-      setFormError(err.message || "Failed to create operating unit.");
+      setFormError(err.message || "Failed to create branch unit.");
       toast.error(err.message || "Failed to create unit.");
     } finally {
       setIsSubmitting(false);
@@ -241,7 +241,7 @@ function CreateUnitContent() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 dark:border-slate-800 pb-5">
         <div className="space-y-1">
           <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
-            <Layers className="h-5 w-5 text-blue-600" /> Create Operating Unit
+            <Layers className="h-5 w-5 text-blue-600" /> Create Branch Unit
           </h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             Establish a new practice division, configure operating shifts, market segment, and unit-isolated job routing policies.
@@ -269,7 +269,7 @@ function CreateUnitContent() {
               </>
             ) : (
               <>
-                <Check className="h-3.5 w-3.5" /> Create Operating Unit
+                <Check className="h-3.5 w-3.5" /> Create Branch Unit
               </>
             )}
           </Button>
@@ -290,7 +290,7 @@ function CreateUnitContent() {
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-blue-600" />
               <h2 className="text-sm font-bold text-neutral-900 dark:text-white">
-                Operating Unit Identity &amp; Host Branch
+                Branch Unit Identity &amp; Host Branch
               </h2>
             </div>
             <span className="text-[10.5px] font-semibold text-neutral-400">Division Structure</span>
@@ -321,7 +321,7 @@ function CreateUnitContent() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                  Operating Unit Name <span className="text-red-500">*</span>
+                  Branch Unit Name <span className="text-red-500">*</span>
                 </label>
                 <Input
                   value={formData.name}
@@ -613,7 +613,7 @@ function CreateUnitContent() {
 
           <CardContent className="p-6 space-y-4">
             <p className="text-xs text-neutral-500 leading-relaxed">
-              Define which assignment channels are enabled for requisitions created under this operating unit.
+              Define which assignment channels are enabled for requisitions created under this branch unit.
             </p>
 
             <div className="space-y-3 divide-y divide-neutral-100 dark:divide-slate-800">
@@ -642,7 +642,7 @@ function CreateUnitContent() {
                     3. All Unit Recruiters (Pool)
                   </span>
                   <p className="text-[11px] text-neutral-400">
-                    When assigned, the job requisition is pooled and broadcast strictly to active recruiters in this operating unit.
+                    When assigned, the job requisition is pooled and broadcast strictly to active recruiters in this branch unit.
                   </p>
                 </div>
                 <input
@@ -780,7 +780,7 @@ function CreateUnitContent() {
                 </>
               ) : (
                 <>
-                  <Check className="h-3.5 w-3.5" /> Save Operating Unit
+                  <Check className="h-3.5 w-3.5" /> Save Branch Unit
                 </>
               )}
             </Button>

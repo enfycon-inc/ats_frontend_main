@@ -349,7 +349,7 @@ function CompanySettingsContent() {
         workEndTime: buWorkEndTime || undefined,
         timezone: buTimezone || undefined,
       });
-      toast.success(`Operating unit "${res.name}" created!`);
+      toast.success(`Branch unit "${res.name}" created!`);
       const [updatedBranches, updatedBUs] = await Promise.all([
         atsApi.branches.list().catch(() => []),
         atsApi.businessUnits.list().catch(() => []),
@@ -368,10 +368,10 @@ function CompanySettingsContent() {
   };
 
   const handleDeleteBU = async (buId: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete operating unit "${name}"?`)) return;
+    if (!confirm(`Are you sure you want to delete branch unit "${name}"?`)) return;
     try {
       await atsApi.businessUnits.delete(buId);
-      toast.success(`Operating unit "${name}" deleted.`);
+      toast.success(`Branch unit "${name}" deleted.`);
       const [updatedBranches, updatedBUs] = await Promise.all([
         atsApi.branches.list().catch(() => []),
         atsApi.businessUnits.list().catch(() => []),

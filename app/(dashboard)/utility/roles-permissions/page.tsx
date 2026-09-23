@@ -116,7 +116,7 @@ const SYSTEM_ARCHETYPES = [
     key: "UNIT_ADMIN",
     label: "Unit Admin Template",
     badge: "Unit Governance",
-    desc: "Operating unit administrative authority, staff assignment, and unit-level recruitment oversight.",
+    desc: "Branch unit administrative authority, staff assignment, and unit-level recruitment oversight.",
     perms: [
       "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",

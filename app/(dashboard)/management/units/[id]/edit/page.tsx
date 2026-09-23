@@ -146,7 +146,7 @@ export default function EditUnitPage() {
         }
       } catch (err: any) {
         console.error("Failed to load unit details:", err);
-        setFormError(err.message || "Failed to load operating unit details.");
+        setFormError(err.message || "Failed to load branch unit details.");
       } finally {
         setLoading(false);
       }
@@ -158,7 +158,7 @@ export default function EditUnitPage() {
   const handleRemoveMember = async (memberId: string, memberName: string) => {
     try {
       await atsApi.businessUnits.removeMember(unitId, memberId);
-      toast.success(`Removed ${memberName} from this operating unit.`);
+      toast.success(`Removed ${memberName} from this branch unit.`);
       const updated = await atsApi.businessUnits.getMembers(unitId).catch(() => []);
       setUnitMembers(updated);
     } catch (err: any) {
@@ -183,7 +183,7 @@ export default function EditUnitPage() {
       return;
     }
     if (!formData.name.trim()) {
-      setFormError("Operating Unit Name is required.");
+      setFormError("Branch Unit Name is required.");
       return;
     }
     if (!formData.code.trim()) {
@@ -215,12 +215,12 @@ export default function EditUnitPage() {
       };
 
       await atsApi.businessUnits.update(unitId, payload);
-      toast.success(`Operating Unit "${formData.name}" updated successfully!`);
+      toast.success(`Branch Unit "${formData.name}" updated successfully!`);
       const targetBranchId = formData.branchId || parentBranch?.id;
       router.push(targetBranchId ? `/management/units?branchId=${targetBranchId}` : "/management/units");
     } catch (err: any) {
       console.error("Update unit error:", err);
-      setFormError(err.message || "Failed to update operating unit.");
+      setFormError(err.message || "Failed to update branch unit.");
       toast.error(err.message || "Failed to update unit.");
     } finally {
       setIsSubmitting(false);
@@ -233,7 +233,7 @@ export default function EditUnitPage() {
     return (
       <div className="py-20 text-center">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
-        <p className="text-xs text-neutral-500 mt-2 font-medium">Loading operating unit details...</p>
+        <p className="text-xs text-neutral-500 mt-2 font-medium">Loading branch unit details...</p>
       </div>
     );
   }
@@ -244,7 +244,7 @@ export default function EditUnitPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 dark:border-slate-800 pb-5">
         <div className="space-y-1">
           <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
-            <Layers className="h-5 w-5 text-blue-600" /> Edit Operating Unit
+            <Layers className="h-5 w-5 text-blue-600" /> Edit Branch Unit
           </h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             Configure shifts, practice division attributes, recruitment pods, and isolated job assignment policies.
@@ -293,7 +293,7 @@ export default function EditUnitPage() {
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-blue-600" />
               <h2 className="text-sm font-bold text-neutral-900 dark:text-white">
-                Operating Unit Identity &amp; Host Branch
+                Branch Unit Identity &amp; Host Branch
               </h2>
             </div>
             {parentBranch && (
@@ -332,7 +332,7 @@ export default function EditUnitPage() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                  Operating Unit Name <span className="text-red-500">*</span>
+                  Branch Unit Name <span className="text-red-500">*</span>
                 </label>
                 <Input
                   value={formData.name}
@@ -639,7 +639,7 @@ export default function EditUnitPage() {
 
           <CardContent className="p-6 space-y-4">
             <p className="text-xs text-neutral-500 leading-relaxed">
-              Define which assignment channels are enabled for requisitions created under this operating unit.
+              Define which assignment channels are enabled for requisitions created under this branch unit.
             </p>
 
             <div className="space-y-3 divide-y divide-neutral-100 dark:divide-slate-800">
@@ -668,7 +668,7 @@ export default function EditUnitPage() {
                     3. All Unit Recruiters (Pool)
                   </span>
                   <p className="text-[11px] text-neutral-400">
-                    When assigned, the job requisition is pooled and broadcast strictly to active recruiters in this operating unit.
+                    When assigned, the job requisition is pooled and broadcast strictly to active recruiters in this branch unit.
                   </p>
                 </div>
                 <input
@@ -786,7 +786,7 @@ export default function EditUnitPage() {
                 <h2 className="text-sm font-bold text-neutral-900 dark:text-white">
                   Recruiter &amp; Staff Members ({unitMembers.length})
                 </h2>
-                <p className="text-[11px] text-neutral-400">Team members assigned to source and manage requisitions in this operating unit</p>
+                <p className="text-[11px] text-neutral-400">Team members assigned to source and manage requisitions in this branch unit</p>
               </div>
             </div>
 
@@ -805,7 +805,7 @@ export default function EditUnitPage() {
                 <Users className="h-10 w-10 text-neutral-300 dark:text-neutral-600 mx-auto mb-2" />
                 <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">No staff members currently assigned to this unit</p>
                 <p className="text-[11px] text-neutral-400 mt-0.5 max-w-sm mx-auto">
-                  Assign recruiters, account managers, and team members to handle jobs and pod allocations under this operating unit.
+                  Assign recruiters, account managers, and team members to handle jobs and pod allocations under this branch unit.
                 </p>
                 <Button
                   type="button"
@@ -879,7 +879,7 @@ export default function EditUnitPage() {
                 <h2 className="text-sm font-bold text-neutral-900 dark:text-white">
                   Recruitment Pods ({unitPods.length})
                 </h2>
-                <p className="text-[11px] text-neutral-400">Domain-specific pods isolated to this operating unit</p>
+                <p className="text-[11px] text-neutral-400">Domain-specific pods isolated to this branch unit</p>
               </div>
             </div>
 
@@ -897,7 +897,7 @@ export default function EditUnitPage() {
             {unitPods.length === 0 ? (
               <div className="p-6 text-center text-neutral-400">
                 <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">No recruitment pods linked to this unit</p>
-                <p className="text-[11px] text-neutral-400 mt-0.5">Pods can be created and tied to this operating unit from the Recruitment Pods module.</p>
+                <p className="text-[11px] text-neutral-400 mt-0.5">Pods can be created and tied to this branch unit from the Recruitment Pods module.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

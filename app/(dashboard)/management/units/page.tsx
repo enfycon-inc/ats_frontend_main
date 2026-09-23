@@ -71,17 +71,34 @@ export function UnitsContent({
   const loadData = async () => {
     setLoading(true);
     try {
+      const currentUser = atsApi.auth.getCurrentUser();
+      const isGlobalAdmin = currentUser?.permissions?.includes("tenant:settings");
+      const userBranchId = currentUser?.branchId;
+
       const [branchList, unitList, marketList] = await Promise.all([
         atsApi.branches.list().catch(() => []),
         atsApi.businessUnits.list().catch(() => []),
         atsApi.marketSegments.list().catch(() => []),
       ]);
-      setBranches(Array.isArray(branchList) ? branchList : []);
-      setUnits(Array.isArray(unitList) ? unitList : []);
+
+      let finalBranches = Array.isArray(branchList) ? branchList : [];
+      let finalUnits = Array.isArray(unitList) ? unitList : [];
+
+      if (!isGlobalAdmin && userBranchId) {
+        finalBranches = finalBranches.filter(b => b.id === userBranchId);
+        finalUnits = finalUnits.filter(u => u.branchId === userBranchId);
+      }
+
+      setBranches(finalBranches);
+      setUnits(finalUnits);
       setMarketSegments(Array.isArray(marketList) ? marketList : []);
+
+      if (!isGlobalAdmin && userBranchId && (!selectedBranchId || selectedBranchId === "ALL")) {
+        setSelectedBranchId(userBranchId);
+      }
     } catch (err) {
       console.error("Failed to load units and branches:", err);
-      toast.error("Failed to load operating units");
+      toast.error("Failed to load Branch Units");
     } finally {
       setLoading(false);
     }
@@ -96,7 +113,7 @@ export function UnitsContent({
     return branches.find((b) => b.id === selectedBranchId) || null;
   }, [branches, selectedBranchId]);
 
-  // Filtered operating units
+  // Filtered Branch Units
   const filteredUnits = useMemo(() => {
     return units.filter((u) => {
       // Branch filter
@@ -143,11 +160,11 @@ export function UnitsContent({
     setIsDeleting(true);
     try {
       await atsApi.businessUnits.delete(unitToDelete.id);
-      toast.success(`Operating Unit "${unitToDelete.name}" deleted successfully.`);
+      toast.success(`Branch Unit "${unitToDelete.name}" deleted successfully.`);
       setUnitToDelete(null);
       await loadData();
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete operating unit.");
+      toast.error(err.message || "Failed to delete Branch Unit.");
     } finally {
       setIsDeleting(false);
     }
@@ -159,7 +176,7 @@ export function UnitsContent({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
           <div className="space-y-0.5">
             <h2 className="text-base font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
-              <Layers className="h-4.5 w-4.5 text-blue-600" /> Operating Units &amp; Practice Divisions
+              <Layers className="h-4.5 w-4.5 text-blue-600" /> Branch Units &amp; Practice Divisions
             </h2>
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
               Configure market segments, work shifts, recruitment pods, and isolated job routing policies.
@@ -176,7 +193,7 @@ export function UnitsContent({
               }}
               className="h-8.5 px-3.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
-              <Plus className="h-3.5 w-3.5" /> Add Operating Unit
+              <Plus className="h-3.5 w-3.5" /> Add Branch Unit
             </Button>
           </div>
         </div>
@@ -186,7 +203,7 @@ export function UnitsContent({
           <div className="space-y-1">
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
-                <Layers className="h-5 w-5 text-blue-600" /> Operating Units &amp; Practice Divisions
+                <Layers className="h-5 w-5 text-blue-600" /> Branch Units &amp; Practice Divisions
               </h1>
             </div>
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
@@ -218,7 +235,7 @@ export function UnitsContent({
               }}
               className="h-8.5 px-3.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
-              <Plus className="h-3.5 w-3.5" /> Add Operating Unit
+              <Plus className="h-3.5 w-3.5" /> Add Branch Unit
             </Button>
           </div>
         </div>
@@ -343,7 +360,7 @@ export function UnitsContent({
         )}
       </div>
 
-      {/* OPERATING UNITS DATA TABLE (Dense & Scalable for 100+ units) */}
+      {/* Branch UnitS DATA TABLE (Dense & Scalable for 100+ units) */}
       <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-xs rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -367,7 +384,7 @@ export function UnitsContent({
                 <tr>
                   <td colSpan={10} className="py-16 text-center">
                     <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
-                    <p className="text-xs text-neutral-500 mt-2 font-medium">Loading operating units...</p>
+                    <p className="text-xs text-neutral-500 mt-2 font-medium">Loading Branch Units...</p>
                   </td>
                 </tr>
               ) : filteredUnits.length === 0 ? (
@@ -377,13 +394,13 @@ export function UnitsContent({
                       <Layers className="h-10 w-10 text-neutral-300 dark:text-neutral-600" />
                       <p className="font-semibold text-neutral-700 dark:text-neutral-200 text-sm">
                         {searchQuery || selectedBranchId !== "ALL" || marketFilter !== "ALL"
-                          ? "No matching operating units found"
-                          : "No operating units configured"}
+                          ? "No matching Branch Units found"
+                          : "No Branch Units configured"}
                       </p>
                       <p className="text-xs text-neutral-400 leading-relaxed">
                         {searchQuery || selectedBranchId !== "ALL" || marketFilter !== "ALL"
                           ? "Try clearing your filters or search query to see all units."
-                          : "Create your first operating unit to establish market shifts and recruitment pods."}
+                          : "Create your first Branch Unit to establish market shifts and recruitment pods."}
                       </p>
                       <Button
                         onClick={() => {
@@ -394,7 +411,7 @@ export function UnitsContent({
                         }}
                         className="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs h-8 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
                       >
-                        <Plus className="h-3.5 w-3.5" /> Add Operating Unit
+                        <Plus className="h-3.5 w-3.5" /> Add Branch Unit
                       </Button>
                     </div>
                   </td>
@@ -639,14 +656,14 @@ export function UnitsContent({
               </div>
               <div>
                 <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                  Delete Operating Unit
+                  Delete Branch Unit
                 </h3>
                 <p className="text-xs text-neutral-400">This action cannot be undone.</p>
               </div>
             </div>
 
             <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
-              Are you sure you want to delete operating unit <strong>"{unitToDelete.name}"</strong>? All associated pod links and unit configurations will be removed.
+              Are you sure you want to delete Branch Unit <strong>"{unitToDelete.name}"</strong>? All associated pod links and unit configurations will be removed.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">

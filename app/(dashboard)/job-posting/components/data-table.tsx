@@ -889,7 +889,7 @@ export default function DataTable({
     return null;
   }, [assignModalJob, branchesList]);
 
-  // Target operating unit resolution for assignModalJob
+  // Target branch unit resolution for assignModalJob
   const assignModalTargetUnit = useMemo(() => {
     if (!assignModalJob) return null;
     if (assignModalJob.businessUnitRef) return assignModalJob.businessUnitRef;

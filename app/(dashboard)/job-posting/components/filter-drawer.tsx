@@ -115,11 +115,11 @@ export default function FilterDrawer({
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
                   <Layers className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                  Branch & Operating Unit
+                  Branch & Branch Unit
                 </label>
                 {businessUnits.length > 0 && (
                   <span className="text-[9.5px] text-blue-600 dark:text-blue-400 font-medium">
-                    {businessUnits.length} operating units
+                    {businessUnits.length} branch units
                   </span>
                 )}
               </div>
@@ -128,7 +128,7 @@ export default function FilterDrawer({
                 onChange={(e) => setBusinessUnit(e.target.value)}
                 className="w-full bg-neutral-50 dark:bg-slate-850 border border-neutral-300 dark:border-slate-700 rounded px-3 py-2 text-xs text-neutral-800 dark:text-neutral-200 outline-hidden focus:border-primary transition-colors cursor-pointer"
               >
-                <option value="All selected">All Operating Units (All Branches)</option>
+                <option value="All selected">All Branch Units (All Branches)</option>
                 {branches.length > 0 ? (
                   branches.map((b) => {
                     const unitsForBranch = businessUnits.filter((u) => u.branchId === b.id);

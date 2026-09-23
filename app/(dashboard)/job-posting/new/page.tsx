@@ -1939,10 +1939,10 @@ const getInitialActiveBranchContext = () => {
                 {!collapsedSections.businessInfo && (
                   <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
 
-                    {/* Operating Unit / Division */}
+                    {/* Branch Unit / Division */}
                     <div className="space-y-1">
                       <Label className="font-bold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
-                        <span>Operating Unit <span className="text-red-500">*</span></span>
+                        <span>Branch Unit <span className="text-red-500">*</span></span>
                         {selectedUnitObj && (
                           <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
                             {selectedUnitObj.market || market} • {selectedUnitObj.shiftTiming || 'General Shift'}
@@ -1955,7 +1955,7 @@ const getInitialActiveBranchContext = () => {
                           onChange={(e) => handleUnitChange(e.target.value)}
                           className="w-full h-8 text-xs bg-white dark:bg-slate-800 border border-neutral-300 dark:border-slate-700 rounded px-2 font-semibold text-neutral-800 dark:text-neutral-200 outline-none focus:border-primary transition-colors cursor-pointer"
                         >
-                          <option value="">-- Select Operating Unit --</option>
+                          <option value="">-- Select Branch Unit --</option>
                           {availableBranches.length > 0 ? (
                             availableBranches.map((b) => {
                               const unitsInBranch = availableUnits.filter((u) => u.branchId === b.id);

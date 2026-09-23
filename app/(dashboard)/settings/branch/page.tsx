@@ -182,7 +182,7 @@ function BranchManagementPageContent() {
   const [selectedUnitId, setSelectedUnitId] = useState<string>("");
   const [selectedBranchUnits, setSelectedBranchUnits] = useState<any[]>([]);
 
-  // Operating Units Management State
+  // Branch Units Management State
   const [isCreateUnitOpen, setIsCreateUnitOpen] = useState(false);
   const [isManageUnitsOpen, setIsManageUnitsOpen] = useState(false);
   const [isEditUnitOpen, setIsEditUnitOpen] = useState(false);
@@ -488,7 +488,7 @@ function BranchManagementPageContent() {
         allowUnassigned: unitFormData.allowUnassigned,
         podDistributionStrategy: unitFormData.podDistributionStrategy,
       });
-      toast.success(`Operating unit "${unitFormData.name}" added successfully!`);
+      toast.success(`Branch unit "${unitFormData.name}" added successfully!`);
       setIsCreateUnitOpen(false);
       await loadBranchesAndHierarchy();
       if (unitBranch) {
@@ -496,7 +496,7 @@ function BranchManagementPageContent() {
         setSelectedBranchUnits(freshUnits || []);
       }
     } catch (err: any) {
-      setUnitFormError(err.message || "Failed to create operating unit");
+      setUnitFormError(err.message || "Failed to create branch unit");
     } finally {
       setIsSubmittingUnit(false);
     }
@@ -518,18 +518,18 @@ function BranchManagementPageContent() {
       toast.error(`Cannot delete unit "${unit.name}": It has active staff or open requisitions assigned.`);
       return;
     }
-    if (!confirm(`Are you sure you want to delete operating unit "${unit.name}"?`)) return;
+    if (!confirm(`Are you sure you want to delete branch unit "${unit.name}"?`)) return;
     try {
       setIsDeletingUnit(true);
       await atsApi.businessUnits.delete(unit.id);
-      toast.success(`Operating unit "${unit.name}" deleted.`);
+      toast.success(`Branch unit "${unit.name}" deleted.`);
       if (unitBranch) {
         const freshUnits = await atsApi.businessUnits.list(unitBranch.id).catch(() => []);
         setSelectedBranchUnits(freshUnits || []);
       }
       await loadBranchesAndHierarchy();
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete operating unit");
+      toast.error(err.message || "Failed to delete branch unit");
     } finally {
       setIsDeletingUnit(false);
     }
@@ -557,7 +557,7 @@ function BranchManagementPageContent() {
     });
     setIsEditUnitOpen(true);
 
-    // Fetch live pods scoped to this operating unit
+    // Fetch live pods scoped to this branch unit
     setLoadingUnitPods(true);
     setUnitPods([]);
     try {
@@ -601,7 +601,7 @@ function BranchManagementPageContent() {
         allowUnassigned: editUnitFormData.allowNone ? false : editUnitFormData.allowUnassigned,
         podDistributionStrategy: editUnitFormData.podDistributionStrategy,
       });
-      toast.success(`Operating unit "${editUnitFormData.name}" updated successfully!`);
+      toast.success(`Branch unit "${editUnitFormData.name}" updated successfully!`);
       setIsEditUnitOpen(false);
       setEditingUnit(null);
       await loadBranchesAndHierarchy();
@@ -614,7 +614,7 @@ function BranchManagementPageContent() {
         setSelectedBranchUnits(freshUnits || []);
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to update operating unit");
+      toast.error(err.message || "Failed to update branch unit");
     } finally {
       setIsSubmittingEditUnit(false);
     }
@@ -1081,7 +1081,7 @@ function BranchManagementPageContent() {
             </h1>
           </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Configure dynamic branch structures, branch heads, staff allocations, and operating units.
+            Configure dynamic branch structures, branch heads, staff allocations, and branch units.
           </p>
         </div>
 
@@ -1126,7 +1126,7 @@ function BranchManagementPageContent() {
               variant="outline"
               className="h-8 px-3 text-xs font-semibold border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:bg-slate-900 dark:text-neutral-300 dark:border-slate-800 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
-              <Layers className="h-3.5 w-3.5 text-neutral-500" /> Operating Units ({totalUnitsCount})
+              <Layers className="h-3.5 w-3.5 text-neutral-500" /> Branch Units ({totalUnitsCount})
             </Button>
             {canManageBranches && (
               <Button
@@ -1185,7 +1185,7 @@ function BranchManagementPageContent() {
                   <th className="py-3.5 px-4">Branch Name</th>
                   <th className="py-3.5 px-4">Branch Code</th>
                   <th className="py-3.5 px-4">Office Location</th>
-                  <th className="py-3.5 px-4">Operating Units</th>
+                  <th className="py-3.5 px-4">Branch Units</th>
                   <th className="py-3.5 px-4">Branch Head</th>
                   <th className="py-3.5 px-4">Staff Members</th>
                   <th className="py-3.5 px-4">Requisitions</th>
@@ -1285,7 +1285,7 @@ function BranchManagementPageContent() {
                           <button
                             onClick={() => openManageUnitsModal(b)}
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/60 dark:text-blue-300 dark:hover:bg-blue-900/60 border border-blue-200/80 dark:border-blue-800 transition-colors cursor-pointer group shadow-2xs"
-                            title={`View and filter all ${unitCount} operating units for ${b.name}`}
+                            title={`View and filter all ${unitCount} branch units for ${b.name}`}
                           >
                             <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
                             <span>{unitCount} {unitCount === 1 ? 'Unit' : 'Units'}</span>
@@ -1389,7 +1389,7 @@ function BranchManagementPageContent() {
                                     <div className="h-6 w-6 rounded-md bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-2xs">
                                       <Plus className="h-3.5 w-3.5" />
                                     </div>
-                                    <span>Add Operating Unit</span>
+                                    <span>Add Branch Unit</span>
                                   </DropdownMenuItem>
                                 )}
 
@@ -1707,7 +1707,7 @@ function BranchManagementPageContent() {
                   <div className="flex items-center gap-2">
                     <Layers className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-blue-500">Operating Units</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-blue-500">Branch Units</p>
                       <p className="text-xs font-bold text-neutral-900 dark:text-white">
                         {b.businessUnits?.length || 0} {b.businessUnits?.length === 1 ? 'Unit Configured' : 'Units Configured'}
                       </p>
@@ -1924,7 +1924,7 @@ function BranchManagementPageContent() {
                   <div className="flex items-center gap-1.5">
                     <Clock className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
                     <span className="text-xs font-bold text-neutral-900 dark:text-white">
-                      Initial Operating Unit Shift Defaults
+                      Initial Branch Unit Shift Defaults
                     </span>
                   </div>
                   <span className="text-[10px] text-neutral-400">Default Practice Unit</span>
@@ -2175,7 +2175,7 @@ function BranchManagementPageContent() {
                   </div>
                 </div>
 
-                {/* 2. Operating Units (Practice Divisions) in Branch */}
+                {/* 2. Branch Units (Practice Divisions) in Branch */}
                 <div className="bg-blue-50/50 dark:bg-blue-950/20 p-4 rounded-xl border border-blue-200/70 dark:border-blue-900/60 space-y-3">
                   <div className="flex items-center justify-between border-b border-blue-200/50 dark:border-blue-900/40 pb-2">
                     <div className="flex items-center gap-2">
@@ -2840,7 +2840,7 @@ function BranchManagementPageContent() {
                       </span>
                     </div>
                     <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                      Restricted to their assigned operating unit. Can manage unit operational timings, staff, and unit-scoped pods.
+                      Restricted to their assigned branch unit. Can manage unit operational timings, staff, and unit-scoped pods.
                     </p>
                   </div>
                 </div>
@@ -2851,7 +2851,7 @@ function BranchManagementPageContent() {
                 <div className="flex items-center justify-between">
                   <label className="text-[10.5px] font-bold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
                     <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                    Operating Unit (Practice Division)
+                    Branch Unit (Practice Division)
                   </label>
                   <span className="text-[10.5px] text-blue-600 dark:text-blue-400 font-medium">
                     Office: {selectedBranch?.name}
@@ -2863,7 +2863,7 @@ function BranchManagementPageContent() {
                     onChange={(e) => setSelectedUnitId(e.target.value)}
                     className="w-full text-xs font-semibold px-3 py-2 rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">-- Select Operating Unit --</option>
+                    <option value="">-- Select Branch Unit --</option>
                     {selectedBranchUnits.map((u: any) => (
                       <option key={u.id} value={u.id}>
                         {u.name} ({u.shiftTiming || "General Shift"} • {u.market || "Domestic"} • {u.currency || "INR"})
@@ -2871,10 +2871,10 @@ function BranchManagementPageContent() {
                     ))}
                   </select>
                 ) : (
-                  <p className="text-xs text-neutral-400 italic">No operating units configured for this branch.</p>
+                  <p className="text-xs text-neutral-400 italic">No branch units configured for this branch.</p>
                 )}
                 <p className="text-[10px] text-neutral-400">
-                  The recruiter inherits requisition visibility, shift hours, and candidate talent pools from their assigned operating unit.
+                  The recruiter inherits requisition visibility, shift hours, and candidate talent pools from their assigned branch unit.
                 </p>
               </div>
 
@@ -3820,7 +3820,7 @@ function BranchManagementPageContent() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    Add Operating Unit / Practice Division
+                    Add Branch Unit / Practice Division
                   </h3>
                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
                     Create a specialized business division within an office branch
@@ -3881,7 +3881,7 @@ function BranchManagementPageContent() {
               {/* Unit Name */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                  Operating Unit Name <span className="text-red-500">*</span>
+                  Branch Unit Name <span className="text-red-500">*</span>
                 </label>
                 <Input
                   value={unitFormData.name}
@@ -4050,7 +4050,7 @@ function BranchManagementPageContent() {
                   disabled={isSubmittingUnit}
                   className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 shadow-xs cursor-pointer"
                 >
-                  {isSubmittingUnit ? "Creating..." : "Create Operating Unit"}
+                  {isSubmittingUnit ? "Creating..." : "Create Branch Unit"}
                 </Button>
               </div>
             </form>
@@ -4069,7 +4069,7 @@ function BranchManagementPageContent() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    Operating Units in {unitBranch.name}
+                    Branch Units in {unitBranch.name}
                   </h3>
                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
                     Manage business divisions, work shifts, currency, and recruiter staffing allocations
@@ -4106,8 +4106,8 @@ function BranchManagementPageContent() {
               {selectedBranchUnits.length === 0 ? (
                 <div className="p-8 text-center border border-dashed border-neutral-200 dark:border-slate-800 rounded-xl space-y-2">
                   <Layers className="h-8 w-8 text-neutral-400 mx-auto" />
-                  <p className="text-xs font-bold text-neutral-700 dark:text-neutral-300">No Operating Units Configured</p>
-                  <p className="text-[11px] text-neutral-400">Add operating units (e.g., US IT, Domestic IT) to segment requisitions and shifts.</p>
+                  <p className="text-xs font-bold text-neutral-700 dark:text-neutral-300">No Branch Units Configured</p>
+                  <p className="text-[11px] text-neutral-400">Add branch units (e.g., US IT, Domestic IT) to segment requisitions and shifts.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -4203,7 +4203,7 @@ function BranchManagementPageContent() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    Edit Operating Unit: {editingUnit.name}
+                    Edit Branch Unit: {editingUnit.name}
                   </h3>
                   <p className="text-[11px] text-neutral-400">Configure operational parameters, shift timings, working days, and recruiter routing policy</p>
                 </div>
@@ -4374,7 +4374,7 @@ function BranchManagementPageContent() {
                 </div>
               </div>
 
-              {/* Job Assignment & Routing Policy (Operating Unit Level) */}
+              {/* Job Assignment & Routing Policy (Branch Unit Level) */}
               <div className="p-5 bg-white dark:bg-slate-900 rounded-xl border border-neutral-200 dark:border-slate-700/80 shadow-xs space-y-4">
                 <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-3">
                   <div className="flex items-center gap-2.5">
@@ -4386,7 +4386,7 @@ function BranchManagementPageContent() {
                         Job Assignment Policy
                       </h4>
                       <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
-                        Control how job orders are assigned and broadcast to recruitment personnel within this operating unit.
+                        Control how job orders are assigned and broadcast to recruitment personnel within this branch unit.
                       </p>
                     </div>
                   </div>
@@ -4451,7 +4451,7 @@ function BranchManagementPageContent() {
                         <span className="font-bold text-neutral-900 dark:text-white">3. All Unit Recruiters (Pool)</span>
                       </div>
                       <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
-                        Allow broadcast to all active recruiters belonging to this operating unit.
+                        Allow broadcast to all active recruiters belonging to this branch unit.
                       </p>
                     </div>
                   </label>
@@ -4476,7 +4476,7 @@ function BranchManagementPageContent() {
                         onClick={(e) => {
                           if (unitPods.length === 0 && !editUnitFormData.allowNone) {
                             e.preventDefault();
-                            toast.error("No pods created for this operating unit. Create a pod first!");
+                            toast.error("No pods created for this branch unit. Create a pod first!");
                             openQuickCreatePod(editingUnit.id);
                           }
                         }}
@@ -4487,7 +4487,7 @@ function BranchManagementPageContent() {
                           disabled={editUnitFormData.allowNone || unitPods.length === 0}
                           onChange={(e) => {
                             if (unitPods.length === 0) {
-                              toast.error("No pods created for this operating unit. Create a pod first!");
+                              toast.error("No pods created for this branch unit. Create a pod first!");
                               openQuickCreatePod(editingUnit.id);
                               return;
                             }
@@ -4627,7 +4627,7 @@ function BranchManagementPageContent() {
                             openQuickCreatePod(editingUnit.id);
                           }}
                           className="h-7 text-[11px] font-semibold border-indigo-200 dark:border-indigo-800/80 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
-                          title="Create a new recruitment pod for this operating unit"
+                          title="Create a new recruitment pod for this branch unit"
                         >
                           <Plus className="h-3 w-3 text-indigo-600 dark:text-indigo-400" /> Create New Pod
                         </Button>
@@ -4644,7 +4644,7 @@ function BranchManagementPageContent() {
                               Create Pod First
                             </p>
                             <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-tight">
-                              This operating unit has no recruitment pods. Create a pod first to enable pod-based routing.
+                              This branch unit has no recruitment pods. Create a pod first to enable pod-based routing.
                             </p>
                           </div>
                         </div>
@@ -4756,7 +4756,7 @@ function BranchManagementPageContent() {
                   disabled={isSubmittingEditUnit}
                   className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 shadow-xs cursor-pointer"
                 >
-                  {isSubmittingEditUnit ? "Saving Changes..." : "Save Operating Unit"}
+                  {isSubmittingEditUnit ? "Saving Changes..." : "Save Branch Unit"}
                 </Button>
               </div>
             </form>

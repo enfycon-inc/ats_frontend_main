@@ -369,14 +369,14 @@ export default function EditBranchPage() {
           </CardContent>
         </Card>
 
-        {/* CARD 4: Operating Units Hosted in this Branch */}
+        {/* CARD 4: Branch Units Hosted in this Branch */}
         <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-xs rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/60 dark:bg-slate-850 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Layers className="h-4 w-4 text-blue-600" />
               <div>
                 <h2 className="text-sm font-bold text-neutral-900 dark:text-white">
-                  Operating Units ({branchUnits.length})
+                  Branch Units ({branchUnits.length})
                 </h2>
                 <p className="text-[11px] text-neutral-400">Practice divisions and market segments operating from this branch</p>
               </div>
@@ -405,14 +405,14 @@ export default function EditBranchPage() {
             {branchUnits.length === 0 ? (
               <div className="p-8 text-center text-neutral-400">
                 <Layers className="h-8 w-8 text-neutral-300 dark:text-neutral-700 mx-auto mb-2" />
-                <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">No Operating Units configured</p>
-                <p className="text-[11px] text-neutral-400 mt-0.5">Add an operating unit to configure market segment, shifts, pods, and routing policies.</p>
+                <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">No Branch Units configured</p>
+                <p className="text-[11px] text-neutral-400 mt-0.5">Add an branch unit to configure market segment, shifts, pods, and routing policies.</p>
                 <Button
                   type="button"
                   onClick={() => router.push(`/management/units/new?branchId=${branchId}`)}
                   className="mt-3 h-8 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  <Plus className="h-3 w-3 mr-1" /> Add First Operating Unit
+                  <Plus className="h-3 w-3 mr-1" /> Add First Branch Unit
                 </Button>
               </div>
             ) : (

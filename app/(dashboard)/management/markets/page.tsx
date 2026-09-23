@@ -137,7 +137,7 @@ function MarketModal({
                 {isEdit ? 'Edit Market Segment' : 'Create Market Segment'}
               </h2>
               <p className="text-xs text-gray-500">
-                {isEdit ? `Editing ${segment?.name}` : 'Define a new market for your operating units'}
+                {isEdit ? `Editing ${segment?.name}` : 'Define a new market for your branch units'}
               </p>
             </div>
           </div>
@@ -375,7 +375,7 @@ export default function MarketsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Market Segments</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Define markets for operating units. Each unit must be assigned to a market.
+            Define markets for branch units. Each unit must be assigned to a market.
           </p>
         </div>
         <button
