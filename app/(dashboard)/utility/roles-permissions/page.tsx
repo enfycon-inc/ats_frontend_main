@@ -225,7 +225,24 @@ export default function RolesPermissionsPage() {
     const [showQuickAddUnit, setShowQuickAddUnit] = useState(false);
     const [quickAddUnitBranchId, setQuickAddUnitBranchId] = useState("");
     const [quickAddUnitName, setQuickAddUnitName] = useState("");
+    const [quickAddUnitCode, setQuickAddUnitCode] = useState("");
+    const [quickAddUnitAddress, setQuickAddUnitAddress] = useState("");
+    const [quickAddUnitZip, setQuickAddUnitZip] = useState("");
+    const [quickAddUnitCity, setQuickAddUnitCity] = useState("");
+    const [quickAddUnitState, setQuickAddUnitState] = useState("");
     const [isCreatingUnit, setIsCreatingUnit] = useState(false);
+
+    const handleZipBlur = async () => {
+      if (!quickAddUnitZip || quickAddUnitZip.length < 5) return;
+      try {
+        const res = await fetch(`https://api.zippopotam.us/us/${quickAddUnitZip}`);
+        if (res.ok) {
+          const data = await res.json();
+          setQuickAddUnitCity(data.places[0]["place name"]);
+          setQuickAddUnitState(data.places[0]["state abbreviation"]);
+        }
+      } catch (e) {}
+    };
 
   // Edit Modal State
   const [editingRole, setEditingRole] = useState<CustomRole | null>(null);
@@ -508,11 +525,21 @@ export default function RolesPermissionsPage() {
         setIsCreatingUnit(true);
         const newUnit = await atsApi.businessUnits.create({
           name: quickAddUnitName.trim(),
-          branchId: quickAddUnitBranchId
+          branchId: quickAddUnitBranchId,
+          code: quickAddUnitCode.trim() || undefined,
+          address: quickAddUnitAddress.trim() || undefined,
+          zipCode: quickAddUnitZip.trim() || undefined,
+          city: quickAddUnitCity.trim() || undefined,
+          state: quickAddUnitState.trim() || undefined
         });
         toast.success("Branch Unit created successfully!");
         setShowQuickAddUnit(false);
         setQuickAddUnitName("");
+        setQuickAddUnitCode("");
+        setQuickAddUnitAddress("");
+        setQuickAddUnitZip("");
+        setQuickAddUnitCity("");
+        setQuickAddUnitState("");
         const refreshedUnits = await atsApi.businessUnits.list().catch(() => []);
         setBusinessUnits(refreshedUnits || []);
         
@@ -1180,15 +1207,31 @@ export default function RolesPermissionsPage() {
               </button>
             </div>
             <form onSubmit={handleQuickAddUnit} className="p-6 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Unit Name <span className="text-red-500">*</span></label>
-                <Input 
-                  value={quickAddUnitName} 
-                  onChange={e => setQuickAddUnitName(e.target.value)} 
-                  placeholder="e.g. US IT Recruitment" 
-                  className="h-10 text-xs" 
-                  required 
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5 col-span-2">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Unit Name <span className="text-red-500">*</span></label>
+                  <Input value={quickAddUnitName} onChange={e => setQuickAddUnitName(e.target.value)} placeholder="e.g. US IT Recruitment" className="h-9 text-xs" required />
+                </div>
+                <div className="space-y-1.5 col-span-2">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Unit ID</label>
+                  <Input value={quickAddUnitCode} onChange={e => setQuickAddUnitCode(e.target.value)} placeholder="e.g. UNIT-101" className="h-9 text-xs" />
+                </div>
+                <div className="space-y-1.5 col-span-2">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Address</label>
+                  <Input value={quickAddUnitAddress} onChange={e => setQuickAddUnitAddress(e.target.value)} placeholder="Street Address" className="h-9 text-xs" />
+                </div>
+                <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Zip / PIN Code</label>
+                  <Input value={quickAddUnitZip} onChange={e => setQuickAddUnitZip(e.target.value)} onBlur={handleZipBlur} placeholder="Zip Code" className="h-9 text-xs" />
+                </div>
+                <div className="space-y-1.5 col-span-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">City</label>
+                  <Input value={quickAddUnitCity} onChange={e => setQuickAddUnitCity(e.target.value)} placeholder="City" className="h-9 text-xs" />
+                </div>
+                <div className="space-y-1.5 col-span-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">State</label>
+                  <Input value={quickAddUnitState} onChange={e => setQuickAddUnitState(e.target.value)} placeholder="State" className="h-9 text-xs" />
+                </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" size="sm" type="button" onClick={() => setShowQuickAddUnit(false)} className="h-9 cursor-pointer text-xs px-4">Cancel</Button>
