@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Globe, Building2, Image as ImageIcon, ArrowRight, Save } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,8 @@ export function GeneralTab({
   isSuperAdmin,
   base,
 }: GeneralTabProps) {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className="space-y-6">
       
@@ -62,14 +64,15 @@ export function GeneralTab({
             <div className="flex-shrink-0">
               <Label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-2">Company Logo</Label>
               <div 
-                onClick={() => document.getElementById('logo-upload')?.click()}
+                onClick={() => fileInputRef.current?.click()}
                 className="relative w-28 h-28 border-2 border-dashed border-neutral-300 dark:border-slate-700 rounded-xl flex flex-col items-center justify-center bg-neutral-50 dark:bg-slate-800/50 hover:bg-neutral-100 dark:hover:bg-slate-800 transition-colors cursor-pointer overflow-hidden group"
               >
                 <input 
+                  ref={fileInputRef}
                   id="logo-upload"
                   type="file" 
                   accept="image/*"
-                  className="hidden"
+                  className="hidden" onClick={(e) => e.stopPropagation()}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {

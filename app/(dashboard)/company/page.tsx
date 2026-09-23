@@ -241,6 +241,10 @@ function CompanySettingsContent() {
         siteTitle: siteTitle,
         logoUrl: logoUrl
       });
+      
+      if (siteTitle) {
+        document.title = siteTitle;
+      }
       toast.success("Company profile saved successfully!");
     } catch (err: any) {
       toast.error(err.message || "Failed to save company profile");
