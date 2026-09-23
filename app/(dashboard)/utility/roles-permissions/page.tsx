@@ -232,6 +232,34 @@ export default function RolesPermissionsPage() {
     const [quickAddUnitState, setQuickAddUnitState] = useState("");
     const [isCreatingUnit, setIsCreatingUnit] = useState(false);
 
+    const [citySuggestions, setCitySuggestions] = useState<any[]>([]);
+    const [showCitySuggestions, setShowCitySuggestions] = useState(false);
+
+    useEffect(() => {
+      if (!quickAddUnitCity || quickAddUnitCity.length < 2) {
+        setCitySuggestions([]);
+        return;
+      }
+      const delayFn = setTimeout(async () => {
+        try {
+          const res = await fetch(https://geocoding-api.open-meteo.com/v1/search?name=&count=5&language=en&format=json);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.results) {
+              setCitySuggestions(data.results);
+            }
+          }
+        } catch (e) {}
+      }, 400);
+      return () => clearTimeout(delayFn);
+    }, [quickAddUnitCity]);
+
+    const handleSelectCity = (cityData: any) => {
+      setQuickAddUnitCity(cityData.name);
+      setQuickAddUnitState(cityData.admin1 || "");
+      setShowCitySuggestions(false);
+    };
+
     const handleZipBlur = async () => {
       if (!quickAddUnitZip || quickAddUnitZip.length < 5) return;
       try {
@@ -1224,9 +1252,31 @@ export default function RolesPermissionsPage() {
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Zip / PIN Code</label>
                   <Input value={quickAddUnitZip} onChange={e => setQuickAddUnitZip(e.target.value)} onBlur={handleZipBlur} placeholder="Zip Code" className="h-9 text-xs" />
                 </div>
-                <div className="space-y-1.5 col-span-1">
+                <div className="space-y-1.5 col-span-1 relative">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">City</label>
-                  <Input value={quickAddUnitCity} onChange={e => setQuickAddUnitCity(e.target.value)} placeholder="City" className="h-9 text-xs" />
+                  <Input 
+                    value={quickAddUnitCity} 
+                    onChange={e => { setQuickAddUnitCity(e.target.value); setShowCitySuggestions(true); }} 
+                    onFocus={() => setShowCitySuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowCitySuggestions(false), 200)}
+                    placeholder="City" 
+                    className="h-9 text-xs" 
+                    autoComplete="off"
+                  />
+                  {showCitySuggestions && citySuggestions.length > 0 && (
+                    <div className="absolute top-full mt-1 left-0 w-[200%] z-50 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden">
+                      {citySuggestions.map((city, idx) => (
+                        <div 
+                          key={idx} 
+                          onClick={() => handleSelectCity(city)}
+                          className="px-3 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer flex flex-col transition-colors border-b last:border-0 border-neutral-100 dark:border-slate-750"
+                        >
+                          <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">{city.name}</span>
+                          <span className="text-[10px] text-neutral-500 dark:text-neutral-400">{city.admin1 ? city.admin1 + ', ' : ''}{city.country}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-1.5 col-span-1">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">State</label>
