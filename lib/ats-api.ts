@@ -613,6 +613,9 @@ const auth = {
     jobAssignmentOptions?: any;
     jobCodePattern?: string;
     enforceJobCodePattern?: boolean;
+    siteTitle?: string;
+    logoUrl?: string;
+    name?: string;
   }): Promise<any> {
     return apiFetch<any>('/api/auth/tenants/my-settings', {
       method: 'PATCH',

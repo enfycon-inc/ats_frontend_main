@@ -64,6 +64,8 @@ function CompanySettingsContent() {
   const [originalSubdomain, setOriginalSubdomain] = useState("");
   const [companyName, setCompanyName] = useState("");
     const [siteTitle, setSiteTitle] = useState("");
+    const [logoUrl, setLogoUrl] = useState("");
+    const [savingCompanyProfile, setSavingCompanyProfile] = useState(false);
   const [podSystemEnabled, setPodSystemEnabled] = useState(true);
   const [togglingPodSystem, setTogglingPodSystem] = useState(false);
   const [candidatePoolMode, setCandidatePoolMode] = useState("COMBINED_MARKET");
@@ -227,6 +229,23 @@ function CompanySettingsContent() {
       toast.error("Failed to update candidate pool settings: " + err.message);
     } finally {
       setUpdatingPoolMode(false);
+    }
+  };
+
+  
+  const handleSaveCompanyProfile = async () => {
+    try {
+      setSavingCompanyProfile(true);
+      await atsApi.auth.updateMySettings({ 
+        name: companyName,
+        siteTitle: siteTitle,
+        logoUrl: logoUrl
+      });
+      toast.success("Company profile saved successfully!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save company profile");
+    } finally {
+      setSavingCompanyProfile(false);
     }
   };
 
@@ -560,6 +579,10 @@ function TenantAdminSettingsView(props: any) {
             setCompanyName={props.setCompanyName}
             siteTitle={props.siteTitle}
             setSiteTitle={props.setSiteTitle}
+            logoUrl={props.logoUrl}
+            setLogoUrl={props.setLogoUrl}
+            savingCompanyProfile={props.savingCompanyProfile}
+            handleSaveCompanyProfile={props.handleSaveCompanyProfile}
             subdomain={props.subdomain}
             setSubdomain={props.setSubdomain}
             originalSubdomain={props.originalSubdomain}

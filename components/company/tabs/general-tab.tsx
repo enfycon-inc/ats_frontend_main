@@ -11,6 +11,10 @@ export interface GeneralTabProps {
   setCompanyName: (val: string) => void;
   siteTitle: string;
   setSiteTitle: (val: string) => void;
+  logoUrl: string;
+  setLogoUrl: (val: string) => void;
+  handleSaveCompanyProfile: () => void;
+  savingCompanyProfile: boolean;
   subdomain: string;
   setSubdomain: (val: string) => void;
   originalSubdomain: string;
@@ -25,6 +29,10 @@ export function GeneralTab({
   setCompanyName,
   siteTitle,
   setSiteTitle,
+  logoUrl,
+  setLogoUrl,
+  handleSaveCompanyProfile,
+  savingCompanyProfile,
   subdomain,
   setSubdomain,
   originalSubdomain,
@@ -53,9 +61,34 @@ export function GeneralTab({
             {/* Logo Upload Area */}
             <div className="flex-shrink-0">
               <Label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-2">Company Logo</Label>
-              <div className="w-28 h-28 border-2 border-dashed border-neutral-300 dark:border-slate-700 rounded-xl flex flex-col items-center justify-center bg-neutral-50 dark:bg-slate-800/50 hover:bg-neutral-100 dark:hover:bg-slate-800 transition-colors cursor-pointer overflow-hidden group">
-                <ImageIcon className="h-8 w-8 text-neutral-400 group-hover:text-indigo-500 transition-colors mb-2" />
-                <span className="text-[10px] font-medium text-neutral-500 group-hover:text-indigo-600">Upload Logo</span>
+              <div 
+                onClick={() => document.getElementById('logo-upload')?.click()}
+                className="relative w-28 h-28 border-2 border-dashed border-neutral-300 dark:border-slate-700 rounded-xl flex flex-col items-center justify-center bg-neutral-50 dark:bg-slate-800/50 hover:bg-neutral-100 dark:hover:bg-slate-800 transition-colors cursor-pointer overflow-hidden group"
+              >
+                <input 
+                  id="logo-upload"
+                  type="file" 
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setLogoUrl(reader.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                />
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Company Logo" className="w-full h-full object-contain p-2" />
+                ) : (
+                  <>
+                    <ImageIcon className="h-8 w-8 text-neutral-400 group-hover:text-indigo-500 transition-colors mb-2" />
+                    <span className="text-[10px] font-medium text-neutral-500 group-hover:text-indigo-600">Upload Logo</span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -84,9 +117,14 @@ export function GeneralTab({
               </div>
 
               <div className="pt-2 flex justify-end">
-                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9">
+                <Button 
+                  size="sm" 
+                  onClick={handleSaveCompanyProfile}
+                  disabled={savingCompanyProfile}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9"
+                >
                   <Save className="h-3.5 w-3.5 mr-1.5" />
-                  Save Company Profile
+                  {savingCompanyProfile ? "Saving..." : "Save Company Profile"}
                 </Button>
               </div>
             </div>
