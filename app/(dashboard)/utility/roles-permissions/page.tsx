@@ -1301,15 +1301,16 @@ export default function RolesPermissionsPage() {
                 <div className="space-y-1.5 col-span-2">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Address</label>
                   <div className="relative">
-                    <Input 
-                      value={quickAddUnitAddress} 
-                      onChange={e => { setQuickAddUnitAddress(e.target.value); setShowAddressSuggestions(true); }} 
-                      onFocus={() => setShowAddressSuggestions(true)}
-                      onBlur={() => setShowAddressSuggestions(false)}
-                      placeholder="Start typing an address..." 
-                      className="h-9 text-xs" 
-                      autoComplete="new-password"
-                    />
+                    <textarea 
+                        value={quickAddUnitAddress} 
+                        onChange={e => { setQuickAddUnitAddress(e.target.value); setShowAddressSuggestions(true); }} 
+                        onFocus={() => setShowAddressSuggestions(true)}
+                        onBlur={() => setShowAddressSuggestions(false)}
+                        placeholder="Start typing an address..." 
+                        className="w-full text-xs font-normal border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[72px]" 
+                        autoComplete="new-password"
+                        rows={2}
+                      />
                     {showAddressSuggestions && addressSuggestions.length > 0 && (
                       <div className="absolute top-full mt-1 left-0 w-full z-50 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden">
                         {addressSuggestions.map((addr, idx) => {
