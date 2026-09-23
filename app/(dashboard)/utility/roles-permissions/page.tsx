@@ -1190,9 +1190,9 @@ export default function RolesPermissionsPage() {
 
                 {/* Role Name */}
                 {branches.length > 0 && (
-                  <div className="space-y-1.5 col-span-1 md:col-span-2">
-                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                      Target Business Unit <span className="text-red-500">*</span>
+                  <div className="space-y-1.5 col-span-1">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                        Target Business Unit <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={newRoleBusinessUnitId}
@@ -1210,9 +1210,9 @@ export default function RolesPermissionsPage() {
                   </div>
                 )}
                 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                    Custom Role Name <span className="text-red-500">*</span>
+                <div className="space-y-1.5 col-span-1 md:col-span-2">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                      Custom Role Name <span className="text-red-500">*</span>
                   </label>
                   <Input
                     placeholder="e.g. Senior Recruiter, Lead BDM, Operations Head..."
@@ -1543,9 +1543,9 @@ export default function RolesPermissionsPage() {
 
                 {/* Role Name */}
                 {branches.length > 0 && (
-                  <div className="space-y-1.5 col-span-1 md:col-span-2">
-                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                      Target Business Unit <span className="text-red-500">*</span>
+                  <div className="space-y-1.5 col-span-1">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                        Target Business Unit <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={editRoleBusinessUnitId}
@@ -1563,9 +1563,9 @@ export default function RolesPermissionsPage() {
                   </div>
                 )}
                 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                    Custom Role Name <span className="text-red-500">*</span>
+                <div className="space-y-1.5 col-span-1 md:col-span-2">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                      Custom Role Name <span className="text-red-500">*</span>
                   </label>
                   <Input
                     value={editRoleName}
