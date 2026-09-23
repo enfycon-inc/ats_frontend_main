@@ -1154,7 +1154,7 @@ export default function RolesPermissionsPage() {
                   onChange={(e) => handleCreateArchetypeChange(e.target.value)}
                   className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  {SYSTEM_ARCHETYPES.map((arch) => (
+                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN").map((arch) => (
                     <option key={arch.key} value={arch.key}>
                       {arch.label} — ({arch.badge})
                     </option>
@@ -1495,7 +1495,7 @@ export default function RolesPermissionsPage() {
                   onChange={(e) => handleEditArchetypeChange(e.target.value)}
                   className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  {SYSTEM_ARCHETYPES.map((arch) => (
+                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN").map((arch) => (
                     <option key={arch.key} value={arch.key}>
                       {arch.label} — ({arch.badge})
                     </option>
