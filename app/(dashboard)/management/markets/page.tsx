@@ -325,6 +325,7 @@ export default function MarketsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<MarketSegment | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -338,6 +339,8 @@ export default function MarketsPage() {
 
   useEffect(() => {
     load();
+    const user = atsApi.auth.getCurrentUser();
+    setIsGlobalAdmin(!!user?.permissions?.includes('tenant:settings'));
   }, [load]);
 
   const openCreate = () => {
@@ -378,13 +381,7 @@ export default function MarketsPage() {
             Define markets for branch units. Each unit must be assigned to a market.
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          New Market
-        </button>
+        {isGlobalAdmin && (<button onClick={openCreate} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"><Plus className="w-4 h-4" />New Market</button>)}
       </div>
 
       {/* KPI Strip */}
@@ -417,12 +414,7 @@ export default function MarketsPage() {
             <Globe className="w-12 h-12 mb-3 opacity-30" />
             <p className="text-sm font-medium">No market segments yet</p>
             <p className="text-xs mt-1">Create your first market to start assigning units</p>
-            <button
-              onClick={openCreate}
-              className="mt-4 flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700"
-            >
-              <Plus className="w-4 h-4" /> Create Market
-            </button>
+            {isGlobalAdmin && (<button onClick={openCreate} className="mt-4 flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700"><Plus className="w-4 h-4" /> Create Market</button>)}
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -435,7 +427,7 @@ export default function MarketsPage() {
                 <th className="text-left font-medium text-gray-500 px-5 py-3">Shift Hours</th>
                 <th className="text-left font-medium text-gray-500 px-5 py-3">Units</th>
                 <th className="text-left font-medium text-gray-500 px-5 py-3">Status</th>
-                <th className="text-left font-medium text-gray-500 px-5 py-3">Actions</th>
+                {isGlobalAdmin && <th className="text-left font-medium text-gray-500 px-5 py-3">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -483,7 +475,7 @@ export default function MarketsPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-5 py-3.5">
+                  {isGlobalAdmin && (<td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => openEdit(seg)}
@@ -501,7 +493,7 @@ export default function MarketsPage() {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </td>
+                  </td>)}
                 </tr>
               ))}
             </tbody>
@@ -552,3 +544,7 @@ export default function MarketsPage() {
     </div>
   );
 }
+
+
+
+
