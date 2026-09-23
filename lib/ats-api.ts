@@ -1507,6 +1507,10 @@ const businessUnits = {
     name: string;
     branchId?: string;
     code?: string;
+      address?: string;
+      zipCode?: string;
+      city?: string;
+      state?: string;
     market?: string;
     marketSegmentId?: string | null;
     jobCodePattern?: string | null;
