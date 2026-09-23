@@ -244,7 +244,7 @@ export default function RolesPermissionsPage() {
       }
       const delayFn = setTimeout(async () => {
         try {
-          const res = await fetch(https://photon.komoot.io/api/?q=&limit=5);
+          const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(quickAddUnitAddress)}&limit=5`);
           if (res.ok) {
             const data = await res.json();
             if (data.features) {
