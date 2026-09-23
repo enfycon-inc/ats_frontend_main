@@ -1961,7 +1961,7 @@ export default function UserManagementPage() {
 
               {/* Business Unit Selection */}
               <div className="space-y-1 mb-4">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Target Business Unit (Optional)</label>
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Unit (Optional)</label>
                 <select
                   value={addForm.businessUnitId}
                   onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
@@ -1970,23 +1970,6 @@ export default function UserManagementPage() {
                   <option value="">-- No Unit Assigned (Branch Admin) --</option>
                   {businessUnits
                     .filter((bu) => !addForm.branchId || bu.branchId === addForm.branchId)
-                    .map((bu) => (
-                      <option key={bu.id} value={bu.id}>{bu.name}</option>
-                    ))}
-                </select>
-              </div>
-
-              {/* Business Unit Selection */}
-              <div className="space-y-1 mb-4">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Target Business Unit (Optional)</label>
-                <select
-                  value={editForm.businessUnitId}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
-                  className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
-                >
-                  <option value="">-- No Unit Assigned (Branch Admin) --</option>
-                  {businessUnits
-                    .filter((bu) => !editForm.branchId || bu.branchId === editForm.branchId)
                     .map((bu) => (
                       <option key={bu.id} value={bu.id}>{bu.name}</option>
                     ))}
@@ -2233,6 +2216,25 @@ export default function UserManagementPage() {
                     ))}
                   </select>
                 )}
+              </div>
+
+              
+
+              {/* Business Unit Selection */}
+              <div className="space-y-1 mb-4">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Unit (Optional)</label>
+                <select
+                  value={editForm.businessUnitId}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
+                  className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
+                >
+                  <option value="">-- No Unit Assigned (Branch Admin) --</option>
+                  {businessUnits
+                    .filter((bu) => !editForm.branchId || bu.branchId === editForm.branchId)
+                    .map((bu) => (
+                      <option key={bu.id} value={bu.id}>{bu.name}</option>
+                    ))}
+                </select>
               </div>
 
               {/* CUSTOM ROLE SELECTION (STRICTLY ISOLATED PER SELECTED BRANCH) */}
