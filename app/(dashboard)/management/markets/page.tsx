@@ -319,6 +319,7 @@ function MarketModal({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function MarketsPage() {
+  const router = useRouter();
   const [segments, setSegments] = useState<MarketSegment[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
