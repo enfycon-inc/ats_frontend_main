@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { atsApi } from '@/lib/ats-api';
 import {
   Globe,
@@ -340,8 +341,12 @@ export default function MarketsPage() {
   useEffect(() => {
     load();
     const user = atsApi.auth.getCurrentUser();
-    setIsGlobalAdmin(!!user?.permissions?.includes('tenant:settings'));
-  }, [load]);
+    const isGlobal = !!user?.permissions?.includes('tenant:settings');
+    setIsGlobalAdmin(isGlobal);
+    if (!isGlobal) {
+      router.push('/management/branch');
+    }
+  }, [load, router]);
 
   const openCreate = () => {
     setEditSegment(null);
