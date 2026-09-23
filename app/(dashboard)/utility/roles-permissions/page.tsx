@@ -234,6 +234,40 @@ export default function RolesPermissionsPage() {
     const [quickAddUnitState, setQuickAddUnitState] = useState("");
     const [isCreatingUnit, setIsCreatingUnit] = useState(false);
 
+    const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+    const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+
+    useEffect(() => {
+      if (!quickAddUnitAddress || quickAddUnitAddress.length < 4) {
+        setAddressSuggestions([]);
+        return;
+      }
+      const delayFn = setTimeout(async () => {
+        try {
+          const res = await fetch(https://photon.komoot.io/api/?q=&limit=5);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.features) {
+              setAddressSuggestions(data.features);
+            }
+          }
+        } catch (e) {}
+      }, 500);
+      return () => clearTimeout(delayFn);
+    }, [quickAddUnitAddress]);
+
+    const handleSelectAddress = (feature: any) => {
+      const p = feature.properties;
+      const street = p.name ? p.name : p.street;
+      const fullAddr = [street, p.housenumber, p.district].filter(Boolean).join(", ");
+      
+      setQuickAddUnitAddress(fullAddr || p.city || "");
+      if (p.city || p.county) setQuickAddUnitCity(p.city || p.county);
+      if (p.state) setQuickAddUnitState(p.state);
+      if (p.postcode) setQuickAddUnitZip(p.postcode);
+      setShowAddressSuggestions(false);
+    };
+
     const [citySuggestions, setCitySuggestions] = useState<any[]>([]);
     const [showCitySuggestions, setShowCitySuggestions] = useState(false);
 
@@ -1266,7 +1300,36 @@ export default function RolesPermissionsPage() {
                 </div>
                 <div className="space-y-1.5 col-span-2">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Address</label>
-                  <Input value={quickAddUnitAddress} onChange={e => setQuickAddUnitAddress(e.target.value)} placeholder="Street Address" className="h-9 text-xs" />
+                  <div className="relative">
+                    <Input 
+                      value={quickAddUnitAddress} 
+                      onChange={e => { setQuickAddUnitAddress(e.target.value); setShowAddressSuggestions(true); }} 
+                      onFocus={() => setShowAddressSuggestions(true)}
+                      onBlur={() => setShowAddressSuggestions(false)}
+                      placeholder="Start typing an address..." 
+                      className="h-9 text-xs" 
+                      autoComplete="off"
+                    />
+                    {showAddressSuggestions && addressSuggestions.length > 0 && (
+                      <div className="absolute top-full mt-1 left-0 w-full z-50 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden">
+                        {addressSuggestions.map((addr, idx) => {
+                          const p = addr.properties;
+                          const title = [p.name, p.housenumber].filter(Boolean).join(" ") || p.street;
+                          const subtitle = [p.district, p.city || p.county, p.state, p.country].filter(Boolean).join(", ");
+                          return (
+                            <div 
+                              key={idx} 
+                              onMouseDown={(e) => { e.preventDefault(); handleSelectAddress(addr); }}
+                              className="px-3 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer flex flex-col transition-colors border-b last:border-0 border-neutral-100 dark:border-slate-750"
+                            >
+                              <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">{title || subtitle}</span>
+                              {title && <span className="text-[10px] text-neutral-500 dark:text-neutral-400">{subtitle}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1.5 col-span-2 sm:col-span-1">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Zip / PIN Code</label>
@@ -1288,7 +1351,7 @@ export default function RolesPermissionsPage() {
                       {citySuggestions.map((city, idx) => (
                         <div 
                           key={idx} 
-                          onClick={() => handleSelectCity(city)}
+                          onMouseDown={(e) => { e.preventDefault(); handleSelectCity(city); }}
                           className="px-3 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer flex flex-col transition-colors border-b last:border-0 border-neutral-100 dark:border-slate-750"
                         >
                           <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">{city.name}</span>
