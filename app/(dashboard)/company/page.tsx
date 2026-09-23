@@ -23,7 +23,7 @@ import {
 import toast from "react-hot-toast";
 import { getBaseDomain } from "@/utils/subdomain-helper";
 import { isRoleAdmin, resolveActiveSystemRole, CustomRoleDefinition } from "@/lib/role-permissions";
-import { GeneralTab, BranchItem, BusinessUnitItem } from "@/components/company/tabs/general-tab";
+import { GeneralTab } from "@/components/company/tabs/general-tab";
 import { AuthTab } from "@/components/company/tabs/auth-tab";
 import { DomainsTab, DomainMapping } from "@/components/company/tabs/domains-tab";
 import { EmailTab } from "@/components/company/tabs/email-tab";
@@ -33,6 +33,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+
+
+export interface BranchItem { id: string; name: string; code: string; location: string; status: string; unitsCount: number; staffCount: number; reqsCount: number; }
+export interface BusinessUnitItem { id: string; branchId: string; name: string; code: string; market: string; shiftTiming: string; staffCount: number; reqsCount: number; status: string; }
 
 export default function CompanySettingsPage() {
   return (
@@ -409,6 +413,7 @@ function CompanySettingsContent() {
         <TenantAdminSettingsView
           profile={profile}
           companyName={companyName}
+          setCompanyName={setCompanyName}
           subdomain={subdomain}
           originalSubdomain={originalSubdomain}
           setSubdomain={setSubdomain}
@@ -550,46 +555,8 @@ function TenantAdminSettingsView(props: any) {
       <div className="pt-2">
         {currentTab === "general" && (
           <GeneralTab
-            branches={props.branches}
-            showAddBranch={props.showAddBranch}
-            setShowAddBranch={props.setShowAddBranch}
-            branchName={props.branchName}
-            setBranchName={props.setBranchName}
-            branchCode={props.branchCode}
-            setBranchCode={props.setBranchCode}
-            branchCity={props.branchCity}
-            setBranchCity={props.setBranchCity}
-            branchState={props.branchState}
-            setBranchState={props.setBranchState}
-            branchCountry={props.branchCountry}
-            setBranchCountry={props.setBranchCountry}
-            addingBranch={props.addingBranch}
-            handleCreateBranch={props.handleCreateBranch}
-            handleDeleteBranch={props.handleDeleteBranch}
-            businessUnits={props.businessUnits}
-            showAddBU={props.showAddBU}
-            setShowAddBU={props.setShowAddBU}
-            buName={props.buName}
-            setBuName={props.setBuName}
-            buCode={props.buCode}
-            setBuCode={props.setBuCode}
-            buMarket={props.buMarket}
-            setBuMarket={props.setBuMarket}
-            buCurrency={props.buCurrency}
-            setBuCurrency={props.setBuCurrency}
-            buBranchId={props.buBranchId}
-            setBuBranchId={props.setBuBranchId}
-            buShiftTiming={props.buShiftTiming}
-            setBuShiftTiming={props.setBuShiftTiming}
-            buWorkStartTime={props.buWorkStartTime}
-            setBuWorkStartTime={props.setBuWorkStartTime}
-            buWorkEndTime={props.buWorkEndTime}
-            setBuWorkEndTime={props.setBuWorkEndTime}
-            buTimezone={props.buTimezone}
-            setBuTimezone={props.setBuTimezone}
-            addingBU={props.addingBU}
-            handleCreateBU={props.handleCreateBU}
-            handleDeleteBU={props.handleDeleteBU}
+            companyName={props.companyName}
+            setCompanyName={props.setCompanyName}
             subdomain={props.subdomain}
             setSubdomain={props.setSubdomain}
             originalSubdomain={props.originalSubdomain}
