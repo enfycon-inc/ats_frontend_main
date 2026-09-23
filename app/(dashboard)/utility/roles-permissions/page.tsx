@@ -558,7 +558,8 @@ export default function RolesPermissionsPage() {
         const newUnit = await atsApi.businessUnits.create({
           name: quickAddUnitName.trim(),
           branchId: quickAddUnitBranchId,
-          code: quickAddUnitCode.trim() || undefined,
+          code: quickAddUnitCode.trim(),
+          marketSegmentId: quickAddUnitMarketSegmentId,
           address: quickAddUnitAddress.trim() || undefined,
           zipCode: quickAddUnitZip.trim() || undefined,
           city: quickAddUnitCity.trim() || undefined,
@@ -1246,8 +1247,22 @@ export default function RolesPermissionsPage() {
                   <Input value={quickAddUnitName} onChange={e => setQuickAddUnitName(e.target.value)} placeholder="e.g. US IT Recruitment" className="h-9 text-xs" required />
                 </div>
                 <div className="space-y-1.5 col-span-2">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Unit ID</label>
-                  <Input value={quickAddUnitCode} onChange={e => setQuickAddUnitCode(e.target.value)} placeholder="e.g. UNIT-101" className="h-9 text-xs" />
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Unit ID <span className="text-red-500">*</span></label>
+                  <Input value={quickAddUnitCode} onChange={e => setQuickAddUnitCode(e.target.value)} placeholder="e.g. UNIT-101" className="h-9 text-xs" required />
+                </div>
+                <div className="space-y-1.5 col-span-2">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Market Segment <span className="text-red-500">*</span></label>
+                  <select 
+                    value={quickAddUnitMarketSegmentId} 
+                    onChange={e => setQuickAddUnitMarketSegmentId(e.target.value)}
+                    className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                    required
+                  >
+                    <option value="" disabled>-- Select Market Segment --</option>
+                    {marketSegments.map(ms => (
+                      <option key={ms.id} value={ms.id}>{ms.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1.5 col-span-2">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Address</label>
