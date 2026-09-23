@@ -341,6 +341,9 @@ export default function RolesPermissionsPage() {
   const [roleToDelete, setRoleToDelete] = useState<{ role: CustomRole; staffCount: number } | null>(null);
   const [targetRoleId, setTargetRoleId] = useState<string>("");
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
+  const [showBulkActionsMenu, setShowBulkActionsMenu] = useState(false);
+  const [showBulkChangeUnit, setShowBulkChangeUnit] = useState(false);
+  const [bulkChangeUnitId, setBulkChangeUnitId] = useState("");
 
   useEffect(() => {
     const user = atsApi.auth.getCurrentUser();
@@ -969,34 +972,136 @@ export default function RolesPermissionsPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          {selectedRoleIds.length > 0 && (
-            <div className="flex items-center gap-2 border-r border-neutral-200 dark:border-slate-700 pr-4">
-              <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                {selectedRoleIds.length} Selected
-              </span>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-8 text-[11px] border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20 px-2 cursor-pointer"
-                onClick={() => {
-                  if(confirm(`Are you sure you want to delete ${selectedRoleIds.length} roles?`)) {
-                    setSubmitting(true);
-                    Promise.all(selectedRoleIds.map(id => atsApi.auth.deleteCustomRole(id)))
-                      .then(() => {
-                        toast.success(`Deleted ${selectedRoleIds.length} roles successfully!`);
-                        setSelectedRoleIds([]);
-                        loadData();
-                      })
-                      .catch(err => toast.error("Failed to delete some roles: " + err.message))
-                      .finally(() => setSubmitting(false));
-                  }
-                }}
-              >
-                <Icon icon="heroicons:trash" className="h-3.5 w-3.5 mr-1" />
-                Bulk Delete
-              </Button>
-            </div>
-          )}
+          {selectedRoleIds.length > 0 && (() => {
+            const selectedRoles = filteredRoles.filter(r => selectedRoleIds.includes(r.id));
+            const branchIds = [...new Set(selectedRoles.map(r => r.branchId).filter(Boolean))];
+            const sameBranch = branchIds.length === 1;
+            const sameBranchId = sameBranch ? branchIds[0] : null;
+            const availableUnitsForBranch = businessUnits.filter(bu => bu.branchId === sameBranchId);
+            return (
+              <div className="flex items-center gap-2 border-r border-neutral-200 dark:border-slate-700 pr-4 relative">
+                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                  {selectedRoleIds.length} Selected
+                </span>
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-[11px] border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-900/20 px-2.5 cursor-pointer gap-1"
+                    onClick={() => setShowBulkActionsMenu(v => !v)}
+                  >
+                    <Icon icon="heroicons:bolt" className="h-3.5 w-3.5" />
+                    Actions
+                    <Icon icon="heroicons:chevron-down" className="h-3 w-3 ml-0.5" />
+                  </Button>
+                  {showBulkActionsMenu && (
+                    <>
+                      {/* backdrop to close */}
+                      <div className="fixed inset-0 z-40" onClick={() => setShowBulkActionsMenu(false)} />
+                      <div className="absolute left-0 top-full mt-1 w-52 rounded-xl border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl z-50 overflow-hidden py-1">
+                        {/* Change Unit — only when all selected share the same branch */}
+                        {sameBranch && availableUnitsForBranch.length > 0 && (
+                          <button
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors text-left"
+                            onClick={() => {
+                              setShowBulkActionsMenu(false);
+                              setBulkChangeUnitId("");
+                              setShowBulkChangeUnit(true);
+                            }}
+                          >
+                            <Icon icon="heroicons:building-office-2" className="h-4 w-4 shrink-0 text-indigo-500" />
+                            Change Branch Unit
+                          </button>
+                        )}
+                        {sameBranch && availableUnitsForBranch.length > 0 && (
+                          <div className="border-t border-neutral-100 dark:border-slate-800 my-1" />
+                        )}
+                        <button
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-left"
+                          onClick={() => {
+                            setShowBulkActionsMenu(false);
+                            if (confirm(`Are you sure you want to delete ${selectedRoleIds.length} role${selectedRoleIds.length > 1 ? 's' : ''}? This action cannot be undone.`)) {
+                              setSubmitting(true);
+                              Promise.all(selectedRoleIds.map(id => atsApi.auth.deleteCustomRole(id)))
+                                .then(() => {
+                                  toast.success(`Deleted ${selectedRoleIds.length} role${selectedRoleIds.length > 1 ? 's' : ''} successfully!`);
+                                  setSelectedRoleIds([]);
+                                  loadData();
+                                })
+                                .catch(err => toast.error("Failed to delete some roles: " + err.message))
+                                .finally(() => setSubmitting(false));
+                            }
+                          }}
+                        >
+                          <Icon icon="heroicons:trash" className="h-4 w-4 shrink-0 text-red-500" />
+                          Delete Selected
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+                {/* Change Unit inline modal */}
+                {showBulkChangeUnit && sameBranch && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-slate-700 w-full max-w-sm p-6 flex flex-col gap-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Change Branch Unit</h3>
+                          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                            Assign <span className="font-semibold text-indigo-600 dark:text-indigo-400">{selectedRoleIds.length} role{selectedRoleIds.length > 1 ? 's' : ''}</span> to a different unit within <span className="font-semibold">{filteredRoles.find(r => r.branchId === sameBranchId)?.branchName || 'this branch'}</span>.
+                          </p>
+                        </div>
+                        <button onClick={() => setShowBulkChangeUnit(false)} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 mt-0.5 cursor-pointer">
+                          <Icon icon="heroicons:x-mark" className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5 block">Target Branch Unit</label>
+                        <select
+                          value={bulkChangeUnitId}
+                          onChange={e => setBulkChangeUnitId(e.target.value)}
+                          className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                        >
+                          <option value="">-- Select Branch Unit --</option>
+                          {availableUnitsForBranch.map(bu => (
+                            <option key={bu.id} value={bu.id}>{bu.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="outline" size="sm" className="h-8 text-xs cursor-pointer" onClick={() => setShowBulkChangeUnit(false)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
+                          disabled={!bulkChangeUnitId || submitting}
+                          onClick={async () => {
+                            if (!bulkChangeUnitId) return;
+                            setSubmitting(true);
+                            try {
+                              await Promise.all(selectedRoleIds.map(id => atsApi.auth.updateCustomRole(id, { businessUnitId: bulkChangeUnitId })));
+                              toast.success(`Updated unit for ${selectedRoleIds.length} role${selectedRoleIds.length > 1 ? 's' : ''}!`);
+                              setShowBulkChangeUnit(false);
+                              setSelectedRoleIds([]);
+                              await loadData();
+                            } catch (err: any) {
+                              toast.error("Failed to update unit: " + err.message);
+                            } finally {
+                              setSubmitting(false);
+                            }
+                          }}
+                        >
+                          <Icon icon="heroicons:check" className="h-3.5 w-3.5 mr-1" />
+                          Apply
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           <div className="flex items-center gap-2 text-xs font-medium text-neutral-500">
             <span>Showing <strong>{filteredRoles.length}</strong> of <strong>{customRolesList.length}</strong> custom roles</span>
           </div>
