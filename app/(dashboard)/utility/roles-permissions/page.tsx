@@ -499,6 +499,7 @@ export default function RolesPermissionsPage() {
   const handleCreateRole = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRoleName.trim()) return toast.error("Please provide a role name.");
+      if (!newRoleBusinessUnitId) return toast.error("Please select a Branch Unit.");
     try {
       setSubmitting(true);
       const baseSystemRoleObj = roles.find(r => r.isSystem && r.name.toUpperCase() === newRoleSystemRole.toUpperCase());
@@ -550,6 +551,7 @@ export default function RolesPermissionsPage() {
     e.preventDefault();
     if (!editingRole) return;
     if (!editRoleName.trim()) return toast.error("Role name cannot be empty.");
+      if (!editRoleBusinessUnitId) return toast.error("Please select a Branch Unit.");
 
     try {
       setSubmitting(true);
@@ -826,7 +828,7 @@ export default function RolesPermissionsPage() {
             onChange={(e) => setUnitFilter(e.target.value)}
             className="text-xs h-9 px-2 rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
           >
-            <option value="all">All Units</option>
+            <option value="all">All Branch Units</option>
             {businessUnits.filter(bu => selectedBranchFilter === "all" || bu.branchId === selectedBranchFilter).map(bu => <option key={bu.id} value={bu.id}>{bu.name}</option>)}
           </select>
           <select
@@ -884,7 +886,7 @@ export default function RolesPermissionsPage() {
                   <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Role Name</th>
                   <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Base Role</th>
                   <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Branch Office</th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Business Unit</th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Branch Unit</th>
                 <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-center">Permissions</th>
                 <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-center">Users Assigned</th>
                 <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Created By</th>
@@ -975,7 +977,7 @@ export default function RolesPermissionsPage() {
                         </span>
                       </td>
 
-                      {/* 3.5. BUSINESS UNIT */}
+                      {/* 3.5. BRANCH UNIT */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                           {role.businessUnitName || "-"}
@@ -1192,7 +1194,7 @@ export default function RolesPermissionsPage() {
                 {branches.length > 0 && (
                   <div className="space-y-1.5 col-span-1">
                       <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                        Target Business Unit <span className="text-red-500">*</span>
+                        Target Branch Unit <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={newRoleBusinessUnitId}
@@ -1200,7 +1202,7 @@ export default function RolesPermissionsPage() {
                       className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                       required
                     >
-                      <option value="">-- Select Unit --</option>
+                      <option value="">-- Select Branch Unit --</option>
                       {businessUnits.filter(bu => !newRoleBranchId || bu.branchId === newRoleBranchId).map((bu) => (
                         <option key={bu.id} value={bu.id}>
                           {bu.name}
@@ -1260,11 +1262,11 @@ export default function RolesPermissionsPage() {
                   onChange={(e) => handleCreateArchetypeChange(e.target.value)}
                   className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN").map((arch) => (
-                    <option key={arch.key} value={arch.key}>
-                      {arch.label} — ({arch.badge})
-                    </option>
-                  ))}
+                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN" && a.key !== "ADMIN").map((arch) => (
+                      <option key={arch.key} value={arch.key}>
+                        {arch.label.replace(" Template", "")}
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -1545,7 +1547,7 @@ export default function RolesPermissionsPage() {
                 {branches.length > 0 && (
                   <div className="space-y-1.5 col-span-1">
                       <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                        Target Business Unit <span className="text-red-500">*</span>
+                        Target Branch Unit <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={editRoleBusinessUnitId}
@@ -1553,7 +1555,7 @@ export default function RolesPermissionsPage() {
                       className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                       required
                     >
-                      <option value="">-- Select Unit --</option>
+                      <option value="">-- Select Branch Unit --</option>
                       {businessUnits.filter(bu => !editRoleBranchId || bu.branchId === editRoleBranchId).map((bu) => (
                         <option key={bu.id} value={bu.id}>
                           {bu.name}
@@ -1622,11 +1624,11 @@ export default function RolesPermissionsPage() {
                   onChange={(e) => handleEditArchetypeChange(e.target.value)}
                   className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN").map((arch) => (
-                    <option key={arch.key} value={arch.key}>
-                      {arch.label} — ({arch.badge})
-                    </option>
-                  ))}
+                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN" && a.key !== "ADMIN").map((arch) => (
+                      <option key={arch.key} value={arch.key}>
+                        {arch.label.replace(" Template", "")}
+                      </option>
+                    ))}
                 </select>
               </div>
 
