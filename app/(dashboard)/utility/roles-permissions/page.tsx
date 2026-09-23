@@ -25,6 +25,7 @@ interface CustomRole {
   branchId?: string | null;
   businessUnitId?: string | null;
   branchName?: string | null;
+  businessUnitName?: string | null;
   isSystem: boolean;
   systemRole?: string;
   baseRoleId?: string | null;
@@ -171,6 +172,8 @@ export default function RolesPermissionsPage() {
   const [branches, setBranches] = useState<any[]>([]);
   const [businessUnits, setBusinessUnits] = useState<any[]>([]);
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
+  const [unitFilter, setUnitFilter] = useState<string>("all");
+  const [archFilter, setArchFilter] = useState<string>("all");
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -251,6 +254,7 @@ export default function RolesPermissionsPage() {
   // Delete Modal State
   const [roleToDelete, setRoleToDelete] = useState<{ role: CustomRole; staffCount: number } | null>(null);
   const [targetRoleId, setTargetRoleId] = useState<string>("");
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
 
   useEffect(() => {
     const user = atsApi.auth.getCurrentUser();
@@ -432,7 +436,7 @@ export default function RolesPermissionsPage() {
       );
     }
     return list;
-  }, [customRolesList, selectedBranchFilter, searchQuery]);
+  }, [customRolesList, selectedBranchFilter, unitFilter, archFilter, searchQuery]);
 
   // Available staff members to assign to assignModalRole (supports multiple roles per user)
   const availableUsersToAssign = useMemo(() => {
@@ -818,9 +822,11 @@ export default function RolesPermissionsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-neutral-50/80 dark:bg-slate-800/40 border-b border-neutral-200 dark:border-slate-800">
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Role Name</th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Base Role</th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Branch Office</th>
+                <th className="py-3 px-4 w-12 text-center"><input type="checkbox" className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" checked={selectedRoleIds.length === filteredRoles.length && filteredRoles.length > 0} onChange={(e) => { if (e.target.checked) { setSelectedRoleIds(filteredRoles.map(r => r.id)); } else { setSelectedRoleIds([]); } }} /></th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Role Name</th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Base Role</th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Branch Office</th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Business Unit</th>
                 <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-center">Permissions</th>
                 <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-center">Users Assigned</th>
                 <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">Created By</th>
@@ -832,7 +838,7 @@ export default function RolesPermissionsPage() {
             <tbody className="divide-y divide-neutral-100 dark:divide-slate-800 text-xs">
               {filteredRoles.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-16 text-center text-neutral-500 font-semibold italic">
+                  <td colSpan={11} className="py-16 text-center text-neutral-500 font-semibold italic">
                     <div className="flex flex-col items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-neutral-100 dark:bg-slate-800 text-neutral-500 flex items-center justify-center">
                         <Icon icon="heroicons:shield-check" className="h-5 w-5" />
