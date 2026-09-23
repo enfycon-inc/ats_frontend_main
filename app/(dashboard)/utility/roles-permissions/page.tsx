@@ -170,6 +170,8 @@ export default function RolesPermissionsPage() {
 
   const [roles, setRoles] = useState<CustomRole[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
+  const [marketSegments, setMarketSegments] = useState<any[]>([]);
+  const [quickAddUnitMarketSegmentId, setQuickAddUnitMarketSegmentId] = useState("");
   const [businessUnits, setBusinessUnits] = useState<any[]>([]);
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
   const [unitFilter, setUnitFilter] = useState<string>("all");
@@ -242,7 +244,7 @@ export default function RolesPermissionsPage() {
       }
       const delayFn = setTimeout(async () => {
         try {
-          const res = await fetch(https://geocoding-api.open-meteo.com/v1/search?name=&count=5&language=en&format=json);
+          const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(quickAddUnitCity)}&count=5&language=en&format=json`);
           if (res.ok) {
             const data = await res.json();
             if (data.results) {
@@ -360,15 +362,17 @@ export default function RolesPermissionsPage() {
     try {
       setLoading(true);
       const bid = branchFilter !== "all" ? branchFilter : undefined;
-      const [rolesData, permsData, usersData, branchesData, businessUnitsData] = await Promise.all([
-        atsApi.auth.listRoles(bid, true),
-        atsApi.auth.listAllPermissions(),
-        atsApi.auth.listUsers(),
-        atsApi.branches.list().catch(() => []),
-        atsApi.businessUnits.list().catch(() => []),
-      ]);
+      const [rolesData, permsData, usersData, branchesData, businessUnitsData, marketSegmentsData] = await Promise.all([
+          atsApi.auth.listRoles(bid, true),
+          atsApi.auth.listAllPermissions(),
+          atsApi.auth.listUsers(),
+          atsApi.branches.list().catch(() => []),
+          atsApi.businessUnits.list().catch(() => []),
+          atsApi.marketSegments.list().catch(() => []),
+        ]);
 
       setBusinessUnits(businessUnitsData || []);
+        setMarketSegments(marketSegmentsData || []);
 
       setRoles(rolesData || []);
       setPermissions(permsData || []);
@@ -565,6 +569,7 @@ export default function RolesPermissionsPage() {
         setQuickAddUnitName("");
         setQuickAddUnitCode("");
         setQuickAddUnitAddress("");
+      setQuickAddUnitMarketSegmentId("");
         setQuickAddUnitZip("");
         setQuickAddUnitCity("");
         setQuickAddUnitState("");
