@@ -1300,11 +1300,18 @@ export default function RolesPermissionsPage() {
                 {/* Role Name */}
                 {branches.length > 0 && (
                   <div className="space-y-1.5 col-span-1">
-                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                        Target Branch Unit <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={newRoleBusinessUnitId}
+                      <div className="flex justify-between items-center mb-1.5">
+                        <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                          Target Branch Unit <span className="text-red-500">*</span>
+                        </label>
+                        {newRoleBranchId && (
+                          <button type="button" onClick={() => { setQuickAddUnitBranchId(newRoleBranchId); setShowQuickAddUnit(true); }} className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer flex items-center gap-1">
+                            <Icon icon="heroicons:plus" className="h-3 w-3" /> Add Unit
+                          </button>
+                        )}
+                      </div>
+                      <select
+                        value={newRoleBusinessUnitId}
                       onChange={(e) => setNewRoleBusinessUnitId(e.target.value)}
                       className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                       required
@@ -1316,14 +1323,7 @@ export default function RolesPermissionsPage() {
                         </option>
                       ))}
                     </select>
-                    {newRoleBranchId && businessUnits.filter(bu => bu.branchId === newRoleBranchId).length === 0 && (
-                      <div className="mt-2 flex items-center justify-between p-2.5 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/50 rounded-lg">
-                        <span className="text-[10px] text-indigo-700 dark:text-indigo-300 font-medium">No Branch Units found.</span>
-                        <Button type="button" size="sm" variant="ghost" className="h-6 text-[10px] text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-2 cursor-pointer" onClick={() => { setQuickAddUnitBranchId(newRoleBranchId); setShowQuickAddUnit(true); }}>
-                          <Icon icon="heroicons:plus" className="h-3 w-3 mr-1" /> Add Unit
-                        </Button>
-                      </div>
-                    )}
+                    
                   </div>
                 )}
                 
@@ -1660,11 +1660,18 @@ export default function RolesPermissionsPage() {
                 {/* Role Name */}
                 {branches.length > 0 && (
                   <div className="space-y-1.5 col-span-1">
-                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                        Target Branch Unit <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={editRoleBusinessUnitId}
+                      <div className="flex justify-between items-center mb-1.5">
+                        <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                          Target Branch Unit <span className="text-red-500">*</span>
+                        </label>
+                        {editRoleBranchId && (
+                          <button type="button" onClick={() => { setQuickAddUnitBranchId(editRoleBranchId); setShowQuickAddUnit(true); }} className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer flex items-center gap-1">
+                            <Icon icon="heroicons:plus" className="h-3 w-3" /> Add Unit
+                          </button>
+                        )}
+                      </div>
+                      <select
+                        value={editRoleBusinessUnitId}
                       onChange={(e) => setEditRoleBusinessUnitId(e.target.value)}
                       className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                       required
@@ -1676,14 +1683,7 @@ export default function RolesPermissionsPage() {
                         </option>
                       ))}
                     </select>
-                    {editRoleBranchId && businessUnits.filter(bu => bu.branchId === editRoleBranchId).length === 0 && (
-                      <div className="mt-2 flex items-center justify-between p-2.5 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/50 rounded-lg">
-                        <span className="text-[10px] text-indigo-700 dark:text-indigo-300 font-medium">No Branch Units found.</span>
-                        <Button type="button" size="sm" variant="ghost" className="h-6 text-[10px] text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-2 cursor-pointer" onClick={() => { setQuickAddUnitBranchId(editRoleBranchId); setShowQuickAddUnit(true); }}>
-                          <Icon icon="heroicons:plus" className="h-3 w-3 mr-1" /> Add Unit
-                        </Button>
-                      </div>
-                    )}
+                    
                   </div>
                 )}
                 
