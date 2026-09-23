@@ -222,6 +222,11 @@ export default function RolesPermissionsPage() {
   const [newRoleSystemRole, setNewRoleSystemRole] = useState("RECRUITER");
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>(SYSTEM_ARCHETYPES[0].perms);
 
+    const [showQuickAddUnit, setShowQuickAddUnit] = useState(false);
+    const [quickAddUnitBranchId, setQuickAddUnitBranchId] = useState("");
+    const [quickAddUnitName, setQuickAddUnitName] = useState("");
+    const [isCreatingUnit, setIsCreatingUnit] = useState(false);
+
   // Edit Modal State
   const [editingRole, setEditingRole] = useState<CustomRole | null>(null);
   const [editRoleName, setEditRoleName] = useState("");
@@ -496,7 +501,32 @@ export default function RolesPermissionsPage() {
     }
   };
 
-  const handleCreateRole = async (e: React.FormEvent) => {
+  const handleQuickAddUnit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!quickAddUnitName.trim() || !quickAddUnitBranchId) return toast.error("Name and Branch are required");
+      try {
+        setIsCreatingUnit(true);
+        const newUnit = await atsApi.businessUnits.create({
+          name: quickAddUnitName.trim(),
+          branchId: quickAddUnitBranchId
+        });
+        toast.success("Branch Unit created successfully!");
+        setShowQuickAddUnit(false);
+        setQuickAddUnitName("");
+        const refreshedUnits = await atsApi.businessUnits.list().catch(() => []);
+        setBusinessUnits(refreshedUnits || []);
+        
+        // Auto-select the newly created unit in the forms
+        setNewRoleBusinessUnitId(newUnit.id);
+        setEditRoleBusinessUnitId(newUnit.id);
+      } catch (err: any) {
+        toast.error("Failed to create Branch Unit: " + err.message);
+      } finally {
+        setIsCreatingUnit(false);
+      }
+    };
+
+    const handleCreateRole = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRoleName.trim()) return toast.error("Please provide a role name.");
       if (!newRoleBusinessUnitId) return toast.error("Please select a Branch Unit.");
@@ -1137,6 +1167,40 @@ export default function RolesPermissionsPage() {
       </Card>
 
       {/* ─── MODAL 1: CREATE CUSTOM ROLE ───────────────────────────────── */}
+      {showQuickAddUnit && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                <Icon icon="heroicons:plus-circle" className="h-4.5 w-4.5 text-indigo-600 dark:text-indigo-400" />
+                Quick Add Branch Unit
+              </h3>
+              <button onClick={() => setShowQuickAddUnit(false)} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-white cursor-pointer">
+                <Icon icon="heroicons:x-mark" className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleQuickAddUnit} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Unit Name <span className="text-red-500">*</span></label>
+                <Input 
+                  value={quickAddUnitName} 
+                  onChange={e => setQuickAddUnitName(e.target.value)} 
+                  placeholder="e.g. US IT Recruitment" 
+                  className="h-10 text-xs" 
+                  required 
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" size="sm" type="button" onClick={() => setShowQuickAddUnit(false)} className="h-9 cursor-pointer text-xs px-4">Cancel</Button>
+                <Button size="sm" type="submit" disabled={isCreatingUnit} className="h-9 cursor-pointer text-xs px-4 bg-indigo-600 hover:bg-indigo-700">
+                  {isCreatingUnit ? 'Saving...' : 'Add Unit'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      
       {showAddRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[90vh] flex flex-col">
@@ -1209,6 +1273,14 @@ export default function RolesPermissionsPage() {
                         </option>
                       ))}
                     </select>
+                    {newRoleBranchId && businessUnits.filter(bu => bu.branchId === newRoleBranchId).length === 0 && (
+                      <div className="mt-2 flex items-center justify-between p-2.5 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/50 rounded-lg">
+                        <span className="text-[10px] text-indigo-700 dark:text-indigo-300 font-medium">No Branch Units found.</span>
+                        <Button type="button" size="sm" variant="ghost" className="h-6 text-[10px] text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-2 cursor-pointer" onClick={() => { setQuickAddUnitBranchId(newRoleBranchId); setShowQuickAddUnit(true); }}>
+                          <Icon icon="heroicons:plus" className="h-3 w-3 mr-1" /> Add Unit
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -1219,8 +1291,7 @@ export default function RolesPermissionsPage() {
                   <Input
                     placeholder="e.g. Senior Recruiter, Lead BDM, Operations Head..."
                     value={newRoleName}
-                    onChange={(e) => setNewRoleName(e.target.value)}
-                    className="text-xs h-10 font-medium"
+                    onChange={(e) => setNewRoleName(e.target.value)} className="text-xs h-10 font-medium" disabled={!newRoleBusinessUnitId}
                     required
                   />
                 </div>
@@ -1562,6 +1633,14 @@ export default function RolesPermissionsPage() {
                         </option>
                       ))}
                     </select>
+                    {editRoleBranchId && businessUnits.filter(bu => bu.branchId === editRoleBranchId).length === 0 && (
+                      <div className="mt-2 flex items-center justify-between p-2.5 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/50 rounded-lg">
+                        <span className="text-[10px] text-indigo-700 dark:text-indigo-300 font-medium">No Branch Units found.</span>
+                        <Button type="button" size="sm" variant="ghost" className="h-6 text-[10px] text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-2 cursor-pointer" onClick={() => { setQuickAddUnitBranchId(editRoleBranchId); setShowQuickAddUnit(true); }}>
+                          <Icon icon="heroicons:plus" className="h-3 w-3 mr-1" /> Add Unit
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -1571,8 +1650,7 @@ export default function RolesPermissionsPage() {
                   </label>
                   <Input
                     value={editRoleName}
-                    onChange={(e) => setEditRoleName(e.target.value)}
-                    className="text-xs h-10 font-medium"
+                    onChange={(e) => setEditRoleName(e.target.value)} className="text-xs h-10 font-medium" disabled={!editRoleBusinessUnitId}
                     required
                   />
                 </div>
