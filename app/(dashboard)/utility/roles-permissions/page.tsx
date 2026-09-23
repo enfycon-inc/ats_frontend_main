@@ -688,6 +688,7 @@ export default function RolesPermissionsPage() {
         systemRole: editRoleSystemRole,
         baseRoleId: baseSystemRoleObj?.id,
         branchId: editRoleBranchId || undefined,
+          businessUnitId: editRoleBusinessUnitId || undefined,
         permissions: sanitizedPerms,
       });
 
