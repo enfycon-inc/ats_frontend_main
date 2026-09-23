@@ -1,15 +1,24 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { UnitsContent } from "@/app/(dashboard)/management/units/page";
 import { 
   Building2, MapPin, Plus, Edit2, Users, CheckCircle2, XCircle, 
   Search, ShieldAlert, X, Globe, UserPlus, Briefcase, Crown, Shield,
   GitFork, ChevronRight, ChevronDown, Layers, ArrowRight, MessageSquare, ListChecks, Trash2,
-  Clock, Calendar, Sun, Moon, Check, Loader2, Table as TableIcon, Mail
+  Lock, Clock, Calendar, Sun, Moon, Check, Loader2, Table as TableIcon, Mail, Pencil, MoreHorizontal
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import {
   HoverCard,
   HoverCardTrigger,
@@ -18,6 +27,8 @@ import {
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
 import { useSocket } from "@/contexts/SocketContext";
+import { CityAutocomplete } from "@/components/city-autocomplete";
+import { getDynamicTimezoneOptions } from "@/lib/timezone-helper";
 
 const SYSTEM_INTERNAL_ROLES = new Set([
   "default_roles_enfycon_ats",
@@ -50,6 +61,13 @@ function getInitials(name?: string, email?: string): string {
 
 function getRoleBadge(role: string) {
   const norm = role.toUpperCase().replace(/[\s-]/g, "_");
+  if (norm.includes("UNIT_ADMIN") || norm.includes("UNIT ADMIN")) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+        Unit Admin
+      </span>
+    );
+  }
   if (norm.includes("ADMIN") || norm.includes("SUPER_ADMIN")) {
     return (
       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
@@ -98,7 +116,11 @@ function formatTime12(timeStr?: string) {
   return `${String(h).padStart(2, "0")}:${m} ${ampm}`;
 }
 
-export default function BranchManagementPage() {
+function BranchManagementPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentTab = searchParams?.get("tab") === "units" ? "units" : "branches";
+  const filterBranchId = searchParams?.get("branchId") || "";
   const [sessionUser, setLiveProfile] = useState<any>(null);
   const { isUserOnline } = useSocket();
   
@@ -120,6 +142,14 @@ export default function BranchManagementPage() {
   const canAssignManager = userPermissions.includes('branch:assign_manager') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('user:manage') || userPermissions.includes('tenant:settings');
   const canAssignUserRoles = userPermissions.includes('branch:assign_user') || userPermissions.includes('branch_admin:manage') || userPermissions.includes('user:manage') || userPermissions.includes('tenant:settings');
   const canManageBranches = canCreateBranch || canDeleteBranch;
+  const canManageUnit = userPermissions.includes('unit_admin:manage') || canManageBranches;
+  const canEditUnitFunc = (unitId: string) => {
+    if (isTenantManager || canManageBranches) return true;
+    if (userPermissions.includes('unit_admin:manage')) {
+      return sessionUser?.businessUnitId === unitId;
+    }
+    return false;
+  };
   const isGlobalAdmin = userPermissions.includes('system:admin') || userPermissions.includes('platform:manage');
   const isTenantManager = userPermissions.some(p => ['tenant:settings', 'tenant:manage', 'platform:manage'].includes(p));
   const ownBranchSettings = !isTenantManager;
@@ -129,6 +159,9 @@ export default function BranchManagementPage() {
     userPermissions.includes('system:admin') || userPermissions.includes('platform:manage');
 
   const [branches, setBranches] = useState<any[]>([]);
+  const totalUnitsCount = useMemo(() => {
+    return branches.reduce((acc, b) => acc + (b.businessUnits?.length || 0), 0);
+  }, [branches]);
   const [hierarchyData, setHierarchyData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -146,6 +179,55 @@ export default function BranchManagementPage() {
   const [savingManager, setSavingManager] = useState(false);
   const [branchToDelete, setBranchToDelete] = useState<any>(null);
   const [isDeletingBranch, setIsDeletingBranch] = useState(false);
+  const [selectedUnitId, setSelectedUnitId] = useState<string>("");
+  const [selectedBranchUnits, setSelectedBranchUnits] = useState<any[]>([]);
+
+  // Operating Units Management State
+  const [isCreateUnitOpen, setIsCreateUnitOpen] = useState(false);
+  const [isManageUnitsOpen, setIsManageUnitsOpen] = useState(false);
+  const [isEditUnitOpen, setIsEditUnitOpen] = useState(false);
+  const [editingUnit, setEditingUnit] = useState<any>(null);
+  const [editUnitFormData, setEditUnitFormData] = useState({
+    name: "",
+    market: "INDIA",
+    currency: "INR",
+    shiftTiming: "General Shift",
+    workStartTime: "09:30",
+    workEndTime: "18:30",
+    timezone: "Asia/Kolkata",
+    workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+    breakDurationMinutes: 60,
+    allowNone: false,
+    allowPods: true,
+    allowAll: true,
+    allowUnassigned: true,
+    podDistributionStrategy: "AUTO" as "AUTO" | "MANUAL",
+  });
+  const [isSubmittingEditUnit, setIsSubmittingEditUnit] = useState(false);
+  const [unitBranch, setUnitBranch] = useState<any>(null);
+  const [unitFormData, setUnitFormData] = useState({
+    name: "",
+    branchId: "",
+    market: "INDIA",
+    currency: "INR",
+    shiftTiming: "General Shift",
+    workStartTime: "09:30",
+    workEndTime: "18:30",
+    timezone: "Asia/Kolkata",
+    workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+    breakDurationMinutes: 60,
+    allowNone: false,
+    allowPods: true,
+    allowAll: true,
+    allowUnassigned: true,
+    podDistributionStrategy: "AUTO" as "AUTO" | "MANUAL",
+  });
+  const [unitPods, setUnitPods] = useState<any[]>([]);
+  const [loadingUnitPods, setLoadingUnitPods] = useState(false);
+  const [quickPodUnitId, setQuickPodUnitId] = useState<string>("");
+  const [isSubmittingUnit, setIsSubmittingUnit] = useState(false);
+  const [unitFormError, setUnitFormError] = useState("");
+  const [isDeletingUnit, setIsDeletingUnit] = useState(false);
 
   // Branch & Global Stage Remarks Modal State
   const [isRemarksOpen, setIsRemarksOpen] = useState(false);
@@ -167,6 +249,8 @@ export default function BranchManagementPage() {
   const [globalSelectorStageFilter, setGlobalSelectorStageFilter] = useState("all");
 
   const [selectedBranch, setSelectedBranch] = useState<any>(null);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([]);
   const [branchMembers, setBranchMembers] = useState<any[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [tenantRoles, setTenantRoles] = useState<any[]>([]);
@@ -192,9 +276,11 @@ export default function BranchManagementPage() {
   const [formData, setFormData] = useState({
     name: "",
     code: "",
+    street: "",
     city: "",
     state: "",
     country: "India",
+    pincode: "",
     market: "INDIA",
     timezone: "Asia/Kolkata",
     workStartTime: "09:00",
@@ -347,26 +433,216 @@ export default function BranchManagementPage() {
     }
   };
 
-  const handleAssignManager = async (managerId: string | null) => {
+  const openCreateUnitModal = (branch?: any) => {
+    const targetBranch = branch || selectedBranch || branches[0] || null;
+    setUnitBranch(targetBranch);
+    const isUs = targetBranch?.market === "US";
+    setUnitFormData({
+      name: "",
+      branchId: targetBranch?.id || "",
+      market: isUs ? "US" : "INDIA",
+      currency: isUs ? "USD" : "INR",
+      shiftTiming: isUs ? "US Shift" : "General Shift",
+      workStartTime: isUs ? "20:00" : "09:30",
+      workEndTime: isUs ? "05:00" : "18:30",
+      timezone: targetBranch?.timezone || (isUs ? "America/New_York" : "Asia/Kolkata"),
+      workingDays: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
+      breakDurationMinutes: 60,
+      allowNone: false,
+      allowPods: true,
+      allowAll: true,
+      allowUnassigned: true,
+      podDistributionStrategy: "AUTO",
+    });
+    setUnitFormError("");
+    setIsCreateUnitOpen(true);
+  };
+
+  const handleCreateUnit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unitFormData.name.trim()) {
+      setUnitFormError("Unit Name is required (e.g. US IT Staffing, Domestic IT)");
+      return;
+    }
+    if (!unitFormData.branchId) {
+      setUnitFormError("Target Branch Office is required");
+      return;
+    }
+    try {
+      setIsSubmittingUnit(true);
+      setUnitFormError("");
+      await atsApi.businessUnits.create({
+        name: unitFormData.name.trim(),
+        branchId: unitFormData.branchId,
+        market: unitFormData.market,
+        currency: unitFormData.currency,
+        shiftTiming: unitFormData.shiftTiming,
+        workStartTime: unitFormData.workStartTime,
+        workEndTime: unitFormData.workEndTime,
+        timezone: unitFormData.timezone,
+        workingDays: unitFormData.workingDays,
+        breakDurationMinutes: unitFormData.breakDurationMinutes,
+        allowNone: unitFormData.allowNone,
+        allowPods: unitFormData.allowPods,
+        allowAll: unitFormData.allowAll,
+        allowUnassigned: unitFormData.allowUnassigned,
+        podDistributionStrategy: unitFormData.podDistributionStrategy,
+      });
+      toast.success(`Operating unit "${unitFormData.name}" added successfully!`);
+      setIsCreateUnitOpen(false);
+      await loadBranchesAndHierarchy();
+      if (unitBranch) {
+        const freshUnits = await atsApi.businessUnits.list(unitBranch.id).catch(() => []);
+        setSelectedBranchUnits(freshUnits || []);
+      }
+    } catch (err: any) {
+      setUnitFormError(err.message || "Failed to create operating unit");
+    } finally {
+      setIsSubmittingUnit(false);
+    }
+  };
+
+  const openManageUnitsModal = async (branch: any) => {
+    setUnitBranch(branch);
+    try {
+      const units = await atsApi.businessUnits.list(branch.id).catch(() => []);
+      setSelectedBranchUnits(units || branch.businessUnits || []);
+    } catch {
+      setSelectedBranchUnits(branch.businessUnits || []);
+    }
+    setIsManageUnitsOpen(true);
+  };
+
+  const handleDeleteUnit = async (unit: any) => {
+    if ((unit.usersCount || 0) > 0 || (unit.jobsCount || 0) > 0) {
+      toast.error(`Cannot delete unit "${unit.name}": It has active staff or open requisitions assigned.`);
+      return;
+    }
+    if (!confirm(`Are you sure you want to delete operating unit "${unit.name}"?`)) return;
+    try {
+      setIsDeletingUnit(true);
+      await atsApi.businessUnits.delete(unit.id);
+      toast.success(`Operating unit "${unit.name}" deleted.`);
+      if (unitBranch) {
+        const freshUnits = await atsApi.businessUnits.list(unitBranch.id).catch(() => []);
+        setSelectedBranchUnits(freshUnits || []);
+      }
+      await loadBranchesAndHierarchy();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete operating unit");
+    } finally {
+      setIsDeletingUnit(false);
+    }
+  };
+
+  const openEditUnitModal = async (unit: any) => {
+    setEditingUnit(unit);
+    const isUs = unit.market === "US";
+    const allowNone = Boolean(unit.allowNone);
+    setEditUnitFormData({
+      name: unit.name || "",
+      market: unit.market || (isUs ? "US" : "INDIA"),
+      currency: unit.currency || (isUs ? "USD" : "INR"),
+      shiftTiming: unit.shiftTiming || (isUs ? "US Shift" : "General Shift"),
+      workStartTime: unit.workStartTime || (isUs ? "20:00" : "09:30"),
+      workEndTime: unit.workEndTime || (isUs ? "05:00" : "18:30"),
+      timezone: unit.timezone || (isUs ? "America/New_York" : "Asia/Kolkata"),
+      workingDays: Array.isArray(unit.workingDays) && unit.workingDays.length > 0 ? unit.workingDays : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      breakDurationMinutes: unit.breakDurationMinutes ?? 60,
+      allowNone: allowNone,
+      allowPods: allowNone ? false : (unit.allowPods !== false),
+      allowAll: allowNone ? false : (unit.allowAll !== false),
+      allowUnassigned: allowNone ? false : (unit.allowUnassigned !== false),
+      podDistributionStrategy: (unit.podDistributionStrategy || "AUTO") as "AUTO" | "MANUAL",
+    });
+    setIsEditUnitOpen(true);
+
+    // Fetch live pods scoped to this operating unit
+    setLoadingUnitPods(true);
+    setUnitPods([]);
+    try {
+      const uPods = await atsApi.pods.list({ businessUnitId: unit.id, branchId: unit.branchId });
+      const pods = Array.isArray(uPods) ? uPods : [];
+      setUnitPods(pods);
+      if (pods.length === 0) {
+        setEditUnitFormData((prev) => ({ ...prev, allowPods: false }));
+      }
+    } catch (err) {
+      console.error("Failed to load unit pods:", err);
+      setUnitPods([]);
+      setEditUnitFormData((prev) => ({ ...prev, allowPods: false }));
+    } finally {
+      setLoadingUnitPods(false);
+    }
+  };
+
+  const handleUpdateUnit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUnit) return;
+    if (!editUnitFormData.name.trim()) {
+      toast.error("Unit Name is required");
+      return;
+    }
+    try {
+      setIsSubmittingEditUnit(true);
+      await atsApi.businessUnits.update(editingUnit.id, {
+        name: editUnitFormData.name.trim(),
+        market: editUnitFormData.market,
+        currency: editUnitFormData.currency,
+        shiftTiming: editUnitFormData.shiftTiming,
+        workStartTime: editUnitFormData.workStartTime,
+        workEndTime: editUnitFormData.workEndTime,
+        timezone: editUnitFormData.timezone,
+        workingDays: editUnitFormData.workingDays,
+        breakDurationMinutes: editUnitFormData.breakDurationMinutes,
+        allowNone: editUnitFormData.allowNone,
+        allowPods: (editUnitFormData.allowNone || unitPods.length === 0) ? false : editUnitFormData.allowPods,
+        allowAll: editUnitFormData.allowNone ? false : editUnitFormData.allowAll,
+        allowUnassigned: editUnitFormData.allowNone ? false : editUnitFormData.allowUnassigned,
+        podDistributionStrategy: editUnitFormData.podDistributionStrategy,
+      });
+      toast.success(`Operating unit "${editUnitFormData.name}" updated successfully!`);
+      setIsEditUnitOpen(false);
+      setEditingUnit(null);
+      await loadBranchesAndHierarchy();
+      if (selectedBranch) {
+        const freshUnits = await atsApi.businessUnits.list(selectedBranch.id).catch(() => []);
+        setSelectedBranchUnits(freshUnits || []);
+      }
+      if (unitBranch) {
+        const freshUnits = await atsApi.businessUnits.list(unitBranch.id).catch(() => []);
+        setSelectedBranchUnits(freshUnits || []);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update operating unit");
+    } finally {
+      setIsSubmittingEditUnit(false);
+    }
+  };
+
+  const handleSaveManagers = async () => {
     if (!selectedBranch) return;
     try {
       setSavingManager(true);
-      await atsApi.branches.updateManager(selectedBranch.id, managerId);
-      toast.success(managerId ? "Branch Head assigned successfully!" : "Branch Head unassigned.");
+      await atsApi.branches.updateManagers(selectedBranch.id, selectedManagerIds);
+      toast.success("Branch Heads assigned successfully!");
       setIsChangeManagerOpen(false);
       await loadBranchesAndHierarchy();
       if (isMembersOpen && selectedBranch) openMembersModal(selectedBranch);
     } catch (err: any) {
-      toast.error(err.message || "Failed to set Branch Manager");
+      toast.error(err.message || "Failed to assign managers");
     } finally {
       setSavingManager(false);
     }
   };
 
-  const handleSelectManager = handleAssignManager;
+  const toggleManagerSelection = (id: string) => {
+    setSelectedManagerIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
 
   const openChangeManagerModal = async (b: any) => {
     setSelectedBranch(b);
+    setSelectedManagerIds(b.managers?.map((m: any) => m.id) || []);
     setManagerSearchQuery("");
     setIsChangeManagerOpen(true);
     try {
@@ -385,7 +661,7 @@ export default function BranchManagementPage() {
     e.preventDefault();
     if (!selectedBranch || !selectedMember) return;
     try {
-      await atsApi.branches.assignUser(selectedBranch.id, selectedMember.id, selectedRoles);
+      await atsApi.branches.assignUser(selectedBranch.id, selectedMember.id, selectedRoles, selectedUnitId || undefined);
       setIsAssignUserOpen(false);
       openMembersModal(selectedBranch);
       await loadBranchesAndHierarchy();
@@ -403,9 +679,11 @@ export default function BranchManagementPage() {
     setFormData({
       name: b.name || "",
       code: b.code || "",
+      street: b.street || "",
       city: b.city || "",
       state: b.state || "",
       country: b.country || "India",
+      pincode: b.pincode || "",
       market: b.market || "INDIA",
       timezone: b.timezone || (b.market === "US" || b.country === "United States" ? "America/New_York" : "Asia/Kolkata"),
       workStartTime: b.workStartTime || "09:00",
@@ -453,15 +731,22 @@ export default function BranchManagementPage() {
     }
   };
 
-  const openQuickCreatePod = async () => {
-    if (!selectedBranch) return;
+  const openQuickCreatePod = async (targetUnitId?: string, targetBranchObj?: any) => {
+    const branchToUse = targetBranchObj || selectedBranch || (editingUnit ? branches.find((b: any) => b.id === editingUnit.branchId) : null);
+    if (!branchToUse) return;
+    if (!selectedBranch) setSelectedBranch(branchToUse);
+    const unitId = targetUnitId || (editingUnit ? editingUnit.id : "");
+    setQuickPodUnitId(unitId);
     setQuickPodName("");
     setQuickPodHeadId("");
     setQuickPodRecruiterIds([]);
     setQuickPodDesc("");
     setIsQuickCreatePodOpen(true);
     try {
-      const recruiters = await atsApi.pods.getAvailableRecruiters(selectedBranch.id).catch(() => []);
+      const recruiters = await atsApi.pods.getAvailableRecruiters({
+        branchId: branchToUse.id,
+        businessUnitId: unitId || undefined,
+      }).catch(() => []);
       setAvailableBranchRecruiters(recruiters || []);
     } catch (err) {
       console.error("Failed to fetch available recruiters:", err);
@@ -471,7 +756,8 @@ export default function BranchManagementPage() {
 
   const handleQuickCreatePod = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedBranch) return;
+    const branchToUse = selectedBranch || (editingUnit ? branches.find((b: any) => b.id === editingUnit.branchId) : null);
+    if (!branchToUse) return;
     if (!quickPodName.trim()) {
       toast.error("Pod Name is required.");
       return;
@@ -481,7 +767,8 @@ export default function BranchManagementPage() {
       setIsCreatingQuickPod(true);
       await atsApi.pods.create({
         name: quickPodName.trim(),
-        branchId: selectedBranch.id,
+        branchId: branchToUse.id,
+        businessUnitId: quickPodUnitId || undefined,
         podHeadId: quickPodHeadId || undefined,
         recruiterIds: quickPodRecruiterIds.length > 0 ? quickPodRecruiterIds : undefined,
         description: quickPodDesc.trim() || undefined,
@@ -490,8 +777,15 @@ export default function BranchManagementPage() {
       toast.success(`Recruitment Pod "${quickPodName}" created! Pod routing is now enabled.`);
       setIsQuickCreatePodOpen(false);
 
+      // If created for editingUnit, refresh unit pods and auto-enable allowPods in editUnitFormData!
+      if (editingUnit && (!quickPodUnitId || quickPodUnitId === editingUnit.id)) {
+        const uPods = await atsApi.pods.list({ businessUnitId: editingUnit.id, branchId: editingUnit.branchId }).catch(() => []);
+        setUnitPods(Array.isArray(uPods) ? uPods : []);
+        setEditUnitFormData((prev) => ({ ...prev, allowPods: true }));
+      }
+
       // Refresh pods for branch
-      const podsList = await atsApi.pods.list(selectedBranch.id);
+      const podsList = await atsApi.pods.list(branchToUse.id);
       const pods = Array.isArray(podsList) ? podsList : [];
       setBranchPods(pods);
 
@@ -513,15 +807,18 @@ export default function BranchManagementPage() {
     setSelectedUserToAssign("");
     try {
       setMembersLoading(true);
-      const [members, users] = await Promise.all([
+      const [members, users, units] = await Promise.all([
         atsApi.branches.getMembers(b.id).catch(() => []),
         atsApi.auth.listUsers().catch(() => []),
+        atsApi.businessUnits.list(b.id).catch(() => []),
       ]);
       setBranchMembers(members || []);
       setAllTenantUsers(users || []);
+      setSelectedBranchUnits(units || b.businessUnits || []);
     } catch (err) {
       console.error("Failed to load members:", err);
       setBranchMembers([]);
+      setSelectedBranchUnits(b.businessUnits || []);
     } finally {
       setMembersLoading(false);
     }
@@ -543,6 +840,7 @@ export default function BranchManagementPage() {
   const openEditMemberRolesModal = (user: any) => {
     setSelectedMember(user);
     setSelectedRoles(Array.isArray(user.roles) ? user.roles : ["RECRUITER"]);
+    setSelectedUnitId(user.businessUnitId || (selectedBranchUnits[0]?.id || ""));
     setIsAssignUserOpen(true);
   };
 
@@ -550,9 +848,11 @@ export default function BranchManagementPage() {
     setFormData({
       name: "",
       code: "",
+      street: "",
       city: "",
       state: "",
       country: "India",
+      pincode: "",
       market: "INDIA",
       timezone: "Asia/Kolkata",
       workStartTime: "09:00",
@@ -781,7 +1081,7 @@ export default function BranchManagementPage() {
             </h1>
           </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Configure dynamic branch structures, operating work shifts, recruitment pods, and staff allocations.
+            Configure dynamic branch structures, branch heads, staff allocations, and operating units.
           </p>
         </div>
 
@@ -821,15 +1121,19 @@ export default function BranchManagementPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              onClick={() => router.push("/management/units")}
+              variant="outline"
+              className="h-8 px-3 text-xs font-semibold border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:bg-slate-900 dark:text-neutral-300 dark:border-slate-800 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <Layers className="h-3.5 w-3.5 text-neutral-500" /> Operating Units ({totalUnitsCount})
+            </Button>
             {canManageBranches && (
               <Button
-                onClick={() => {
-                  resetForm();
-                  setIsCreateOpen(true);
-                }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
+                onClick={() => router.push("/management/branch/new")}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
-                <Plus className="h-4 w-4" /> Add New Branch
+                <Plus className="h-3.5 w-3.5" /> Add New Branch
               </Button>
             )}
           </div>
@@ -864,9 +1168,24 @@ export default function BranchManagementPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-neutral-50/80 dark:bg-slate-800/40 border-b border-neutral-200 dark:border-slate-800 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
-                  <th className="py-3.5 px-4">Branch Office</th>
-                  <th className="py-3.5 px-4">Market</th>
-                  <th className="py-3.5 px-4">Hours &amp; Shift</th>
+                  <th className="py-3.5 px-4 w-10">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-neutral-300 dark:border-slate-600 cursor-pointer"
+                      checked={filteredBranches.length > 0 && selectedBranchIds.length === filteredBranches.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedBranchIds(filteredBranches.map((b) => b.id));
+                        } else {
+                          setSelectedBranchIds([]);
+                        }
+                      }}
+                    />
+                  </th>
+                  <th className="py-3.5 px-4">Branch Name</th>
+                  <th className="py-3.5 px-4">Branch Code</th>
+                  <th className="py-3.5 px-4">Office Location</th>
+                  <th className="py-3.5 px-4">Operating Units</th>
                   <th className="py-3.5 px-4">Branch Head</th>
                   <th className="py-3.5 px-4">Staff Members</th>
                   <th className="py-3.5 px-4">Requisitions</th>
@@ -876,7 +1195,7 @@ export default function BranchManagementPage() {
               <tbody className="divide-y divide-neutral-100 dark:divide-slate-800 text-xs">
                 {filteredBranches.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-16 text-center text-neutral-400">
+                    <td colSpan={9} className="py-16 text-center text-neutral-400">
                       <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
                         <Building2 className="h-10 w-10 text-neutral-300 dark:text-neutral-600" />
                         <p className="font-semibold text-neutral-700 dark:text-neutral-200 text-sm">
@@ -889,10 +1208,7 @@ export default function BranchManagementPage() {
                         </p>
                         {!searchQuery && canManageBranches && (
                           <Button
-                            onClick={() => {
-                              resetForm();
-                              setIsCreateOpen(true);
-                            }}
+                            onClick={() => router.push("/management/branch/new")}
                             className="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
                           >
                             <Plus className="h-3.5 w-3.5" /> Add New Branch
@@ -909,52 +1225,80 @@ export default function BranchManagementPage() {
                       : (branchHier?.members && branchHier.members.length > 0)
                       ? branchHier.members
                       : [];
+                    const unitCount = b.businessUnits?.length || 0;
 
                     return (
                       <tr key={b.id} className="hover:bg-neutral-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                        {/* CHECKBOX */}
+                        <td className="py-3.5 px-4">
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-neutral-300 dark:border-slate-600 cursor-pointer"
+                            checked={selectedBranchIds.includes(b.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedBranchIds((prev) => [...prev, b.id]);
+                              } else {
+                                setSelectedBranchIds((prev) => prev.filter((id) => id !== b.id));
+                              }
+                            }}
+                          />
+                        </td>
+                        {/* BRANCH NAME */}
                         <td className="py-3.5 px-4 font-semibold text-neutral-900 dark:text-white">
-                          <div>
+                          <div className="flex items-center gap-2">
                             {canEditBranchFunc(b.id) ? (
                               <button
-                                onClick={() => openEditModal(b)}
-                                className="font-bold text-xs text-neutral-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 text-left transition-colors cursor-pointer block"
+                                onClick={() => router.push(`/management/branch/${b.id}/edit`)}
+                                className="font-bold text-xs text-neutral-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 text-left transition-colors cursor-pointer"
                               >
                                 {b.name}
                               </button>
                             ) : (
-                              <span className="font-bold text-xs text-neutral-900 dark:text-white block">
+                              <span className="font-bold text-xs text-neutral-900 dark:text-white">
                                 {b.name}
                               </span>
                             )}
-                            <p className="text-[11px] text-neutral-500 font-normal mt-0.5">
-                              {b.city || "City Unspecified"}, {b.country || "India"}
-                            </p>
                           </div>
                         </td>
 
+                        {/* BRANCH CODE */}
                         <td className="py-3.5 px-4">
-                          <span className="text-[10.5px] font-medium font-mono px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-slate-700">
-                            {b.market === "US" ? "US IT Market" : "Domestic India"}
-                          </span>
+                          {b.code ? (
+                            <span className="px-1.5 py-0.5 rounded text-[10.5px] font-mono font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800">
+                              {b.code}
+                            </span>
+                          ) : (
+                            <span className="text-neutral-400 text-[10.5px] italic">No code</span>
+                          )}
+                        </td>
+
+                        {/* OFFICE LOCATION */}
+                        <td className="py-3.5 px-4">
+                          <p className="text-[11.5px] text-neutral-600 dark:text-neutral-400 font-medium">
+                            {b.city || "City Unspecified"}, {b.country || "India"}
+                          </p>
+                        </td>
+
+                        {/* OPERATING UNITS COLUMN (Scalable for 100+ Units) */}
+                        <td className="py-3.5 px-4">
+                          <button
+                            onClick={() => openManageUnitsModal(b)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/60 dark:text-blue-300 dark:hover:bg-blue-900/60 border border-blue-200/80 dark:border-blue-800 transition-colors cursor-pointer group shadow-2xs"
+                            title={`View and filter all ${unitCount} operating units for ${b.name}`}
+                          >
+                            <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
+                            <span>{unitCount} {unitCount === 1 ? 'Unit' : 'Units'}</span>
+                            <ChevronRight className="h-3 w-3 text-blue-500 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                          </button>
                         </td>
 
                         <td className="py-3.5 px-4">
-                          <div className="space-y-0.5">
-                            <div className="font-medium text-neutral-800 dark:text-neutral-200 text-xs">
-                              {formatTime12(b.workStartTime)} - {formatTime12(b.workEndTime)}
-                            </div>
-                            <div className="text-[10.5px] text-neutral-400 font-mono">
-                              {b.shiftTiming || (b.market === "US" ? "US Shift" : "General Shift")} • {b.timezone ? b.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          {b.managerName ? (
-                            <div className="flex items-center gap-1.5">
+                          {b.managers && b.managers.length > 0 ? (
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                               <span className="text-xs font-semibold text-neutral-900 dark:text-white">
-                                {b.managerName}
+                                {b.managers.map((m: any) => m.fullName).join(", ")}
                               </span>
                               {canAssignManager && (
                                 <button
@@ -994,41 +1338,125 @@ export default function BranchManagementPage() {
                           {b.jobsCount || 0} Requisitions
                         </td>
 
+                        {/* ACTIONS COLUMN - UNIVERSAL THREE-DOT DROPDOWN MENU */}
                         <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              onClick={() => openBranchRemarksModal(b)}
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-[11px] font-semibold border-neutral-200 dark:border-slate-700 rounded-md flex items-center gap-1 cursor-pointer"
-                              title="Configure stage remark templates"
-                            >
-                              <MessageSquare className="h-3 w-3" /> Remarks
-                            </Button>
-
-                            {canEditBranchFunc(b.id) && (
-                              <Button
-                                onClick={() => openEditModal(b)}
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-[11px] font-semibold border-neutral-200 dark:border-slate-700 rounded-md flex items-center gap-1 cursor-pointer"
-                                title="Edit branch parameters & routing policy"
+                          <div className="flex items-center justify-end">
+                            <DropdownMenu modal={false}>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  className="p-1 hover:bg-[#1a4fa0]/10 dark:hover:bg-slate-800 rounded-md text-neutral-500 dark:text-neutral-400 hover:text-[#1a4fa0] dark:hover:text-blue-400 transition-colors cursor-pointer"
+                                  title="Actions"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="end"
+                                sideOffset={4}
+                                className="w-56 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-neutral-200/90 dark:border-slate-800 rounded-xl shadow-xl shadow-slate-900/10 dark:shadow-black/50 p-1.5 animate-in fade-in-0 zoom-in-95 z-[100] font-sans"
                               >
-                                <Edit2 className="h-3 w-3" /> Edit
-                              </Button>
-                            )}
+                                <div className="px-2.5 pt-1 pb-1 text-[9.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                  Branch Operations
+                                </div>
 
-                            {canManageBranches && (
-                              <Button
-                                onClick={() => setBranchToDelete(b)}
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-[11px] font-semibold border-neutral-200 dark:border-slate-700 rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-1 cursor-pointer"
-                                title="Delete branch"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            )}
+                                {canEditBranchFunc(b.id) && (
+                                  <DropdownMenuItem
+                                    onClick={() => router.push(`/management/branch/${b.id}/edit`)}
+                                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                  >
+                                    <div className="h-6 w-6 rounded-md bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                      <Edit2 className="h-3.5 w-3.5" />
+                                    </div>
+                                    <span>Edit Branch</span>
+                                  </DropdownMenuItem>
+                                )}
+
+                                <DropdownMenuItem
+                                  onClick={() => openManageUnitsModal(b)}
+                                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                  <div className="h-6 w-6 rounded-md bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                    <Layers className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span>View Units ({unitCount})</span>
+                                </DropdownMenuItem>
+
+                                {canManageBranches && (
+                                  <DropdownMenuItem
+                                    onClick={() => router.push(`/management/units/new?branchId=${b.id}`)}
+                                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                                  >
+                                    <div className="h-6 w-6 rounded-md bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                      <Plus className="h-3.5 w-3.5" />
+                                    </div>
+                                    <span>Add Operating Unit</span>
+                                  </DropdownMenuItem>
+                                )}
+
+                                <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
+
+                                <div className="px-2.5 pt-1 pb-1 text-[9.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                  Management &amp; Staff
+                                </div>
+
+                                <DropdownMenuItem
+                                  onClick={() => openMembersModal(b)}
+                                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                  <div className="h-6 w-6 rounded-md bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                    <Users className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span>Manage Staff ({b.usersCount || members.length})</span>
+                                </DropdownMenuItem>
+
+                                {canAssignManager && (
+                                  <DropdownMenuItem
+                                    onClick={() => openChangeManagerModal(b)}
+                                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                  >
+                                    <div className="h-6 w-6 rounded-md bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                      <Crown className="h-3.5 w-3.5" />
+                                    </div>
+                                    <span>{b.managers && b.managers.length > 0 ? "Change Branch Heads" : "Assign Branch Heads"}</span>
+                                  </DropdownMenuItem>
+                                )}
+
+                                <DropdownMenuItem
+                                  onClick={() => openBranchRemarksModal(b)}
+                                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                  <div className="h-6 w-6 rounded-md bg-violet-100 dark:bg-violet-950/80 text-violet-600 dark:text-violet-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                    <MessageSquare className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span>Remarks Templates</span>
+                                </DropdownMenuItem>
+
+                                {canManageBranches && (
+                                  <>
+                                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
+                                    {b.usersCount > 0 || (b.jobsCount || 0) > 0 || members.length > 0 ? (
+                                      <div
+                                        className="flex items-center gap-2 px-2.5 py-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 italic"
+                                        title="Branch deletion locked: contains active staff or requisitions"
+                                      >
+                                        <Lock className="h-3 w-3 shrink-0" />
+                                        <span>Deletion locked (active)</span>
+                                      </div>
+                                    ) : (
+                                      <DropdownMenuItem
+                                        onClick={() => setBranchToDelete(b)}
+                                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                      >
+                                        <div className="h-6 w-6 rounded-md bg-red-100 dark:bg-red-950/80 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </div>
+                                        <span>Delete Branch</span>
+                                      </DropdownMenuItem>
+                                    )}
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </td>
                       </tr>
@@ -1102,7 +1530,7 @@ export default function BranchManagementPage() {
 
                             {canEditBranchFunc(b.id) && (
                               <Button
-                                onClick={() => openEditModal(b)}
+                                onClick={() => router.push(`/management/branch/${b.id}/edit`)}
                                 size="sm"
                                 variant="outline"
                                 className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer"
@@ -1145,7 +1573,7 @@ export default function BranchManagementPage() {
                           <div className="flex items-center gap-2">
                             <Crown className="h-4 w-4 text-amber-500" />
                             <span className="text-xs font-bold text-neutral-800 dark:text-white">
-                              Branch Head: {b.managerName ? b.managerName : <span className="text-neutral-400 font-normal italic">Unassigned</span>}
+                              Branch Heads: {b.managers && b.managers.length > 0 ? b.managers.map((m: any) => m.fullName).join(", ") : <span className="text-neutral-400 font-normal italic">Unassigned</span>}
                             </span>
                           </div>
                           {canManageBranches && (
@@ -1153,7 +1581,7 @@ export default function BranchManagementPage() {
                               onClick={() => openChangeManagerModal(b)}
                               className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer"
                             >
-                              {b.managerName ? "Change Manager" : "Assign Manager"}
+                              {b.managers && b.managers.length > 0 ? "Change Heads" : "Assign Heads"}
                             </button>
                           )}
                         </div>
@@ -1168,7 +1596,7 @@ export default function BranchManagementPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                               {members.map((m: any) => {
                                 const memberRoles = getDisplayRoles(m.roles);
-                                const isManager = b.managerId === m.id;
+                                const isManager = (b.managers || []).some((mgr: any) => mgr.id === m.id);
                                 return (
                                   <div key={m.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 text-xs shadow-2xs">
                                     <div className="space-y-0.5 min-w-0 pr-2">
@@ -1246,9 +1674,11 @@ export default function BranchManagementPage() {
                     </div>
                   </div>
 
-                  <span className="text-[10.5px] font-medium font-mono px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-slate-700">
-                    {b.market === "US" ? "US IT Market" : "Domestic India"}
-                  </span>
+                  {b.code && (
+                    <span className="text-[10.5px] font-medium font-mono px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-slate-700">
+                      {b.code}
+                    </span>
+                  )}
                 </div>
 
                 {/* BRANCH MANAGER BADGE */}
@@ -1256,38 +1686,39 @@ export default function BranchManagementPage() {
                   <div className="flex items-center gap-2">
                     <Crown className="h-4 w-4 text-amber-500 shrink-0" />
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Branch Head / Manager</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Branch Heads</p>
                       <p className="text-xs font-bold text-neutral-800 dark:text-neutral-100">
-                        {b.managerName ? b.managerName : <span className="text-neutral-400 font-normal italic">Unassigned</span>}
+                        {b.managers && b.managers.length > 0 ? b.managers.map((m: any) => m.fullName).join(", ") : <span className="text-neutral-400 font-normal italic">Unassigned</span>}
                       </p>
                     </div>
                   </div>
-                  {canAssignManager && (
+                  {canManageBranches && (
                     <button
                       onClick={() => openChangeManagerModal(b)}
                       className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
                     >
-                      {b.managerName ? "Change" : "Assign"}
+                      {b.managers && b.managers.length > 0 ? "Change" : "Assign"}
                     </button>
                   )}
                 </div>
 
-                {/* OPERATING HOURS & SHIFT BADGE */}
-                <div className="bg-neutral-100/80 dark:bg-slate-800/60 border border-neutral-200/80 dark:border-slate-700 p-2.5 rounded-lg flex items-center justify-between text-xs">
+                {/* OPERATING UNITS BANNER */}
+                <div className="bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800 p-2.5 rounded-lg flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-neutral-600 dark:text-neutral-400 shrink-0" />
+                    <Layers className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
                     <div>
-                      <div className="flex items-center gap-1.5 font-semibold text-neutral-900 dark:text-white">
-                        <span>{formatTime12(b.workStartTime)} - {formatTime12(b.workEndTime)}</span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-neutral-200 dark:bg-slate-700 text-neutral-700 dark:text-neutral-300 font-mono font-medium">
-                          {b.timezone ? b.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}
-                        </span>
-                      </div>
-                      <p className="text-[10.5px] text-neutral-500 font-normal">
-                        {b.shiftTiming || (b.market === "US" ? "US Shift" : "General Shift")} • {Array.isArray(b.workingDays) && b.workingDays.length > 0 ? (b.workingDays.length === 5 ? "Mon - Fri" : b.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon - Fri"}
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-blue-500">Operating Units</p>
+                      <p className="text-xs font-bold text-neutral-900 dark:text-white">
+                        {b.businessUnits?.length || 0} {b.businessUnits?.length === 1 ? 'Unit Configured' : 'Units Configured'}
                       </p>
                     </div>
                   </div>
+                  <button
+                    onClick={() => openManageUnitsModal(b)}
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-0.5 cursor-pointer"
+                  >
+                    View Units <ChevronRight className="h-3 w-3" />
+                  </button>
                 </div>
 
                 {/* STATS STRIP */}
@@ -1324,7 +1755,7 @@ export default function BranchManagementPage() {
 
                   {canEditBranchFunc(b.id) && (
                     <Button
-                      onClick={() => openEditModal(b)}
+                      onClick={() => router.push(`/management/branch/${b.id}/edit`)}
                       variant="outline"
                       size="sm"
                       className="h-7 text-[11px] font-semibold border-neutral-300 dark:border-slate-700 rounded flex items-center gap-1 cursor-pointer"
@@ -1350,9 +1781,9 @@ export default function BranchManagementPage() {
         </div>
         )
       )}
+      </>}
 
       {/* CREATE BRANCH MODAL */}
-      </>}
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto max-h-[90vh] flex flex-col">
@@ -1425,12 +1856,17 @@ export default function BranchManagementPage() {
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
                     City <span className="text-red-500">*</span>
                   </label>
-                  <Input
+                  <CityAutocomplete
                     value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="e.g. Bhubaneswar, New York, London..."
-                    className="h-10 text-xs rounded-lg border-neutral-300 dark:border-slate-700"
-                    required
+                    onChange={(city, state, country) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        city: city || "",
+                        state: state !== undefined ? state : prev.state,
+                        country: country !== undefined ? country : prev.country,
+                      }));
+                    }}
+                    placeholder="Search city (auto-fills state/country)..."
                   />
                 </div>
 
@@ -1456,15 +1892,42 @@ export default function BranchManagementPage() {
                     <option value="US">US IT Segment</option>
                   </select>
                 </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Street Address / Office Premises
+                  </label>
+                  <Input
+                    value={formData.street}
+                    onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                    placeholder="e.g. Infocity, Patia, Suite 400"
+                    className="h-10 text-xs rounded-lg border-neutral-300 dark:border-slate-700"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Postal / Zip Code
+                  </label>
+                  <Input
+                    value={formData.pincode}
+                    onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                    placeholder="e.g. 751024, 75001"
+                    className="h-10 text-xs rounded-lg border-neutral-300 dark:border-slate-700"
+                  />
+                </div>
               </div>
 
               {/* Operating Hours & Shift Timing Section */}
               <div className="p-4 bg-neutral-50 dark:bg-slate-850 rounded-xl border border-neutral-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center gap-1.5 border-b border-neutral-200/60 dark:border-slate-800 pb-2">
-                  <Clock className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
-                  <span className="text-xs font-bold text-neutral-900 dark:text-white">
-                    Working Hours &amp; Shift Schedule
-                  </span>
+                <div className="flex items-center justify-between border-b border-neutral-200/60 dark:border-slate-800 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                    <span className="text-xs font-bold text-neutral-900 dark:text-white">
+                      Initial Operating Unit Shift Defaults
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400">Default Practice Unit</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -1475,16 +1938,11 @@ export default function BranchManagementPage() {
                       onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
                       className="w-full h-9 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 font-medium text-neutral-900 dark:text-white cursor-pointer"
                     >
-                      <option value="Asia/Kolkata">Asia/Kolkata (IST +5:30)</option>
-                      <option value="America/New_York">America/New_York (EST -5:00)</option>
-                      <option value="America/Chicago">America/Chicago (CST -6:00)</option>
-                      <option value="America/Denver">America/Denver (MST -7:00)</option>
-                      <option value="America/Los_Angeles">America/Los_Angeles (PST -8:00)</option>
-                      <option value="Europe/London">Europe/London (GMT +0:00)</option>
-                      <option value="Asia/Dubai">Asia/Dubai (GST +4:00)</option>
-                      <option value="Asia/Singapore">Asia/Singapore (SGT +8:00)</option>
-                      <option value="Australia/Sydney">Australia/Sydney (AEST +10:00)</option>
-                      <option value="UTC">UTC</option>
+                      {getDynamicTimezoneOptions().map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -1585,10 +2043,10 @@ export default function BranchManagementPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    {ownBranchSettings ? 'Branch Details & Routing Policy' : 'Edit Branch Details & Routing Policy'}
+                    {ownBranchSettings ? 'Branch Office Details' : 'Edit Branch Office Details'}
                   </h3>
                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                    Configure office location parameters, recruiter assignment strategies, and job approval rules.
+                    Configure office location parameters, city, address, and view operating practice divisions.
                   </p>
                 </div>
               </div>
@@ -1611,13 +2069,19 @@ export default function BranchManagementPage() {
                   </div>
                 )}
 
-                {/* 1. Branch Identity & Region Info */}
+                {/* 1. Branch Physical Identity & Office Address */}
                 <div className="bg-neutral-50/70 dark:bg-slate-800/40 p-4 rounded-xl border border-neutral-200/80 dark:border-slate-700/80 space-y-3">
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 block">
-                    Branch General Information
-                  </span>
+                  <div className="flex items-center justify-between border-b border-neutral-200/60 dark:border-slate-700/60 pb-2">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                      Branch Office Location &amp; Address
+                    </span>
+                    <span className="text-[10.5px] text-neutral-400">
+                      Physical Location Shell
+                    </span>
+                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
                         Branch Name <span className="text-red-500">*</span>
@@ -1625,23 +2089,10 @@ export default function BranchManagementPage() {
                       <Input
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="e.g. Bhubaneswar Office, Dallas Hub"
                         className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700 font-semibold bg-white dark:bg-slate-900"
                         required
                       />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                        Market Segment <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.market}
-                        onChange={(e) => setFormData({ ...formData, market: e.target.value })}
-                        className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 font-semibold text-neutral-800 dark:text-neutral-200 outline-none focus:ring-1 focus:ring-indigo-500"
-                      >
-                        <option value="INDIA">Domestic India Segment (INR)</option>
-                        <option value="US">US IT Segment (USD)</option>
-                      </select>
                     </div>
 
                     <div className="space-y-1">
@@ -1651,514 +2102,177 @@ export default function BranchManagementPage() {
                       <Input
                         value={formData.code}
                         onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                        placeholder="e.g. BBS, VIZ, NY"
+                        placeholder="e.g. BBS, VIZ, DAL, NY"
                         className="h-8.5 text-xs font-mono rounded-lg border-neutral-300 dark:border-slate-700 uppercase font-semibold bg-white dark:bg-slate-900"
                       />
                     </div>
 
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                        Office City
+                        Office City <span className="text-red-500">*</span>
                       </label>
-                      <Input
+                      <CityAutocomplete
                         value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                        placeholder="e.g. Bhubaneswar"
-                        className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Branch Working Hours & Shift Timing */}
-                <div className="bg-neutral-50/70 dark:bg-slate-800/40 p-4 rounded-xl border border-neutral-200/80 dark:border-slate-700/80 space-y-4">
-                  <div className="flex items-center justify-between border-b border-neutral-200/60 dark:border-slate-700/60 pb-2">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
-                        Branch Operating Hours &amp; Shift Schedule
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                    {/* Timezone */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
-                        <Globe className="h-3 w-3 text-neutral-400" /> Office Timezone
-                      </label>
-                      <select
-                        value={formData.timezone}
-                        onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                        className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 font-semibold text-neutral-800 dark:text-neutral-200 outline-none focus:ring-1 focus:ring-indigo-500"
-                      >
-                        <option value="Asia/Kolkata">India Standard Time (IST) • UTC+05:30</option>
-                        <option value="America/New_York">US Eastern Time (EST/EDT) • UTC-05:00</option>
-                        <option value="America/Chicago">US Central Time (CST/CDT) • UTC-06:00</option>
-                        <option value="America/Denver">US Mountain Time (MST/MDT) • UTC-07:00</option>
-                        <option value="America/Los_Angeles">US Pacific Time (PST/PDT) • UTC-08:00</option>
-                        <option value="Europe/London">UK / London (GMT/BST) • UTC+00:00</option>
-                        <option value="Asia/Dubai">Gulf Standard Time (GST) • UTC+04:00</option>
-                        <option value="Asia/Singapore">Singapore / SGT • UTC+08:00</option>
-                        <option value="Australia/Sydney">Australia Sydney (AEST) • UTC+10:00</option>
-                        <option value="UTC">UTC (Universal)</option>
-                      </select>
-                    </div>
-
-                    {/* Work Start Time */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
-                        <Sun className="h-3 w-3 text-amber-500" /> Work Start Time
-                      </label>
-                      <Input
-                        type="time"
-                        value={formData.workStartTime}
-                        onChange={(e) => setFormData({ ...formData, workStartTime: e.target.value })}
-                        className="h-8.5 text-xs font-mono rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                        onChange={(city, state, country) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            city: city || "",
+                            state: state !== undefined ? state : prev.state,
+                            country: country !== undefined ? country : prev.country,
+                          }));
+                        }}
+                        placeholder="Search city (auto-fills state/country)..."
                       />
                     </div>
 
-                    {/* Work End Time */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
-                        <Moon className="h-3 w-3 text-indigo-500" /> Work End Time
-                      </label>
-                      <Input
-                        type="time"
-                        value={formData.workEndTime}
-                        onChange={(e) => setFormData({ ...formData, workEndTime: e.target.value })}
-                        className="h-8.5 text-xs font-mono rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
-                      />
-                    </div>
-
-                    {/* Shift Name / Timing */}
                     <div className="space-y-1 sm:col-span-2">
                       <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                        Shift Schedule Label / Name
+                        Street Address / Premises
                       </label>
                       <Input
-                        value={formData.shiftTiming}
-                        onChange={(e) => setFormData({ ...formData, shiftTiming: e.target.value })}
-                        placeholder="e.g. Day Shift (09:00 - 18:00 IST) or Night US Shift"
-                        className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-medium"
+                        value={formData.street}
+                        onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                        placeholder="e.g. Infocity, Patia, Suite 400"
+                        className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
                       />
                     </div>
 
-                    {/* Break Duration */}
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                        Break Duration (Minutes)
+                        State / Province
                       </label>
                       <Input
-                        type="number"
-                        min={0}
-                        max={180}
-                        value={formData.breakDurationMinutes}
-                        onChange={(e) => setFormData({ ...formData, breakDurationMinutes: Number(e.target.value) || 0 })}
+                        value={formData.state}
+                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                        placeholder="State / Region"
+                        className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-neutral-100/60 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                        Country
+                      </label>
+                      <Input
+                        value={formData.country}
+                        onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                        placeholder="Country"
+                        className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-neutral-100/60 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                        Postal / Zip Code
+                      </label>
+                      <Input
+                        value={formData.pincode}
+                        onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                        placeholder="e.g. 751024, 75001"
                         className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
                       />
                     </div>
                   </div>
-
-                  {/* Working Days Selector */}
-                  <div className="space-y-1.5 pt-1">
-                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
-                      <Calendar className="h-3.5 w-3.5 text-neutral-400" /> Working Days
-                    </label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => {
-                        const isSelected = formData.workingDays.includes(day);
-                        return (
-                          <button
-                            key={day}
-                            type="button"
-                            onClick={() => {
-                              const updated = isSelected
-                                ? formData.workingDays.filter((d) => d !== day)
-                                : [...formData.workingDays, day];
-                              setFormData({ ...formData, workingDays: updated });
-                            }}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border ${
-                              isSelected
-                                ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
-                                : "bg-white dark:bg-slate-900 text-neutral-600 dark:text-neutral-300 border-neutral-200 dark:border-slate-700 hover:bg-neutral-100"
-                            }`}
-                          >
-                            {day.slice(0, 3)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </div>
 
-                {/* 3. Job Assignment & Routing Policy */}
-                <div className="p-5 bg-white dark:bg-slate-900 rounded-xl border border-neutral-200 dark:border-slate-700/80 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-650 dark:text-indigo-400">
-                        <Shield className="h-4 w-4" />
-                      </div>
+                {/* 2. Operating Units (Practice Divisions) in Branch */}
+                <div className="bg-blue-50/50 dark:bg-blue-950/20 p-4 rounded-xl border border-blue-200/70 dark:border-blue-900/60 space-y-3">
+                  <div className="flex items-center justify-between border-b border-blue-200/50 dark:border-blue-900/40 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                       <div>
-                        <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
-                          Job Assignment
-                        </h4>
-                        <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
-                          Control how job orders are assigned and broadcast to recruitment personnel.
-                        </p>
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-900 dark:text-blue-300 block">
+                          Operating Practice Units ({selectedBranchUnits.length})
+                        </span>
+                        <span className="text-[10px] text-blue-700/70 dark:text-blue-400/70 font-normal">
+                          Operational shifts, timings, timezone, working days, and currency are managed per unit.
+                        </span>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                      Branch Isolated
-                    </span>
+                    {canManageBranches && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => openCreateUnitModal(selectedBranch)}
+                        className="h-7 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 cursor-pointer shadow-xs"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add Unit
+                      </Button>
+                    )}
                   </div>
 
-                  {/* Standard Assignment Modes 1 - 4 (Clean 2x2 Grid) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {/* Option 1: None / Direct */}
-                    <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs cursor-pointer transition-all ${
-                      formData.allowNone
-                        ? "bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-800"
-                        : "bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
-                    }`}>
-                      <input
-                        type="checkbox"
-                        checked={formData.allowNone}
-                        onChange={(e) => {
-                          const isNone = e.target.checked;
-                          setFormData({
-                            ...formData,
-                            allowNone: isNone,
-                            ...(isNone
-                              ? { allowPods: false, allowAll: false, allowUnassigned: false }
-                              : { allowPods: branchPods.length > 0, allowAll: true, allowUnassigned: true }),
-                          });
-                        }}
-                        className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-neutral-900 dark:text-white">1. Direct Assignment Only</span>
-                          {formData.allowNone && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-200 text-indigo-900 dark:bg-indigo-900 dark:text-indigo-200">
-                              Exclusive
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
-                          Direct individual recruiter assignment only. Pod and pooled routing options are disabled.
-                        </p>
-                      </div>
-                    </label>
-
-                    {/* Option 3: All Branch Recruiters */}
-                    <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs transition-all ${
-                      formData.allowNone
-                        ? "opacity-40 cursor-not-allowed bg-neutral-100 dark:bg-slate-900"
-                        : "cursor-pointer bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
-                    }`}>
-                      <input
-                        type="checkbox"
-                        checked={formData.allowAll}
-                        disabled={formData.allowNone}
-                        onChange={(e) => setFormData({ ...formData, allowAll: e.target.checked })}
-                        className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
-                      />
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-neutral-900 dark:text-white">3. All Branch Recruiters (Pool)</span>
-                        </div>
-                        <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
-                          Allow broadcast to all active recruiters belonging to this branch office.
-                        </p>
-                      </div>
-                    </label>
-
-                    {/* Option 2: Pod System (with sub-strategy & 0-pod gating) */}
-                    <div className={`space-y-2.5 p-3 rounded-xl border text-xs transition-all ${
-                      formData.allowNone
-                        ? "opacity-40 pointer-events-none bg-neutral-100 dark:bg-slate-900 border-neutral-200"
-                        : branchPods.length === 0
-                        ? "bg-amber-50/25 dark:bg-amber-950/15 border-amber-200/80 dark:border-amber-900/40"
-                        : "bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750"
-                    }`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <label 
-                          className={`flex items-start gap-2.5 flex-1 ${
-                            formData.allowNone 
-                              ? "cursor-not-allowed" 
-                              : branchPods.length === 0 
-                              ? "cursor-pointer" 
-                              : "cursor-pointer"
-                          }`}
-                          onClick={(e) => {
-                            if (branchPods.length === 0 && !formData.allowNone) {
-                              e.preventDefault();
-                              toast.error("No pods created for this branch. Create a pod first!");
-                              openQuickCreatePod();
-                            }
-                          }}
+                  {selectedBranchUnits.length === 0 ? (
+                    <p className="text-xs text-neutral-400 italic">No operating practice divisions created for this branch yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {selectedBranchUnits.map((u: any) => (
+                        <div
+                          key={u.id}
+                          className="p-3.5 rounded-xl border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xs flex flex-col justify-between gap-2.5 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
                         >
-                          <input
-                            type="checkbox"
-                            checked={Boolean(formData.allowPods && branchPods.length > 0)}
-                            disabled={formData.allowNone || branchPods.length === 0}
-                            onChange={(e) => {
-                              if (branchPods.length === 0) {
-                                toast.error("No pods created for this branch. Create a pod first!");
-                                openQuickCreatePod();
-                                return;
-                              }
-                              setFormData({ ...formData, allowPods: e.target.checked });
-                            }}
-                            className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-bold text-neutral-900 dark:text-white">2. Recruitment Pod System</span>
-                              {loadingBranchPods ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] text-neutral-400">
-                                  <Loader2 className="h-3 w-3 animate-spin" /> Checking pods...
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-xs font-bold text-neutral-900 dark:text-white truncate">{u.name}</span>
+                                <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase ${
+                                  u.market === "US" 
+                                    ? "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800" 
+                                    : "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                                }`}>
+                                  {u.market === "US" ? "US IT" : "Domestic IT"} • {u.currency || "INR"}
                                 </span>
-                              ) : branchPods.length === 0 ? (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800/80">
-                                  0 Pods Available
-                                </span>
-                              ) : (
-                                <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                                  <HoverCard openDelay={80} closeDelay={150}>
-                                    <HoverCardTrigger asChild>
-                                      <button
-                                        type="button"
-                                        className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-800/80 hover:bg-emerald-200/90 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
-                                        title="Hover to view all available pods, leads, and members"
-                                      >
-                                        <Users className="h-2.5 w-2.5" />
-                                        <span>{branchPods.length} {branchPods.length === 1 ? "Pod" : "Pods"} Available</span>
-                                      </button>
-                                    </HoverCardTrigger>
-                                    <HoverCardContent
-                                      align="start"
-                                      side="bottom"
-                                      sideOffset={6}
-                                      className="w-84 sm:w-96 p-3 shadow-2xl z-60 font-sans bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl"
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {canEditUnitFunc(u.id) && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openEditUnitModal(u)}
+                                    className="h-6 px-2 text-[10.5px] font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 border-neutral-200 dark:border-slate-700"
+                                  >
+                                    <Pencil className="h-3 w-3 mr-1" /> Edit
+                                  </Button>
+                                )}
+                                {canManageBranches && (
+                                  (u.usersCount > 0 || u.jobsCount > 0) ? (
+                                    <span title="Protected: contains active staff or open jobs" className="text-neutral-400 p-1">
+                                      <Lock className="h-3 w-3" />
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteUnit(u)}
+                                      className="text-neutral-400 hover:text-red-500 cursor-pointer p-1"
+                                      title="Delete unused unit"
                                     >
-                                      <div className="space-y-2.5">
-                                        {/* Pop-up Header */}
-                                        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-2">
-                                          <div className="flex items-center gap-1.5">
-                                            <Layers className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                                            <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                                              Available Recruitment Pods
-                                            </span>
-                                            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                                              {branchPods.length}
-                                            </span>
-                                          </div>
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              e.stopPropagation();
-                                              openQuickCreatePod();
-                                            }}
-                                            className="text-[10.5px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 flex items-center gap-0.5 hover:underline cursor-pointer"
-                                          >
-                                            <Plus className="h-2.5 w-2.5" /> New Pod
-                                          </button>
-                                        </div>
-
-                                        {/* Pod List with Leads & Members */}
-                                        <div className="max-h-60 overflow-y-auto space-y-2 pr-1 select-text">
-                                          {branchPods.map((pod: any) => (
-                                            <div
-                                              key={pod.id}
-                                              className="p-2.5 rounded-lg border border-neutral-200/80 dark:border-slate-800 bg-neutral-50/60 dark:bg-slate-850/50 space-y-1.5 text-xs"
-                                            >
-                                              {/* Pod Title & Status */}
-                                              <div className="flex items-center justify-between gap-2">
-                                                <span className="font-bold text-xs text-neutral-900 dark:text-white truncate">
-                                                  {pod.name}
-                                                </span>
-                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0">
-                                                  <Check className="h-2 w-2" /> Active
-                                                </span>
-                                              </div>
-
-                                              {/* Pod Lead */}
-                                              <div className="flex items-center gap-1.5 text-[11px]">
-                                                <Crown className="h-3 w-3 text-amber-500 shrink-0" />
-                                                <span className="text-neutral-500 dark:text-neutral-400">Pod Lead:</span>
-                                                <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
-                                                  {pod.podHeadName || "No Lead Assigned"}
-                                                </span>
-                                              </div>
-
-                                              {/* Members */}
-                                              <div className="space-y-1 text-[11px] pt-0.5">
-                                                <div className="flex items-center justify-between text-neutral-500 dark:text-neutral-400">
-                                                  <span className="flex items-center gap-1">
-                                                    <Users className="h-3 w-3 text-indigo-500 shrink-0" />
-                                                    Members ({pod.members?.length || 0}):
-                                                  </span>
-                                                </div>
-                                                {pod.members && pod.members.length > 0 ? (
-                                                  <div className="flex flex-wrap gap-1">
-                                                    {pod.members.map((m: any) => (
-                                                      <span
-                                                        key={m.id}
-                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 text-[10px] text-neutral-700 dark:text-neutral-300 font-medium"
-                                                        title={m.email || m.fullName}
-                                                      >
-                                                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />
-                                                        {m.fullName || m.email}
-                                                      </span>
-                                                    ))}
-                                                  </div>
-                                                ) : (
-                                                  <p className="text-[10px] text-neutral-400 dark:text-neutral-500 italic pl-4">
-                                                    No recruiters assigned to this pod yet.
-                                                  </p>
-                                                )}
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    </HoverCardContent>
-                                  </HoverCard>
-                                </div>
-                              )}
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  )
+                                )}
+                              </div>
                             </div>
-                            <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                              Allow selecting and routing jobs to recruitment pods.
+                            <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-neutral-700 dark:text-neutral-300">
+                                <Clock className="h-3 w-3 inline mr-1 text-amber-500" />
+                                {u.shiftTiming || "General Shift"} ({formatTime12(u.workStartTime)} - {formatTime12(u.workEndTime)})
+                              </span>
+                              <span>•</span>
+                              <span>{u.timezone ? u.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}</span>
+                            </p>
+                            <p className="text-[10px] text-neutral-400">
+                              Days: {Array.isArray(u.workingDays) && u.workingDays.length > 0 ? (u.workingDays.length === 5 ? "Mon–Fri" : u.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon–Fri"} • Break: {u.breakDurationMinutes ?? 60}m
                             </p>
                           </div>
-                        </label>
-
-                        {/* Top-Right "Create New Pod" Button */}
-                        <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openQuickCreatePod();
-                            }}
-                            className="h-7 text-[11px] font-semibold border-indigo-200 dark:border-indigo-800/80 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
-                            title="Create a new recruitment pod for this branch"
-                          >
-                            <Plus className="h-3 w-3 text-indigo-600 dark:text-indigo-400" /> Create New Pod
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* When NO pods exist for this branch: Show "Create Pod First" banner and action */}
-                      {branchPods.length === 0 && !loadingBranchPods && (
-                        <div className="mt-1.5 p-3 rounded-lg bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/90 dark:border-amber-800/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-                          <div className="flex items-start gap-2">
-                            <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                            <div className="space-y-0.5">
-                              <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
-                                Create Pod First
-                              </p>
-                              <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-tight">
-                                This branch has no recruitment pods. Create a pod first to enable pod-based routing.
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openQuickCreatePod();
-                            }}
-                            className="h-7 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-md flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
-                          >
-                            <Plus className="h-3.5 w-3.5" /> Create Pod First
-                          </Button>
-                        </div>
-                      )}
-
-                      {formData.allowPods && branchPods.length > 0 && !formData.allowNone && (
-                        <div className="ml-5 pl-3 border-l-2 border-indigo-200 dark:border-indigo-800 space-y-1.5 pt-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 block">Pod Strategy:</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openQuickCreatePod();
-                              }}
-                              className="text-[10.5px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center gap-0.5 hover:underline cursor-pointer"
-                            >
-                              <Plus className="h-2.5 w-2.5" /> Add Pod
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-[10.5px]">
-                            <label className={`flex items-center gap-1.5 p-1.5 rounded-lg border cursor-pointer ${
-                              formData.podDistributionStrategy === "AUTO"
-                                ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-900 dark:text-indigo-200 font-bold"
-                                : "border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-neutral-600"
-                            }`}>
-                              <input
-                                type="radio"
-                                name="podStrategy"
-                                value="AUTO"
-                                checked={formData.podDistributionStrategy === "AUTO"}
-                                onChange={() => setFormData({ ...formData, podDistributionStrategy: "AUTO" })}
-                                className="sr-only"
-                              />
-                              <span>⚡ Auto (Sequential)</span>
-                            </label>
-                            <label className={`flex items-center gap-1.5 p-1.5 rounded-lg border cursor-pointer ${
-                              formData.podDistributionStrategy === "MANUAL"
-                                ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-900 dark:text-indigo-200 font-bold"
-                                : "border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-neutral-600"
-                            }`}>
-                              <input
-                                type="radio"
-                                name="podStrategy"
-                                value="MANUAL"
-                                checked={formData.podDistributionStrategy === "MANUAL"}
-                                onChange={() => setFormData({ ...formData, podDistributionStrategy: "MANUAL" })}
-                                className="sr-only"
-                              />
-                              <span>👤 Manual</span>
-                            </label>
+                          <div className="flex items-center gap-3 pt-2 border-t border-neutral-100 dark:border-slate-800 text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                            <span className="font-semibold text-neutral-700 dark:text-neutral-300">{u.usersCount || 0} Staff</span>
+                            <span>•</span>
+                            <span className="font-semibold text-neutral-700 dark:text-neutral-300">{u.jobsCount || 0} Jobs</span>
                           </div>
                         </div>
-                      )}
+                      ))}
                     </div>
-
-                    {/* Option 4: Unassigned */}
-                    <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs transition-all ${
-                      formData.allowNone
-                        ? "opacity-40 cursor-not-allowed bg-neutral-100 dark:bg-slate-900"
-                        : "cursor-pointer bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
-                    }`}>
-                      <input
-                        type="checkbox"
-                        checked={formData.allowUnassigned}
-                        disabled={formData.allowNone}
-                        onChange={(e) => setFormData({ ...formData, allowUnassigned: e.target.checked })}
-                        className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
-                      />
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-neutral-900 dark:text-white">4. Unassigned Allocation</span>
-                        </div>
-                        <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
-                          Hold job in unassigned queue for Delivery Head or Pod Lead manual assignment.
-                        </p>
-                      </div>
-                    </label>
-                  </div>
+                  )}
                 </div>
               </div>
 
@@ -2291,6 +2405,12 @@ export default function BranchManagementPage() {
                                     <Crown className="h-3 w-3 text-amber-600 dark:text-amber-400" /> Branch Head
                                   </span>
                                 )}
+                                {(user.businessUnitName || user.businessUnit?.name) && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 shrink-0">
+                                    <Layers className="h-2.5 w-2.5" />
+                                    {user.businessUnitName || user.businessUnit?.name}
+                                  </span>
+                                )}
                               </div>
 
                               <p className="text-[11.5px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5">
@@ -2324,7 +2444,18 @@ export default function BranchManagementPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleAssignManager(user.id)}
+                                  onClick={async () => {
+                                    setSavingManager(true);
+                                    try {
+                                      await atsApi.branches.updateManagers(selectedBranch.id, [user.id]);
+                                      toast.success("Branch Head assigned successfully!");
+                                      await loadBranchesAndHierarchy();
+                                    } catch(e: any) {
+                                      toast.error(e.message || "Failed to assign head");
+                                    } finally {
+                                      setSavingManager(false);
+                                    }
+                                  }}
                                   className="h-7 px-2.5 text-[10.5px] font-bold border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800"
                                 >
                                   Set as Branch Head
@@ -2452,7 +2583,7 @@ export default function BranchManagementPage() {
               {/* Option to clear / unassign manager */}
               {selectedBranch.managerId && (
                 <div
-                  onClick={() => handleSelectManager(null)}
+                  onClick={() => setSelectedManagerIds([])}
                   className="flex items-center justify-between p-2.5 rounded-lg border border-dashed border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-2.5">
@@ -2527,7 +2658,7 @@ export default function BranchManagementPage() {
                 }
 
                 return eligibleList.map((user) => {
-                  const isCurrentManager = selectedBranch.managerId === user.id;
+                  const isCurrentManager = selectedManagerIds.includes(user.id);
                   const initials = (user.fullName || user.email || "U")
                     .split(" ")
                     .map((n: string) => n[0])
@@ -2538,7 +2669,7 @@ export default function BranchManagementPage() {
                   return (
                     <div
                       key={user.id}
-                      onClick={() => !isCurrentManager && handleSelectManager(user.id)}
+                      onClick={() => toggleManagerSelection(user.id)}
                       className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${
                         isCurrentManager
                           ? "bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 cursor-default"
@@ -2587,7 +2718,7 @@ export default function BranchManagementPage() {
                             disabled={savingManager}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleSelectManager(user.id);
+                              toggleManagerSelection(user.id);
                             }}
                             className="h-6 text-[10.5px] font-semibold border-neutral-300 hover:border-indigo-500 hover:text-indigo-650 px-2"
                           >
@@ -2602,14 +2733,22 @@ export default function BranchManagementPage() {
             </div>
 
             {/* Footer */}
-            <div className="p-3 bg-neutral-50 dark:bg-slate-850 border-t border-neutral-100 dark:border-slate-800 flex justify-end">
+            <div className="p-3 bg-neutral-50 dark:bg-slate-850 border-t border-neutral-100 dark:border-slate-800 flex justify-end gap-2">
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setIsChangeManagerOpen(false)}
                 className="h-7 text-xs font-bold px-4"
               >
-                Close
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveManagers}
+                disabled={savingManager}
+                className="h-7 text-xs font-bold px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                {savingManager ? "Saving..." : "Save Branch Heads"}
               </Button>
             </div>
           </div>
@@ -2671,6 +2810,72 @@ export default function BranchManagementPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Unit Admin */}
+                <div 
+                  onClick={() => {
+                    const isChecked = selectedRoles.includes("UNIT_ADMIN");
+                    if (isChecked) setSelectedRoles(selectedRoles.filter(r => r !== "UNIT_ADMIN"));
+                    else setSelectedRoles([...selectedRoles, "UNIT_ADMIN"]);
+                  }}
+                  className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all border ${
+                    selectedRoles.includes("UNIT_ADMIN")
+                      ? "bg-violet-50/80 border-violet-300 dark:bg-violet-950/40 dark:border-violet-700 shadow-xs"
+                      : "bg-white dark:bg-slate-850 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedRoles.includes("UNIT_ADMIN")}
+                    onChange={() => {}}
+                    className="h-4 w-4 accent-violet-600 cursor-pointer mt-0.5"
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold text-neutral-900 dark:text-white flex items-center gap-1">
+                        <Shield className="h-3.5 w-3.5 text-violet-500" /> Unit Admin (Practice Division Manager)
+                      </p>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-violet-100 text-violet-900 dark:bg-violet-900/60 dark:text-violet-200">
+                        Unit Level
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                      Restricted to their assigned operating unit. Can manage unit operational timings, staff, and unit-scoped pods.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Operating Division / Unit Assignment */}
+              <div className="space-y-1.5 p-3 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10.5px] font-bold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                    Operating Unit (Practice Division)
+                  </label>
+                  <span className="text-[10.5px] text-blue-600 dark:text-blue-400 font-medium">
+                    Office: {selectedBranch?.name}
+                  </span>
+                </div>
+                {selectedBranchUnits.length > 0 ? (
+                  <select
+                    value={selectedUnitId}
+                    onChange={(e) => setSelectedUnitId(e.target.value)}
+                    className="w-full text-xs font-semibold px-3 py-2 rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Select Operating Unit --</option>
+                    {selectedBranchUnits.map((u: any) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.shiftTiming || "General Shift"} • {u.market || "Domestic"} • {u.currency || "INR"})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-xs text-neutral-400 italic">No operating units configured for this branch.</p>
+                )}
+                <p className="text-[10px] text-neutral-400">
+                  The recruiter inherits requisition visibility, shift hours, and candidate talent pools from their assigned operating unit.
+                </p>
               </div>
 
               {/* 2. Workspace Custom Staffing Roles */}
@@ -3402,19 +3607,25 @@ export default function BranchManagementPage() {
             </div>
 
             <form onSubmit={handleQuickCreatePod} className="p-6 space-y-4">
-              {/* Branch Scope Banner */}
+              {/* Scope Banner */}
               <div className="p-3 rounded-xl bg-neutral-100/70 dark:bg-slate-800/60 border border-neutral-200 dark:border-slate-700/80 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-neutral-600 dark:text-neutral-300 shrink-0" />
                   <div>
-                    <span className="font-bold text-neutral-900 dark:text-white block">{selectedBranch.name}</span>
+                    <span className="font-bold text-neutral-900 dark:text-white block">
+                      {quickPodUnitId ? (editingUnit?.name || "Operating Practice Unit") : selectedBranch?.name}
+                    </span>
                     <span className="text-[10.5px] text-neutral-500 font-mono">
-                      {selectedBranch.city || "Branch Location"} • {selectedBranch.market === "US" ? "US IT Market" : "Domestic India"}
+                      {selectedBranch?.name ? `${selectedBranch.name} • ` : ""}{selectedBranch?.city || "Location"}
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  Branch Isolated
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  quickPodUnitId
+                    ? "bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                    : "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                }`}>
+                  {quickPodUnitId ? "Unit Isolated" : "Branch Isolated"}
                 </span>
               </div>
 
@@ -3598,6 +3809,976 @@ export default function BranchManagementPage() {
         </div>
       )}
 
+      {/* ADD / CREATE OPERATING PRACTICE UNIT MODAL */}
+      {isCreateUnitOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden my-auto flex flex-col">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-200/80 dark:border-slate-800 bg-neutral-50/80 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
+                  <Layers className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Add Operating Unit / Practice Division
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    Create a specialized business division within an office branch
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCreateUnitOpen(false)}
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateUnit} className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+              {unitFormError && (
+                <div className="p-3 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-xs font-semibold rounded-lg border border-red-200 dark:border-red-900/60 flex items-center gap-2">
+                  <X className="h-4 w-4 shrink-0" />
+                  <span>{unitFormError}</span>
+                </div>
+              )}
+
+              {/* Target Office Branch */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  Parent Office Branch <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={unitFormData.branchId}
+                  onChange={(e) => {
+                    const bId = e.target.value;
+                    const bObj = branches.find((b) => b.id === bId);
+                    setUnitBranch(bObj || null);
+                    const isUs = bObj?.market === "US";
+                    setUnitFormData({
+                      ...unitFormData,
+                      branchId: bId,
+                      market: isUs ? "US" : "INDIA",
+                      currency: isUs ? "USD" : "INR",
+                      shiftTiming: isUs ? "US Shift" : "General Shift",
+                      workStartTime: isUs ? "20:00" : "09:30",
+                      workEndTime: isUs ? "05:00" : "18:30",
+                      timezone: bObj?.timezone || (isUs ? "America/New_York" : "Asia/Kolkata"),
+                    });
+                  }}
+                  className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 font-semibold text-neutral-800 dark:text-neutral-200 outline-none focus:ring-1 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">-- Select Branch Office --</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.city || "Unspecified"}, {b.country || "India"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Unit Name */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  Operating Unit Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={unitFormData.name}
+                  onChange={(e) => setUnitFormData({ ...unitFormData, name: e.target.value })}
+                  placeholder="e.g. US IT Staffing, Domestic IT, Healthcare, BFSI"
+                  className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700 font-semibold bg-white dark:bg-slate-900"
+                  required
+                />
+                <p className="text-[10px] text-neutral-400">
+                  Example: Bhubaneswar Branch can have "US IT Staffing" (night shift) and "Domestic IT" (day shift).
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Market Segment */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                    Market Focus
+                  </label>
+                  <select
+                    value={unitFormData.market}
+                    onChange={(e) => {
+                      const m = e.target.value;
+                      const isUs = m === "US";
+                      setUnitFormData({
+                        ...unitFormData,
+                        market: m,
+                        currency: isUs ? "USD" : "INR",
+                        shiftTiming: isUs ? "US Shift" : "General Shift",
+                        workStartTime: isUs ? "20:00" : "09:30",
+                        workEndTime: isUs ? "05:00" : "18:30",
+                        timezone: isUs ? "America/New_York" : "Asia/Kolkata",
+                      });
+                    }}
+                    className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 font-semibold text-neutral-800 dark:text-neutral-200 outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="INDIA">Domestic India</option>
+                    <option value="US">US IT Staffing</option>
+                  </select>
+                </div>
+
+                {/* Currency */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                    Billing Currency
+                  </label>
+                  <select
+                    value={unitFormData.currency}
+                    onChange={(e) => setUnitFormData({ ...unitFormData, currency: e.target.value })}
+                    className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 font-semibold text-neutral-800 dark:text-neutral-200 outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="INR">INR (₹ Indian Rupee)</option>
+                    <option value="USD">USD ($ US Dollar)</option>
+                    <option value="GBP">GBP (£ British Pound)</option>
+                    <option value="EUR">EUR (€ Euro)</option>
+                    <option value="CAD">CAD ($ Canadian Dollar)</option>
+                    <option value="AED">AED (Dirham)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Shift Timing */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  Shift Timing Preset
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setUnitFormData({
+                      ...unitFormData,
+                      shiftTiming: "General Shift (Day)",
+                      workStartTime: "09:30",
+                      workEndTime: "18:30",
+                    })}
+                    className={`p-2 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                      unitFormData.shiftTiming.includes("General")
+                        ? "border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 font-bold"
+                        : "border-neutral-200 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <Sun className="h-3.5 w-3.5 text-amber-500" /> Day Shift
+                    </div>
+                    <span className="text-[10px] text-neutral-500 block mt-0.5">09:30 AM - 06:30 PM</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setUnitFormData({
+                      ...unitFormData,
+                      shiftTiming: "US Shift (Night)",
+                      workStartTime: "20:00",
+                      workEndTime: "05:00",
+                    })}
+                    className={`p-2 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                      unitFormData.shiftTiming.includes("US") || unitFormData.shiftTiming.includes("Night")
+                        ? "border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 font-bold"
+                        : "border-neutral-200 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <Moon className="h-3.5 w-3.5 text-indigo-500" /> Night Shift
+                    </div>
+                    <span className="text-[10px] text-neutral-500 block mt-0.5">08:00 PM - 05:00 AM</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Work Hours & Timezone */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-neutral-600 dark:text-neutral-400">
+                    Start Time
+                  </label>
+                  <Input
+                    type="time"
+                    value={unitFormData.workStartTime}
+                    onChange={(e) => setUnitFormData({ ...unitFormData, workStartTime: e.target.value })}
+                    className="h-8 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-neutral-600 dark:text-neutral-400">
+                    End Time
+                  </label>
+                  <Input
+                    type="time"
+                    value={unitFormData.workEndTime}
+                    onChange={(e) => setUnitFormData({ ...unitFormData, workEndTime: e.target.value })}
+                    className="h-8 text-xs rounded-lg border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-neutral-600 dark:text-neutral-400">
+                  Operational Timezone
+                </label>
+                <select
+                  value={unitFormData.timezone}
+                  onChange={(e) => setUnitFormData({ ...unitFormData, timezone: e.target.value })}
+                  className="w-full h-8 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 font-semibold text-neutral-800 dark:text-neutral-200 outline-none"
+                >
+                  {getDynamicTimezoneOptions().map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-neutral-100 dark:border-slate-800">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCreateUnitOpen(false)}
+                  className="text-xs font-bold px-4"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isSubmittingUnit}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 shadow-xs cursor-pointer"
+                >
+                  {isSubmittingUnit ? "Creating..." : "Create Operating Unit"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MANAGE OPERATING UNITS MODAL */}
+      {isManageUnitsOpen && unitBranch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden my-auto flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-200/80 dark:border-slate-800 bg-neutral-50/80 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
+                  <Layers className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Operating Units in {unitBranch.name}
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    Manage business divisions, work shifts, currency, and recruiter staffing allocations
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsManageUnitsOpen(false)}
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
+                  Configured Units ({selectedBranchUnits.length})
+                </span>
+                {canManageBranches && (
+                  <Button
+                    onClick={() => {
+                      setIsManageUnitsOpen(false);
+                      openCreateUnitModal(unitBranch);
+                    }}
+                    size="sm"
+                    className="h-7 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add New Unit
+                  </Button>
+                )}
+              </div>
+
+              {selectedBranchUnits.length === 0 ? (
+                <div className="p-8 text-center border border-dashed border-neutral-200 dark:border-slate-800 rounded-xl space-y-2">
+                  <Layers className="h-8 w-8 text-neutral-400 mx-auto" />
+                  <p className="text-xs font-bold text-neutral-700 dark:text-neutral-300">No Operating Units Configured</p>
+                  <p className="text-[11px] text-neutral-400">Add operating units (e.g., US IT, Domestic IT) to segment requisitions and shifts.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedBranchUnits.map((u: any) => (
+                    <div
+                      key={u.id}
+                      className="p-4 rounded-xl border border-neutral-200 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850/50 hover:bg-white dark:hover:bg-slate-850 transition-all space-y-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-neutral-900 dark:text-white">{u.name}</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
+                              {u.market || "Domestic"} • {u.currency || "INR"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-neutral-500 dark:text-neutral-400 flex items-center gap-2">
+                            <span><Clock className="h-3 w-3 inline mr-1 text-amber-500" />{u.shiftTiming || "General Shift"} ({u.workStartTime || "09:30"} - {u.workEndTime || "18:30"})</span>
+                            <span>•</span>
+                            <span>{u.timezone ? u.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}</span>
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {canEditUnitFunc(u.id) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                openEditUnitModal(u);
+                              }}
+                              className="h-7 px-2.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30 border-neutral-200 dark:border-slate-700"
+                            >
+                              <Pencil className="h-3 w-3 mr-1" /> Edit
+                            </Button>
+                          )}
+                          {canManageBranches && (
+                            (u.usersCount > 0 || u.jobsCount > 0) ? (
+                              <span
+                                title="Unit is actively protected: contains staff or jobs"
+                                className="h-7 px-2 rounded-md border border-neutral-200 dark:border-slate-800 text-neutral-400 flex items-center gap-1 text-[10px] font-medium"
+                              >
+                                <Lock className="h-3 w-3 text-neutral-400" /> Active
+                              </span>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteUnit(u)}
+                                disabled={isDeletingUnit}
+                                className="h-7 px-2.5 text-[11px] font-semibold text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-neutral-200 dark:border-slate-700"
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" /> Delete
+                              </Button>
+                            )
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 pt-2 border-t border-neutral-100 dark:border-slate-800/80 text-[11px] text-neutral-600 dark:text-neutral-400">
+                        <span className="font-semibold text-neutral-900 dark:text-white">{u.usersCount || 0} Staff Assigned</span>
+                        <span>•</span>
+                        <span className="font-semibold text-neutral-900 dark:text-white">{u.jobsCount || 0} Active Requisitions</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-3.5 bg-neutral-50 dark:bg-slate-850 border-t border-neutral-200/80 dark:border-slate-800 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsManageUnitsOpen(false)}
+                className="text-xs font-bold px-4"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT OPERATING UNIT MODAL */}
+      {isEditUnitOpen && editingUnit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden my-auto flex flex-col max-h-[92vh]">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <Layers className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Edit Operating Unit: {editingUnit.name}
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">Configure operational parameters, shift timings, working days, and recruiter routing policy</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditUnitOpen(false)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateUnit} className="p-6 space-y-4 overflow-y-auto flex-1">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                  Unit Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={editUnitFormData.name}
+                  onChange={(e) => setEditUnitFormData({ ...editUnitFormData, name: e.target.value })}
+                  placeholder="e.g. US IT Staffing, Domestic IT"
+                  className="h-9 text-xs rounded-lg border-neutral-300 dark:border-slate-700"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Market Segment
+                  </label>
+                  <select
+                    value={editUnitFormData.market}
+                    onChange={(e) => {
+                      const m = e.target.value;
+                      setEditUnitFormData({
+                        ...editUnitFormData,
+                        market: m,
+                        currency: m === "US" ? "USD" : "INR",
+                        timezone: m === "US" ? "America/New_York" : "Asia/Kolkata",
+                        shiftTiming: m === "US" ? "US Shift" : "General Shift",
+                        workStartTime: m === "US" ? "20:00" : "09:30",
+                        workEndTime: m === "US" ? "05:00" : "18:30",
+                      });
+                    }}
+                    className="w-full h-9 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-medium text-neutral-900 dark:text-white cursor-pointer"
+                  >
+                    <option value="INDIA">Domestic IT (India)</option>
+                    <option value="US">US IT Staffing</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Operating Currency
+                  </label>
+                  <select
+                    value={editUnitFormData.currency}
+                    onChange={(e) => setEditUnitFormData({ ...editUnitFormData, currency: e.target.value })}
+                    className="w-full h-9 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-medium text-neutral-900 dark:text-white cursor-pointer"
+                  >
+                    <option value="INR">INR (₹) - Indian Rupee</option>
+                    <option value="USD">USD ($) - US Dollar</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                  Shift Timing Preset / Label
+                </label>
+                <Input
+                  value={editUnitFormData.shiftTiming}
+                  onChange={(e) => setEditUnitFormData({ ...editUnitFormData, shiftTiming: e.target.value })}
+                  placeholder="e.g. General Shift, US EST Night Shift"
+                  className="h-9 text-xs rounded-lg border-neutral-300 dark:border-slate-700"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                    <Sun className="h-3 w-3 text-amber-500" /> Start Time
+                  </label>
+                  <Input
+                    type="time"
+                    value={editUnitFormData.workStartTime}
+                    onChange={(e) => setEditUnitFormData({ ...editUnitFormData, workStartTime: e.target.value })}
+                    className="h-8.5 text-xs font-mono rounded-lg border-neutral-300 dark:border-slate-700"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                    <Moon className="h-3 w-3 text-indigo-500" /> End Time
+                  </label>
+                  <Input
+                    type="time"
+                    value={editUnitFormData.workEndTime}
+                    onChange={(e) => setEditUnitFormData({ ...editUnitFormData, workEndTime: e.target.value })}
+                    className="h-8.5 text-xs font-mono rounded-lg border-neutral-300 dark:border-slate-700"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                    <Globe className="h-3 w-3 text-neutral-400" /> Timezone
+                  </label>
+                  <select
+                    value={editUnitFormData.timezone}
+                    onChange={(e) => setEditUnitFormData({ ...editUnitFormData, timezone: e.target.value })}
+                    className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 font-semibold text-neutral-800 dark:text-neutral-200 outline-none"
+                  >
+                    {getDynamicTimezoneOptions().map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
+                    Break Duration (Minutes)
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={180}
+                    value={editUnitFormData.breakDurationMinutes}
+                    onChange={(e) => setEditUnitFormData({ ...editUnitFormData, breakDurationMinutes: Number(e.target.value) || 0 })}
+                    className="h-8.5 text-xs rounded-lg border-neutral-300 dark:border-slate-700"
+                  />
+                </div>
+              </div>
+
+              {/* Working Days Selector */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                  <Calendar className="h-3.5 w-3.5 text-neutral-400" /> Operating Working Days
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => {
+                    const isSelected = editUnitFormData.workingDays.includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => {
+                          const updated = isSelected
+                            ? editUnitFormData.workingDays.filter((d) => d !== day)
+                            : [...editUnitFormData.workingDays, day];
+                          setEditUnitFormData({ ...editUnitFormData, workingDays: updated });
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border ${
+                          isSelected
+                            ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                            : "bg-white dark:bg-slate-900 text-neutral-600 dark:text-neutral-300 border-neutral-200 dark:border-slate-700 hover:bg-neutral-100"
+                        }`}
+                      >
+                        {day.slice(0, 3)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Job Assignment & Routing Policy (Operating Unit Level) */}
+              <div className="p-5 bg-white dark:bg-slate-900 rounded-xl border border-neutral-200 dark:border-slate-700/80 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-650 dark:text-indigo-400">
+                      <Shield className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
+                        Job Assignment Policy
+                      </h4>
+                      <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                        Control how job orders are assigned and broadcast to recruitment personnel within this operating unit.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                    Unit Isolated
+                  </span>
+                </div>
+
+                {/* Standard Assignment Modes 1 - 4 (Clean 2x2 Grid) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Option 1: None / Direct */}
+                  <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                    editUnitFormData.allowNone
+                      ? "bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-800"
+                      : "bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={editUnitFormData.allowNone}
+                      onChange={(e) => {
+                        const isNone = e.target.checked;
+                        setEditUnitFormData({
+                          ...editUnitFormData,
+                          allowNone: isNone,
+                          ...(isNone
+                            ? { allowPods: false, allowAll: false, allowUnassigned: false }
+                            : { allowPods: unitPods.length > 0, allowAll: true, allowUnassigned: true }),
+                        });
+                      }}
+                      className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-neutral-900 dark:text-white">1. Direct Assignment Only</span>
+                        {editUnitFormData.allowNone && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-200 text-indigo-900 dark:bg-indigo-900 dark:text-indigo-200">
+                            Exclusive
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                        Direct individual recruiter assignment only. Pod and pooled routing options are disabled.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Option 3: All Unit Recruiters */}
+                  <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs transition-all ${
+                    editUnitFormData.allowNone
+                      ? "opacity-40 cursor-not-allowed bg-neutral-100 dark:bg-slate-900"
+                      : "cursor-pointer bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={editUnitFormData.allowAll}
+                      disabled={editUnitFormData.allowNone}
+                      onChange={(e) => setEditUnitFormData({ ...editUnitFormData, allowAll: e.target.checked })}
+                      className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                    />
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-neutral-900 dark:text-white">3. All Unit Recruiters (Pool)</span>
+                      </div>
+                      <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                        Allow broadcast to all active recruiters belonging to this operating unit.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Option 2: Pod System (with sub-strategy & 0-pod gating) */}
+                  <div className={`space-y-2.5 p-3 rounded-xl border text-xs transition-all ${
+                    editUnitFormData.allowNone
+                      ? "opacity-40 pointer-events-none bg-neutral-100 dark:bg-slate-900 border-neutral-200"
+                      : unitPods.length === 0
+                      ? "bg-amber-50/25 dark:bg-amber-950/15 border-amber-200/80 dark:border-amber-900/40"
+                      : "bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750"
+                  }`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <label 
+                        className={`flex items-start gap-2.5 flex-1 ${
+                          editUnitFormData.allowNone 
+                            ? "cursor-not-allowed" 
+                            : unitPods.length === 0 
+                            ? "cursor-pointer" 
+                            : "cursor-pointer"
+                        }`}
+                        onClick={(e) => {
+                          if (unitPods.length === 0 && !editUnitFormData.allowNone) {
+                            e.preventDefault();
+                            toast.error("No pods created for this operating unit. Create a pod first!");
+                            openQuickCreatePod(editingUnit.id);
+                          }
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={Boolean(editUnitFormData.allowPods && unitPods.length > 0)}
+                          disabled={editUnitFormData.allowNone || unitPods.length === 0}
+                          onChange={(e) => {
+                            if (unitPods.length === 0) {
+                              toast.error("No pods created for this operating unit. Create a pod first!");
+                              openQuickCreatePod(editingUnit.id);
+                              return;
+                            }
+                            setEditUnitFormData({ ...editUnitFormData, allowPods: e.target.checked });
+                          }}
+                          className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-bold text-neutral-900 dark:text-white">2. Recruitment Pod System</span>
+                            {loadingUnitPods ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-neutral-400">
+                                <Loader2 className="h-3 w-3 animate-spin" /> Checking pods...
+                              </span>
+                            ) : unitPods.length === 0 ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800/80">
+                                0 Pods Available
+                              </span>
+                            ) : (
+                              <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                                <HoverCard openDelay={80} closeDelay={150}>
+                                  <HoverCardTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-800/80 hover:bg-emerald-200/90 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                                      title="Hover to view all available pods, leads, and members"
+                                    >
+                                      <Users className="h-2.5 w-2.5" />
+                                      <span>{unitPods.length} {unitPods.length === 1 ? "Pod" : "Pods"} Available</span>
+                                    </button>
+                                  </HoverCardTrigger>
+                                  <HoverCardContent
+                                    align="start"
+                                    side="bottom"
+                                    sideOffset={6}
+                                    className="w-84 sm:w-96 p-3 shadow-2xl z-60 font-sans bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl"
+                                  >
+                                    <div className="space-y-2.5">
+                                      {/* Pop-up Header */}
+                                      <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-2">
+                                        <div className="flex items-center gap-1.5">
+                                          <Layers className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                                          <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                                            Available Unit Pods
+                                          </span>
+                                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                            {unitPods.length}
+                                          </span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            openQuickCreatePod(editingUnit.id);
+                                          }}
+                                          className="text-[10.5px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 flex items-center gap-0.5 hover:underline cursor-pointer"
+                                        >
+                                          <Plus className="h-2.5 w-2.5" /> New Pod
+                                        </button>
+                                      </div>
+
+                                      {/* Pod List with Leads & Members */}
+                                      <div className="max-h-60 overflow-y-auto space-y-2 pr-1 select-text">
+                                        {unitPods.map((pod: any) => (
+                                          <div
+                                            key={pod.id}
+                                            className="p-2.5 rounded-lg border border-neutral-200/80 dark:border-slate-800 bg-neutral-50/60 dark:bg-slate-850/50 space-y-1.5 text-xs"
+                                          >
+                                            <div className="flex items-center justify-between gap-2">
+                                              <span className="font-bold text-xs text-neutral-900 dark:text-white truncate">
+                                                {pod.name}
+                                              </span>
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                                                <Check className="h-2 w-2" /> Active
+                                              </span>
+                                            </div>
+
+                                            <div className="flex items-center gap-1.5 text-[11px]">
+                                              <Crown className="h-3 w-3 text-amber-500 shrink-0" />
+                                              <span className="text-neutral-500 dark:text-neutral-400">Pod Lead:</span>
+                                              <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+                                                {pod.podHeadName || "No Lead Assigned"}
+                                              </span>
+                                            </div>
+
+                                            <div className="space-y-1 text-[11px] pt-0.5">
+                                              <div className="flex items-center justify-between text-neutral-500 dark:text-neutral-400">
+                                                <span className="flex items-center gap-1">
+                                                  <Users className="h-3 w-3 text-indigo-500 shrink-0" />
+                                                  Members ({pod.members?.length || 0}):
+                                                </span>
+                                              </div>
+                                              {pod.members && pod.members.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                  {pod.members.map((m: any) => (
+                                                    <span
+                                                      key={m.id}
+                                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 text-[10px] text-neutral-700 dark:text-neutral-300 font-medium"
+                                                      title={m.email || m.fullName}
+                                                    >
+                                                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />
+                                                      {m.fullName || m.email}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              ) : (
+                                                <p className="text-[10px] text-neutral-400 dark:text-neutral-500 italic pl-4">
+                                                  No recruiters assigned to this pod yet.
+                                                </p>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </HoverCardContent>
+                                </HoverCard>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                            Allow selecting and routing jobs to recruitment pods.
+                          </p>
+                        </div>
+                      </label>
+
+                      {/* Top-Right "Create New Pod" Button */}
+                      <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openQuickCreatePod(editingUnit.id);
+                          }}
+                          className="h-7 text-[11px] font-semibold border-indigo-200 dark:border-indigo-800/80 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+                          title="Create a new recruitment pod for this operating unit"
+                        >
+                          <Plus className="h-3 w-3 text-indigo-600 dark:text-indigo-400" /> Create New Pod
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* When NO pods exist for this unit: Show "Create Pod First" banner and action */}
+                    {unitPods.length === 0 && !loadingUnitPods && (
+                      <div className="mt-1.5 p-3 rounded-lg bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/90 dark:border-amber-800/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                        <div className="flex items-start gap-2">
+                          <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                              Create Pod First
+                            </p>
+                            <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-tight">
+                              This operating unit has no recruitment pods. Create a pod first to enable pod-based routing.
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openQuickCreatePod(editingUnit.id);
+                          }}
+                          className="h-7 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-md flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Create Pod First
+                        </Button>
+                      </div>
+                    )}
+
+                    {editUnitFormData.allowPods && unitPods.length > 0 && !editUnitFormData.allowNone && (
+                      <div className="ml-5 pl-3 border-l-2 border-indigo-200 dark:border-indigo-800 space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 block">Pod Strategy:</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openQuickCreatePod(editingUnit.id);
+                            }}
+                            className="text-[10.5px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center gap-0.5 hover:underline cursor-pointer"
+                          >
+                            <Plus className="h-2.5 w-2.5" /> Add Pod
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+                          <label className={`flex items-center gap-1.5 p-1.5 rounded-lg border cursor-pointer ${
+                            editUnitFormData.podDistributionStrategy === "AUTO"
+                              ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-900 dark:text-indigo-200 font-bold"
+                              : "border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-neutral-600"
+                          }`}>
+                            <input
+                              type="radio"
+                              name="unitPodStrategy"
+                              value="AUTO"
+                              checked={editUnitFormData.podDistributionStrategy === "AUTO"}
+                              onChange={() => setEditUnitFormData({ ...editUnitFormData, podDistributionStrategy: "AUTO" })}
+                              className="sr-only"
+                            />
+                            <span>⚡ Auto (Sequential)</span>
+                          </label>
+                          <label className={`flex items-center gap-1.5 p-1.5 rounded-lg border cursor-pointer ${
+                            editUnitFormData.podDistributionStrategy === "MANUAL"
+                              ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-900 dark:text-indigo-200 font-bold"
+                              : "border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-neutral-600"
+                          }`}>
+                            <input
+                              type="radio"
+                              name="unitPodStrategy"
+                              value="MANUAL"
+                              checked={editUnitFormData.podDistributionStrategy === "MANUAL"}
+                              onChange={() => setEditUnitFormData({ ...editUnitFormData, podDistributionStrategy: "MANUAL" })}
+                              className="sr-only"
+                            />
+                            <span>👤 Manual</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Option 4: Unassigned */}
+                  <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs transition-all ${
+                    editUnitFormData.allowNone
+                      ? "opacity-40 cursor-not-allowed bg-neutral-100 dark:bg-slate-900"
+                      : "cursor-pointer bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={editUnitFormData.allowUnassigned}
+                      disabled={editUnitFormData.allowNone}
+                      onChange={(e) => setEditUnitFormData({ ...editUnitFormData, allowUnassigned: e.target.checked })}
+                      className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                    />
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-neutral-900 dark:text-white">4. Unassigned Allocation</span>
+                      </div>
+                      <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
+                        Hold job in unassigned queue for Delivery Head or Pod Lead manual assignment.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-neutral-100 dark:border-slate-800">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditUnitOpen(false)}
+                  className="text-xs font-bold px-4"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isSubmittingEditUnit}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 shadow-xs cursor-pointer"
+                >
+                  {isSubmittingEditUnit ? "Saving Changes..." : "Save Operating Unit"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
+  );
+}
+
+export default function BranchManagementPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-12 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="text-xs text-neutral-500 mt-2 font-medium">Loading branch management...</p>
+        </div>
+      }
+    >
+      <BranchManagementPageContent />
+    </Suspense>
   );
 }

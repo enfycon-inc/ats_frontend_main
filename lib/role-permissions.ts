@@ -290,6 +290,7 @@ export function getFilteredPrimaryNav(
       "vendors",
       "onboarding",
       "reports",
+      "branch-units",
     ],
     TENANT_ADMIN: [
       "dashboard",
@@ -302,6 +303,7 @@ export function getFilteredPrimaryNav(
       "vendors",
       "onboarding",
       "reports",
+      "branch-units",
     ],
     BRANCH_ADMIN: [
       "dashboard",
@@ -314,6 +316,7 @@ export function getFilteredPrimaryNav(
       "vendors",
       "onboarding",
       "reports",
+      "branch-units",
     ],
     DELIVERY_HEAD: [
       "dashboard",
@@ -362,6 +365,15 @@ export function getFilteredPrimaryNav(
   }
   if (permissions.includes("report:view")) {
     allowedIds.add("reports");
+  }
+  if (
+    permissions.includes("branch:view") ||
+    permissions.includes("branch:edit") ||
+    permissions.includes("branch_admin:manage") ||
+    permissions.includes("unit_admin:manage") ||
+    permissions.includes("tenant:settings")
+  ) {
+    allowedIds.add("branch-units");
   }
 
   return PRIMARY_NAV_ITEMS.filter((item) => allowedIds.has(item.id)).map((item) => {
@@ -436,7 +448,6 @@ export function getFilteredMoreNav(
     allowedIds.add("database");
     allowedIds.add("integrations");
     allowedIds.add("user-management");
-    allowedIds.add("branch-management");
     allowedIds.add("role-management");
     allowedIds.add("pod-management");
     allowedIds.add("dictionaries");
@@ -444,7 +455,6 @@ export function getFilteredMoreNav(
     allowedIds.add("user-management");
     allowedIds.add("pod-management");
     allowedIds.add("tenant-management");
-    allowedIds.add("branch-management");
   } else if (isDeliveryHead) {
     allowedIds.add("pod-management");
   } else if (isPodLead) {
@@ -467,9 +477,6 @@ export function getFilteredMoreNav(
   }
   if (permissions.includes("user:manage") && (isAdmin || isBranchAdmin)) {
     allowedIds.add("user-management");
-  }
-  if (permissions.includes("branch_admin:manage") || permissions.includes("branch:edit") || permissions.includes("branch:view")) {
-    allowedIds.add("branch-management");
   }
   if (permissions.includes("tenant:settings") && isAdmin) {
     allowedIds.add("dictionaries");
@@ -498,7 +505,11 @@ export function getFilteredMoreNav(
       if (item.id === "settings") {
         const subChildren: { label: string; href: string }[] = [];
         if (canManageCompany) {
-          subChildren.push({ label: "Company & Workspace", href: "/company" });
+          subChildren.push({ label: "Company & Structure", href: "/company?tab=general" });
+          subChildren.push({ label: "Authentication & SSO", href: "/company?tab=auth" });
+          subChildren.push({ label: "Custom Domains", href: "/company?tab=domains" });
+          subChildren.push({ label: "Email Dispatch", href: "/company?tab=email" });
+          subChildren.push({ label: "Hiring & Pod Rules", href: "/company?tab=hiring" });
         }
         if (isAdmin || permissions.includes("tenant:settings") || permissions.includes("tenant:manage") || permissions.includes("system:admin")) {
           subChildren.push({ label: "Global Remarks Templates", href: "/utility/global-remarks" });

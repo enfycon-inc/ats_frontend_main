@@ -1,79 +1,55 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import React, { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { atsApi } from "@/lib/ats-api";
 import {
-  Globe,
   Building2,
-  Trash2,
-  Plus,
-  ExternalLink,
-  RefreshCw,
-  Users,
-  MapPin,
-  Briefcase,
-  CheckCircle2,
-  ShieldCheck,
-  Shield,
-  Bell,
+  Lock,
+  Globe,
   Mail,
-  DollarSign,
-  Filter,
   Sliders,
+  RefreshCw,
+  Briefcase,
+  Users,
+  Target,
   Sparkles,
   Save,
-  ChevronRight,
-  Layers,
+  CheckCircle2,
+  Filter,
+  Bell,
   Award,
-  Target
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { getBaseDomain } from "@/utils/subdomain-helper";
 import { isRoleAdmin, resolveActiveSystemRole, CustomRoleDefinition } from "@/lib/role-permissions";
-import { EmailDispatchCard } from "@/components/company/email-dispatch-card";
-
-interface DomainMapping {
-  id: string | number;
-  domain_name: string;
-  is_primary: boolean;
-  verification_token?: string;
-  verification_status?: string;
-  ssl_status?: string;
-  verified_at?: string;
-  created_at: string;
-}
-
-interface BranchItem {
-  id: string;
-  name: string;
-  code: string | null;
-  city: string | null;
-  state: string | null;
-  country: string | null;
-  isActive: boolean;
-  usersCount: number;
-  jobsCount: number;
-  createdAt: string;
-}
-
-interface BusinessUnitItem {
-  id: string;
-  name: string;
-  code: string | null;
-  market: string;
-  currency: string;
-  usersCount: number;
-  jobsCount: number;
-  createdAt: string;
-}
+import { GeneralTab, BranchItem, BusinessUnitItem } from "@/components/company/tabs/general-tab";
+import { AuthTab } from "@/components/company/tabs/auth-tab";
+import { DomainsTab, DomainMapping } from "@/components/company/tabs/domains-tab";
+import { EmailTab } from "@/components/company/tabs/email-tab";
+import { HiringTab } from "@/components/company/tabs/hiring-tab";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export default function CompanySettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 flex flex-col items-center justify-center min-h-[300px] bg-neutral-100 dark:bg-[#1e2734]">
+          <RefreshCw className="animate-spin h-8 w-8 text-primary mb-3" />
+          <p className="text-sm text-neutral-500">Loading settings...</p>
+        </div>
+      }
+    >
+      <CompanySettingsContent />
+    </Suspense>
+  );
+}
+
+function CompanySettingsContent() {
   const [profile, setProfile] = useState<any>(null);
   const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
@@ -87,10 +63,16 @@ export default function CompanySettingsPage() {
   const [togglingPodSystem, setTogglingPodSystem] = useState(false);
   const [candidatePoolMode, setCandidatePoolMode] = useState("COMBINED_MARKET");
   const [updatingPoolMode, setUpdatingPoolMode] = useState(false);
+  const [jobCodePattern, setJobCodePattern] = useState("{BRANCH}-{UNIT}-{YYMMDD}-{SEQ}");
+  const [enforceJobCodePattern, setEnforceJobCodePattern] = useState(false);
+  const [updatingJobCodePattern, setUpdatingJobCodePattern] = useState(false);
   const [customDomains, setCustomDomains] = useState<DomainMapping[]>([]);
   const [newDomain, setNewDomain] = useState("");
   const [savingSubdomain, setSavingSubdomain] = useState(false);
   const [addingDomain, setAddingDomain] = useState(false);
+  const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null);
+
+  // Branches
   const [branches, setBranches] = useState<BranchItem[]>([]);
   const [showAddBranch, setShowAddBranch] = useState(false);
   const [branchName, setBranchName] = useState("");
@@ -99,20 +81,30 @@ export default function CompanySettingsPage() {
   const [branchState, setBranchState] = useState("");
   const [branchCountry, setBranchCountry] = useState("India");
   const [addingBranch, setAddingBranch] = useState(false);
+
+  // Business Units
   const [businessUnits, setBusinessUnits] = useState<BusinessUnitItem[]>([]);
   const [showAddBU, setShowAddBU] = useState(false);
   const [buName, setBuName] = useState("");
   const [buCode, setBuCode] = useState("");
   const [buMarket, setBuMarket] = useState("US");
   const [buCurrency, setBuCurrency] = useState("USD");
+  const [buBranchId, setBuBranchId] = useState("");
+  const [buShiftTiming, setBuShiftTiming] = useState("General Shift");
+  const [buWorkStartTime, setBuWorkStartTime] = useState("09:00");
+  const [buWorkEndTime, setBuWorkEndTime] = useState("18:00");
+  const [buTimezone, setBuTimezone] = useState("Asia/Kolkata");
   const [addingBU, setAddingBU] = useState(false);
 
   useEffect(() => {
-    atsApi.auth.listRoles().then((data) => {
-      if (Array.isArray(data) && data.length > 0) {
-        setAvailableRoles(data);
-      }
-    }).catch(() => {});
+    atsApi.auth
+      .listRoles()
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setAvailableRoles(data);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -140,7 +132,7 @@ export default function CompanySettingsPage() {
       const [user, profileData, rolesList] = await Promise.all([
         atsApi.auth.getCurrentUser(),
         atsApi.auth.me().catch(() => null),
-        atsApi.auth.listRoles().catch(() => [])
+        atsApi.auth.listRoles().catch(() => []),
       ]);
 
       if (profileData) {
@@ -149,6 +141,8 @@ export default function CompanySettingsPage() {
           setCompanyName(profileData.tenant.name || "");
           setSubdomain(profileData.tenant.domain || "");
           setOriginalSubdomain(profileData.tenant.domain || "");
+          if (profileData.tenant.jobCodePattern !== undefined) setJobCodePattern(profileData.tenant.jobCodePattern || "{BRANCH}-{UNIT}-{YYMMDD}-{SEQ}");
+          if (profileData.tenant.enforceJobCodePattern !== undefined) setEnforceJobCodePattern(profileData.tenant.enforceJobCodePattern || false);
         }
         if (profileData.podSystemEnabled !== undefined) {
           setPodSystemEnabled(profileData.podSystemEnabled);
@@ -201,6 +195,20 @@ export default function CompanySettingsPage() {
       toast.error("Failed to update pod settings: " + err.message);
     } finally {
       setTogglingPodSystem(false);
+    }
+  };
+
+  const handleUpdateJobCodePattern = async (pattern: string, enforce: boolean) => {
+    try {
+      setUpdatingJobCodePattern(true);
+      await atsApi.auth.updateMySettings({ jobCodePattern: pattern, enforceJobCodePattern: enforce });
+      setJobCodePattern(pattern);
+      setEnforceJobCodePattern(enforce);
+      toast.success("Job code standardization settings updated.");
+    } catch (err: any) {
+      toast.error("Failed to update job code settings: " + err.message);
+    } finally {
+      setUpdatingJobCodePattern(false);
     }
   };
 
@@ -268,8 +276,6 @@ export default function CompanySettingsPage() {
     }
   };
 
-  const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null);
-
   const handleVerifyDomain = async (domainName: string) => {
     try {
       setVerifyingDomain(domainName);
@@ -277,7 +283,9 @@ export default function CompanySettingsPage() {
       if (res.verified) {
         toast.success(res.message || `Domain ${domainName} verified and SSL activated!`);
       } else {
-        toast(res.message || "DNS verification in progress. Please ensure TXT/CNAME records are created.", { icon: "ℹ️" });
+        toast(res.message || "DNS verification in progress. Please ensure TXT/CNAME records are created.", {
+          icon: "ℹ️",
+        });
       }
       const updatedDomains = await atsApi.auth.listMyDomains();
       setCustomDomains(updatedDomains || []);
@@ -332,15 +340,26 @@ export default function CompanySettingsPage() {
       setAddingBU(true);
       const res = await atsApi.businessUnits.create({
         name: buName.trim(),
+        branchId: buBranchId || undefined,
         code: buCode.trim() || undefined,
         market: buMarket,
         currency: buCurrency,
+        shiftTiming: buShiftTiming || undefined,
+        workStartTime: buWorkStartTime || undefined,
+        workEndTime: buWorkEndTime || undefined,
+        timezone: buTimezone || undefined,
       });
-      toast.success(`Business unit "${res.name}" created!`);
-      setBusinessUnits((prev) => [...prev, res]);
+      toast.success(`Operating unit "${res.name}" created!`);
+      const [updatedBranches, updatedBUs] = await Promise.all([
+        atsApi.branches.list().catch(() => []),
+        atsApi.businessUnits.list().catch(() => []),
+      ]);
+      setBranches(updatedBranches || []);
+      setBusinessUnits(updatedBUs || []);
       setShowAddBU(false);
       setBuName("");
       setBuCode("");
+      setBuBranchId("");
     } catch (err: any) {
       toast.error(err.message || "Failed to create business unit.");
     } finally {
@@ -349,11 +368,16 @@ export default function CompanySettingsPage() {
   };
 
   const handleDeleteBU = async (buId: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete business unit "${name}"?`)) return;
+    if (!confirm(`Are you sure you want to delete operating unit "${name}"?`)) return;
     try {
       await atsApi.businessUnits.delete(buId);
-      toast.success(`Business unit "${name}" deleted.`);
-      setBusinessUnits((prev) => prev.filter((bu) => bu.id !== buId));
+      toast.success(`Operating unit "${name}" deleted.`);
+      const [updatedBranches, updatedBUs] = await Promise.all([
+        atsApi.branches.list().catch(() => []),
+        atsApi.businessUnits.list().catch(() => []),
+      ]);
+      setBranches(updatedBranches || []);
+      setBusinessUnits(updatedBUs || []);
     } catch (err: any) {
       toast.error(err.message || "Failed to delete business unit.");
     }
@@ -383,6 +407,7 @@ export default function CompanySettingsPage() {
       {/* Role-Specific Settings View Rendering */}
       {systemRole === "ADMIN" || systemRole === "TENANT_ADMIN" || systemRole === "SUPER_ADMIN" ? (
         <TenantAdminSettingsView
+          profile={profile}
           companyName={companyName}
           subdomain={subdomain}
           originalSubdomain={originalSubdomain}
@@ -395,6 +420,10 @@ export default function CompanySettingsPage() {
           candidatePoolMode={candidatePoolMode}
           updatingPoolMode={updatingPoolMode}
           handleUpdatePoolMode={handleUpdatePoolMode}
+          jobCodePattern={jobCodePattern}
+          enforceJobCodePattern={enforceJobCodePattern}
+          updatingJobCodePattern={updatingJobCodePattern}
+          handleUpdateJobCodePattern={handleUpdateJobCodePattern}
           branches={branches}
           showAddBranch={showAddBranch}
           setShowAddBranch={setShowAddBranch}
@@ -422,6 +451,16 @@ export default function CompanySettingsPage() {
           setBuMarket={setBuMarket}
           buCurrency={buCurrency}
           setBuCurrency={setBuCurrency}
+          buBranchId={buBranchId}
+          setBuBranchId={setBuBranchId}
+          buShiftTiming={buShiftTiming}
+          setBuShiftTiming={setBuShiftTiming}
+          buWorkStartTime={buWorkStartTime}
+          setBuWorkStartTime={setBuWorkStartTime}
+          buWorkEndTime={buWorkEndTime}
+          setBuWorkEndTime={setBuWorkEndTime}
+          buTimezone={buTimezone}
+          setBuTimezone={setBuTimezone}
           addingBU={addingBU}
           handleCreateBU={handleCreateBU}
           handleDeleteBU={handleDeleteBU}
@@ -438,7 +477,11 @@ export default function CompanySettingsPage() {
       ) : systemRole === "ACCOUNT_MANAGER" ? (
         <AccountManagerSettingsView profile={profile} activeRoleName={activeRoleName} />
       ) : systemRole === "POD_LEAD" || systemRole === "DELIVERY_HEAD" ? (
-        <PodLeadSettingsView profile={profile} activeRoleName={activeRoleName} isDeliveryHead={systemRole === "DELIVERY_HEAD"} />
+        <PodLeadSettingsView
+          profile={profile}
+          activeRoleName={activeRoleName}
+          isDeliveryHead={systemRole === "DELIVERY_HEAD"}
+        />
       ) : (
         <RecruiterSettingsView profile={profile} activeRoleName={activeRoleName} />
       )}
@@ -446,676 +489,165 @@ export default function CompanySettingsPage() {
   );
 }
 
-// ─── 1. TENANT ADMIN WORKSPACE & ORGANIZATION SETTINGS VIEW ──────────────────
+// ─── 1. TENANT ADMIN WORKSPACE SETTINGS VIEW (DECOUPLED TABBED LAYOUT) ────────
 function TenantAdminSettingsView(props: any) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const base = getBaseDomain();
 
+  // Tab State synced with URL query (?tab=general|auth|domains|email|hiring)
+  const currentTab = searchParams.get("tab") || "general";
+
+  const tabs = [
+    { id: "general", label: "General & Structure", icon: Building2 },
+    { id: "auth", label: "Authentication & SSO", icon: Lock },
+    { id: "domains", label: "Custom Domains", icon: Globe },
+    { id: "email", label: "Email Integration", icon: Mail },
+    { id: "hiring", label: "Hiring & Pod Rules", icon: Sliders },
+  ];
+
+  const handleSelectTab = (tabId: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tabId);
+    router.replace(`/company?${params.toString()}`);
+  };
+
+  const tabDescriptions: Record<string, string> = {
+    general: "Manage your corporate branches, business unit divisions, and tenant workspace subdomain.",
+    auth: "Configure employee sign-in methods, Microsoft 365 / Google SSO, and domain isolation policies.",
+    domains: "Map custom external domains (e.g. careers.company.com) with automated DNS verification and SSL.",
+    email: "Configure outbound transactional email delivery strategies, DNS authentication, and SMTP.",
+    hiring: "Set candidate CV pool sharing boundaries, recruitment pod dispatch, and stage remark templates.",
+  };
+
   return (
-    <>
-      {/* Page Title */}
-      <div className="mb-4 mt-2 flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-primary" />
-            Workspace &amp; Organization Settings
-          </h2>
-          <p className="text-xs text-neutral-500 mt-0.5">
-            Manage your corporate branches, business unit divisions, tenant domains, and pod system.
-          </p>
+    <div className="space-y-4">
+      {/* Top Tab Switcher Pills */}
+      <div className="flex items-center pt-1 pb-1">
+        <div className="flex items-center gap-1.5 p-1 bg-neutral-200/70 dark:bg-slate-800/80 rounded-xl border border-neutral-250 dark:border-slate-700/80 overflow-x-auto">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = currentTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleSelectTab(tab.id)}
+                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                  isActive
+                    ? "bg-white dark:bg-slate-900 text-neutral-900 dark:text-neutral-100 shadow-xs border border-neutral-200/90 dark:border-slate-700 font-bold"
+                    : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-white/50 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Icon className={`h-3.5 w-3.5 ${isActive ? "text-primary" : "text-neutral-500"}`} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Branches & Business Units */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* 1. Branch Locations Card */}
-          <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
-            <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-emerald-600" />
-                  Office Branch Locations ({props.branches.length})
-                </CardTitle>
-                <CardDescription className="text-xs text-neutral-500 mt-0.5">
-                  Define geographic office branches (e.g. Hyderabad Office, Vizag Office) for seat scoping and analytics.
-                </CardDescription>
-              </div>
-              <Button
-                onClick={() => props.setShowAddBranch(!props.showAddBranch)}
-                size="sm"
-                className="h-8 text-xs font-bold px-3 flex items-center gap-1"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Branch
-              </Button>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-4">
-              {props.showAddBranch && (
-                <form onSubmit={props.handleCreateBranch} className="p-3 border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-950/10 rounded-lg space-y-3">
-                  <h4 className="text-xs font-bold text-neutral-800 dark:text-neutral-200">New Branch Office</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Branch Name *</Label>
-                      <Input
-                        type="text"
-                        placeholder="e.g. Hyderabad Branch"
-                        value={props.branchName}
-                        onChange={(e) => props.setBranchName(e.target.value)}
-                        className="h-8 text-xs font-medium bg-white dark:bg-slate-900"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Branch Code</Label>
-                      <Input
-                        type="text"
-                        placeholder="e.g. HYD"
-                        value={props.branchCode}
-                        onChange={(e) => props.setBranchCode(e.target.value)}
-                        className="h-8 text-xs font-medium bg-white dark:bg-slate-900 uppercase"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">City</Label>
-                      <Input
-                        type="text"
-                        placeholder="e.g. Hyderabad"
-                        value={props.branchCity}
-                        onChange={(e) => props.setBranchCity(e.target.value)}
-                        className="h-8 text-xs font-medium bg-white dark:bg-slate-900"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Country</Label>
-                      <Input
-                        type="text"
-                        placeholder="e.g. India"
-                        value={props.branchCountry}
-                        onChange={(e) => props.setBranchCountry(e.target.value)}
-                        className="h-8 text-xs font-medium bg-white dark:bg-slate-900"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-1">
-                    <Button type="button" variant="outline" size="sm" onClick={() => props.setShowAddBranch(false)} className="h-7 text-xs">
-                      Cancel
-                    </Button>
-                    <Button type="submit" size="sm" disabled={props.addingBranch} className="h-7 text-xs font-bold">
-                      {props.addingBranch ? "Saving..." : "Save Branch"}
-                    </Button>
-                  </div>
-                </form>
-              )}
+      {/* Decoupled Tab Views */}
+      <div className="pt-2">
+        {currentTab === "general" && (
+          <GeneralTab
+            branches={props.branches}
+            showAddBranch={props.showAddBranch}
+            setShowAddBranch={props.setShowAddBranch}
+            branchName={props.branchName}
+            setBranchName={props.setBranchName}
+            branchCode={props.branchCode}
+            setBranchCode={props.setBranchCode}
+            branchCity={props.branchCity}
+            setBranchCity={props.setBranchCity}
+            branchState={props.branchState}
+            setBranchState={props.setBranchState}
+            branchCountry={props.branchCountry}
+            setBranchCountry={props.setBranchCountry}
+            addingBranch={props.addingBranch}
+            handleCreateBranch={props.handleCreateBranch}
+            handleDeleteBranch={props.handleDeleteBranch}
+            businessUnits={props.businessUnits}
+            showAddBU={props.showAddBU}
+            setShowAddBU={props.setShowAddBU}
+            buName={props.buName}
+            setBuName={props.setBuName}
+            buCode={props.buCode}
+            setBuCode={props.setBuCode}
+            buMarket={props.buMarket}
+            setBuMarket={props.setBuMarket}
+            buCurrency={props.buCurrency}
+            setBuCurrency={props.setBuCurrency}
+            buBranchId={props.buBranchId}
+            setBuBranchId={props.setBuBranchId}
+            buShiftTiming={props.buShiftTiming}
+            setBuShiftTiming={props.setBuShiftTiming}
+            buWorkStartTime={props.buWorkStartTime}
+            setBuWorkStartTime={props.setBuWorkStartTime}
+            buWorkEndTime={props.buWorkEndTime}
+            setBuWorkEndTime={props.setBuWorkEndTime}
+            buTimezone={props.buTimezone}
+            setBuTimezone={props.setBuTimezone}
+            addingBU={props.addingBU}
+            handleCreateBU={props.handleCreateBU}
+            handleDeleteBU={props.handleDeleteBU}
+            subdomain={props.subdomain}
+            setSubdomain={props.setSubdomain}
+            originalSubdomain={props.originalSubdomain}
+            savingSubdomain={props.savingSubdomain}
+            handleSaveSubdomain={props.handleSaveSubdomain}
+            isSuperAdmin={props.isSuperAdmin}
+            base={base}
+          />
+        )}
 
-              {props.branches.length === 0 ? (
-                <div className="text-center py-6 border border-dashed border-neutral-250 dark:border-slate-800 rounded bg-neutral-50/50 dark:bg-slate-950/5 text-xs text-neutral-500 font-medium">
-                  No office branches defined yet. Click "Add Branch" to set up your primary office location.
-                </div>
-              ) : (
-                <div className="border border-neutral-200 dark:border-slate-800/80 rounded divide-y divide-neutral-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                  {props.branches.map((b: any) => (
-                    <div key={b.id} className="flex items-center justify-between px-3 py-3 hover:bg-neutral-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 flex items-center justify-center text-emerald-600 font-bold text-xs">
-                          {b.code || b.name.substring(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-neutral-850 dark:text-neutral-150">{b.name}</span>
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-300 text-emerald-700 dark:text-emerald-400 bg-emerald-50/50">
-                              Active Location
-                            </Badge>
-                          </div>
-                          <p className="text-[11px] text-neutral-500 mt-0.5">
-                            {b.city ? `${b.city}, ${b.country || "India"}` : b.country || "India"} • {b.usersCount || 0} Assigned Recruiters • {b.jobsCount || 0} Jobs
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => props.handleDeleteBranch(b.id, b.name)}
-                        className="h-7 w-7 text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {currentTab === "auth" && (
+          <AuthTab
+            tenantId={props.profile?.tenantId}
+            subdomain={props.subdomain || props.originalSubdomain}
+            companyName={props.companyName}
+          />
+        )}
 
-          {/* 2. Business Units & Divisions Card */}
-          <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
-            <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-indigo-600" />
-                  Business Units &amp; Operating Divisions ({props.businessUnits.length})
-                </CardTitle>
-                <CardDescription className="text-xs text-neutral-500 mt-0.5">
-                  Separate US IT Staffing from Domestic Staffing for market-specific tax and recruitment workflows.
-                </CardDescription>
-              </div>
-              <Button
-                onClick={() => props.setShowAddBU(!props.showAddBU)}
-                size="sm"
-                className="h-8 text-xs font-bold px-3 flex items-center gap-1"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Division
-              </Button>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-4">
-              {props.showAddBU && (
-                <form onSubmit={props.handleCreateBU} className="p-3 border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-950/10 rounded-lg space-y-3">
-                  <h4 className="text-xs font-bold text-neutral-800 dark:text-neutral-200">New Business Unit</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Unit Name *</Label>
-                      <Input
-                        type="text"
-                        placeholder="e.g. US IT Staffing Division"
-                        value={props.buName}
-                        onChange={(e) => props.setBuName(e.target.value)}
-                        className="h-8 text-xs font-medium bg-white dark:bg-slate-900"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Unit Code</Label>
-                      <Input
-                        type="text"
-                        placeholder="e.g. USIT"
-                        value={props.buCode}
-                        onChange={(e) => props.setBuCode(e.target.value)}
-                        className="h-8 text-xs font-medium bg-white dark:bg-slate-900 uppercase"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Target Market</Label>
-                      <select
-                        value={props.buMarket}
-                        onChange={(e) => props.setBuMarket(e.target.value)}
-                        className="w-full h-8 text-xs font-medium bg-white dark:bg-slate-900 border border-neutral-250 dark:border-slate-700 rounded px-2"
-                      >
-                        <option value="US">US Market</option>
-                        <option value="INDIA">India Domestic Market</option>
-                        <option value="GLOBAL">Global / Multi-Market</option>
-                      </select>
-                    </div>
-                    <div>
-                      <Label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Billing Currency</Label>
-                      <select
-                        value={props.buCurrency}
-                        onChange={(e) => props.setBuCurrency(e.target.value)}
-                        className="w-full h-8 text-xs font-medium bg-white dark:bg-slate-900 border border-neutral-250 dark:border-slate-700 rounded px-2"
-                      >
-                        <option value="USD">USD ($)</option>
-                        <option value="INR">INR (₹)</option>
-                        <option value="EUR">EUR (€)</option>
-                        <option value="GBP">GBP (£)</option>
-                        <option value="CAD">CAD ($)</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-1">
-                    <Button type="button" variant="outline" size="sm" onClick={() => props.setShowAddBU(false)} className="h-7 text-xs">
-                      Cancel
-                    </Button>
-                    <Button type="submit" size="sm" disabled={props.addingBU} className="h-7 text-xs font-bold">
-                      {props.addingBU ? "Saving..." : "Save Unit"}
-                    </Button>
-                  </div>
-                </form>
-              )}
+        {currentTab === "domains" && (
+          <DomainsTab
+            customDomains={props.customDomains}
+            subdomain={props.subdomain}
+            newDomain={props.newDomain}
+            setNewDomain={props.setNewDomain}
+            addingDomain={props.addingDomain}
+            handleAddDomain={props.handleAddDomain}
+            handleDeleteDomain={props.handleDeleteDomain}
+            handleVerifyDomain={props.handleVerifyDomain}
+            verifyingDomain={props.verifyingDomain}
+            base={base}
+          />
+        )}
 
-              {props.businessUnits.length === 0 ? (
-                <div className="text-center py-6 border border-dashed border-neutral-250 dark:border-slate-800 rounded bg-neutral-50/50 dark:bg-slate-950/5 text-xs text-neutral-500 font-medium">
-                  No business units defined yet. Click "Add Division" to separate your market teams.
-                </div>
-              ) : (
-                <div className="border border-neutral-200 dark:border-slate-800/80 rounded divide-y divide-neutral-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                  {props.businessUnits.map((bu: any) => (
-                    <div key={bu.id} className="flex items-center justify-between px-3 py-3 hover:bg-neutral-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/50 flex items-center justify-center text-indigo-600 font-bold text-xs">
-                          {bu.code || bu.name.substring(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-neutral-850 dark:text-neutral-150">{bu.name}</span>
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-indigo-300 text-indigo-700 dark:text-indigo-400 bg-indigo-50/50">
-                              {bu.market} • {bu.currency}
-                            </Badge>
-                          </div>
-                          <p className="text-[11px] text-neutral-500 mt-0.5">
-                            {bu.usersCount || 0} Staff Members • {bu.jobsCount || 0} Requisitions
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => props.handleDeleteBU(bu.id, bu.name)}
-                        className="h-7 w-7 text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* 3. Subdomain Card */}
-          <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
-            <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60">
-              <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
-                Workspace Subdomain
-              </CardTitle>
-              <CardDescription className="text-xs text-neutral-500 mt-0.5">
-                Your default access link. You can customize the subdomain slug.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-4">
-              <form onSubmit={props.handleSaveSubdomain} className="space-y-3">
-                <div>
-                  <Label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Subdomain Slug</Label>
-                  <div className="flex items-center mt-1.5 max-w-md">
-                    <Input
-                      type="text"
-                      value={props.subdomain}
-                      onChange={(e) => props.setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                      placeholder="e.g. acme"
-                      className="h-9 text-xs font-semibold rounded-r-none border-r-0 bg-white dark:bg-slate-900"
-                      disabled={!props.isSuperAdmin}
-                    />
-                    <div className="h-9 px-3 flex items-center justify-center bg-neutral-100 dark:bg-slate-800 border border-neutral-250 dark:border-slate-700 rounded-r text-xs text-neutral-600 dark:text-neutral-400 font-mono select-none">
-                      .{base}
-                    </div>
-                  </div>
-                  {!props.isSuperAdmin && (
-                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1">
-                      <span>🔒 Subdomain slug changes require Enfycon Platform Administrator (SUPER_ADMIN) authorization.</span>
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <div className="text-xs text-neutral-500">
-                    Current workspace URL: <span className="font-mono text-primary font-bold">{props.originalSubdomain ? `${props.originalSubdomain}.${base}` : "Loading..."}</span>
-                  </div>
-                  {props.isSuperAdmin && (
-                    <Button
-                      type="submit"
-                      disabled={props.savingSubdomain || props.subdomain === props.originalSubdomain || !props.subdomain.trim()}
-                      size="sm"
-                      className="text-xs font-bold"
-                    >
-                      {props.savingSubdomain ? "Updating..." : "Update Subdomain"}
-                    </Button>
-                  )}
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* 4. Workspace Email & Custom Domain Strategy Card */}
-          <EmailDispatchCard
+        {currentTab === "email" && (
+          <EmailTab
             tenantId={props.profile?.tenantId}
             subdomain={props.subdomain || props.originalSubdomain}
             companyName={props.companyName}
             userEmail={props.profile?.email}
           />
+        )}
 
-          {/* 5. Candidate Pool Mode Card */}
-          <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
-            <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60">
-              <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                Candidate CV Pool &amp; Branch Sharing Control
-              </CardTitle>
-              <CardDescription className="text-xs text-neutral-500 mt-0.5">
-                Configure how candidate search and CV records are shared across office branches in this workspace.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-3">
-              <div
-                onClick={() => props.handleUpdatePoolMode("COMBINED_MARKET")}
-                className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-3 ${
-                  props.candidatePoolMode === "COMBINED_MARKET"
-                    ? "border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-xs"
-                    : "border-neutral-200 dark:border-slate-800 hover:bg-neutral-50/50"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="candidatePoolMode"
-                  checked={props.candidatePoolMode === "COMBINED_MARKET"}
-                  onChange={() => props.handleUpdatePoolMode("COMBINED_MARKET")}
-                  className="mt-0.5 text-emerald-600"
-                />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-neutral-850 dark:text-neutral-150">
-                      Combined Market Pools (Recommended Default)
-                    </span>
-                    <Badge variant="outline" className="text-[9px] px-1 py-0 border-emerald-300 text-emerald-700 bg-emerald-50">
-                      DEFAULT
-                    </Badge>
-                  </div>
-                  <p className="text-[11px] text-neutral-500 mt-0.5">
-                    All Domestic branches (India) share the Domestic CV pool (market = INDIA). All USIT branches share the USIT CV pool (market = US). Operations remain branch-isolated.
-                  </p>
-                </div>
-              </div>
-
-              <div
-                onClick={() => props.handleUpdatePoolMode("STRICT_ISOLATION")}
-                className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-3 ${
-                  props.candidatePoolMode === "STRICT_ISOLATION"
-                    ? "border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-xs"
-                    : "border-neutral-200 dark:border-slate-800 hover:bg-neutral-50/50"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="candidatePoolMode"
-                  checked={props.candidatePoolMode === "STRICT_ISOLATION"}
-                  onChange={() => props.handleUpdatePoolMode("STRICT_ISOLATION")}
-                  className="mt-0.5 text-emerald-600"
-                />
-                <div>
-                  <span className="text-xs font-bold text-neutral-850 dark:text-neutral-150">
-                    Strict Branch Isolation
-                  </span>
-                  <p className="text-[11px] text-neutral-500 mt-0.5">
-                    Recruiters can only search and view candidate CVs created within or assigned to their home branch. Cross-branch CV search is restricted.
-                  </p>
-                </div>
-              </div>
-
-              <div
-                onClick={() => props.handleUpdatePoolMode("OPEN_WORKSPACE")}
-                className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-3 ${
-                  props.candidatePoolMode === "OPEN_WORKSPACE"
-                    ? "border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-xs"
-                    : "border-neutral-200 dark:border-slate-800 hover:bg-neutral-50/50"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="candidatePoolMode"
-                  checked={props.candidatePoolMode === "OPEN_WORKSPACE"}
-                  onChange={() => props.handleUpdatePoolMode("OPEN_WORKSPACE")}
-                  className="mt-0.5 text-emerald-600"
-                />
-                <div>
-                  <span className="text-xs font-bold text-neutral-850 dark:text-neutral-150">
-                    Open Workspace Sharing
-                  </span>
-                  <p className="text-[11px] text-neutral-500 mt-0.5">
-                    All recruiters across all branches and markets can search and view all candidate CVs in the tenant workspace.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 5. Pod System Settings Card */}
-          <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
-            <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
-                  <Users className="h-4 w-4 text-purple-600" />
-                  Recruitment Pod System
-                </CardTitle>
-                <CardDescription className="text-xs text-neutral-500 mt-0.5">
-                  Enable or disable round-robin delivery team pod routing for job requisitions in this company workspace.
-                </CardDescription>
-              </div>
-              <Switch
-                checked={props.podSystemEnabled}
-                onCheckedChange={props.handleTogglePodSystem}
-                disabled={props.togglingPodSystem}
-              />
-            </CardHeader>
-            <CardContent className="pt-4">
-              <div className="text-xs text-neutral-600 dark:text-neutral-400 flex items-center gap-2">
-                <span className={`h-2 w-2 rounded-full ${props.podSystemEnabled ? "bg-emerald-500" : "bg-neutral-400"}`} />
-                <span>Status: <strong>{props.podSystemEnabled ? "Pods Enabled (Multi-Pod Routing Active)" : "Pods Disabled (Universal Recruiter Mode Active)"}</strong></span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Branch-Isolated Job Assignment Notice Card */}
-          <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
-            <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-indigo-600" />
-                  Branch-Isolated Job Assignment Policies
-                </CardTitle>
-                <CardDescription className="text-xs text-neutral-500 mt-0.5">
-                  Job assignment strategies (Direct Recruiter, Pod System Auto/Manual, All Branch Recruiters, and Unassigned) are configured individually per branch.
-                </CardDescription>
-              </div>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => { window.location.href = "/settings/branch"; }}
-                className="h-8 text-xs font-bold px-3 gap-1 bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
-              >
-                Manage Branch Policies →
-              </Button>
-            </CardHeader>
-          </Card>
-
-          {/* Global Remarks Templates Card */}
-          <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
-            <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
-                  <Globe className="h-4 w-4 text-indigo-600" />
-                  Global Stage Remarks Templates
-                </CardTitle>
-                <CardDescription className="text-xs text-neutral-500 mt-0.5">
-                  Universal quick-pick templates for candidate acceptances and rejections across all hiring stages.
-                </CardDescription>
-              </div>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => { window.location.href = "/utility/global-remarks"; }}
-                className="h-8 text-xs font-bold px-3 gap-1 bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
-              >
-                Manage Global Templates →
-              </Button>
-            </CardHeader>
-          </Card>
-        </div>
-
-        {/* Right Column: Custom Domains & DNS Instructions */}
-        <div className="space-y-6">
-          {/* Custom Domains Card */}
-          <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
-            <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60">
-              <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
-                <Globe className="h-4 w-4 text-primary" />
-                Custom Domains
-              </CardTitle>
-              <CardDescription className="text-xs text-neutral-500 mt-0.5">
-                Point your own custom domain (e.g. `careers.mycompany.com`) directly to this ATS workspace.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-4">
-              <form onSubmit={props.handleAddDomain} className="space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    type="text"
-                    value={props.newDomain}
-                    onChange={(e) => props.setNewDomain(e.target.value.toLowerCase().trim())}
-                    placeholder="e.g. careers.mycompany.com"
-                    className="h-8 text-xs bg-white dark:bg-slate-900 flex-1"
-                  />
-                  <Button
-                    type="submit"
-                    disabled={props.addingDomain || !props.newDomain.trim()}
-                    size="sm"
-                    className="h-8 text-xs font-bold"
-                  >
-                    {props.addingDomain ? "Adding..." : "+ Map Domain"}
-                  </Button>
-                </div>
-              </form>
-
-              <div className="space-y-2 pt-1">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
-                  Mapped Domains ({props.customDomains.length + (props.subdomain ? 1 : 0)})
-                </p>
-
-                {props.subdomain && (
-                  <div className="flex items-center justify-between p-2 rounded border border-neutral-200 dark:border-slate-800 bg-neutral-50/70 dark:bg-slate-950/20 text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Globe className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                      <span className="font-mono text-neutral-800 dark:text-neutral-200 truncate">{props.subdomain}.{base}</span>
-                      <Badge variant="outline" className="text-[9px] px-1 py-0 border-emerald-300 text-emerald-700 bg-emerald-50 flex-shrink-0">
-                        Primary Subdomain
-                      </Badge>
-                    </div>
-                  </div>
-                )}
-
-                {props.customDomains.map((d: any) => (
-                  <div key={d.id} className="flex flex-col gap-2 p-2.5 rounded border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs">
-                    <div className="flex items-center justify-between min-w-0">
-                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                        <Globe className="h-3.5 w-3.5 text-neutral-400 flex-shrink-0" />
-                        <span className="font-mono font-semibold text-neutral-800 dark:text-neutral-200 truncate">{d.domain_name}</span>
-                        {d.is_primary && (
-                          <Badge variant="outline" className="text-[9px] px-1 py-0 border-emerald-300 text-emerald-700 bg-emerald-50 flex-shrink-0">
-                            Primary
-                          </Badge>
-                        )}
-                        <Badge
-                          variant="outline"
-                          className={`text-[9px] px-1.5 py-0 font-medium ${
-                            d.verification_status === "VERIFIED"
-                              ? "border-emerald-300 text-emerald-700 bg-emerald-50/70"
-                              : "border-amber-300 text-amber-700 bg-amber-50/70"
-                          }`}
-                        >
-                          {d.verification_status === "VERIFIED" ? "✓ Verified" : "⏳ Pending DNS"}
-                        </Badge>
-                        {d.ssl_status === "ACTIVE" && (
-                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-blue-300 text-blue-700 bg-blue-50/70">
-                            🔒 SSL Active
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {d.verification_status !== "VERIFIED" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={props.verifyingDomain === d.domain_name}
-                            onClick={() => props.handleVerifyDomain(d.domain_name)}
-                            className="h-6 px-2 text-[10px] font-bold cursor-pointer"
-                          >
-                            {props.verifyingDomain === d.domain_name ? "Checking..." : "Verify DNS"}
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => props.handleDeleteDomain(d.id)}
-                          className="h-6 w-6 text-neutral-400 hover:text-red-600"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                    {d.verification_status !== "VERIFIED" && d.verification_token && (
-                      <div className="text-[10px] bg-slate-50 dark:bg-slate-950/40 p-1.5 rounded border border-slate-200/80 font-mono text-slate-500">
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">TXT Record Value:</span>{" "}
-                        <span className="select-all text-indigo-600 font-bold">{d.verification_token}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* DNS Instructions Card */}
-          <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
-            <CardHeader className="pb-2 border-b border-neutral-150 dark:border-slate-800/60">
-              <CardTitle className="text-xs font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                <Globe className="h-3.5 w-3.5 text-primary" />
-                DNS Instructions
-              </CardTitle>
-              <CardDescription className="text-[11px] text-neutral-500">
-                How to configure your domain mapping correctly.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-3 text-[11px] text-neutral-600 dark:text-neutral-400 space-y-2.5 leading-relaxed">
-              <p>
-                To link a custom domain to your workspace, you must configure your domain's DNS settings at your registrar (e.g. Cloudflare, GoDaddy, Namecheap).
-              </p>
-
-              <div className="p-2.5 rounded bg-neutral-50 dark:bg-slate-950/40 border border-neutral-200 dark:border-slate-800 font-mono text-[10.5px] space-y-1">
-                <div className="font-bold text-neutral-700 dark:text-neutral-300">Option A: CNAME Record (Recommended)</div>
-                <div className="text-neutral-500">For subdomains like <code className="text-primary">jobs.yourcompany.com</code></div>
-                <div className="grid grid-cols-3 gap-1 pt-1 text-neutral-800 dark:text-neutral-200">
-                  <span>Type</span><span>Host</span><span>Points To</span>
-                  <span className="font-bold">CNAME</span><span>jobs</span><span className="text-primary font-bold">enfycon.com</span>
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded bg-neutral-50 dark:bg-slate-950/40 border border-neutral-200 dark:border-slate-800 font-mono text-[10.5px] space-y-1">
-                <div className="font-bold text-neutral-700 dark:text-neutral-300">Option B: A Record</div>
-                <div className="text-neutral-500">For root domains like <code className="text-primary">yourcompany.com</code></div>
-                <div className="grid grid-cols-3 gap-1 pt-1 text-neutral-800 dark:text-neutral-200">
-                  <span>Type</span><span>Host</span><span>Points To</span>
-                  <span className="font-bold">A</span><span>@</span><span className="text-primary font-bold">192.0.2.1 (Your Server IP)</span>
-                </div>
-              </div>
-
-              <p className="text-[10px] text-neutral-400 italic">
-                Note: DNS changes can take anywhere from a few minutes up to 24 hours to propagate worldwide. Once active, visitors accessing the custom domain will load this workspace instantly.
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Security & Governance Audit Trail Card */}
-          <Card className="border border-indigo-200 dark:border-indigo-900/50 shadow-xs bg-indigo-50/20 dark:bg-slate-900">
-            <CardHeader className="pb-2 border-b border-indigo-100 dark:border-slate-800">
-              <CardTitle className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4 text-indigo-600" />
-                Security &amp; Audit Trail
-              </CardTitle>
-              <CardDescription className="text-[11px] text-neutral-500">
-                View real-time immutable audit logs of recruiter actions, client rate changes, and workspace security events.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-3 flex items-center justify-between">
-              <div className="text-[11px] text-neutral-600 dark:text-slate-400">
-                SOC2-ready event stream.
-              </div>
-              <Button
-                size="sm"
-                onClick={() => { window.location.href = "/utility/audit-logs"; }}
-                className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1 cursor-pointer"
-              >
-                View Audit Logs →
-              </Button>
-            </CardContent>
-          </Card>
-
-        </div>
+        {currentTab === "hiring" && (
+          <HiringTab
+            candidatePoolMode={props.candidatePoolMode}
+            updatingPoolMode={props.updatingPoolMode}
+            handleUpdatePoolMode={props.handleUpdatePoolMode}
+            podSystemEnabled={props.podSystemEnabled}
+            togglingPodSystem={props.togglingPodSystem}
+            handleTogglePodSystem={props.handleTogglePodSystem}
+            jobCodePattern={props.jobCodePattern}
+            enforceJobCodePattern={props.enforceJobCodePattern}
+            updatingJobCodePattern={props.updatingJobCodePattern}
+            handleUpdateJobCodePattern={props.handleUpdateJobCodePattern}
+          />
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -1128,7 +660,11 @@ function AccountManagerSettingsView({ profile, activeRoleName }: { profile: any;
   const [clientFeedbackAlerts, setClientFeedbackAlerts] = useState(true);
   const [dailyDigest, setDailyDigest] = useState(true);
   const [agingAlerts, setAgingAlerts] = useState(true);
-  const [signature, setSignature] = useState(`Best Regards,\n${profile?.fullName || "Account Manager"}\nClient Solutions & Business Development\n${profile?.tenantDomain || "Enfycon"} ATS`);
+  const [signature, setSignature] = useState(
+    `Best Regards,\n${profile?.fullName || "Account Manager"}\nClient Solutions & Business Development\n${
+      profile?.tenantDomain || "Enfycon"
+    } ATS`
+  );
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -1216,7 +752,7 @@ function AccountManagerSettingsView({ profile, activeRoleName }: { profile: any;
             <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
               <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60">
                 <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-emerald-600" />
+                  <Briefcase className="h-4 w-4 text-emerald-600" />
                   Client &amp; Requisition Portfolio Defaults
                 </CardTitle>
                 <CardDescription className="text-xs text-neutral-500">
@@ -1502,7 +1038,15 @@ function RecruiterSettingsView({ profile, activeRoleName }: { profile: any; acti
 }
 
 // ─── 4. POD LEAD & DELIVERY HEAD WORKSPACE SETTINGS VIEW ──────────────────────
-function PodLeadSettingsView({ profile, activeRoleName, isDeliveryHead }: { profile: any; activeRoleName: string; isDeliveryHead?: boolean }) {
+function PodLeadSettingsView({
+  profile,
+  activeRoleName,
+  isDeliveryHead,
+}: {
+  profile: any;
+  activeRoleName: string;
+  isDeliveryHead?: boolean;
+}) {
   const [distMode, setDistMode] = useState("AUTO_ROUND_ROBIN");
   const [reviewRequired, setReviewRequired] = useState(true);
   const [targetAlerts, setTargetAlerts] = useState(true);

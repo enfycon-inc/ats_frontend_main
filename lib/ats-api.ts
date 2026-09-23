@@ -606,6 +606,8 @@ const auth = {
     candidatePoolMode?: string;
     jobAssignmentMode?: string;
     jobAssignmentOptions?: any;
+    jobCodePattern?: string;
+    enforceJobCodePattern?: boolean;
   }): Promise<any> {
     return apiFetch<any>('/api/auth/tenants/my-settings', {
       method: 'PATCH',
@@ -1007,7 +1009,7 @@ const jobs = {
     });
   },
 
-  async delegate(id: string, payload: { targetBranchId: string; slaDaysTarget?: number; marginSplitAmPct?: number; marginSplitRecPct?: number; notes?: string }): Promise<any> {
+  async delegate(id: string, payload: { targetUnitId?: string; targetBranchId?: string; slaDaysTarget?: number; marginSplitAmPct?: number; marginSplitRecPct?: number; notes?: string }): Promise<any> {
     return apiFetch(`/api/jobs/${id}/delegate`, {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -1266,14 +1268,28 @@ const clients = {
 };
 
 const pods = {
-  async list(branchId?: string): Promise<any[]> {
-    return apiFetch<any[]>(`/api/pods${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''}`);
+  async list(params?: string | { branchId?: string; businessUnitId?: string }): Promise<any[]> {
+    if (typeof params === 'string') {
+      return apiFetch<any[]>(`/api/pods${params ? `?branchId=${encodeURIComponent(params)}` : ''}`);
+    }
+    const q = new URLSearchParams();
+    if (params?.branchId) q.set('branchId', params.branchId);
+    if (params?.businessUnitId) q.set('businessUnitId', params.businessUnitId);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiFetch<any[]>(`/api/pods${qs}`);
   },
   async get(id: string): Promise<any> {
     return apiFetch<any>(`/api/pods/${id}`);
   },
-  async getAvailableRecruiters(branchId?: string): Promise<any[]> {
-    return apiFetch<any[]>(`/api/pods/available-recruiters${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''}`);
+  async getAvailableRecruiters(params?: string | { branchId?: string; businessUnitId?: string }): Promise<any[]> {
+    if (typeof params === 'string') {
+      return apiFetch<any[]>(`/api/pods/available-recruiters${params ? `?branchId=${encodeURIComponent(params)}` : ''}`);
+    }
+    const q = new URLSearchParams();
+    if (params?.branchId) q.set('branchId', params.branchId);
+    if (params?.businessUnitId) q.set('businessUnitId', params.businessUnitId);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiFetch<any[]>(`/api/pods/available-recruiters${qs}`);
   },
   async getMyTeam(): Promise<any> {
     return apiFetch<any>('/api/pods/my-team');
@@ -1295,8 +1311,17 @@ const pods = {
       method: 'DELETE',
     });
   },
-  async resetCycle(branchId?: string): Promise<any> {
-    return apiFetch<any>(`/api/pods/reset-cycle${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''}`, {
+  async resetCycle(params?: string | { branchId?: string; businessUnitId?: string }): Promise<any> {
+    if (typeof params === 'string') {
+      return apiFetch<any>(`/api/pods/reset-cycle${params ? `?branchId=${encodeURIComponent(params)}` : ''}`, {
+        method: 'POST',
+      });
+    }
+    const q = new URLSearchParams();
+    if (params?.branchId) q.set('branchId', params.branchId);
+    if (params?.businessUnitId) q.set('businessUnitId', params.businessUnitId);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiFetch<any>(`/api/pods/reset-cycle${qs}`, {
       method: 'POST',
     });
   },
@@ -1433,16 +1458,31 @@ const branches = {
   async getMembers(id: string): Promise<any[]> {
     return apiFetch<any[]>(`/api/branches/${id}/members`);
   },
-  async assignUser(id: string, userId: string, roles?: string[]): Promise<any> {
+  async assignUser(id: string, userId: string, roles?: string[], businessUnitId?: string): Promise<any> {
     return apiFetch<any>(`/api/branches/${id}/assign-user`, {
       method: 'POST',
-      body: JSON.stringify({ userId, roles }),
+      body: JSON.stringify({ userId, roles, businessUnitId }),
     });
   },
-  async updateManager(id: string, managerId: string | null): Promise<any> {
-    return apiFetch<any>(`/api/branches/${id}/manager`, {
+  async updateManagers(id: string, managerIds: string[]): Promise<any> {
+    return apiFetch<any>(`/api/branches/${id}/managers`, {
       method: 'PATCH',
-      body: JSON.stringify({ managerId }),
+      body: JSON.stringify({ managerIds }),
+    });
+  },
+  async updateRoutingPolicy(
+    branchId: string,
+    payload: {
+      allowNone?: boolean;
+      allowPods?: boolean;
+      allowAll?: boolean;
+      allowUnassigned?: boolean;
+      podDistributionStrategy?: string;
+    }
+  ): Promise<any> {
+    return apiFetch<any>(`/api/branches/${branchId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
     });
   },
   async getHierarchy(): Promise<any> {
@@ -1451,19 +1491,61 @@ const branches = {
 };
 
 const businessUnits = {
-  async list(): Promise<any[]> {
-    return apiFetch<any[]>('/api/business-units');
+  async list(branchId?: string): Promise<any[]> {
+    const q = branchId ? `?branchId=${encodeURIComponent(branchId)}` : '';
+    return apiFetch<any[]>(`/api/business-units${q}`);
   },
   async get(id: string): Promise<any> {
     return apiFetch<any>(`/api/business-units/${id}`);
   },
-  async create(data: { name: string; code?: string; market?: string; currency?: string }): Promise<any> {
+  async create(data: {
+    name: string;
+    branchId?: string;
+    code?: string;
+    market?: string;
+    marketSegmentId?: string | null;
+    jobCodePattern?: string | null;
+    currency?: string;
+    shiftTiming?: string;
+    workStartTime?: string;
+    workEndTime?: string;
+    timezone?: string;
+    workingDays?: string[];
+    breakDurationMinutes?: number;
+    allowNone?: boolean;
+    allowPods?: boolean;
+    allowAll?: boolean;
+    allowUnassigned?: boolean;
+    podDistributionStrategy?: string;
+  }): Promise<any> {
     return apiFetch<any>('/api/business-units', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
-  async update(id: string, data: { name?: string; code?: string; market?: string; currency?: string }): Promise<any> {
+  async update(
+    id: string,
+    data: {
+      name?: string;
+      branchId?: string;
+      code?: string;
+      market?: string;
+      marketSegmentId?: string | null;
+      jobCodePattern?: string | null;
+      currency?: string;
+      shiftTiming?: string;
+      workStartTime?: string;
+      workEndTime?: string;
+      timezone?: string;
+      workingDays?: string[];
+      breakDurationMinutes?: number;
+      allowNone?: boolean;
+      allowPods?: boolean;
+      allowAll?: boolean;
+      allowUnassigned?: boolean;
+      podDistributionStrategy?: string;
+    },
+  ): Promise<any> {
     return apiFetch<any>(`/api/business-units/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -1472,6 +1554,33 @@ const businessUnits = {
   async delete(id: string): Promise<any> {
     return apiFetch<any>(`/api/business-units/${id}`, {
       method: 'DELETE',
+    });
+  },
+  async delegationTargets(jobId?: string): Promise<any[]> {
+    const q = jobId ? `?jobId=${encodeURIComponent(jobId)}` : '';
+    return apiFetch<any[]>(`/api/business-units/delegation-targets${q}`);
+  },
+  async getMembers(id: string): Promise<any[]> {
+    return apiFetch<any[]>(`/api/business-units/${id}/members`);
+  },
+  async getCandidateStaff(id: string): Promise<any[]> {
+    return apiFetch<any[]>(`/api/business-units/${id}/candidate-staff`);
+  },
+  async assignMembers(id: string, userIds: string[]): Promise<any> {
+    return apiFetch<any>(`/api/business-units/${id}/assign-members`, {
+      method: 'POST',
+      body: JSON.stringify({ userIds }),
+    });
+  },
+  async removeMember(id: string, userId: string): Promise<any> {
+    return apiFetch<any>(`/api/business-units/${id}/members/${userId}`, {
+      method: 'DELETE',
+    });
+  },
+  async updateAdmins(id: string, adminIds: string[]): Promise<any> {
+    return apiFetch<any>(`/api/business-units/${id}/admins`, {
+      method: 'PATCH',
+      body: JSON.stringify({ adminIds }),
     });
   },
 };
@@ -1507,6 +1616,53 @@ const integrations = {
   },
 };
 
+// ─── Market Segments ────────────────────────────────────────────────
+const marketSegments = {
+  async list(): Promise<any[]> {
+    return apiFetch<any[]>('/api/market-segments').catch(() => []);
+  },
+  async get(id: string): Promise<any> {
+    return apiFetch<any>(`/api/market-segments/${id}`);
+  },
+  async create(data: {
+    name: string;
+    code: string;
+    description?: string;
+    defaultCurrency?: string;
+    defaultTimezone?: string;
+    defaultShift?: string;
+    defaultStartTime?: string;
+    defaultEndTime?: string;
+    isActive?: boolean;
+    sortOrder?: number;
+  }): Promise<any> {
+    return apiFetch<any>('/api/market-segments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async update(id: string, data: Partial<{
+    name: string;
+    code: string;
+    description: string;
+    defaultCurrency: string;
+    defaultTimezone: string;
+    defaultShift: string;
+    defaultStartTime: string;
+    defaultEndTime: string;
+    isActive: boolean;
+    sortOrder: number;
+  }>): Promise<any> {
+    return apiFetch<any>(`/api/market-segments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async delete(id: string): Promise<void> {
+    return apiFetch<void>(`/api/market-segments/${id}`, { method: 'DELETE' });
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────
 export const atsApi = {
   auth,
@@ -1516,6 +1672,7 @@ export const atsApi = {
   pods,
   branches,
   businessUnits,
+  marketSegments,
   submissions,
   auditLogs,
   integrations,

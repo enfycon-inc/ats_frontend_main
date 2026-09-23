@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Layers, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { atsApi } from "@/lib/ats-api";
 
 interface FilterDrawerProps {
   isOpen: boolean;
@@ -41,6 +42,17 @@ export default function FilterDrawer({
 }: FilterDrawerProps) {
   const [businessUnit, setBusinessUnit] = useState(currentFilters.businessUnit || "All selected");
   const [selectedPredefined, setSelectedPredefined] = useState<string[]>(currentFilters.predefined || []);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [businessUnits, setBusinessUnits] = useState<any[]>([]);
+
+  useEffect(() => {
+    atsApi.branches.list()
+      .then((data) => setBranches(data || []))
+      .catch((err) => console.error("Failed to load branches for filter:", err));
+    atsApi.businessUnits.list()
+      .then((data) => setBusinessUnits(data || []))
+      .catch((err) => console.error("Failed to load business units for filter:", err));
+  }, []);
 
   // Sync state with parent state when drawer opens
   useEffect(() => {
@@ -100,18 +112,50 @@ export default function FilterDrawer({
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
             {/* Business Unit Select */}
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
-                Business Unit
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                  <Layers className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                  Branch & Operating Unit
+                </label>
+                {businessUnits.length > 0 && (
+                  <span className="text-[9.5px] text-blue-600 dark:text-blue-400 font-medium">
+                    {businessUnits.length} operating units
+                  </span>
+                )}
+              </div>
               <select
                 value={businessUnit}
                 onChange={(e) => setBusinessUnit(e.target.value)}
                 className="w-full bg-neutral-50 dark:bg-slate-850 border border-neutral-300 dark:border-slate-700 rounded px-3 py-2 text-xs text-neutral-800 dark:text-neutral-200 outline-hidden focus:border-primary transition-colors cursor-pointer"
               >
-                <option value="All selected">All selected</option>
-                <option value="enfysync Inc">enfysync Inc</option>
-                <option value="US Staffing">US Staffing</option>
-                <option value="RPO Division">RPO Division</option>
+                <option value="All selected">All Operating Units (All Branches)</option>
+                {branches.length > 0 ? (
+                  branches.map((b) => {
+                    const unitsForBranch = businessUnits.filter((u) => u.branchId === b.id);
+                    if (unitsForBranch.length === 0) {
+                      return (
+                        <option key={b.id} value={b.name}>
+                          {b.name} (Branch Office)
+                        </option>
+                      );
+                    }
+                    return (
+                      <optgroup key={b.id} label={`${b.name} (${b.city ? b.city + ', ' : ''}${b.country || ''})`}>
+                        {unitsForBranch.map((u) => (
+                          <option key={u.id} value={u.name}>
+                            {u.name} — {u.shiftTiming || 'General Shift'} ({u.currency || 'INR'})
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })
+                ) : (
+                  businessUnits.map((u) => (
+                    <option key={u.id} value={u.name}>
+                      {u.name}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 

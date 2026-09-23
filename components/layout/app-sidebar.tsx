@@ -36,7 +36,11 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
   const checkActive = (href: string) => {
     if (!href) return false;
     const currentUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "");
-    return currentUrl === href;
+    if (currentUrl === href) return true;
+    if (!href.includes("?")) {
+      return pathname === href || pathname?.startsWith(href + "/");
+    }
+    return false;
   };
   const [overrideRole, setOverrideRole] = useState<string | null>(initialNavigation?.overrideRole ?? null);
   const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>(() => {
@@ -138,12 +142,19 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
                   <Collapsible
                     key={item.id}
                     asChild
-                    defaultOpen={pathname?.startsWith(item.href)}
+                    defaultOpen={pathname?.startsWith(item.href) || item.children.some((c) => pathname?.startsWith(c.href))}
                     className="group/collapsible"
                   >
                     <SidebarMenuItem>
                       <CollapsibleTrigger asChild>
-                        <SidebarMenuButton tooltip={item.label} isActive={pathname === item.href || pathname?.startsWith(item.href)}>
+                        <SidebarMenuButton
+                          tooltip={item.label}
+                          isActive={
+                            pathname === item.href ||
+                            pathname?.startsWith(item.href) ||
+                            item.children.some((c) => pathname === c.href || pathname?.startsWith(c.href))
+                          }
+                        >
                           {item.icon && <item.icon />}
                           <span>{item.label}</span>
                           <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />

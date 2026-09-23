@@ -10,7 +10,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
-import { Loader2, Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
+import { Loader2, Eye, EyeOff, Mail, Lock, ArrowRight, ShieldCheck } from "lucide-react";
 import { signIn, signOut } from "next-auth/react";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
@@ -30,6 +30,17 @@ const LoginForm = () => {
   const formRef = useRef<HTMLFormElement>(null);
 
   const [isAuthorizingSso, setIsAuthorizingSso] = useState(false);
+  const [authPolicy, setAuthPolicy] = useState<{
+    allowPasswordLogin: boolean;
+    allowMicrosoftSso: boolean;
+    allowGoogleSso: boolean;
+    enforceSsoOnly: boolean;
+  }>({
+    allowPasswordLogin: true,
+    allowMicrosoftSso: true,
+    allowGoogleSso: true,
+    enforceSsoOnly: false,
+  });
 
   const togglePasswordType = () => {
     setPasswordType((prev) => (prev === "password" ? "text" : "password"));
@@ -48,6 +59,19 @@ const LoginForm = () => {
       password: "",
     },
   });
+
+  React.useEffect(() => {
+    atsApi.auth.getTenantAuthPolicy().then((policy) => {
+      if (policy) {
+        setAuthPolicy({
+          allowPasswordLogin: policy.allowPasswordLogin ?? true,
+          allowMicrosoftSso: policy.allowMicrosoftSso ?? true,
+          allowGoogleSso: policy.allowGoogleSso ?? true,
+          enforceSsoOnly: policy.enforceSsoOnly ?? false,
+        });
+      }
+    }).catch(() => {});
+  }, []);
 
   React.useEffect(() => {
     const isExpired = searchParams.get("expired");
@@ -283,6 +307,33 @@ const LoginForm = () => {
     );
   }
 
+  const showPassword = !authPolicy.enforceSsoOnly && authPolicy.allowPasswordLogin;
+  const showGoogle = authPolicy.allowGoogleSso;
+  const showMicrosoft = authPolicy.allowMicrosoftSso;
+  const hasSocial = showGoogle || showMicrosoft;
+
+  if (!showPassword && hasSocial) {
+    return (
+      <div className="space-y-4 text-left">
+        <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200/80 dark:bg-indigo-950/20 dark:border-indigo-900/40 text-center space-y-2">
+          <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center mx-auto text-indigo-600 dark:text-indigo-400">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Single Sign-On (SSO) Enforced</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+              Password login is disabled by your workspace administrator. Please authenticate using your authorized identity provider.
+            </p>
+          </div>
+        </div>
+
+        <div className="pt-2">
+          <Social showGoogle={showGoogle} showMicrosoft={showMicrosoft} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form ref={formRef} method="POST" onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
       
@@ -387,17 +438,19 @@ const LoginForm = () => {
       </Button>
 
       {/* Social Login Options */}
-      <div className="pt-3">
-        <div className="relative flex items-center justify-center mb-4">
-          <div className="absolute inset-0 flex items-center">
-            <div className="border-t border-slate-200 w-full" />
+      {hasSocial && (
+        <div className="pt-3">
+          <div className="relative flex items-center justify-center mb-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="border-t border-slate-200 w-full" />
+            </div>
+            <span className="relative bg-white px-3 text-xs uppercase font-semibold text-slate-400">
+              Or Sign In With
+            </span>
           </div>
-          <span className="relative bg-white px-3 text-xs uppercase font-semibold text-slate-400">
-            Or Sign In With
-          </span>
+          <Social showGoogle={showGoogle} showMicrosoft={showMicrosoft} />
         </div>
-        <Social />
-      </div>
+      )}
 
     </form>
   );

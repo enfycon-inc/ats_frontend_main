@@ -889,6 +889,18 @@ export default function DataTable({
     return null;
   }, [assignModalJob, branchesList]);
 
+  // Target operating unit resolution for assignModalJob
+  const assignModalTargetUnit = useMemo(() => {
+    if (!assignModalJob) return null;
+    if (assignModalJob.businessUnitRef) return assignModalJob.businessUnitRef;
+    const targetUnitId = assignModalJob.businessUnitId || assignModalJob.business_unit_id;
+    if (targetUnitId && assignModalTargetBranch?.businessUnits) {
+      const u = assignModalTargetBranch.businessUnits.find((x: any) => x.id === targetUnitId);
+      if (u) return u;
+    }
+    return null;
+  }, [assignModalJob, assignModalTargetBranch]);
+
   // ─── ROLE & PERMISSION SCOPING FOR ASSIGNMENT ─────────────────────────
   const userRoles = useMemo(() => {
     return (currentUser?.roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
@@ -966,29 +978,38 @@ export default function DataTable({
     );
   }, [isHigherRole, userRoles, currentUser, podsList]);
 
-  // ─── BRANCH POLICY ENFORCEMENT ─────────────────────────────────────────
+  // ─── UNIT / BRANCH POLICY ENFORCEMENT ─────────────────────────────────
   const branchAllowsPods = useMemo(() => {
-    if (!assignModalTargetBranch) return true;
-    const allowNone = Boolean(assignModalTargetBranch.allowNone ?? assignModalTargetBranch.allow_none);
+    const targetPolicy = assignModalTargetUnit || assignModalTargetBranch;
+    if (!targetPolicy) return true;
+    const allowNone = Boolean(targetPolicy.allowNone ?? targetPolicy.allow_none);
     if (allowNone) return false; // allowNone = Direct Assignment Only
-    const allowPods = (assignModalTargetBranch.allowPods ?? assignModalTargetBranch.allow_pods) !== false;
+    const allowPods = (targetPolicy.allowPods ?? targetPolicy.allow_pods) !== false;
     return allowPods;
-  }, [assignModalTargetBranch]);
+  }, [assignModalTargetUnit, assignModalTargetBranch]);
 
   const branchAllowsDirectStaff = useMemo(() => {
-    if (!assignModalTargetBranch) return true;
-    const allowDirect = assignModalTargetBranch.allowDirect ?? assignModalTargetBranch.allow_direct;
+    const targetPolicy = assignModalTargetUnit || assignModalTargetBranch;
+    if (!targetPolicy) return true;
+    const allowDirect = targetPolicy.allowDirect ?? targetPolicy.allow_direct;
     if (allowDirect === false) return false;
-    const allowDirectStaff = assignModalTargetBranch.allowDirectStaff ?? assignModalTargetBranch.allow_direct_staff;
+    const allowDirectStaff = targetPolicy.allowDirectStaff ?? targetPolicy.allow_direct_staff;
     if (allowDirectStaff === false) return false;
     return true;
-  }, [assignModalTargetBranch]);
+  }, [assignModalTargetUnit, assignModalTargetBranch]);
 
   // ─── SCOPED PODS & USERS (Role Scoping) ─────────────────────────────────
   const targetBranchPods = useMemo(() => {
     const bId = assignModalTargetBranch?.id;
+    const uId = assignModalJob?.businessUnitId || assignModalJob?.business_unit_id || assignModalTargetUnit?.id;
     let list = podsList;
-    if (bId && bId !== "all") {
+
+    if (uId) {
+      const unitPods = podsList.filter((p: any) => p.businessUnitId === uId || p.business_unit_id === uId);
+      if (unitPods.length > 0) {
+        list = unitPods;
+      }
+    } else if (bId && bId !== "all") {
       const filtered = podsList.filter(
         (p: any) => !p.branchId || !p.branch_id || p.branchId === bId || p.branch_id === bId
       );
@@ -1000,10 +1021,11 @@ export default function DataTable({
       return [myPod];
     }
     return list;
-  }, [podsList, assignModalTargetBranch, isPodHead, myPod]);
+  }, [podsList, assignModalTargetBranch, assignModalJob, assignModalTargetUnit, isPodHead, myPod]);
 
   const branchRecruiterUsers = useMemo(() => {
     const bId = assignModalTargetBranch?.id;
+    const targetUnitId = assignModalJob?.businessUnitId || assignModalJob?.business_unit_id || assignModalTargetUnit?.id;
     let list = usersList.filter((u: any) => u.isActive !== false && u.is_active !== false);
 
     // Filter to only users who act as Recruiters (RECRUITER, POD_LEAD)
@@ -1029,7 +1051,12 @@ export default function DataTable({
     const isCoSourcedJob = assignModalJob?.isCoSourced || (assignModalJob?.sharedBranchIds && assignModalJob.sharedBranchIds.length > 0);
     const isSharedBranchViewing = isCoSourcedJob && assignModalJob?.branchId !== currentUserBranchId;
 
-    if (isSharedBranchViewing && currentUserBranchId) {
+    if (targetUnitId) {
+      const unitScoped = list.filter((u: any) => (u.businessUnitId || u.business_unit_id) === targetUnitId);
+      if (unitScoped.length > 0) {
+        list = unitScoped;
+      }
+    } else if (isSharedBranchViewing && currentUserBranchId) {
       list = list.filter((u: any) => {
         const userBranchId = u.branchId || u.branch_id;
         if (userBranchId === currentUserBranchId) return true;

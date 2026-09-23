@@ -359,9 +359,29 @@ export const data = {
       isActive: true,
       items: [
         {
-          title: "Company",
-          url: "/company",
+          title: "Company & Structure",
+          url: "/company?tab=general",
           circleColor: "bg-primary",
+        },
+        {
+          title: "Authentication & SSO",
+          url: "/company?tab=auth",
+          circleColor: "bg-amber-500",
+        },
+        {
+          title: "Custom Domains",
+          url: "/company?tab=domains",
+          circleColor: "bg-blue-500",
+        },
+        {
+          title: "Email Dispatch",
+          url: "/company?tab=email",
+          circleColor: "bg-emerald-500",
+        },
+        {
+          title: "Hiring & Pod Rules",
+          url: "/company?tab=hiring",
+          circleColor: "bg-purple-500",
         },
         {
           title: "Global Remarks Templates",

@@ -3,6 +3,9 @@ export interface Job {
   jobCode: string;
   jobTitle: string;
   businessUnit: string;
+  businessUnitId?: string | null;
+  businessUnitRef?: any;
+  business_unit_id?: string | null;
   client: string;
   endClientName?: string;
   clientJobId: string;
@@ -68,6 +71,9 @@ export function mapApiJobToJob(api: any): Job {
     jobCode: api.jobCode || "",
     jobTitle: api.jobTitle || "",
     businessUnit: api.businessUnit || api.branchName || "Main Office",
+    businessUnitId: api.businessUnitId || api.business_unit_id || undefined,
+    business_unit_id: api.businessUnitId || api.business_unit_id || undefined,
+    businessUnitRef: api.businessUnitRef || undefined,
     client: api.client || api.clientName || "",
     endClientName: api.endClientName || api.endClient || api.client || "",
     clientJobId: api.clientJobId || "N/A",

@@ -599,17 +599,91 @@ export function getRouteBreadcrumbInfo(
     };
   }
 
-  // 11. Management & Administration
-  if (cleanPath === "/management/branch") {
+  // 11. Branch & Operating Units Management
+  if (cleanPath === "/management/branch" || cleanPath === "/settings/branch") {
     return {
-      pageTitle: "Branch Management",
+      pageTitle: "Branch Office Locations",
       breadcrumbs: [
         { label: "ATS", href: "/dashboard" },
-        { label: "Management", href: "/management/branch" },
-        { label: "Branch Management", isCurrent: true },
+        { label: "Branch & Units", href: "/management/branch" },
+        { label: "Branch", isCurrent: true },
       ],
       showBackButton: true,
       backHref: "/dashboard",
+    };
+  }
+
+  if (cleanPath === "/management/branch/new") {
+    return {
+      pageTitle: "Create Branch",
+      breadcrumbs: [
+        { label: "ATS", href: "/dashboard" },
+        { label: "Branch & Units", href: "/management/branch" },
+        { label: "Branch", href: "/management/branch" },
+        { label: "New Branch", isCurrent: true },
+      ],
+      showBackButton: true,
+      backHref: "/management/branch",
+    };
+  }
+
+  if (cleanPath.startsWith("/management/branch/") && cleanPath.endsWith("/edit") && !cleanPath.includes("/units/")) {
+    return {
+      pageTitle: "Edit Branch",
+      breadcrumbs: [
+        { label: "ATS", href: "/dashboard" },
+        { label: "Branch & Units", href: "/management/branch" },
+        { label: "Branch", href: "/management/branch" },
+        { label: "Edit", isCurrent: true },
+      ],
+      showBackButton: true,
+      backHref: "/management/branch",
+    };
+  }
+
+  if (cleanPath === "/management/units" || cleanPath === "/settings/units") {
+    const branchId = searchParams?.get("branchId");
+    return {
+      pageTitle: "Operating Units",
+      breadcrumbs: [
+        { label: "ATS", href: "/dashboard" },
+        { label: "Branch & Units", href: "/management/branch" },
+        { label: "Units", isCurrent: true },
+      ],
+      showBackButton: true,
+      backHref: branchId ? "/management/branch" : "/dashboard",
+    };
+  }
+
+  if (cleanPath === "/management/units/new" || cleanPath === "/management/branch/units/new") {
+    const branchId = searchParams?.get("branchId");
+    return {
+      pageTitle: "Create Operating Unit",
+      breadcrumbs: [
+        { label: "ATS", href: "/dashboard" },
+        { label: "Branch & Units", href: "/management/branch" },
+        { label: "Units", href: "/management/units" },
+        { label: "New Unit", isCurrent: true },
+      ],
+      showBackButton: true,
+      backHref: branchId ? `/management/units?branchId=${branchId}` : "/management/units",
+    };
+  }
+
+  if (
+    (cleanPath.startsWith("/management/units/") && cleanPath.endsWith("/edit")) ||
+    (cleanPath.startsWith("/management/branch/units/") && cleanPath.endsWith("/edit"))
+  ) {
+    return {
+      pageTitle: "Edit Operating Unit",
+      breadcrumbs: [
+        { label: "ATS", href: "/dashboard" },
+        { label: "Branch & Units", href: "/management/branch" },
+        { label: "Units", href: "/management/units" },
+        { label: "Edit", isCurrent: true },
+      ],
+      showBackButton: true,
+      backHref: "/management/units",
     };
   }
 

@@ -69,7 +69,7 @@ export function PendingDelegationRequests({ onRefresh }: { onRefresh: () => void
           <thead>
             <tr className="border-b border-amber-100 dark:border-amber-900/50">
               <th className="py-2 px-6 text-[11px] font-bold text-amber-700/70 uppercase">Job</th>
-              <th className="py-2 px-6 text-[11px] font-bold text-amber-700/70 uppercase">Source Branch</th>
+              <th className="py-2 px-6 text-[11px] font-bold text-amber-700/70 uppercase">Source Unit / Branch</th>
               <th className="py-2 px-6 text-[11px] font-bold text-amber-700/70 uppercase">SLA & Margin</th>
               <th className="py-2 px-6 text-[11px] font-bold text-amber-700/70 uppercase text-right">Actions</th>
             </tr>
@@ -82,7 +82,9 @@ export function PendingDelegationRequests({ onRefresh }: { onRefresh: () => void
                   <div className="text-xs text-default-500 mt-0.5 truncate max-w-xs">{req.notes || 'No notes'}</div>
                 </td>
                 <td className="py-3 px-6">
-                  <Badge variant="outline" className="text-xs border-amber-200 text-amber-700 bg-white">{req.sourceBranch?.name}</Badge>
+                  <Badge variant="outline" className="text-xs border-amber-200 text-amber-700 bg-white">
+                    {req.sourceUnit?.name ? `${req.sourceBranch?.name ? req.sourceBranch.name + ' — ' : ''}${req.sourceUnit.name}` : (req.sourceBranch?.name || 'Branch')}
+                  </Badge>
                 </td>
                 <td className="py-3 px-6 text-xs text-default-700">
                   <div className="font-medium">AM: {req.marginSplitAmPct ?? 0}% / REC: {req.marginSplitRecPct ?? 0}%</div>

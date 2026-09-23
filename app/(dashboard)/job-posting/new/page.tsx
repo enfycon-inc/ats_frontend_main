@@ -381,6 +381,62 @@ const getInitialActiveBranchContext = () => {
   const [selectedApproverRole, setSelectedApproverRole] = useState<string>("POD_LEAD");
   const [selectedApproverId, setSelectedApproverId] = useState<string>("");
   const [activeBranch, setActiveBranch] = useState<any>(null);
+  const [availableBranches, setAvailableBranches] = useState<any[]>([]);
+  const [availableUnits, setAvailableUnits] = useState<any[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState<string>("");
+  const selectedUnitObj = useMemo(() => availableUnits.find(u => u.id === selectedUnitId), [availableUnits, selectedUnitId]);
+
+  const handleUnitChange = async (unitId: string) => {
+    setSelectedUnitId(unitId);
+    const unit = availableUnits.find((u) => u.id === unitId);
+    if (!unit) return;
+
+    setValue("businessUnit", unit.name);
+
+    // Determine market from unit
+    const unitMarket = (unit.market || "").toUpperCase();
+    const isUs = unitMarket === "US" || unitMarket === "USA" || unit.currency === "USD" || (unit.shiftTiming || "").toLowerCase().includes("night") || (unit.shiftTiming || "").toLowerCase().includes("us");
+    const targetM: "US" | "IN" = isUs ? "US" : "IN";
+
+    setMarket(targetM);
+    if (targetM === "IN") {
+      setValue("country", "India");
+      setValue("jobType", "Full Time");
+      setValue("shiftTiming", unit.shiftTiming || "General Shift (Day)");
+      setValue("workAuthorization", "Indian Citizen");
+      setValue("taxTerms", "Permanent");
+      setBillCurrency("INR");
+      setBillUnit("LPA");
+      setBillTerm("Permanent");
+      setPayCurrency("INR");
+      setPayUnit("LPA");
+      setPayTerm("Permanent");
+    } else {
+      setValue("country", "United States");
+      setValue("jobType", "Contract");
+      setValue("shiftTiming", unit.shiftTiming || "US Shift (Night)");
+      setValue("workAuthorization", "US Authorized");
+      setValue("taxTerms", "C2C");
+      setBillCurrency("USD");
+      setBillUnit("Hourly");
+      setBillTerm("C2C");
+      setPayCurrency("USD");
+      setPayUnit("Hourly");
+      setPayTerm("C2C");
+    }
+
+    try {
+      const res = await atsApi.jobs.getNextCode({
+        branchId: unit.branchId || undefined,
+        shift: isUs ? "NIGHT" : "DAY",
+      });
+      if (res && res.code) {
+        setValue("jobCode", res.code);
+      }
+    } catch (e) {
+      console.warn("Could not fetch next job code for selected unit:", e);
+    }
+  };
   
   const [tenantName, setTenantName] = useState(() => initialBranchContext.branchName || "enfycon Inc");
   const [market, setMarket] = useState<"US" | "IN">(() => initialBranchContext.market);
@@ -695,19 +751,37 @@ const getInitialActiveBranchContext = () => {
           let fetchedUsers: any[] = [];
           let fetchedRoles: any[] = [];
           try {
-            const [bList, pList, uList, rList] = await Promise.all([
+            const [bList, pList, uList, rList, unitsList] = await Promise.all([
               atsApi.branches.list().catch(() => []),
               atsApi.pods.list().catch(() => []),
               atsApi.auth.listUsers().catch(() => []),
               atsApi.auth.listRoles(undefined, true).catch(() => []),
+              atsApi.businessUnits.list().catch(() => []),
             ]);
             branchesList = bList || [];
             fetchedPods = pList || [];
             fetchedUsers = uList || [];
             fetchedRoles = rList || [];
+            setAvailableBranches(branchesList);
+            setAvailableUnits(unitsList || []);
             setPodsList(fetchedPods);
             setBranchUsers(fetchedUsers);
             setRolesList(fetchedRoles);
+
+            let matchedUnit = null;
+            if (activeBranchId) {
+              matchedUnit = (unitsList || []).find((u: any) => u.branchId === activeBranchId);
+            }
+            if (!matchedUnit && prof?.businessUnitId) {
+              matchedUnit = (unitsList || []).find((u: any) => u.id === prof.businessUnitId);
+            }
+            if (!matchedUnit && unitsList && unitsList.length > 0) {
+              matchedUnit = unitsList[0];
+            }
+            if (matchedUnit) {
+              setSelectedUnitId(matchedUnit.id);
+              setValue("businessUnit", matchedUnit.name);
+            }
           } catch (e) {
             console.warn("Failed to load branches/pods/users/roles:", e);
           }
@@ -827,7 +901,11 @@ const getInitialActiveBranchContext = () => {
         setActiveWorkflow("manual");
 
         if (sourceJob.jobTitle) setValue("jobTitle", sourceJob.jobTitle);
-        if (sourceJob.businessUnit) setValue("businessUnit", sourceJob.businessUnit);
+        if (sourceJob.businessUnit) {
+          setValue("businessUnit", sourceJob.businessUnit);
+          const u = (availableUnits || []).find((unit: any) => unit.name?.toLowerCase() === sourceJob.businessUnit?.toLowerCase());
+          if (u) setSelectedUnitId(u.id);
+        }
         if (sourceJob.client) setValue("client", sourceJob.client);
         if (sourceJob.endClientName) setValue("endClientName", sourceJob.endClientName);
         if (sourceJob.clientJobId) setValue("clientJobId", sourceJob.clientJobId);
@@ -1259,7 +1337,8 @@ const getInitialActiveBranchContext = () => {
       // Map frontend form fields → backend CreateJobDto
       const payload = {
         jobCode: data.jobCode,
-        branchId: typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') || undefined : undefined,
+        branchId: selectedUnitObj?.branchId || (typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') || undefined : undefined),
+        businessUnitId: selectedUnitId || undefined,
         title: data.jobTitle,
         client: data.client || data.endClientName || "Direct Client",
         endClientName: data.endClientName || undefined,
@@ -1860,15 +1939,53 @@ const getInitialActiveBranchContext = () => {
                 {!collapsedSections.businessInfo && (
                   <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
 
-                    {/* BU */}
+                    {/* Operating Unit / Division */}
                     <div className="space-y-1">
-                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Business Unit <span className="text-red-500">*</span></Label>
-                      <Input
-                        type="text"
-                        readOnly
-                        {...register("businessUnit")}
-                        className="h-8 text-xs bg-neutral-100 dark:bg-slate-800 border-neutral-300 dark:border-slate-700 font-semibold cursor-not-allowed"
-                      />
+                      <Label className="font-bold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
+                        <span>Operating Unit <span className="text-red-500">*</span></span>
+                        {selectedUnitObj && (
+                          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                            {selectedUnitObj.market || market} • {selectedUnitObj.shiftTiming || 'General Shift'}
+                          </span>
+                        )}
+                      </Label>
+                      {availableUnits.length > 0 ? (
+                        <select
+                          value={selectedUnitId}
+                          onChange={(e) => handleUnitChange(e.target.value)}
+                          className="w-full h-8 text-xs bg-white dark:bg-slate-800 border border-neutral-300 dark:border-slate-700 rounded px-2 font-semibold text-neutral-800 dark:text-neutral-200 outline-none focus:border-primary transition-colors cursor-pointer"
+                        >
+                          <option value="">-- Select Operating Unit --</option>
+                          {availableBranches.length > 0 ? (
+                            availableBranches.map((b) => {
+                              const unitsInBranch = availableUnits.filter((u) => u.branchId === b.id);
+                              if (unitsInBranch.length === 0) return null;
+                              return (
+                                <optgroup key={b.id} label={`${b.name} (${b.city ? b.city + ', ' : ''}${b.country || ''})`}>
+                                  {unitsInBranch.map((u) => (
+                                    <option key={u.id} value={u.id}>
+                                      {u.name} — {u.shiftTiming || 'General Shift'} ({u.currency || 'INR'})
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              );
+                            })
+                          ) : (
+                            availableUnits.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.name} — {u.shiftTiming || 'General Shift'}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      ) : (
+                        <Input
+                          type="text"
+                          readOnly
+                          {...register("businessUnit")}
+                          className="h-8 text-xs bg-neutral-100 dark:bg-slate-800 border-neutral-300 dark:border-slate-700 font-semibold cursor-not-allowed"
+                        />
+                      )}
                       {errors.businessUnit && (
                         <p className="text-[10px] text-red-650 font-bold">{errors.businessUnit.message}</p>
                       )}

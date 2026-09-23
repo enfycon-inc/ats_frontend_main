@@ -181,6 +181,17 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
       { label: "Activity Reports", href: "/reports/activity" },
     ],
   },
+  {
+    id: "branch-units",
+    label: "Branch & Units",
+    href: "/management/branch",
+    icon: Building2,
+    children: [
+      { label: "Branch", href: "/management/branch" },
+      { label: "Units", href: "/management/units" },
+      { label: "Markets", href: "/management/markets" },
+    ],
+  },
 ];
 
 // ─────────────────────────────────────────────
@@ -195,7 +206,6 @@ export const MORE_NAV_ITEMS: NavItem[] = [
   { id: "integrations", label: "Integrations", href: "/integrations", icon: Globe },
   { id: "tenant-management", label: "Tenant Management", href: "/utility/approvals", icon: Building2 },
   { id: "user-management", label: "Users & Teams", href: "/utility/users", icon: Users },
-  { id: "branch-management", label: "Branch Management", href: "/management/branch", icon: MapPin },
   { id: "role-management", label: "Role Management", href: "/utility/roles-permissions", icon: UserCheck },
   { id: "pod-management", label: "Recruitment Pods", href: "/utility/pods", icon: Users },
   { id: "dictionaries", label: "Master Dictionaries", href: "/utility/dictionaries", icon: Database },
@@ -215,7 +225,11 @@ export const MORE_NAV_ITEMS: NavItem[] = [
     href: "/company",
     icon: Settings,
     children: [
-      { label: "Company & Workspace", href: "/company" },
+      { label: "Company & Structure", href: "/company?tab=general" },
+      { label: "Authentication & SSO", href: "/company?tab=auth" },
+      { label: "Custom Domains", href: "/company?tab=domains" },
+      { label: "Email Dispatch", href: "/company?tab=email" },
+      { label: "Hiring & Pod Rules", href: "/company?tab=hiring" },
       { label: "Global Remarks Templates", href: "/utility/global-remarks" },
       { label: "Sound & Tone Preferences", href: "/utility/settings-notifications" },
     ],
@@ -288,7 +302,11 @@ export const GLOBAL_ADMIN_MORE_ITEMS: NavItem[] = [
     href: "/company",
     icon: Settings,
     children: [
-      { label: "Company & Workspace", href: "/company" },
+      { label: "Company & Structure", href: "/company?tab=general" },
+      { label: "Authentication & SSO", href: "/company?tab=auth" },
+      { label: "Custom Domains", href: "/company?tab=domains" },
+      { label: "Email Dispatch", href: "/company?tab=email" },
+      { label: "Hiring & Pod Rules", href: "/company?tab=hiring" },
       { label: "Global Remarks Templates", href: "/utility/global-remarks" },
       { label: "Sound & Tone Preferences", href: "/utility/settings-notifications" },
     ],

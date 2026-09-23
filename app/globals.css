@@ -615,3 +615,9 @@ html {
   scrollbar-color: rgba(99, 147, 255, 0.4) transparent;
 }
 
+/* Hide browser native clock / calendar picker indicator on time inputs */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
