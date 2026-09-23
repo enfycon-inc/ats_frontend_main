@@ -2192,49 +2192,49 @@ export default function UserManagementPage() {
               </div>
 
               {/* OFFICE BRANCH SELECTION */}
-              <div className="space-y-1 pt-2 border-t border-neutral-100 dark:border-slate-800">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                  Office Branch *
-                </label>
-                {isBranchAdmin ? (
-                  <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                    <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
-                    <span>{branches.find((b) => b.id === editForm.branchId)?.name || "Assigned Branch"}</span>
-                  </div>
-                ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-neutral-100 dark:border-slate-800">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
+                    Office Branch *
+                  </label>
+                  {isBranchAdmin ? (
+                    <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                      <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
+                      <span>{branches.find((b) => b.id === editForm.branchId)?.name || "Assigned Branch"}</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={editForm.branchId}
+                      onChange={(e) => setEditForm({ ...editForm, branchId: e.target.value })}
+                      className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
+                      required
+                    >
+                      <option value="">Select Office Branch...</option>
+                      {assignedBranches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* Business Unit Selection */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Unit (Optional)</label>
                   <select
-                    value={editForm.branchId}
-                    onChange={(e) => setEditForm({ ...editForm, branchId: e.target.value })}
+                    value={editForm.businessUnitId}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
                     className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
-                    required
                   >
-                    <option value="">Select Office Branch...</option>
-                    {assignedBranches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
+                    <option value="">-- No Unit Assigned (Branch Admin) --</option>
+                    {businessUnits
+                      .filter((bu) => !editForm.branchId || bu.branchId === editForm.branchId)
+                      .map((bu) => (
+                        <option key={bu.id} value={bu.id}>{bu.name}</option>
+                      ))}
                   </select>
-                )}
-              </div>
-
-              
-
-              {/* Business Unit Selection */}
-              <div className="space-y-1 mb-4">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Unit (Optional)</label>
-                <select
-                  value={editForm.businessUnitId}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
-                  className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
-                >
-                  <option value="">-- No Unit Assigned (Branch Admin) --</option>
-                  {businessUnits
-                    .filter((bu) => !editForm.branchId || bu.branchId === editForm.branchId)
-                    .map((bu) => (
-                      <option key={bu.id} value={bu.id}>{bu.name}</option>
-                    ))}
-                </select>
+                </div>
               </div>
 
               {/* CUSTOM ROLE SELECTION (STRICTLY ISOLATED PER SELECTED BRANCH) */}
