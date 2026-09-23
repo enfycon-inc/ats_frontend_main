@@ -1264,7 +1264,7 @@ export default function RolesPermissionsPage() {
       {/* ─── MODAL 1: CREATE CUSTOM ROLE ───────────────────────────────── */}
       {showQuickAddUnit && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
             <div className="px-6 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 flex items-center justify-between">
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
                 <Icon icon="heroicons:plus-circle" className="h-4.5 w-4.5 text-indigo-600 dark:text-indigo-400" />
@@ -1308,7 +1308,7 @@ export default function RolesPermissionsPage() {
                       onBlur={() => setShowAddressSuggestions(false)}
                       placeholder="Start typing an address..." 
                       className="h-9 text-xs" 
-                      autoComplete="off"
+                      autoComplete="new-password"
                     />
                     {showAddressSuggestions && addressSuggestions.length > 0 && (
                       <div className="absolute top-full mt-1 left-0 w-full z-50 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden">
@@ -1331,20 +1331,16 @@ export default function RolesPermissionsPage() {
                     )}
                   </div>
                 </div>
-                <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Zip / PIN Code</label>
-                  <Input value={quickAddUnitZip} onChange={e => setQuickAddUnitZip(e.target.value)} onBlur={handleZipBlur} placeholder="Zip Code" className="h-9 text-xs" />
-                </div>
-                <div className="space-y-1.5 col-span-1 relative">
+                  <div className="space-y-1.5 col-span-1 relative">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">City</label>
                   <Input 
                     value={quickAddUnitCity} 
                     onChange={e => { setQuickAddUnitCity(e.target.value); setShowCitySuggestions(true); }} 
                     onFocus={() => setShowCitySuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowCitySuggestions(false), 200)}
+                    onBlur={() => setShowCitySuggestions(false)}
                     placeholder="City" 
                     className="h-9 text-xs" 
-                    autoComplete="off"
+                    autoComplete="new-password"
                   />
                   {showCitySuggestions && citySuggestions.length > 0 && (
                     <div className="absolute top-full mt-1 left-0 w-[200%] z-50 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden">
@@ -1361,9 +1357,13 @@ export default function RolesPermissionsPage() {
                     </div>
                   )}
                 </div>
-                <div className="space-y-1.5 col-span-1">
+                  <div className="space-y-1.5 col-span-1">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">State</label>
                   <Input value={quickAddUnitState} onChange={e => setQuickAddUnitState(e.target.value)} placeholder="State" className="h-9 text-xs" />
+                </div>
+                  <div className="space-y-1.5 col-span-2">
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Zip / PIN Code</label>
+                  <Input value={quickAddUnitZip} onChange={e => setQuickAddUnitZip(e.target.value)} onBlur={handleZipBlur} placeholder="Zip Code" className="h-9 text-xs" />
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
