@@ -415,6 +415,14 @@ export function getFilteredPrimaryNav(
         ],
       };
     }
+    if (item.id === "branch-units") {
+      if (!permissions.includes("tenant:settings")) {
+        return {
+          ...item,
+          children: item.children ? item.children.filter((child) => child.href !== "/management/markets") : undefined,
+        };
+      }
+    }
     return item;
   });
 }
