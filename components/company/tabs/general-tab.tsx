@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 export interface GeneralTabProps {
   companyName: string;
   setCompanyName: (val: string) => void;
+  siteTitle: string;
+  setSiteTitle: (val: string) => void;
   subdomain: string;
   setSubdomain: (val: string) => void;
   originalSubdomain: string;
@@ -21,6 +23,8 @@ export interface GeneralTabProps {
 export function GeneralTab({
   companyName,
   setCompanyName,
+  siteTitle,
+  setSiteTitle,
   subdomain,
   setSubdomain,
   originalSubdomain,
@@ -57,32 +61,25 @@ export function GeneralTab({
 
             {/* Form Fields */}
             <div className="flex-1 space-y-4">
-              <div>
-                <Label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Company Name</Label>
-                <Input
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="e.g. Enfycon Inc."
-                  className="h-9 mt-1.5 text-sm"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div>
-                  <Label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Industry / Sector</Label>
+                  <Label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Company Name</Label>
                   <Input
-                    placeholder="e.g. IT Staffing"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="e.g. Enfycon Inc."
                     className="h-9 mt-1.5 text-sm"
                   />
                 </div>
                 <div>
-                  <Label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Company Size</Label>
-                  <select className="w-full h-9 mt-1.5 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded-md text-sm px-3 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
-                    <option>1-50 Employees</option>
-                    <option>51-200 Employees</option>
-                    <option>201-500 Employees</option>
-                    <option>500+ Employees</option>
-                  </select>
+                  <Label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Browser Site Title</Label>
+                  <Input
+                    value={siteTitle}
+                    onChange={(e) => setSiteTitle(e.target.value)}
+                    placeholder="e.g. Enfycon ATS"
+                    className="h-9 mt-1.5 text-sm"
+                  />
+                  <p className="text-[10px] text-neutral-500 mt-1">This appears on browser tabs and search engines.</p>
                 </div>
               </div>
 

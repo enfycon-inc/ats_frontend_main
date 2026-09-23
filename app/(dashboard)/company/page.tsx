@@ -63,6 +63,7 @@ function CompanySettingsContent() {
   const [subdomain, setSubdomain] = useState("");
   const [originalSubdomain, setOriginalSubdomain] = useState("");
   const [companyName, setCompanyName] = useState("");
+    const [siteTitle, setSiteTitle] = useState("");
   const [podSystemEnabled, setPodSystemEnabled] = useState(true);
   const [togglingPodSystem, setTogglingPodSystem] = useState(false);
   const [candidatePoolMode, setCandidatePoolMode] = useState("COMBINED_MARKET");
@@ -557,6 +558,8 @@ function TenantAdminSettingsView(props: any) {
           <GeneralTab
             companyName={props.companyName}
             setCompanyName={props.setCompanyName}
+            siteTitle={props.siteTitle}
+            setSiteTitle={props.setSiteTitle}
             subdomain={props.subdomain}
             setSubdomain={props.setSubdomain}
             originalSubdomain={props.originalSubdomain}
