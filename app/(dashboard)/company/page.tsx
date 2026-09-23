@@ -146,6 +146,8 @@ function CompanySettingsContent() {
         setProfile(profileData);
         if (profileData.tenant) {
           setCompanyName(profileData.tenant.name || "");
+          setSiteTitle(profileData.tenant.siteTitle || "");
+          setLogoUrl(profileData.tenant.logoUrl || "");
           setSubdomain(profileData.tenant.domain || "");
           setOriginalSubdomain(profileData.tenant.domain || "");
           if (profileData.tenant.jobCodePattern !== undefined) setJobCodePattern(profileData.tenant.jobCodePattern || "{BRANCH}-{UNIT}-{YYMMDD}-{SEQ}");
@@ -438,6 +440,12 @@ function CompanySettingsContent() {
           profile={profile}
           companyName={companyName}
           setCompanyName={setCompanyName}
+          siteTitle={siteTitle}
+          setSiteTitle={setSiteTitle}
+          logoUrl={logoUrl}
+          setLogoUrl={setLogoUrl}
+          savingCompanyProfile={savingCompanyProfile}
+          handleSaveCompanyProfile={handleSaveCompanyProfile}
           subdomain={subdomain}
           originalSubdomain={originalSubdomain}
           setSubdomain={setSubdomain}
