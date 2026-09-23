@@ -1407,10 +1407,6 @@ const branches = {
   async create(data: {
     name: string;
     code?: string;
-      address?: string;
-      city?: string;
-      state?: string;
-      zipCode?: string;
     city?: string;
     state?: string;
     country?: string;
@@ -1431,10 +1427,6 @@ const branches = {
   async update(id: string, data: {
     name?: string;
     code?: string;
-      address?: string;
-      city?: string;
-      state?: string;
-      zipCode?: string;
     city?: string;
     state?: string;
     country?: string;
@@ -1515,10 +1507,6 @@ const businessUnits = {
     name: string;
     branchId?: string;
     code?: string;
-      address?: string;
-      city?: string;
-      state?: string;
-      zipCode?: string;
     market?: string;
     marketSegmentId?: string | null;
     jobCodePattern?: string | null;
@@ -1546,10 +1534,6 @@ const businessUnits = {
       name?: string;
       branchId?: string;
       code?: string;
-      address?: string;
-      city?: string;
-      state?: string;
-      zipCode?: string;
       market?: string;
       marketSegmentId?: string | null;
       jobCodePattern?: string | null;
