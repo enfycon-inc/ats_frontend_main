@@ -61,7 +61,9 @@ export function HiringTab({
 return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 1. Candidate Pool Mode Card */}
+                {/* LEFT COLUMN */}
+        <div className="space-y-6">
+          {/* 1. Candidate Pool Mode Card */}
         <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900 flex flex-col">
           <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60">
             <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
@@ -158,8 +160,12 @@ return (
         </CardContent>
       </Card>
 
-      {/* Job Code Pattern Settings Card */}
-      <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900 flex flex-col mt-6">
+              </div>
+
+        {/* RIGHT COLUMN */}
+        <div className="space-y-6">
+          {/* Job Code Pattern Settings Card */}
+      <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900 flex flex-col">
         <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60 flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
@@ -213,7 +219,6 @@ return (
       </Card>
 
       {/* 2. Pod System Settings Card */}
-        <div className="space-y-6">
           <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900">
             <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60 flex flex-row items-center justify-between">
               <div>
