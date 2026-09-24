@@ -2,16 +2,19 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useTenantBranding } from "@/contexts/tenant-branding";
+import { CompanyLogoImage } from "@/components/shared/company-logo-image";
 
 export function NavbarLogo({ className }: { className?: string }) {
+  const { branding } = useTenantBranding();
   return (
     <Link
       href="/dashboard"
       id="navbar-logo"
-      aria-label="enfySync – go to Dashboard"
+      aria-label={`${branding.name || 'enfySync'} – go to Dashboard`}
       className={`
         flex items-center gap-2.5
-        px-2 py-1
+        px-2 ${branding.logoUrl ? 'py-0' : 'py-1'}
         hover:bg-white/10
         rounded-lg
         transition-all duration-150
@@ -24,6 +27,10 @@ export function NavbarLogo({ className }: { className?: string }) {
         ${className || ""}
       `}
     >
+      {branding.logoUrl ? (
+        <CompanyLogoImage src={branding.logoUrl} alt={`${branding.name || 'Company'} Logo`}
+          className="h-[34px] w-full max-w-[240px] min-w-0 group-data-[collapsible=icon]:w-7 group-data-[collapsible=icon]:h-7" />
+      ) : <>
       {/* Brand Logo Icon */}
       <div className="flex-shrink-0 flex items-center justify-center h-7 w-7 rounded-md bg-white/15 border border-white/20 p-1 shadow-xs transition-transform duration-150 group-hover/logo:scale-105">
         <Image
@@ -45,6 +52,7 @@ export function NavbarLogo({ className }: { className?: string }) {
           AI Recruitment
         </span>
       </div>
+      </>}
     </Link>
   );
 }

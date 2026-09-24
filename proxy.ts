@@ -17,6 +17,7 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith("/favicon.ico") ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/images") ||
+    pathname.startsWith("/public/image/logos/") ||
     pathname.startsWith("/manifest.json")
   ) {
     return NextResponse.next();

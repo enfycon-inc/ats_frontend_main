@@ -1,4 +1,6 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
+import { CompanyLogoImage } from "@/components/shared/company-logo-image";
+import toast from "react-hot-toast";
 import { Globe, Building2, Image as ImageIcon, ArrowRight, Save } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,7 @@ export function GeneralTab({
   base,
 }: GeneralTabProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [logoSize, setLogoSize] = useState<{ width: number; height: number } | null>(null);
 
   return (
     <div className="space-y-6">
@@ -59,44 +62,57 @@ export function GeneralTab({
         </CardHeader>
         <CardContent className="pt-5 space-y-6">
           
-          <div className="flex flex-col sm:flex-row gap-6">
+          <div className="flex flex-col lg:flex-row gap-6">
             {/* Logo Upload Area */}
-            <div className="flex-shrink-0">
+            <div className="w-full sm:w-64 flex-shrink-0">
               <Label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-2">Company Logo</Label>
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="relative w-28 h-28 border-2 border-dashed border-neutral-300 dark:border-slate-700 rounded-xl flex flex-col items-center justify-center bg-neutral-50 dark:bg-slate-800/50 hover:bg-neutral-100 dark:hover:bg-slate-800 transition-colors cursor-pointer overflow-hidden group"
-              >
+              <div>
                 <input 
                   ref={fileInputRef}
                   id="logo-upload"
                   type="file" 
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
                   className="hidden" onClick={(e) => e.stopPropagation()}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
+                      if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+                        toast.error('Choose a PNG, JPEG, GIF, or WebP image up to 2 MB.');
+                        e.target.value = '';
+                        return;
+                      }
                       const reader = new FileReader();
-                      reader.onloadend = () => {
+                      reader.onload = () => {
+                        setLogoSize(null);
                         setLogoUrl(reader.result as string);
                       };
+                      reader.onerror = () => toast.error('Could not read the logo image. Please try again.');
                       reader.readAsDataURL(file);
                     }
                   }}
                 />
+                <button type="button" onClick={() => fileInputRef.current?.click()}
+                  aria-label="Upload or replace company logo" aria-describedby="company-logo-guide"
+                  className="w-full h-[60px] rounded-lg border border-blue-800 bg-[#1a4fa0] dark:bg-[#0f2d6b] px-2.5 flex items-center justify-start overflow-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
                 {logoUrl ? (
-                  <img src={logoUrl} alt="Company Logo" className="w-full h-full object-contain p-2" />
+                  <CompanyLogoImage src={logoUrl} alt="Company logo header preview" onDimensions={setLogoSize}
+                    className="h-[34px] w-full max-w-[240px]" />
                 ) : (
-                  <>
-                    <ImageIcon className="h-8 w-8 text-neutral-400 group-hover:text-indigo-500 transition-colors mb-2" />
-                    <span className="text-[10px] font-medium text-neutral-500 group-hover:text-indigo-600">Upload Logo</span>
-                  </>
+                  <span className="flex items-center gap-2 text-xs text-white"><ImageIcon className="h-5 w-5" />Upload logo</span>
                 )}
+                </button>
+                <p className="mt-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">Header preview · Click to change</p>
+                <div id="company-logo-guide" className="mt-2 space-y-1 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+                  <p className="font-semibold text-neutral-700 dark:text-neutral-200">Recommended: 480 × 96 px (5:1)</p>
+                  <p>Use a tightly cropped logo with a transparent background. Light lettering works best on the blue header.</p>
+                  <p>PNG or WebP recommended. JPEG and GIF accepted. Maximum 2 MB.</p>
+                  {logoUrl && logoSize && <p>Current image: {logoSize.width} × {logoSize.height} px</p>}
+                </div>
               </div>
             </div>
 
             {/* Form Fields */}
-            <div className="flex-1 space-y-4">
+            <div className="flex-1 min-w-0 space-y-4">
               <div className="space-y-4">
                 <div>
                   <Label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Company Name</Label>

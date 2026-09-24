@@ -3,6 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { atsApi } from "@/lib/ats-api";
+import { useTenantBranding } from "@/contexts/tenant-branding";
 import {
   Building2,
   Lock,
@@ -54,6 +55,7 @@ export default function CompanySettingsPage() {
 }
 
 function CompanySettingsContent() {
+  const { updateBranding } = useTenantBranding();
   const [profile, setProfile] = useState<any>(null);
   const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
@@ -145,6 +147,7 @@ function CompanySettingsContent() {
       if (profileData) {
         setProfile(profileData);
         if (profileData.tenant) {
+          updateBranding(profileData.tenant);
           setCompanyName(profileData.tenant.name || "");
           setSiteTitle(profileData.tenant.siteTitle || "");
           setLogoUrl(profileData.tenant.logoUrl || "");
@@ -238,15 +241,14 @@ function CompanySettingsContent() {
   const handleSaveCompanyProfile = async () => {
     try {
       setSavingCompanyProfile(true);
-      await atsApi.auth.updateMySettings({ 
+      const saved = await atsApi.auth.updateMySettings({
         name: companyName,
         siteTitle: siteTitle,
         logoUrl: logoUrl
       });
       
-      if (siteTitle) {
-        document.title = siteTitle;
-      }
+      setLogoUrl(saved.logo_url || '');
+      updateBranding({ name: saved.name, siteTitle: saved.site_title || '', logoUrl: saved.logo_url || '' });
       toast.success("Company profile saved successfully!");
     } catch (err: any) {
       toast.error(err.message || "Failed to save company profile");

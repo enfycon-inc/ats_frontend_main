@@ -1,6 +1,7 @@
 "use client";
 
 import Footer from "@/components/layout/footer";
+import { TenantBrandingProvider } from "@/contexts/tenant-branding";
 import ThemeCustomizer from "@/components/theme-customizer/theme-customizer";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ReactNode, useEffect, useMemo, useState, Suspense } from "react";
@@ -135,6 +136,7 @@ export function ClientRoot({
   );
 
   return (
+    <TenantBrandingProvider initialBranding={initialNavigation?.profile?.tenant}>
     <ThemeProvider
       attribute="class"
       defaultTheme="system"
@@ -169,5 +171,6 @@ export function ClientRoot({
         </SocketProvider>
       </TooltipProvider>
     </ThemeProvider>
+    </TenantBrandingProvider>
   );
 }

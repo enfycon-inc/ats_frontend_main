@@ -1,4 +1,5 @@
 import { ClientRoot } from "@/app/client-root";
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { SessionProvider } from "next-auth/react";
 import { redirect } from "next/navigation";
@@ -19,6 +20,13 @@ async function getSessionSafe() {
   } catch {
     return null;
   }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const session = await getSessionSafe();
+  const navigation = await loadNavigationBootstrap(getApiBase(), (session as any)?.user?.accessToken || "");
+  const title = navigation?.profile?.tenant?.siteTitle;
+  return title ? { title: { absolute: title } } : {};
 }
 
 export default async function DashboardLayout({
