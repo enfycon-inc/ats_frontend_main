@@ -2568,36 +2568,45 @@ export default function UserManagementPage() {
               {/* ADMINISTRATIVE ACCESS & STAFF ROLES LOGIC */}
               {(() => {
                 const getAdminSysKey = (rolesArray: string[]) => {
-                  for (const r of rolesArray) {
-                    const sr = rolesList.find(rl => rl.id === r || rl.name === r || (r === "Tenant Admin" && (rl.systemRole === "ADMIN" || rl.system_role === "ADMIN")) || (r === "Super Admin" && (rl.systemRole === "SUPER_ADMIN" || rl.system_role === "SUPER_ADMIN")));
-                    if (sr && sr.isSystem) {
-                      const sys = (sr.systemRole || sr.system_role || "").toUpperCase();
-                      if (["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "TENANTADMIN", "SUPERADMIN"].includes(sys)) return "ADMIN";
-                      if (["BRANCH_ADMIN", "BRANCHADMIN"].includes(sys)) return "BRANCH_ADMIN";
-                      if (["UNIT_ADMIN", "UNITADMIN"].includes(sys)) return "UNIT_ADMIN";
-                    }
-                  }
-                  return "NONE";
-                };
+  for (const r of rolesArray) {
+    const sr = rolesList.find(rl => rl.id === r || rl.name === r || (r === "Tenant Admin" && (rl.systemRole === "ADMIN" || rl.system_role === "ADMIN" || rl.name === "ADMIN" || rl.name === "Tenant Admin")) || (r === "Super Admin" && (rl.systemRole === "SUPER_ADMIN" || rl.system_role === "SUPER_ADMIN" || rl.name === "SUPER_ADMIN")));
+    if (sr) {
+      const sys = (sr.systemRole || sr.system_role || sr.systemKey || sr.system_key || sr.name || "").toUpperCase();
+      const isSys = sr.isSystem || ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "UNIT_ADMIN"].includes(sys);
+      if (isSys) {
+        if (["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "TENANT ADMIN", "SUPER ADMIN", "TENANTADMIN", "SUPERADMIN"].includes(sys)) return "ADMIN";
+        if (["BRANCH_ADMIN", "BRANCHADMIN", "BRANCH ADMIN"].includes(sys)) return "BRANCH_ADMIN";
+        if (["UNIT_ADMIN", "UNITADMIN", "UNIT ADMIN"].includes(sys)) return "UNIT_ADMIN";
+      }
+    }
+  }
+  return "NONE";
+};
 
                 const addFormAdminRole = getAdminSysKey(addForm.roles);
 
                 const handleAddAdminRoleChange = (targetSysKey: string) => {
                   let nextRoles = addForm.roles.filter(r => {
-                    const sr = rolesList.find(rl => rl.id === r || rl.name === r || (r === "Tenant Admin" && (rl.systemRole === "ADMIN" || rl.system_role === "ADMIN")) || (r === "Super Admin" && (rl.systemRole === "SUPER_ADMIN" || rl.system_role === "SUPER_ADMIN")));
-                    return !(sr && sr.isSystem);
+                    const sr = rolesList.find(rl => rl.id === r || rl.name === r || (r === "Tenant Admin" && (rl.systemRole === "ADMIN" || rl.system_role === "ADMIN" || rl.name === "ADMIN" || rl.name === "Tenant Admin")) || (r === "Super Admin" && (rl.systemRole === "SUPER_ADMIN" || rl.system_role === "SUPER_ADMIN")));
+                    return !(sr && (sr.isSystem || sr.name === "ADMIN" || sr.name === "Tenant Admin" || sr.name === "SUPER_ADMIN"));
                   });
 
                   if (targetSysKey !== "NONE") {
                     const newAdminRole = rolesList.find(rl => {
-                      if (!rl.isSystem) return false;
-                      const sys = (rl.systemRole || rl.system_role || "").toUpperCase();
-                      if (targetSysKey === "ADMIN") return ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "TENANTADMIN", "SUPERADMIN"].includes(sys);
-                      if (targetSysKey === "BRANCH_ADMIN") return ["BRANCH_ADMIN", "BRANCHADMIN"].includes(sys);
-                      if (targetSysKey === "UNIT_ADMIN") return ["UNIT_ADMIN", "UNITADMIN"].includes(sys);
+                      const sys = (rl.systemRole || rl.system_role || rl.systemKey || rl.system_key || rl.name || "").toUpperCase();
+                      const isSys = rl.isSystem || ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "UNIT_ADMIN"].includes(sys);
+                      if (!isSys) return false;
+                      if (targetSysKey === "ADMIN") return ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "TENANT ADMIN", "SUPER ADMIN", "TENANTADMIN", "SUPERADMIN"].includes(sys);
+                      if (targetSysKey === "BRANCH_ADMIN") return ["BRANCH_ADMIN", "BRANCHADMIN", "BRANCH ADMIN"].includes(sys);
+                      if (targetSysKey === "UNIT_ADMIN") return ["UNIT_ADMIN", "UNITADMIN", "UNIT ADMIN"].includes(sys);
                       return false;
                     });
-                    if (newAdminRole) nextRoles.push(newAdminRole.id);
+                    if (newAdminRole) {
+                      nextRoles.push(newAdminRole.id);
+                    } else {
+                      alert("Error: Could not find system role " + targetSysKey + " in the database. Please contact support.");
+                      console.error("DEBUG: Role not found for " + targetSysKey, rolesList);
+                    }
                   }
                   
                   // Retain business unit for Branch Admin so they can also have custom roles (like Recruiter)
@@ -2861,36 +2870,45 @@ export default function UserManagementPage() {
               {/* ADMINISTRATIVE ACCESS & STAFF ROLES LOGIC */}
               {(() => {
                 const getAdminSysKey = (rolesArray: string[]) => {
-                  for (const r of rolesArray) {
-                    const sr = rolesList.find(rl => rl.id === r || rl.name === r || (r === "Tenant Admin" && (rl.systemRole === "ADMIN" || rl.system_role === "ADMIN")) || (r === "Super Admin" && (rl.systemRole === "SUPER_ADMIN" || rl.system_role === "SUPER_ADMIN")));
-                    if (sr && sr.isSystem) {
-                      const sys = (sr.systemRole || sr.system_role || "").toUpperCase();
-                      if (["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "TENANTADMIN", "SUPERADMIN"].includes(sys)) return "ADMIN";
-                      if (["BRANCH_ADMIN", "BRANCHADMIN"].includes(sys)) return "BRANCH_ADMIN";
-                      if (["UNIT_ADMIN", "UNITADMIN"].includes(sys)) return "UNIT_ADMIN";
-                    }
-                  }
-                  return "NONE";
-                };
+  for (const r of rolesArray) {
+    const sr = rolesList.find(rl => rl.id === r || rl.name === r || (r === "Tenant Admin" && (rl.systemRole === "ADMIN" || rl.system_role === "ADMIN" || rl.name === "ADMIN" || rl.name === "Tenant Admin")) || (r === "Super Admin" && (rl.systemRole === "SUPER_ADMIN" || rl.system_role === "SUPER_ADMIN" || rl.name === "SUPER_ADMIN")));
+    if (sr) {
+      const sys = (sr.systemRole || sr.system_role || sr.systemKey || sr.system_key || sr.name || "").toUpperCase();
+      const isSys = sr.isSystem || ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "UNIT_ADMIN"].includes(sys);
+      if (isSys) {
+        if (["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "TENANT ADMIN", "SUPER ADMIN", "TENANTADMIN", "SUPERADMIN"].includes(sys)) return "ADMIN";
+        if (["BRANCH_ADMIN", "BRANCHADMIN", "BRANCH ADMIN"].includes(sys)) return "BRANCH_ADMIN";
+        if (["UNIT_ADMIN", "UNITADMIN", "UNIT ADMIN"].includes(sys)) return "UNIT_ADMIN";
+      }
+    }
+  }
+  return "NONE";
+};
 
                 const editFormAdminRole = getAdminSysKey(editForm.roles);
 
                 const handleEditAdminRoleChange = (targetSysKey: string) => {
                   let nextRoles = editForm.roles.filter(r => {
-                    const sr = rolesList.find(rl => rl.id === r || rl.name === r || (r === "Tenant Admin" && (rl.systemRole === "ADMIN" || rl.system_role === "ADMIN")) || (r === "Super Admin" && (rl.systemRole === "SUPER_ADMIN" || rl.system_role === "SUPER_ADMIN")));
-                    return !(sr && sr.isSystem);
+                    const sr = rolesList.find(rl => rl.id === r || rl.name === r || (r === "Tenant Admin" && (rl.systemRole === "ADMIN" || rl.system_role === "ADMIN" || rl.name === "ADMIN" || rl.name === "Tenant Admin")) || (r === "Super Admin" && (rl.systemRole === "SUPER_ADMIN" || rl.system_role === "SUPER_ADMIN")));
+                    return !(sr && (sr.isSystem || sr.name === "ADMIN" || sr.name === "Tenant Admin" || sr.name === "SUPER_ADMIN"));
                   });
 
                   if (targetSysKey !== "NONE") {
                     const newAdminRole = rolesList.find(rl => {
-                      if (!rl.isSystem) return false;
-                      const sys = (rl.systemRole || rl.system_role || "").toUpperCase();
-                      if (targetSysKey === "ADMIN") return ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "TENANTADMIN", "SUPERADMIN"].includes(sys);
-                      if (targetSysKey === "BRANCH_ADMIN") return ["BRANCH_ADMIN", "BRANCHADMIN"].includes(sys);
-                      if (targetSysKey === "UNIT_ADMIN") return ["UNIT_ADMIN", "UNITADMIN"].includes(sys);
+                      const sys = (rl.systemRole || rl.system_role || rl.systemKey || rl.system_key || rl.name || "").toUpperCase();
+                      const isSys = rl.isSystem || ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "UNIT_ADMIN"].includes(sys);
+                      if (!isSys) return false;
+                      if (targetSysKey === "ADMIN") return ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "TENANT ADMIN", "SUPER ADMIN", "TENANTADMIN", "SUPERADMIN"].includes(sys);
+                      if (targetSysKey === "BRANCH_ADMIN") return ["BRANCH_ADMIN", "BRANCHADMIN", "BRANCH ADMIN"].includes(sys);
+                      if (targetSysKey === "UNIT_ADMIN") return ["UNIT_ADMIN", "UNITADMIN", "UNIT ADMIN"].includes(sys);
                       return false;
                     });
-                    if (newAdminRole) nextRoles.push(newAdminRole.id);
+                    if (newAdminRole) {
+                      nextRoles.push(newAdminRole.id);
+                    } else {
+                      alert("Error: Could not find system role " + targetSysKey + " in the database. Please contact support.");
+                      console.error("DEBUG: Role not found for " + targetSysKey, rolesList);
+                    }
                   }
                   
                   // Retain business unit for Branch Admin so they can also have custom roles (like Recruiter)
