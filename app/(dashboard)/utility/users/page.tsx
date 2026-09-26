@@ -2859,7 +2859,7 @@ export default function UserManagementPage() {
                     const sr = rolesList.find(rl => rl.systemRole === sysKey || (sysKey === "ADMIN" && (rl.systemRole === "TENANT_ADMIN" || rl.name === "Tenant Admin")));
                     if (sr) nextRoles.push(sr.id || sr.name);
                   }
-                  setAddForm(prev => ({
+                  setEditForm(prev => ({
                     ...prev, 
                     roles: nextRoles,
                     branchId: sysKey === "ADMIN" ? "" : prev.branchId,
@@ -2914,7 +2914,7 @@ export default function UserManagementPage() {
                                   <span>{assignedBranches.find((b) => b.id === editForm.branchId)?.name || branches.find((b) => b.id === editForm.branchId)?.name || "Assigned Branch"}</span>
                                 </div>
                               ) : (
-                                <select value={editForm.branchId} onChange={(e) => setAddForm((prev) => ({ ...prev, branchId: e.target.value, businessUnitId: "" }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500" required>
+                                <select value={editForm.branchId} onChange={(e) => setEditForm((prev) => ({ ...prev, branchId: e.target.value, businessUnitId: "" }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500" required>
                                   <option value="">Select Primary Branch...</option>
                                   {assignedBranches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
                                 </select>
@@ -2933,7 +2933,7 @@ export default function UserManagementPage() {
                               {!editForm.branchId ? (
                                 <select disabled className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"><option>-- Select a Branch Office First --</option></select>
                               ) : (
-                                <select value={editForm.businessUnitId} onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer">
+                                <select value={editForm.businessUnitId} onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer">
                                   {!isUnitAdmin && <option value="">-- Select a Unit --</option>}
                                   {assignedBusinessUnits.filter((bu) => bu.branchId === editForm.branchId || bu.branch_id === editForm.branchId).map((bu) => (<option key={bu.id} value={bu.id}>{bu.name}</option>))}
                                 </select>
@@ -2961,7 +2961,7 @@ export default function UserManagementPage() {
                                   const isChecked = editForm.roles.includes(r.id) || editForm.roles.includes(r.name);
                                   return (
                                     <label key={r.id || r.name} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors select-none ${isChecked ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs" : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"}`}>
-                                      <input type="checkbox" checked={isChecked} onChange={(e) => { const checked = e.target.checked; let nextRoles = editForm.roles.filter((x) => x !== r.id && x !== r.name); if (checked) nextRoles.push(r.id || r.name); setAddForm({ ...editForm, roles: nextRoles }); }} className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer" />
+                                      <input type="checkbox" checked={isChecked} onChange={(e) => { const checked = e.target.checked; let nextRoles = editForm.roles.filter((x) => x !== r.id && x !== r.name); if (checked) nextRoles.push(r.id || r.name); setEditForm({ ...editForm, roles: nextRoles }); }} className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer" />
                                       <span className="truncate">{r.name}</span>
                                     </label>
                                   );
