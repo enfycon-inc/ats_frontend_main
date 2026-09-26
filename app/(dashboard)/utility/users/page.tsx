@@ -1,6 +1,4 @@
 "use client";
-  const [addModalTab, setAddModalTab] = useState("STAFF");
-  const [editModalTab, setEditModalTab] = useState("STAFF");
 
 import React, { useState, useEffect, useMemo } from "react";
 import { 
@@ -308,6 +306,8 @@ let cachedUsersData: {
 } | null = null;
 
 export default function UserManagementPage() {
+  const [addModalTab, setAddModalTab] = useState("STAFF");
+  const [editModalTab, setEditModalTab] = useState("STAFF");
   const [loading, setLoading] = useState(() => !cachedUsersData);
   const [users, setUsers] = useState<UserItem[]>(() => cachedUsersData?.users || []);
   const [branches, setBranches] = useState<any[]>(() => cachedUsersData?.branches || []);
