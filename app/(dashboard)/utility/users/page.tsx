@@ -2567,14 +2567,7 @@ export default function UserManagementPage() {
 
               {/* ADMINISTRATIVE ACCESS & STAFF ROLES LOGIC */}
               {(() => {
-                const SYSTEM_ROLE_IDS = {
-  SUPER_ADMIN: "f2166291-efe5-402d-a2be-92cfb2e4c9e2",
-  ADMIN: "1c2025cc-4ab3-43b5-a785-9147a9dfe348",
-  BRANCH_ADMIN: "59cef5e8-d4cb-42eb-9be3-7d9ef43f04b7",
-  UNIT_ADMIN: "852f9ad5-3ea7-4c4e-bfcf-a27a22f27f0a"
-};
-
-const getAdminSysKey = (rolesArray: string[]) => {
+                const getAdminSysKey = (rolesArray: string[]) => {
   for (const r of rolesArray) {
     const sr = rolesList.find(rl => rl.id === r);
     if (sr && sr.isSystem) {
