@@ -697,10 +697,10 @@ export default function UserManagementPage() {
       return toast.error(`Seat limit reached! (${userLimit} active licenses). Deactivate an inactive user first or upgrade plan.`);
     }
 
-    const isTenantOrBranchAdminAdd = addForm.roles.some(r => {
-      const sr = rolesList.find(rl => rl.name === r);
-      return sr && (sr.systemRole === 'ADMIN' || sr.systemRole === 'BRANCH_ADMIN');
-    });
+    const addAdminRole = addForm.roles.find(r => rolesList.find(rl => rl.name === r)?.isSystem);
+    const addSysKey = addAdminRole ? rolesList.find(rl => rl.name === addAdminRole)?.systemRole : "NONE";
+    const isTenantOrBranchAdminAdd = addSysKey === 'ADMIN' || addSysKey === 'BRANCH_ADMIN';
+    
     if (!isTenantOrBranchAdminAdd && !addForm.businessUnitId) {
       return toast.error('Branch Unit is mandatory for staffing roles.');
     }
@@ -774,10 +774,10 @@ export default function UserManagementPage() {
       return toast.error("First Name, Last Name, and Work Email are required.");
     }
 
-    const isTenantOrBranchAdminEdit = editForm.roles.some(r => {
-      const sr = rolesList.find(rl => rl.name === r || rl.id === r);
-      return sr && (sr.systemRole === 'ADMIN' || sr.systemRole === 'BRANCH_ADMIN');
-    });
+    const editAdminRole = editForm.roles.find(r => rolesList.find(rl => rl.name === r || rl.id === r)?.isSystem);
+    const editSysKey = editAdminRole ? rolesList.find(rl => rl.name === editAdminRole || rl.id === editAdminRole)?.systemRole : "NONE";
+    const isTenantOrBranchAdminEdit = editSysKey === 'ADMIN' || editSysKey === 'BRANCH_ADMIN';
+    
     if (!isTenantOrBranchAdminEdit && !editForm.businessUnitId) {
       return toast.error('Branch Unit is mandatory for staffing roles.');
     }
@@ -2497,7 +2497,7 @@ export default function UserManagementPage() {
               </div>
 
               {/* WORK EMAIL & PRIMARY BRANCH */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1  gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
                     Work Email Address <span className="text-red-500">*</span>
@@ -2539,166 +2539,208 @@ export default function UserManagementPage() {
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">
-                    Office Branch <span className="text-red-500">*</span>
-                  </label>
-                  {isBranchAdmin ? (
-                    <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                      <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
-                      <span>{assignedBranches.find((b) => b.id === addForm.branchId)?.name || branches.find((b) => b.id === addForm.branchId)?.name || "Assigned Branch"}</span>
+                {/* --- END OF WORK EMAIL GRID --- */}
+              </div>
+
+              {/* ADMINISTRATIVE ACCESS */}
+              {(() => {
+                const addFormAdminRole = (() => {
+                  const admin = addForm.roles.find(r => {
+                    const sr = rolesList.find(rl => rl.name === r);
+                    return sr?.isSystem;
+                  });
+                  if (!admin) return "NONE";
+                  const sysKey = rolesList.find(rl => rl.name === admin)?.systemRole;
+                  if (sysKey === "ADMIN") return "ADMIN";
+                  if (sysKey === "BRANCH_ADMIN") return "BRANCH_ADMIN";
+                  if (sysKey === "UNIT_ADMIN") return "UNIT_ADMIN";
+                  return "NONE";
+                })();
+
+                const handleAddAdminRoleChange = (sysKey: string) => {
+                  let nextRoles = addForm.roles.filter(r => {
+                    const sr = rolesList.find(rl => rl.name === r);
+                    return !sr?.isSystem;
+                  });
+                  if (sysKey !== "NONE") {
+                    const sr = rolesList.find(rl => rl.systemRole === sysKey);
+                    if (sr) nextRoles.push(sr.name);
+                  }
+                  setAddForm(prev => ({
+                    ...prev, 
+                    roles: nextRoles,
+                    branchId: sysKey === "ADMIN" ? "" : prev.branchId,
+                    businessUnitId: (sysKey === "ADMIN" || sysKey === "BRANCH_ADMIN") ? "" : prev.businessUnitId
+                  }));
+                };
+
+                const branchRolesForAdd = (rolesList || []).filter((r) => {
+                  if (r.isSystem) return false;
+                  if (!addForm.businessUnitId) return false;
+                  const rBUId = r.businessUnitId || (r as any).business_unit_id;
+                  if (!rBUId) return false;
+                  return String(rBUId).toLowerCase() === String(addForm.businessUnitId).toLowerCase();
+                });
+
+                return (
+                  <div className="space-y-4 mb-4 pt-3 border-t border-neutral-100 dark:border-slate-800">
+                    <div>
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block mb-2">Administrative Access</label>
+                      <div className="flex flex-wrap gap-4">
+                        {[
+                          { key: "NONE", label: "None" },
+                          { key: "ADMIN", label: "Tenant Admin" },
+                          { key: "BRANCH_ADMIN", label: "Branch Admin" },
+                          { key: "UNIT_ADMIN", label: "Branch Unit Admin" }
+                        ].map((role) => (
+                          <label key={role.key} className="flex items-center gap-1.5 text-xs font-medium cursor-pointer text-neutral-700 dark:text-neutral-300">
+                            <input
+                              type="radio"
+                              name="addForm_adminRole"
+                              value={role.key}
+                              checked={addFormAdminRole === role.key}
+                              onChange={() => handleAddAdminRoleChange(role.key)}
+                              className="accent-indigo-600 cursor-pointer h-3.5 w-3.5"
+                            />
+                            {role.label}
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  ) : (
-                    <select
-                      value={addForm.branchId}
-                      onChange={(e) => {
-                        const newBranchId = e.target.value;
-                        const validRolesForNewBranch = (rolesList || [])
-                          .filter((r) => !r.branchId || r.branchId === newBranchId)
-                          .map((r) => r.name);
-                        setAddForm((prev) => ({
-                          ...prev,
-                          branchId: newBranchId,
-                          businessUnitId: "", // reset unit when branch changes
-                          roles: prev.roles.filter((roleName) => validRolesForNewBranch.includes(roleName)),
-                        }));
-                      }}
-                      className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
-                      required
-                    >
-                      <option value="">Select Primary Branch...</option>
-                      {assignedBranches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              </div>
 
-              {/* Business Unit Selection */}
-              <div className="space-y-1 mb-4">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Unit *</label>
-                {addForm.branchId ? (
-                  <select
-                    value={addForm.businessUnitId}
-                    onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
-                    className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer"
-                  >
-                    {!isUnitAdmin && <option value="">-- No Unit Assigned (Branch Admin) --</option>}
-                    {assignedBusinessUnits
-                      .filter((bu) => bu.branchId === addForm.branchId || bu.branch_id === addForm.branchId)
-                      .map((bu) => (
-                        <option key={bu.id} value={bu.id}>{bu.name}</option>
-                      ))}
-                  </select>
-                ) : (
-                  <select
-                    disabled
-                    className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-                  >
-                    <option>-- Select a Branch Office First --</option>
-                  </select>
-                )}
-              </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
+                      {addFormAdminRole === "ADMIN" ? (
+                        <div className="space-y-1 opacity-50">
+                          <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch</label>
+                          <div className="text-[10px] py-2">Not Applicable (Tenant Scope)</div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">
+                            Office Branch <span className="text-red-500">*</span>
+                          </label>
+                          {isBranchAdmin ? (
+                            <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                              <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
+                              <span>{assignedBranches.find((b) => b.id === addForm.branchId)?.name || branches.find((b) => b.id === addForm.branchId)?.name || "Assigned Branch"}</span>
+                            </div>
+                          ) : (
+                            <select
+                              value={addForm.branchId}
+                              onChange={(e) => {
+                                const newBranchId = e.target.value;
+                                setAddForm((prev) => ({
+                                  ...prev,
+                                  branchId: newBranchId,
+                                  businessUnitId: "",
+                                  roles: prev.roles.filter(r => rolesList.find(rl => rl.name === r)?.isSystem)
+                                }));
+                              }}
+                              className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
+                              required
+                            >
+                              <option value="">Select Primary Branch...</option>
+                              {assignedBranches.map((b) => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      )}
 
-              {/* CUSTOM ROLE SELECTION (STRICTLY ISOLATED PER SELECTED BRANCH) */}
-              <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Shield className="h-3.5 w-3.5 text-indigo-600" />
-                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                      Assigned Role(s) <span className="text-red-500">*</span>
-                    </label>
-                    {addForm.businessUnitId && (
-                      <span className="text-[10.5px] text-neutral-400 font-medium">
-                        ({businessUnits.find((u) => u.id === addForm.businessUnitId)?.name || "Selected Unit"})
-                      </span>
+                      {addFormAdminRole === "ADMIN" || addFormAdminRole === "BRANCH_ADMIN" ? (
+                        <div className="space-y-1 opacity-50">
+                          <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Branch Unit</label>
+                          <div className="text-[10px] py-2">Not Applicable ({addFormAdminRole === "ADMIN" ? "Tenant Scope" : "Branch Scope"})</div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Branch Unit *</label>
+                          {!addForm.branchId ? (
+                            <select disabled className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed">
+                              <option>-- Select a Branch Office First --</option>
+                            </select>
+                          ) : (
+                            <select
+                              value={addForm.businessUnitId}
+                              onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
+                              className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer"
+                            >
+                              {!isUnitAdmin && <option value="">-- Select a Unit --</option>}
+                              {assignedBusinessUnits
+                                .filter((bu) => bu.branchId === addForm.branchId || bu.branch_id === addForm.branchId)
+                                .map((bu) => (
+                                  <option key={bu.id} value={bu.id}>{bu.name}</option>
+                                ))}
+                            </select>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {(addFormAdminRole === "NONE" || addFormAdminRole === "UNIT_ADMIN") && (
+                      <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Shield className="h-3.5 w-3.5 text-indigo-600" />
+                            <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                              Custom / Business Roles
+                            </label>
+                          </div>
+                          {addForm.businessUnitId && (
+                            <a href={`/utility/roles-permissions?branch=${addForm.branchId}`} className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                              + Manage Custom Roles
+                            </a>
+                          )}
+                        </div>
+
+                        {!addForm.branchId || !addForm.businessUnitId ? (
+                           <div className="p-3 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-lg text-xs text-neutral-500 text-center">
+                             Please select a Branch and Unit above to view its custom staffing roles.
+                           </div>
+                        ) : branchRolesForAdd.length === 0 ? (
+                           <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                              <div>
+                                <span className="font-bold block">No custom roles configured for this unit yet.</span>
+                                <span className="text-[10.5px] text-amber-700/80 dark:text-amber-400">Custom roles are isolated per Branch Unit.</span>
+                              </div>
+                              <a href={`/utility/roles-permissions?branch=${addForm.branchId}`} className="font-bold underline text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-800/80 px-2.5 py-1 rounded text-xs shrink-0 self-start sm:self-auto hover:bg-amber-100/50 transition-colors shadow-2xs">
+                                + Create Role for Branch ?
+                              </a>
+                           </div>
+                        ) : (
+                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
+                              {branchRolesForAdd.map((r) => {
+                                 const isChecked = addForm.roles.includes(r.name);
+                                 return (
+                                   <label
+                                     key={r.id || r.name}
+                                     className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors select-none ${
+                                       isChecked ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs" : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"
+                                     }`}
+                                   >
+                                     <input
+                                       type="checkbox"
+                                       checked={isChecked}
+                                       onChange={(e) => {
+                                         const checked = e.target.checked;
+                                         let nextRoles = addForm.roles.filter((x) => x !== r.name);
+                                         if (checked) nextRoles.push(r.name);
+                                         setAddForm({ ...addForm, roles: nextRoles });
+                                       }}
+                                       className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                                     />
+                                     <span className="truncate">{r.name}</span>
+                                   </label>
+                                 );
+                              })}
+                           </div>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <a
-                    href={addForm.branchId ? `/utility/roles-permissions?branch=${addForm.branchId}` : "/utility/roles-permissions"}
-                    className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                  >
-                    + Manage Custom Roles
-                  </a>
-                </div>
-
-                {(() => {
-                  if (!addForm.branchId) {
-                    return (
-                      <div className="p-3 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-lg text-xs text-neutral-500 text-center">
-                        Please select a Primary Office Branch above to view its custom staffing roles.
-                      </div>
-                    );
-                  }
-
-                  const selectedBranch = branches.find((b) => b.id === addForm.branchId);
-                  const branchRolesForAdd = (rolesList || []).filter((r) => {
-                    if (r.isSystem) {
-                      const sysKey = (r.systemRole || '').toUpperCase();
-                      return ['ADMIN', 'BRANCH_ADMIN', 'UNIT_ADMIN'].includes(sysKey);
-                    }
-                    if (!addForm.businessUnitId) return false;
-                    const rBUId = r.businessUnitId || (r as any).business_unit_id;
-                    if (!rBUId) return false;
-                    return String(rBUId).toLowerCase() === String(addForm.businessUnitId).toLowerCase();
-                  });
-
-                  if (branchRolesForAdd.length === 0) {
-                    return (
-                      <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                        <div>
-                          <span className="font-bold block">
-                            No custom roles configured for {selectedBranch?.name || "this branch"} yet.
-                          </span>
-                          <span className="text-[10.5px] text-amber-700/80 dark:text-amber-400">
-                            Custom roles are strictly isolated per branch office.
-                          </span>
-                        </div>
-                        <a
-                          href={`/utility/roles-permissions?branch=${addForm.branchId}`}
-                          className="font-bold underline text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-800/80 px-2.5 py-1 rounded text-xs shrink-0 self-start sm:self-auto hover:bg-amber-100/50 transition-colors shadow-2xs"
-                        >
-                          + Create Role for Branch →
-                        </a>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
-                      {branchRolesForAdd.map((r) => {
-                        const isChecked = addForm.roles.includes(r.name);
-                        return (
-                          <label
-                            key={r.id || r.name}
-                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors select-none ${
-                              isChecked
-                                ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
-                                : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                const checked = e.target.checked;
-                                let nextRoles = addForm.roles.filter((x) => x !== r.name);
-                                if (checked) nextRoles.push(r.name);
-                                setAddForm({ ...addForm, roles: nextRoles });
-                              }}
-                              className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
-                            />
-                            <span className="truncate">{r.name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </div>
+                );
+              })()}
 
               {/* PASSWORD + CONFIRM PASSWORD GRID */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -2823,156 +2865,208 @@ export default function UserManagementPage() {
               </div>
 
               {/* OFFICE BRANCH SELECTION */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-neutral-100 dark:border-slate-800">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                    Office Branch *
-                  </label>
-                  {isBranchAdmin ? (
-                    <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                      <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
-                      <span>{branches.find((b) => b.id === editForm.branchId)?.name || "Assigned Branch"}</span>
-                    </div>
-                  ) : (
-                    <select
-                      value={editForm.branchId}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, branchId: e.target.value, businessUnitId: "" }))}
-                      className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
-                      required
-                    >
-                      <option value="">Select Office Branch...</option>
-                      {assignedBranches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+              {/* ADMINISTRATIVE ACCESS */}
+              {(() => {
+                const editFormAdminRole = (() => {
+                  const admin = editForm.roles.find(r => {
+                    const sr = rolesList.find(rl => rl.name === r || rl.id === r);
+                    return sr?.isSystem;
+                  });
+                  if (!admin) return "NONE";
+                  const sysKey = rolesList.find(rl => rl.name === admin || rl.id === admin)?.systemRole;
+                  if (sysKey === "ADMIN") return "ADMIN";
+                  if (sysKey === "BRANCH_ADMIN") return "BRANCH_ADMIN";
+                  if (sysKey === "UNIT_ADMIN") return "UNIT_ADMIN";
+                  return "NONE";
+                })();
 
-                {/* Business Unit Selection */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Unit *</label>
-                  {editForm.branchId ? (
-                    <select
-                      value={editForm.businessUnitId}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
-                      className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer"
-                    >
-                      {!isUnitAdmin && <option value="">-- No Unit Assigned (Branch Admin) --</option>}
-                      {assignedBusinessUnits
-                        .filter((bu) => bu.branchId === editForm.branchId || bu.branch_id === editForm.branchId)
-                        .map((bu) => (
-                          <option key={bu.id} value={bu.id}>{bu.name}</option>
+                const handleEditAdminRoleChange = (sysKey: string) => {
+                  let nextRoles = editForm.roles.filter(r => {
+                    const sr = rolesList.find(rl => rl.name === r || rl.id === r);
+                    return !sr?.isSystem;
+                  });
+                  if (sysKey !== "NONE") {
+                    const sr = rolesList.find(rl => rl.systemRole === sysKey);
+                    if (sr) nextRoles.push(sr.id || sr.name);
+                  }
+                  setEditForm(prev => ({
+                    ...prev, 
+                    roles: nextRoles,
+                    branchId: sysKey === "ADMIN" ? "" : prev.branchId,
+                    businessUnitId: (sysKey === "ADMIN" || sysKey === "BRANCH_ADMIN") ? "" : prev.businessUnitId
+                  }));
+                };
+
+                const branchRolesForEdit = (rolesList || []).filter((r) => {
+                  if (r.isSystem) return false;
+                  if (!editForm.businessUnitId) return false;
+                  const rBUId = r.businessUnitId || (r as any).business_unit_id;
+                  if (!rBUId) return false;
+                  return String(rBUId).toLowerCase() === String(editForm.businessUnitId).toLowerCase();
+                });
+
+                return (
+                  <div className="space-y-4 mb-4 pt-4 border-t border-neutral-100 dark:border-slate-800">
+                    <div>
+                      <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block mb-2">Administrative Access</label>
+                      <div className="flex flex-wrap gap-4">
+                        {[
+                          { key: "NONE", label: "None" },
+                          { key: "ADMIN", label: "Tenant Admin" },
+                          { key: "BRANCH_ADMIN", label: "Branch Admin" },
+                          { key: "UNIT_ADMIN", label: "Branch Unit Admin" }
+                        ].map((role) => (
+                          <label key={role.key} className="flex items-center gap-1.5 text-xs font-medium cursor-pointer text-neutral-700 dark:text-neutral-300">
+                            <input
+                              type="radio"
+                              name="editForm_adminRole"
+                              value={role.key}
+                              checked={editFormAdminRole === role.key}
+                              onChange={() => handleEditAdminRoleChange(role.key)}
+                              className="accent-indigo-600 cursor-pointer h-3.5 w-3.5"
+                            />
+                            {role.label}
+                          </label>
                         ))}
-                    </select>
-                  ) : (
-                    <select
-                      disabled
-                      className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-                    >
-                      <option>-- Select a Branch Office First --</option>
-                    </select>
-                  )}
-                </div>
-              </div>
+                      </div>
+                    </div>
 
-              {/* CUSTOM ROLE SELECTION (STRICTLY ISOLATED PER SELECTED BRANCH) */}
-              <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Shield className="h-3.5 w-3.5 text-indigo-600" />
-                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                      Assigned Role(s) <span className="text-red-500">*</span>
-                    </label>
-                    {editForm.businessUnitId && (
-                      <span className="text-[10.5px] text-neutral-400 font-medium">
-                        ({businessUnits.find((u) => u.id === editForm.businessUnitId)?.name || "Selected Unit"})
-                      </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
+                      {editFormAdminRole === "ADMIN" ? (
+                        <div className="space-y-1 opacity-50">
+                          <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch</label>
+                          <div className="text-[10px] py-2">Not Applicable (Tenant Scope)</div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">
+                            Office Branch *
+                          </label>
+                          {isBranchAdmin ? (
+                            <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                              <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
+                              <span>{branches.find((b) => b.id === editForm.branchId)?.name || "Assigned Branch"}</span>
+                            </div>
+                          ) : (
+                            <select
+                              value={editForm.branchId}
+                              onChange={(e) => {
+                                const newBranchId = e.target.value;
+                                setEditForm((prev) => ({
+                                  ...prev,
+                                  branchId: newBranchId,
+                                  businessUnitId: "",
+                                  roles: prev.roles.filter(r => {
+                                    const sr = rolesList.find(rl => rl.name === r || rl.id === r);
+                                    return sr?.isSystem;
+                                  })
+                                }));
+                              }}
+                              className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
+                              required
+                            >
+                              <option value="">Select Primary Branch...</option>
+                              {branches.map((b) => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      )}
+
+                      {editFormAdminRole === "ADMIN" || editFormAdminRole === "BRANCH_ADMIN" ? (
+                        <div className="space-y-1 opacity-50">
+                          <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Branch Unit</label>
+                          <div className="text-[10px] py-2">Not Applicable ({editFormAdminRole === "ADMIN" ? "Tenant Scope" : "Branch Scope"})</div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Branch Unit *</label>
+                          {!editForm.branchId ? (
+                            <select disabled className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed">
+                              <option>-- Select a Branch Office First --</option>
+                            </select>
+                          ) : (
+                            <select
+                              value={editForm.businessUnitId}
+                              onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
+                              className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer"
+                            >
+                              {!isUnitAdmin && <option value="">-- Select a Unit --</option>}
+                              {assignedBusinessUnits
+                                .filter((bu) => bu.branchId === editForm.branchId || bu.branch_id === editForm.branchId)
+                                .map((bu) => (
+                                  <option key={bu.id} value={bu.id}>{bu.name}</option>
+                                ))}
+                            </select>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {(editFormAdminRole === "NONE" || editFormAdminRole === "UNIT_ADMIN") && (
+                      <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Shield className="h-3.5 w-3.5 text-indigo-600" />
+                            <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                              Custom / Business Roles
+                            </label>
+                          </div>
+                          {editForm.businessUnitId && (
+                            <a href={`/utility/roles-permissions?branch=${editForm.branchId}`} className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                              + Manage Custom Roles
+                            </a>
+                          )}
+                        </div>
+
+                        {!editForm.branchId || !editForm.businessUnitId ? (
+                           <div className="p-3 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-lg text-xs text-neutral-500 text-center">
+                             Please select a Branch and Unit above to view its custom staffing roles.
+                           </div>
+                        ) : branchRolesForEdit.length === 0 ? (
+                           <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                              <div>
+                                <span className="font-bold block">No custom roles configured for this unit yet.</span>
+                                <span className="text-[10.5px] text-amber-700/80 dark:text-amber-400">Custom roles are isolated per Branch Unit.</span>
+                              </div>
+                              <a href={`/utility/roles-permissions?branch=${editForm.branchId}`} className="font-bold underline text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-800/80 px-2.5 py-1 rounded text-xs shrink-0 self-start sm:self-auto hover:bg-amber-100/50 transition-colors shadow-2xs">
+                                + Create Role for Branch ?
+                              </a>
+                           </div>
+                        ) : (
+                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
+                              {branchRolesForEdit.map((r) => {
+                                 const isChecked = editForm.roles.includes(r.id) || editForm.roles.includes(r.name);
+                                 return (
+                                   <label
+                                     key={r.id || r.name}
+                                     className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors select-none ${
+                                       isChecked ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs" : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"
+                                     }`}
+                                   >
+                                     <input
+                                       type="checkbox"
+                                       checked={isChecked}
+                                       onChange={(e) => {
+                                         const checked = e.target.checked;
+                                         let nextRoles = editForm.roles.filter((x) => x !== r.id && x !== r.name);
+                                         if (checked) nextRoles.push(r.id || r.name);
+                                         setEditForm({ ...editForm, roles: nextRoles });
+                                       }}
+                                       className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
+                                     />
+                                     <span className="truncate">{r.name}</span>
+                                   </label>
+                                 );
+                              })}
+                           </div>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <a
-                    href={editForm.branchId ? `/utility/roles-permissions?branch=${editForm.branchId}` : "/utility/roles-permissions"}
-                    className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                  >
-                    + Manage Custom Roles
-                  </a>
-                </div>
-
-                {(() => {
-                  if (!editForm.branchId) {
-                    return (
-                      <div className="p-3 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-lg text-xs text-neutral-500 text-center">
-                        Please select an Office Branch above to view its custom staffing roles.
-                      </div>
-                    );
-                  }
-
-                  const selectedBranch = branches.find((b) => b.id === editForm.branchId);
-                  const branchRolesForEdit = (rolesList || []).filter((r) => {
-                    if (r.isSystem) {
-                      const sysKey = (r.systemRole || '').toUpperCase();
-                      return ['ADMIN', 'BRANCH_ADMIN', 'UNIT_ADMIN'].includes(sysKey);
-                    }
-                    if (!editForm.businessUnitId) return false;
-                    const rBUId = r.businessUnitId || (r as any).business_unit_id;
-                    if (!rBUId) return false;
-                    return String(rBUId).toLowerCase() === String(editForm.businessUnitId).toLowerCase();
-                  });
-
-                  if (branchRolesForEdit.length === 0) {
-                    return (
-                      <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                        <div>
-                          <span className="font-bold block">
-                            No custom roles configured for {selectedBranch?.name || "this branch"} yet.
-                          </span>
-                          <span className="text-[10.5px] text-amber-700/80 dark:text-amber-400">
-                            Custom roles are strictly isolated per branch office.
-                          </span>
-                        </div>
-                        <a
-                          href={`/utility/roles-permissions?branch=${editForm.branchId}`}
-                          className="font-bold underline text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-800/80 px-2.5 py-1 rounded text-xs shrink-0 self-start sm:self-auto hover:bg-amber-100/50 transition-colors shadow-2xs"
-                        >
-                          + Create Role for Branch →
-                        </a>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-200 dark:border-slate-800">
-                      {branchRolesForEdit.map((r) => {
-                        const isChecked = editForm.roles.some((x) => x.toLowerCase() === r.id.toLowerCase() || x.toLowerCase() === r.name.toLowerCase());
-                        return (
-                          <label
-                            key={r.id || r.name}
-                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors select-none ${
-                              isChecked
-                                ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
-                                : "bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                const checked = e.target.checked;
-                                let nextRoles = editForm.roles.filter((x) => x.toLowerCase() !== r.id.toLowerCase() && x.toLowerCase() !== r.name.toLowerCase());
-                                if (checked) nextRoles.push(r.name);
-                                setEditForm({ ...editForm, roles: nextRoles });
-                              }}
-                              className="h-3.5 w-3.5 accent-indigo-600 rounded cursor-pointer"
-                            />
-                            <span className="truncate">{r.name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </div>
+                );
+              })()}
 
               {/* DESIGNATED MANAGER */}
               <div className="space-y-2 pt-3 border-t border-neutral-100 dark:border-slate-800">
