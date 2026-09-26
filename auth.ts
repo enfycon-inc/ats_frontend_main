@@ -220,6 +220,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const requestHeaders = await headers();
           const subdomain = getTenantIdentifier(requestHeaders.get('host') || '');
           if (provider === 'keycloak' && !account.access_token) {
+            console.error("SSO MISSING ACCESS TOKEN:", { account, user });
             return `/auth/login?error=AccessDenied`;
           }
           const res = await fetchBackend(`/api/auth/sso-login`, {
