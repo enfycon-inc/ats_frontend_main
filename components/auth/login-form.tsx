@@ -30,10 +30,15 @@ const LoginForm = () => {
   const formRef = useRef<HTMLFormElement>(null);
 
   const [isAuthorizingSso, setIsAuthorizingSso] = useState(false);
+  const [authPolicyStatus, setAuthPolicyStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [authPolicyRetry, setAuthPolicyRetry] = useState(0);
   const [authPolicy, setAuthPolicy] = useState<{
     allowPasswordLogin: boolean;
     allowMicrosoftSso: boolean;
     allowGoogleSso: boolean;
+    microsoftTenantId?: string;
+    microsoftClientId?: string;
+    tenantId?: string;
     enforceSsoOnly: boolean;
   }>({
     allowPasswordLogin: true,
@@ -61,17 +66,27 @@ const LoginForm = () => {
   });
 
   React.useEffect(() => {
+    let active = true;
+    setAuthPolicyStatus("loading");
     atsApi.auth.getTenantAuthPolicy().then((policy) => {
-      if (policy) {
-        setAuthPolicy({
-          allowPasswordLogin: policy.allowPasswordLogin ?? true,
-          allowMicrosoftSso: policy.allowMicrosoftSso ?? true,
+      if (!active) return;
+      const tenantId = typeof policy?.tenantId === "string" ? policy.tenantId.trim() : "";
+      if (!tenantId) throw new Error("Workspace sign-in policy is incomplete.");
+      setAuthPolicy({
+        allowPasswordLogin: policy.allowPasswordLogin ?? true,
+          allowMicrosoftSso: policy.allowMicrosoftSso === true,
           allowGoogleSso: policy.allowGoogleSso ?? true,
+          microsoftTenantId: typeof policy.microsoftTenantId === "string" ? policy.microsoftTenantId.trim() : "",
+          microsoftClientId: typeof policy.microsoftClientId === "string" ? policy.microsoftClientId.trim() : "",
           enforceSsoOnly: policy.enforceSsoOnly ?? false,
-        });
-      }
-    }).catch(() => {});
-  }, []);
+        tenantId,
+      });
+      setAuthPolicyStatus("ready");
+    }).catch(() => {
+      if (active) setAuthPolicyStatus("error");
+    });
+    return () => { active = false; };
+  }, [authPolicyRetry]);
 
   React.useEffect(() => {
     const isExpired = searchParams.get("expired");
@@ -310,7 +325,36 @@ const LoginForm = () => {
   const showPassword = !authPolicy.enforceSsoOnly && authPolicy.allowPasswordLogin;
   const showGoogle = authPolicy.allowGoogleSso;
   const showMicrosoft = authPolicy.allowMicrosoftSso;
+  const microsoftTenantConfigured = !!authPolicy.microsoftTenantId &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(authPolicy.microsoftTenantId);
+  const microsoftConfigured = microsoftTenantConfigured && !!authPolicy.microsoftClientId;
   const hasSocial = showGoogle || showMicrosoft;
+  const socialLogin = (
+    <div className="space-y-2">
+      <Social
+        showGoogle={showGoogle}
+        showMicrosoft={showMicrosoft}
+        tenantId={authPolicy.tenantId}
+        microsoftReady={authPolicyStatus === "ready" && showMicrosoft && microsoftConfigured}
+      />
+      {authPolicyStatus === "loading" && (
+        <p role="status" className="text-xs text-slate-500">Checking workspace sign-in options...</p>
+      )}
+      {authPolicyStatus === "error" && (
+        <p role="alert" className="text-xs text-red-600">
+          Unable to load workspace sign-in options.{' '}
+          <button type="button" onClick={() => setAuthPolicyRetry(attempt => attempt + 1)} className="font-semibold underline cursor-pointer">
+            Retry
+          </button>
+        </p>
+      )}
+      {authPolicyStatus === "ready" && showMicrosoft && !microsoftConfigured && (
+        <p role="alert" className="text-xs text-amber-700">
+          Microsoft sign-in is not configured. An administrator must enter the Microsoft Entra Directory (Tenant) ID in workspace settings.
+        </p>
+      )}
+    </div>
+  );
 
   if (!showPassword && hasSocial) {
     return (
@@ -328,7 +372,7 @@ const LoginForm = () => {
         </div>
 
         <div className="pt-2">
-          <Social showGoogle={showGoogle} showMicrosoft={showMicrosoft} />
+          {socialLogin}
         </div>
       </div>
     );
@@ -448,7 +492,7 @@ const LoginForm = () => {
               Or Sign In With
             </span>
           </div>
-          <Social showGoogle={showGoogle} showMicrosoft={showMicrosoft} />
+          {socialLogin}
         </div>
       )}
 

@@ -213,11 +213,16 @@ async function apiFetch<T = any>(
   options: RequestInit = {},
   isRetry = false,
 ): Promise<T> {
-  let token = getToken();
-  if (!token && typeof window !== 'undefined' && !path.includes('/api/auth/login') && !path.includes('/api/auth/register')) {
+  const isPublicAuthPolicy = path.split('?')[0] === '/api/auth/tenant-auth-policy' &&
+    (options.method || 'GET').toUpperCase() === 'GET';
+  let token = isPublicAuthPolicy ? null : getToken();
+  if (!isPublicAuthPolicy && !token && typeof window !== 'undefined' && !path.includes('/api/auth/login') && !path.includes('/api/auth/register')) {
     token = await getOrFetchToken();
   }
   const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
+  const tenantDomain = typeof window !== 'undefined' ? (window.location.hostname === 'localhost' ? '' : window.location.hostname.split('.')[0]) : null;
+  const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null;
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
@@ -228,6 +233,12 @@ async function apiFetch<T = any>(
   }
   if (activeBranchId) {
     headers['x-branch-id'] = activeBranchId;
+  }
+  if (tenantDomain && tenantDomain !== 'www' && tenantDomain !== 'api') {
+    headers['x-tenant-domain'] = tenantDomain;
+  }
+  if (tenantId) {
+    headers['x-tenant-id'] = tenantId;
   }
 
   let res: Response;
@@ -251,7 +262,7 @@ async function apiFetch<T = any>(
     const isExpired = res.status === 401 || (body.message && body.message.toLowerCase().includes('expired'));
 
     // Attempt automatic token refresh / session recovery if token expired and retry once
-    if (isExpired && !isRetry) {
+    if (isExpired && !isRetry && !isPublicAuthPolicy) {
       if (getRefreshToken()) {
         if (!isRefreshing) {
           isRefreshing = true;
@@ -283,7 +294,7 @@ async function apiFetch<T = any>(
     }
 
     // If request failed with 401 Unauthorized after all refresh attempts:
-    if (res.status === 401 && typeof window !== 'undefined' && !path.includes('/api/auth/login') && !path.includes('/api/auth/session')) {
+    if (res.status === 401 && !isPublicAuthPolicy && typeof window !== 'undefined' && !path.includes('/api/auth/login') && !path.includes('/api/auth/session')) {
       clearToken();
       if (!window.location.pathname.startsWith('/auth/')) {
         window.location.href = '/auth/login?expired=true';
@@ -365,7 +376,7 @@ const auth = {
     return apiFetch<any[]>('/api/auth/approvals/pending');
   },
 
-  async approveUser(
+  async approveTenantRegistration(
     userId: string,
     market: string,
     subdomain?: string,
@@ -375,6 +386,25 @@ const auth = {
     return apiFetch<any>(`/api/auth/approvals/approve/${userId}`, {
       method: 'POST',
       body: JSON.stringify({ market, subdomain, userLimit, maxBranches }),
+    });
+  },
+
+  async approveUser(
+    userId: string,
+    dataOrMarket?: string | { roleId?: string; roleIds?: string[]; branchId?: string; businessUnitId?: string; roles?: string[] },
+    subdomain?: string,
+    userLimit?: number,
+    maxBranches?: number,
+  ): Promise<any> {
+    if (typeof dataOrMarket === 'string') {
+      return apiFetch<any>(`/api/auth/approvals/approve/${userId}`, {
+        method: 'POST',
+        body: JSON.stringify({ market: dataOrMarket, subdomain, userLimit, maxBranches }),
+      });
+    }
+    return apiFetch<any>(`/api/auth/users/${userId}/approve`, {
+      method: 'PATCH',
+      body: JSON.stringify(dataOrMarket || {}),
     });
   },
 
@@ -487,6 +517,20 @@ const auth = {
     return apiFetch<any>('/api/auth/users/bulk-reviewer', {
       method: 'POST',
       body: JSON.stringify({ userIds, reviewerId: reviewerId || null }),
+    });
+  },
+
+  async requestRole(role: string, branchId?: string, businessUnitId?: string): Promise<any> {
+    return apiFetch<any>('/api/auth/request-role', {
+      method: 'POST',
+      body: JSON.stringify({ role, branchId, businessUnitId }),
+    });
+  },
+
+
+  async rejectUser(userId: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/users/${userId}/reject`, {
+      method: 'PATCH',
     });
   },
 
@@ -939,9 +983,10 @@ const jobs = {
     return apiFetch<JobMatchesResponse>(`/api/jobs/${id}/matches${suffix}`);
   },
 
-  async getNextCode(opts?: { branchId?: string; shift?: string }): Promise<{ code: string }> {
+  async getNextCode(opts?: { branchId?: string; businessUnitId?: string; shift?: string }): Promise<{ code: string }> {
     const params = new URLSearchParams();
     if (opts?.branchId) params.append('branchId', opts.branchId);
+    if (opts?.businessUnitId) params.append('businessUnitId', opts.businessUnitId);
     if (opts?.shift) params.append('shift', opts.shift);
     const qs = params.toString() ? `?${params.toString()}` : '';
     return apiFetch<{ code: string }>(`/api/jobs/next-code${qs}`);

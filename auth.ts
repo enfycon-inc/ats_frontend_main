@@ -2,9 +2,11 @@ import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import GitHub from "next-auth/providers/github"
 import Google from "next-auth/providers/google"
-import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id"
+import Keycloak from "next-auth/providers/keycloak"
 import { ZodError } from "zod"
 import { loginSchema } from "./lib/zod"
+import { headers } from "next/headers"
+import { getTenantIdentifier } from "./utils/subdomain-helper"
 
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || "d3b07384-d113-49c3-a555-9ee75c13ca33";
 const isProd = process.env.NODE_ENV === "production";
@@ -84,6 +86,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   branchName: u.branchName || u.branch_name || null,
                   tenantId: u.tenantId || u.tenant_id || DEFAULT_TENANT_ID,
                   defaultMarket: u.defaultMarket || u.default_market || "US",
+                  isApproved: u.isApproved !== undefined ? u.isApproved : (u.is_approved !== undefined ? u.is_approved : true),
+                  requestedRole: u.requestedRole || u.requested_role || null,
                 };
               }
             } catch {}
@@ -191,10 +195,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         },
       },
     }),
-    MicrosoftEntraID({
-      clientId: process.env.MICROSOFT_CLIENT_ID,
-      clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
-      issuer: "https://login.microsoftonline.com/common/v2.0",
+    Keycloak({
+      clientId: process.env.KEYCLOAK_CLIENT_ID!,
+      clientSecret: process.env.KEYCLOAK_CLIENT_SECRET!,
+      issuer: process.env.KEYCLOAK_ISSUER!,
     }),
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID,
@@ -210,14 +214,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      if (account?.provider === "google" || account?.provider === "microsoft-entra-id" || account?.provider === "microsoft") {
+      if (account?.provider === "google" || account?.provider === "keycloak") {
         try {
-          const provider = account.provider.includes("microsoft") ? "microsoft" : "google";
+          const provider = account.provider === "keycloak" ? "keycloak" : "google";
+          const requestHeaders = await headers();
+          const subdomain = getTenantIdentifier(requestHeaders.get('host') || '');
+          if (provider === 'keycloak' && !account.access_token) {
+            return `/auth/login?error=AccessDenied`;
+          }
           const res = await fetchBackend(`/api/auth/sso-login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               provider,
+              subdomain,
+              ...(provider === 'keycloak' ? { accessToken: account.access_token } : {}),
               email: user.email,
               name: user.name,
               picture: user.image,
@@ -234,6 +245,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               (user as any).permissions = data.user.permissions || [];
               (user as any).roles = data.user.roles || [];
               (user as any).accessToken = data.accessToken;
+              (user as any).refreshToken = account.provider === 'keycloak' ? account.refresh_token : data.refreshToken;
+              (user as any).expiresIn = data.expiresIn;
               (user as any).tenantDomain = data.user.tenantDomain || "";
               (user as any).systemRole = data.user.systemRole || "";
               (user as any).podId = data.user.podId || null;
@@ -241,6 +254,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               (user as any).branchName = data.user.branchName || null;
               (user as any).tenantId = data.user.tenantId || DEFAULT_TENANT_ID;
               (user as any).defaultMarket = data.user.defaultMarket || "US";
+              (user as any).isApproved = data.user.isApproved !== undefined ? data.user.isApproved : (data.user.is_approved !== undefined ? data.user.is_approved : true);
+              (user as any).requestedRole = data.user.requestedRole || data.user.requested_role || null;
               return true;
             }
           }
@@ -272,6 +287,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.branchName = (user as any).branchName
         token.tenantId = (user as any).tenantId
         token.defaultMarket = (user as any).defaultMarket
+        token.isApproved = (user as any).isApproved !== undefined ? (user as any).isApproved : true
+        token.requestedRole = (user as any).requestedRole || null
         delete token.error
         return token
       }
@@ -332,6 +349,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as any).branchName = token.branchName;
         (session.user as any).tenantId = token.tenantId;
         (session.user as any).defaultMarket = token.defaultMarket;
+        (session.user as any).isApproved = token.isApproved !== undefined ? token.isApproved : true;
+        (session.user as any).requestedRole = token.requestedRole || null;
         // Forward refresh error so client can detect and redirect to login
         (session as any).error = token.error || null;
       }

@@ -15,6 +15,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopNavbar } from "@/components/layout/top-navbar";
 import { SitePageHeader } from "@/components/layout/site-page-header";
+import PendingApprovalView from "@/components/auth/pending-approval-view";
 import { SocketProvider } from "@/contexts/SocketContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -99,6 +100,21 @@ export function ClientRoot({
     }
   }, []);
 
+
+  const isApproved = useMemo(() => {
+    if (initialNavigation?.profile?.isApproved !== undefined) {
+      return initialNavigation.profile.isApproved !== false;
+    }
+    if (session && (session as any).user) {
+      return (session as any).user.isApproved !== false;
+    }
+    return true;
+  }, [initialNavigation, session]);
+
+  const requestedRole = useMemo(() => {
+    return initialNavigation?.profile?.requestedRole || (session?.user as any)?.requestedRole || null;
+  }, [initialNavigation, session]);
+
   const isSuperAdmin = useMemo(() => {
     if (overrideRole === "SUPER_ADMIN") return true;
     if (overrideRole && overrideRole !== "SUPER_ADMIN") return false;
@@ -134,6 +150,30 @@ export function ClientRoot({
       )}
     </>
   );
+
+
+  if (!isApproved) {
+    return (
+      <TenantBrandingProvider initialBranding={initialNavigation?.profile?.tenant}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <div className="min-h-screen bg-neutral-50 dark:bg-[#121820] flex flex-col justify-center items-center">
+            <PendingApprovalView
+              initialRequestedRole={requestedRole}
+              userEmail={(session as any)?.user?.email || initialNavigation?.profile?.email}
+              userName={(session as any)?.user?.name || initialNavigation?.profile?.fullName}
+              tenantName={initialNavigation?.profile?.tenant?.name}
+            />
+            <Toaster position="top-center" reverseOrder={false} />
+          </div>
+        </ThemeProvider>
+      </TenantBrandingProvider>
+    );
+  }
 
   return (
     <TenantBrandingProvider initialBranding={initialNavigation?.profile?.tenant}>

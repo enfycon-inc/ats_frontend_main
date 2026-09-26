@@ -53,7 +53,7 @@ import toast from "react-hot-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { AddClientModal } from "../components/add-client-modal";
-import { resolveActiveSystemRole } from "@/lib/role-permissions";
+import { resolveActiveSystemRole, isRoleAdmin } from "@/lib/role-permissions";
 
 import { Country, State, City } from "country-state-city";
 import ReactCountryFlag from "react-country-flag";
@@ -428,6 +428,7 @@ const getInitialActiveBranchContext = () => {
     try {
       const res = await atsApi.jobs.getNextCode({
         branchId: unit.branchId || undefined,
+        businessUnitId: unit.id || undefined,
         shift: isUs ? "NIGHT" : "DAY",
       });
       if (res && res.code) {
@@ -630,7 +631,7 @@ const getInitialActiveBranchContext = () => {
     mode: "onSubmit",
     resolver: zodResolver(formSchema),
     defaultValues: {
-      businessUnit: initialBranchContext.branchName || "enfycon Inc",
+      businessUnit: "",
       jobCode: "",
       clientBillRate: initialBranchContext.isUs ? "80" : "8.33% Placement Commission",
       country: initialBranchContext.isUs ? "United States" : "India",
@@ -743,47 +744,58 @@ const getInitialActiveBranchContext = () => {
           
           const displayBusinessUnit = activeBranchName || tName;
           setTenantName(displayBusinessUnit);
-          setValue("businessUnit", displayBusinessUnit);
 
-          // Fetch branches, pods, users, and roles list
+          // Fetch branches and units immediately
           let branchesList: any[] = [];
-          let fetchedPods: any[] = [];
-          let fetchedUsers: any[] = [];
-          let fetchedRoles: any[] = [];
+          let matchedUnit = null;
           try {
-            const [bList, pList, uList, rList, unitsList] = await Promise.all([
+            const [bList, unitsList] = await Promise.all([
               atsApi.branches.list().catch(() => []),
-              atsApi.pods.list().catch(() => []),
-              atsApi.auth.listUsers().catch(() => []),
-              atsApi.auth.listRoles(undefined, true).catch(() => []),
               atsApi.businessUnits.list().catch(() => []),
             ]);
             branchesList = bList || [];
-            fetchedPods = pList || [];
-            fetchedUsers = uList || [];
-            fetchedRoles = rList || [];
+            
+            let finalUnits = unitsList || [];
+            const isAdmin = prof ? isRoleAdmin(resolveActiveSystemRole(prof.roles)) : false;
+            
+            if (!isAdmin) {
+              if (prof?.businessUnitId) {
+                finalUnits = finalUnits.filter((u: any) => u.id === prof.businessUnitId);
+              } else if (activeBranchId) {
+                finalUnits = finalUnits.filter((u: any) => u.branchId === activeBranchId);
+              }
+            }
+            
             setAvailableBranches(branchesList);
-            setAvailableUnits(unitsList || []);
-            setPodsList(fetchedPods);
-            setBranchUsers(fetchedUsers);
-            setRolesList(fetchedRoles);
+            setAvailableUnits(finalUnits);
 
-            let matchedUnit = null;
             if (activeBranchId) {
-              matchedUnit = (unitsList || []).find((u: any) => u.branchId === activeBranchId);
+              matchedUnit = (finalUnits || []).find((u: any) => u.branchId === activeBranchId);
             }
             if (!matchedUnit && prof?.businessUnitId) {
-              matchedUnit = (unitsList || []).find((u: any) => u.id === prof.businessUnitId);
+              matchedUnit = (finalUnits || []).find((u: any) => u.id === prof.businessUnitId);
             }
-            if (!matchedUnit && unitsList && unitsList.length > 0) {
-              matchedUnit = unitsList[0];
+            if (!matchedUnit && finalUnits && finalUnits.length > 0) {
+              matchedUnit = finalUnits[0];
             }
             if (matchedUnit) {
               setSelectedUnitId(matchedUnit.id);
               setValue("businessUnit", matchedUnit.name);
             }
+
+            // Load heavier data in background without blocking job code generation
+            Promise.all([
+              atsApi.pods.list().catch(() => []),
+              atsApi.auth.listUsers().catch(() => []),
+              atsApi.auth.listRoles(undefined, true).catch(() => [])
+            ]).then(([pList, uList, rList]) => {
+              setPodsList(pList || []);
+              setBranchUsers(uList || []);
+              setRolesList(rList || []);
+            });
+            
           } catch (e) {
-            console.warn("Failed to load branches/pods/users/roles:", e);
+            console.warn("Failed to load units:", e);
           }
 
           let activeBranchObj = null;
@@ -830,6 +842,7 @@ const getInitialActiveBranchContext = () => {
           try {
             const res = await atsApi.jobs.getNextCode({ 
               branchId: activeBranchId || undefined,
+              businessUnitId: matchedUnit?.id || undefined,
               shift: isUsBranch ? 'NIGHT' : 'DAY'
             });
             if (res && res.code) {
@@ -1942,20 +1955,24 @@ const getInitialActiveBranchContext = () => {
                     {/* Branch Unit / Division */}
                     <div className="space-y-1">
                       <Label className="font-bold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
-                        <span>Branch Unit <span className="text-red-500">*</span></span>
+                        <span>Business Unit <span className="text-red-500">*</span></span>
                         {selectedUnitObj && (
                           <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
                             {selectedUnitObj.market || market} • {selectedUnitObj.shiftTiming || 'General Shift'}
                           </span>
                         )}
                       </Label>
-                      {availableUnits.length > 0 ? (
+                      {availableUnits.length === 1 ? (
+                        <div className="w-full h-8 text-xs bg-slate-50 dark:bg-slate-800/50 border border-neutral-300 dark:border-slate-700 rounded px-2 font-semibold text-neutral-800 dark:text-neutral-200 flex items-center select-none opacity-80 cursor-not-allowed">
+                          {availableUnits[0].name}
+                        </div>
+                      ) : availableUnits.length > 0 ? (
                         <select
                           value={selectedUnitId}
                           onChange={(e) => handleUnitChange(e.target.value)}
                           className="w-full h-8 text-xs bg-white dark:bg-slate-800 border border-neutral-300 dark:border-slate-700 rounded px-2 font-semibold text-neutral-800 dark:text-neutral-200 outline-none focus:border-primary transition-colors cursor-pointer"
                         >
-                          <option value="">-- Select Branch Unit --</option>
+                          <option value="">-- Select Business Unit --</option>
                           {availableBranches.length > 0 ? (
                             availableBranches.map((b) => {
                               const unitsInBranch = availableUnits.filter((u) => u.branchId === b.id);

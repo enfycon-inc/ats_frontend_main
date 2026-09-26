@@ -1586,13 +1586,28 @@ function BranchSwitcher() {
   const isTenantAdmin = systemRole === "ADMIN" || systemRole === "SUPER_ADMIN" || systemRole === "TENANT_ADMIN" || perms.includes("tenant:settings") || perms.includes("tenant:manage");
 
   useEffect(() => {
-    if (isTenantAdmin && typeof window !== "undefined") {
+    if (typeof window !== "undefined") {
       const currentId = localStorage.getItem("active_branch_id");
-      if (currentId !== "all") {
-        localStorage.setItem("active_branch_id", "all");
-        localStorage.setItem("active_branch_name", "All Branches");
-        window.dispatchEvent(new Event("branchChanged"));
-        setTimeout(() => window.location.reload(), 50);
+      
+      if (isTenantAdmin) {
+        if (currentId !== "all") {
+          localStorage.setItem("active_branch_id", "all");
+          localStorage.setItem("active_branch_name", "All Branches");
+          window.dispatchEvent(new Event("branchChanged"));
+          setTimeout(() => window.location.reload(), 50);
+        }
+      } else {
+        // Enforce assigned branch for non-admins to prevent them from being stuck on 'all'
+        if (currentId === "all" || !currentId) {
+          const user = atsApi.auth.getCurrentUser();
+          if (user?.branchId) {
+            localStorage.setItem("active_branch_id", user.branchId);
+            localStorage.setItem("active_branch_name", user.branchName || "Assigned Office");
+            setActiveBranch(user.branchName || "Assigned Office");
+            window.dispatchEvent(new Event("branchChanged"));
+            // setTimeout(() => window.location.reload(), 50);
+          }
+        }
       }
     }
   }, [isTenantAdmin]);

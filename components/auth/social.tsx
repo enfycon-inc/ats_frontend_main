@@ -1,21 +1,24 @@
 "use client";
 
 import React from "react";
-import { doSocialLogin } from "@/app/actions";
+import { signIn } from "next-auth/react";
 import { cn } from "@/lib/utils";
 
 interface SocialProps {
   showGoogle?: boolean;
   showMicrosoft?: boolean;
   className?: string;
+  tenantId?: string;
+  microsoftReady?: boolean;
 }
 
-const Social = ({ showGoogle = true, showMicrosoft = true, className }: SocialProps) => {
+const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, microsoftReady = false }: SocialProps) => {
   if (!showGoogle && !showMicrosoft) {
     return null;
   }
 
   const isSingle = (showGoogle && !showMicrosoft) || (!showGoogle && showMicrosoft);
+  const canSignInWithMicrosoft = microsoftReady && !!tenantId;
 
   return (
     <div className={cn(isSingle ? "flex flex-col gap-2.5" : "grid grid-cols-2 gap-3", className)}>
@@ -24,9 +27,7 @@ const Social = ({ showGoogle = true, showMicrosoft = true, className }: SocialPr
         <button
           type="button"
           onClick={async () => {
-            const formData = new FormData();
-            formData.append("action", "google");
-            await doSocialLogin(formData);
+            await signIn("google", { callbackUrl: "/dashboard" });
           }}
           className={cn(
             "flex items-center justify-center gap-2 w-full h-11 px-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 font-medium text-xs shadow-sm transition-all hover:scale-[1.01] cursor-pointer active:scale-[0.99]",
@@ -47,13 +48,13 @@ const Social = ({ showGoogle = true, showMicrosoft = true, className }: SocialPr
       {showMicrosoft && (
         <button
           type="button"
+          disabled={!canSignInWithMicrosoft}
           onClick={async () => {
-            const formData = new FormData();
-            formData.append("action", "microsoft");
-            await doSocialLogin(formData);
+            if (!canSignInWithMicrosoft) return;
+            await signIn("keycloak", { callbackUrl: "/dashboard" }, { kc_idp_hint: `microsoft-${tenantId}` });
           }}
           className={cn(
-            "flex items-center justify-center gap-2 w-full h-11 px-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 font-medium text-xs shadow-sm transition-all hover:scale-[1.01] cursor-pointer active:scale-[0.99]",
+            "flex items-center justify-center gap-2 w-full h-11 px-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 font-medium text-xs shadow-sm transition-all hover:scale-[1.01] cursor-pointer active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none",
             isSingle && "text-sm font-semibold border-slate-300 shadow-xs"
           )}
         >

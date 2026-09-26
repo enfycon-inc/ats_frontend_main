@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { 
-  Users, UserPlus, Search, Edit2, Key, Shield, Building2, MapPin, 
+  Users, UserPlus, Search, Edit2, Key, Shield, Building2, MapPin, Briefcase,
   CheckCircle2, XCircle, RefreshCw, Mail, Lock, Sparkles, Filter, ShieldAlert, X, ChevronRight, Loader2,
-  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check, Eye, EyeOff, Info
+  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check, Eye, EyeOff, Info, Clock
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -15,9 +15,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
+import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
 import { getSelectedMemberRoleIds } from "@/lib/member-role-selection";
@@ -31,6 +39,7 @@ interface UserItem {
   roles?: string[];
   branchId: string | null;
   businessUnitId?: string | null;
+  businessUnitName?: string | null;
   assignedBranchIds?: string[];
   branchRoles?: Record<string, string[]>;
   branchName: string | null;
@@ -39,6 +48,8 @@ interface UserItem {
   permissions?: string[];
   canReview?: boolean;
   isActive: boolean;
+  isApproved?: boolean;
+  requestedRole?: string | null;
   lastLoginAt?: string;
   createdAt: string;
 }
@@ -360,12 +371,38 @@ export default function UserManagementPage() {
     return branches.filter((b) => ids.includes(b.id));
   }, [isBranchAdmin, branches, currentUser]);
 
+  const assignedBusinessUnits = useMemo(() => {
+    if (sessionPerms.includes('tenant:settings') || sessionPerms.includes('branch_admin:manage')) return businessUnits;
+    if (currentUser?.businessUnitId) {
+      return businessUnits.filter((bu) => bu.id === currentUser.businessUnitId);
+    }
+    return businessUnits;
+  }, [businessUnits, sessionPerms, currentUser]);
+
+  const isUnitAdmin = useMemo(() => {
+    if (overrideRole) return false;
+    return !sessionPerms.includes('tenant:settings') && !sessionPerms.includes('branch_admin:manage') && !!currentUser?.businessUnitId;
+  }, [overrideRole, sessionPerms, currentUser]);
+
   // Can the current user manage (edit/delete/status) a given target user?
   const canManageUser = (targetUser: any): boolean => {
-    if (!isBranchAdmin) return true;
+    const isTenantAdmin = sessionPerms.includes('tenant:settings');
+    if (isTenantAdmin) return true;
+
     const targetBranchId = targetUser?.branchId || targetUser?.branch_id;
-    if (!targetBranchId) return false;
-    return assignedBranches.some((b) => b.id === targetBranchId);
+    const targetBusinessUnitId = targetUser?.businessUnitId || targetUser?.business_unit_id;
+
+    if (isBranchAdmin) {
+      if (!targetBranchId) return false;
+      return assignedBranches.some((b) => b.id === targetBranchId);
+    }
+
+    if (isUnitAdmin) {
+      if (!targetBusinessUnitId) return false;
+      return targetBusinessUnitId === currentUser?.businessUnitId;
+    }
+
+    return false; // Default to false if no administrative role
   };
 
   const getDomainSuffix = () => {
@@ -494,12 +531,26 @@ export default function UserManagementPage() {
   const [selectedReviewerId, setSelectedReviewerId] = useState<string>("");
   const [reviewerSearch, setReviewerSearch] = useState<string>("");
 
+  // Active tab state: ALL members or PENDING role requests
+  const [activeTab, setActiveTab] = useState<"ALL" | "PENDING">("ALL");
+
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [branchRoleModalState, setBranchRoleModalState] = useState<{ branchId: string; branchName: string; isAddForm?: boolean } | null>(null);
+
+  // Review & Approve Role Request Modal State
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewUser, setReviewUser] = useState<UserItem | null>(null);
+  const [reviewForm, setReviewForm] = useState({
+    roleCategory: "",
+      roleId: "",
+    roles: [] as string[],
+    branchId: "",
+    businessUnitId: "",
+  });
 
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -723,6 +774,7 @@ export default function UserManagementPage() {
         fullName: trimmedName,
         email: editEmail,
         branchId: editForm.branchId || undefined,
+        businessUnitId: editForm.businessUnitId || undefined,
         jobReviewerId: editForm.jobReviewerId || null,
         assignedRoleIds: finalRoles,
       });
@@ -739,6 +791,7 @@ export default function UserManagementPage() {
                 fullName: trimmedName,
                 email: editEmail,
                 branchId: editForm.branchId || null,
+                businessUnitId: editForm.businessUnitId || null,
                 jobReviewerId: editForm.jobReviewerId || null,
                 jobReviewerName: chosenReviewer ? chosenReviewer.fullName : null,
                 roles: finalRoles,
@@ -815,6 +868,157 @@ export default function UserManagementPage() {
       loadData();
     } catch (err: any) {
       toast.error(err.message || "Failed to delete user.");
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+
+  const availableReviewRoles = useMemo(() => {
+    // 1. Tenant Admin (No Branch)
+    if (reviewForm.branchId === "none") {
+      const tenantRole = rolesList.find(r => r.isSystem && (r.name === 'Tenant Admin' || r.name === 'ADMIN' || r.systemRole === 'ADMIN'));
+      return [{ id: tenantRole?.id || 'ADMIN', name: 'Tenant Admin', systemRole: 'ADMIN' }];
+    }
+
+    if (!reviewForm.branchId) {
+      return [];
+    }
+
+    // 2. Branch Admin (Branch selected, No Unit)
+    if (reviewForm.businessUnitId === "none") {
+      const branchAdminRole = rolesList.find(r => (r.name?.toUpperCase() === 'BRANCH ADMIN' || r.systemRole === 'BRANCH_ADMIN'));
+      const branchWideCustom = rolesList.filter(r => !r.isSystem && (r.branchId === reviewForm.branchId || r.branch_id === reviewForm.branchId) && (!r.businessUnitId && !r.business_unit_id));
+      const list: any[] = [];
+      list.push(branchAdminRole ? { id: branchAdminRole.id, name: 'Branch Admin', systemRole: 'BRANCH_ADMIN' } : { id: 'BRANCH_ADMIN', name: 'Branch Admin', systemRole: 'BRANCH_ADMIN' });
+      branchWideCustom.forEach(r => list.push({ id: r.id, name: r.name, systemRole: r.systemRole }));
+      return list;
+    }
+
+    if (!reviewForm.businessUnitId) {
+      return [];
+    }
+
+    // 3. Branch Unit Admin & Staff Roles (Branch and Unit both selected)
+    const unitAdminRole = rolesList.find(r => (r.name?.toUpperCase() === 'UNIT ADMIN' || r.systemRole === 'UNIT_ADMIN'));
+    const unitHeadOption = unitAdminRole ? { id: unitAdminRole.id, name: 'Branch Unit Admin', systemRole: 'UNIT_ADMIN' } : { id: 'UNIT_ADMIN', name: 'Branch Unit Admin', systemRole: 'UNIT_ADMIN' };
+
+    const unitCustomRoles = rolesList.filter(r => {
+      if (r.isSystem) return false;
+      const bId = r.branchId || r.branch_id;
+      const uId = r.businessUnitId || r.business_unit_id;
+      return bId === reviewForm.branchId && uId === reviewForm.businessUnitId;
+    });
+
+    const list: any[] = [unitHeadOption];
+    unitCustomRoles.forEach(r => list.push({ id: r.id, name: r.name, systemRole: r.systemRole }));
+    return list;
+  }, [rolesList, reviewForm.branchId, reviewForm.businessUnitId]);
+
+  const openReviewModal = (user: UserItem) => {
+    setReviewUser(user);
+    const reqUpper = (user.requestedRole || "").toUpperCase();
+    const isReqTenant = reqUpper === 'ADMIN' || reqUpper === 'TENANT_ADMIN' || reqUpper === 'TENANT ADMIN' || reqUpper === 'WORKSPACE_ADMIN' || reqUpper === 'WORKSPACE ADMINISTRATOR';
+    const isReqBranchAdmin = reqUpper === 'BRANCH_ADMIN' || reqUpper === 'BRANCH ADMIN' || reqUpper === 'BRANCH ADMINISTRATOR';
+
+    const initialBranchId = user.branchId || (isReqTenant ? 'none' : (branches[0]?.id || ''));
+    const initialUnitId = user.businessUnitId || (isReqTenant || isReqBranchAdmin ? 'none' : '');
+
+    // Resolve matching role
+    let matchedRoleId = user.roleId || '';
+    if (isReqTenant) {
+      matchedRoleId = 'ADMIN';
+    } else if (isReqBranchAdmin) {
+      matchedRoleId = 'BRANCH_ADMIN';
+    } else if (reqUpper === 'UNIT_ADMIN' || reqUpper === 'UNIT ADMIN') {
+      matchedRoleId = 'UNIT_ADMIN';
+    } else if (user.requestedRole) {
+      const match = rolesList.find(r => 
+        r.name?.toUpperCase() === reqUpper || r.systemRole?.toUpperCase() === reqUpper
+      );
+      matchedRoleId = match?.id || user.requestedRole;
+    }
+
+    setReviewForm({
+      roleId: matchedRoleId,
+      roles: user.requestedRole ? [user.requestedRole] : (user.roles || []),
+        roleCategory: isReqTenant ? "TENANT_ADMIN" : isReqBranchAdmin ? "BRANCH_ADMIN" : (reqUpper === "UNIT_ADMIN" || reqUpper === "UNIT ADMIN") ? "UNIT_ADMIN" : "EMPLOYEE",
+      branchId: initialBranchId,
+      businessUnitId: initialUnitId,
+    });
+    setIsReviewModalOpen(true);
+  };
+
+  const handleConfirmApproval = async () => {
+    if (!reviewUser) return;
+
+    const isTenantAdmin = reviewForm.branchId === "none" || reviewForm.roles.some(r => r.toUpperCase() === "ADMIN" || r.toUpperCase() === "TENANT ADMIN");
+    const isBranchAdmin = reviewForm.businessUnitId === "none" || reviewForm.roles.some(r => r.toUpperCase() === "BRANCH_ADMIN" || r.toUpperCase() === "BRANCH ADMIN");
+    const isUnitAdminOrEmployee = !isTenantAdmin && !isBranchAdmin;
+
+    if (!isTenantAdmin && (!reviewForm.branchId || reviewForm.branchId === "none")) {
+      toast.error("Branch Office is mandatory.");
+      return;
+    }
+    if (isBranchAdmin && (!reviewForm.branchId || reviewForm.branchId === "none")) {
+      toast.error("Branch Office is mandatory for Branch Admin.");
+      return;
+    }
+    if (isUnitAdminOrEmployee) {
+      if (!reviewForm.branchId || reviewForm.branchId === "none") {
+        toast.error("Branch Office is mandatory.");
+        return;
+      }
+      if (!reviewForm.businessUnitId || reviewForm.businessUnitId === "none") {
+        toast.error("Branch Unit is mandatory for staffing and unit head roles.");
+        return;
+      }
+    }
+    if (!reviewForm.roles || reviewForm.roles.length === 0) {
+      toast.error("Please select at least one role to assign.");
+      return;
+    }
+
+    try {
+      setSubmittingId(reviewUser.id);
+      
+      const finalBranchId = reviewForm.branchId === "none" ? undefined : reviewForm.branchId;
+      const finalUnitId = (reviewForm.branchId === "none" || reviewForm.businessUnitId === "none") ? undefined : reviewForm.businessUnitId;
+
+      await atsApi.auth.approveUser(reviewUser.id, {
+        roleId: reviewForm.roleId || undefined,
+        roles: reviewForm.roles,
+        branchId: finalBranchId,
+        businessUnitId: finalUnitId,
+      });
+      toast.success(`User ${reviewUser.fullName || reviewUser.email} approved and activated!`);
+      setIsReviewModalOpen(false);
+      setReviewUser(null);
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to approve user.");
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  const handleApproveUser = async (user: UserItem) => {
+    openReviewModal(user);
+  };
+
+  const handleRejectUser = async (user: UserItem) => {
+    const confirmReject = window.confirm(
+      `Are you sure you want to reject the registration request for ${user.fullName || user.email}? This will remove their pending registration.`
+    );
+    if (!confirmReject) return;
+
+    try {
+      setSubmittingId(user.id);
+      await atsApi.auth.rejectUser(user.id);
+      toast.success(`Registration request for ${user.email} was rejected.`);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reject user.");
     } finally {
       setSubmittingId(null);
     }
@@ -1301,12 +1505,24 @@ export default function UserManagementPage() {
 
     const matchesStatus =
       statusFilter === "ALL" ||
-      (statusFilter === "ACTIVE" ? u.isActive : !u.isActive);
+      (statusFilter === "PENDING"
+        ? u.isApproved === false
+        : statusFilter === "ACTIVE"
+        ? u.isActive && u.isApproved !== false
+        : !u.isActive && u.isApproved !== false);
 
-    return matchesSearch && matchesRole && matchesBranch && matchesStatus;
+    const matchesTab = activeTab === "ALL" || u.isApproved === false;
+
+    return matchesSearch && matchesRole && matchesBranch && matchesStatus && matchesTab;
+  }).sort((a, b) => {
+    const aPending = a.isApproved === false ? 1 : 0;
+    const bPending = b.isApproved === false ? 1 : 0;
+    if (aPending !== bPending) return bPending - aPending; // Pending role requests ALWAYS appear at the top!
+    return 0;
   });
 
   const activeSeats = users.filter((u) => u.isActive).length;
+  const pendingApprovalsCount = users.filter((u) => u.isApproved === false).length;
   const isFiltered = searchQuery !== "" || roleFilter !== "ALL" || branchFilter !== "ALL" || statusFilter !== "ALL";
 
   const clearFilters = () => {
@@ -1352,6 +1568,55 @@ export default function UserManagementPage() {
             <UserPlus className="h-4 w-4" /> Add Team Member
           </Button>
         </div>
+      </div>
+
+      {/* NAVIGATION TABS */}
+      <div className="flex items-center gap-2 border-b border-default-200 dark:border-slate-800 pb-0">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("ALL");
+            if (statusFilter === "PENDING") setStatusFilter("ALL");
+          }}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer",
+            activeTab === "ALL"
+              ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+              : "border-transparent text-default-500 hover:text-default-800 dark:hover:text-neutral-200"
+          )}
+        >
+          <Users className="w-3.5 h-3.5" />
+          All Team Members
+          <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-default-100 dark:bg-slate-800 text-default-600 dark:text-neutral-300 font-semibold">
+            {users.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("PENDING");
+            setStatusFilter("ALL");
+          }}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer relative",
+            activeTab === "PENDING"
+              ? "border-amber-500 text-amber-700 dark:text-amber-400"
+              : "border-transparent text-default-500 hover:text-default-800 dark:hover:text-neutral-200"
+          )}
+        >
+          <Clock className="w-3.5 h-3.5 text-amber-500" />
+          Pending Role Requests
+          {pendingApprovalsCount > 0 ? (
+            <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+              ({pendingApprovalsCount})
+            </span>
+          ) : (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-default-100 text-default-400 font-medium">
+              (0)
+            </span>
+          )}
+        </button>
       </div>
 
       {/* STANDARD FILTER & SEARCH TOOLBAR */}
@@ -1409,6 +1674,9 @@ export default function UserManagementPage() {
               className="h-9 text-xs rounded-md border border-default-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 font-medium text-default-700 dark:text-neutral-200 outline-none hover:border-indigo-500"
             >
               <option value="ALL">All Statuses</option>
+              <option value="PENDING">
+                Pending Approval ${pendingApprovalsCount > 0 ? `(${pendingApprovalsCount})` : ""}
+              </option>
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
             </select>
@@ -1605,6 +1873,7 @@ export default function UserManagementPage() {
                   <th className="py-3 px-4">Work Email</th>
                   <th className="py-3 px-4">Assigned Role(s)</th>
                   <th className="py-3 px-4">Branch Location</th>
+                  <th className="py-3 px-4">Branch Unit</th>
                   <th className="py-3 px-4">Manager</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
@@ -1645,6 +1914,11 @@ export default function UserManagementPage() {
                                   You
                                 </span>
                               )}
+                              {user.isApproved === false && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                  Pending Approval
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1655,8 +1929,24 @@ export default function UserManagementPage() {
                         {user.email}
                       </td>
 
+
                       {/* Roles */}
                       <td className="py-3 px-4">
+                        {user.isApproved === false ? (
+                          <div className="flex items-center">
+                            {canManageUser(user) && (
+                              <Button
+                                size="sm"
+                                onClick={() => openReviewModal(user)}
+                                disabled={submittingId === user.id}
+                                className="h-7 px-3 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer transition-all"
+                              >
+                                <Shield className="w-3.5 h-3.5" />
+                                Review
+                              </Button>
+                            )}
+                          </div>
+                        ) : (
                         <div className="flex flex-wrap gap-1.5">
                           {(() => {
                             const groups = getUserEffectiveRoleGroups(user, branchFilter);
@@ -1681,6 +1971,7 @@ export default function UserManagementPage() {
                             });
                           })()}
                         </div>
+                        )}
                       </td>
 
                       {/* Branch Location — Plain Comma-Separated Text */}
@@ -1704,6 +1995,17 @@ export default function UserManagementPage() {
                             </span>
                           );
                         })()}
+                      </td>
+
+                      {/* Branch Unit */}
+                      <td className="py-3 px-4 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                        {user.businessUnitName ? (
+                          <span className="truncate max-w-[150px] inline-block font-medium">
+                            {user.businessUnitName}
+                          </span>
+                        ) : (
+                          <span className="text-neutral-400 font-normal">--</span>
+                        )}
                       </td>
 
                       {/* Designated Job Reviewer */}
@@ -1769,6 +2071,24 @@ export default function UserManagementPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-52 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-xl rounded-lg p-1 text-xs">
+                              
+                              {user.isApproved === false && canManageUser(user) && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => openReviewModal(user)}
+                                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-bold"
+                                  >
+                                    <Shield className="h-3.5 w-3.5 text-indigo-600" /> Review & Approve Request
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleRejectUser(user)}
+                                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/50 text-rose-600 font-medium"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 text-rose-600" /> Reject Registration
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
+                                </>
+                              )}
                               <DropdownMenuItem
                                 onClick={() => openEditModal(user)}
                                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
@@ -1834,6 +2154,287 @@ export default function UserManagementPage() {
           </div>
         )}
       </div>
+
+      {/* REVIEW & APPROVE ROLE REQUEST MODAL */}
+      {isReviewModalOpen && reviewUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between bg-neutral-50/80 dark:bg-slate-800/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600">
+                  <Shield className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                    Review & Approve Role Request
+                  </h3>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    Review request details, configure branch office and unit, then approve access.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsReviewModalOpen(false);
+                  setReviewUser(null);
+                }}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-white p-1 rounded-md cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {/* User Summary Card */}
+              <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/60 dark:bg-amber-950/20">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-neutral-900 dark:text-white">
+                      {reviewUser.fullName || "User"}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-200">
+                      Pending Request
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-neutral-500 font-mono">
+                    {reviewUser.email}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-amber-200/60 dark:border-amber-900/40 text-[11px]">
+                  <div>
+                    <span className="text-neutral-400 block text-[10px] font-medium">Requested Role:</span>
+                    <span className="font-bold text-amber-800 dark:text-amber-300">
+                      {reviewUser.requestedRole ? reviewUser.requestedRole.replace(/_/g, " ") : "Not specified"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 block text-[10px] font-medium">Requested Branch:</span>
+                    <span className="font-semibold text-neutral-700 dark:text-neutral-300">
+                      {branches.find(b => b.id === reviewUser.branchId)?.name || (reviewUser.requestedRole?.toUpperCase() === 'ADMIN' ? "None (HQ)" : "None")}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 block text-[10px] font-medium">Requested Unit:</span>
+                    <span className="font-semibold text-neutral-700 dark:text-neutral-300">
+                      {businessUnits.find(u => u.id === reviewUser.businessUnitId)?.name || (reviewUser.requestedRole?.toUpperCase() === 'BRANCH_ADMIN' ? "Branch-Wide" : "None")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Controls */}
+<div className="space-y-4">
+  {/* 1. Select Role Category */}
+  <div>
+    <label className="block text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
+      1. Select Role Category
+    </label>
+    <div className="grid grid-cols-2 gap-2.5">
+      {[
+        { id: "EMPLOYEE", title: "Branch Employee", icon: Users, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-950/40" },
+        { id: "BRANCH_ADMIN", title: "Branch Admin", icon: Building2, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-950/40" },
+        { id: "UNIT_ADMIN", title: "Branch Unit Admin", icon: Briefcase, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-950/40" },
+        { id: "TENANT_ADMIN", title: "Workspace Admin", icon: Shield, color: "text-rose-500", bg: "bg-rose-50 dark:bg-rose-950/40" }
+      ].map((cat) => {
+        const isSelected = reviewForm.roleCategory === cat.id;
+        const Icon = cat.icon;
+        return (
+          <button
+            key={cat.id}
+            type="button"
+            onClick={() => {
+              setReviewForm(prev => {
+                const updates: { roleCategory: string; roles: string[]; roleId: string; branchId?: string; businessUnitId?: string } = { roleCategory: cat.id, roles: [], roleId: "" };
+                if (cat.id === "TENANT_ADMIN") {
+                  updates.branchId = "none";
+                  updates.businessUnitId = "none";
+                  updates.roles = ["Tenant Admin"];
+                  updates.roleId = "ADMIN";
+                } else if (cat.id === "BRANCH_ADMIN") {
+                  updates.businessUnitId = "none";
+                  updates.roles = ["Branch Admin"];
+                  updates.roleId = "BRANCH_ADMIN";
+                  if (prev.branchId === "none") updates.branchId = "";
+                } else if (cat.id === "UNIT_ADMIN") {
+                  updates.roles = ["Unit Admin"];
+                  updates.roleId = "UNIT_ADMIN";
+                  if (prev.branchId === "none") updates.branchId = "";
+                  if (prev.businessUnitId === "none") updates.businessUnitId = "";
+                } else {
+                  if (prev.branchId === "none") updates.branchId = "";
+                  if (prev.businessUnitId === "none") updates.businessUnitId = "";
+                }
+                return { ...prev, ...updates };
+              });
+            }}
+            className={cn(
+              "relative flex flex-col items-start p-3 rounded-xl transition-all duration-200 border-2 text-left group cursor-pointer",
+              isSelected
+                ? "border-indigo-600 bg-white dark:bg-slate-800 shadow-md ring-2 ring-indigo-600/10"
+                : "border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-800"
+            )}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <div className={cn("p-1.5 rounded-lg", cat.bg, cat.color)}>
+                <Icon className="w-4 h-4" />
+              </div>
+              <h4 className="font-bold text-xs text-neutral-900 dark:text-white leading-tight">
+                {cat.title}
+              </h4>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+
+  {reviewForm.roleCategory !== "TENANT_ADMIN" && (
+    <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+      <label className="block text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
+        2. Branch & Unit Selection
+      </label>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1">
+          <label className="block text-[10px] font-bold text-neutral-700 dark:text-neutral-300 mb-1">Office Branch *</label>
+          <Select
+            value={reviewForm.branchId || undefined}
+            onValueChange={(val) => {
+              setReviewForm(prev => ({ ...prev, branchId: val, businessUnitId: prev.roleCategory === "BRANCH_ADMIN" ? "none" : "" }));
+            }}
+          >
+            <SelectTrigger className="h-9 text-xs rounded-xl border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <SelectValue placeholder="Select Office Branch" />
+            </SelectTrigger>
+            <SelectContent>
+              {branches.map(b => (
+                <SelectItem key={b.id} value={b.id} className="text-xs">{b.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {reviewForm.roleCategory !== "BRANCH_ADMIN" && (
+          <div className="flex-1">
+            <label className="block text-[10px] font-bold text-neutral-700 dark:text-neutral-300 mb-1">Branch Unit *</label>
+            <select
+              value={reviewForm.businessUnitId}
+              onChange={(e) => setReviewForm(prev => ({ ...prev, businessUnitId: e.target.value }))}
+              className="w-full h-9 px-3 text-xs rounded-xl border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+              disabled={!reviewForm.branchId || reviewForm.branchId === "none"}
+            >
+              <option value="">-- Select Branch Unit --</option>
+              {businessUnits.filter(u => u.branchId === reviewForm.branchId || u.branch_id === reviewForm.branchId).map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+    </div>
+  )}
+
+  {reviewForm.roleCategory === "EMPLOYEE" && reviewForm.branchId && reviewForm.businessUnitId && reviewForm.branchId !== "none" && reviewForm.businessUnitId !== "none" && (
+    <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+      <label className="block text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
+        3. Assign Role <span className="text-rose-500">*</span>
+      </label>
+      {availableReviewRoles.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {availableReviewRoles.map((r) => {
+            const isChecked = reviewForm.roles.includes(r.name) || reviewForm.roles.includes(r.id);
+            return (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => {
+                  const checked = !isChecked;
+                  let nextRoles = reviewForm.roles.filter((x) => x !== r.name && x !== r.id);
+                  if (checked) nextRoles.push(r.name);
+                  setReviewForm({ 
+                    ...reviewForm, 
+                    roles: nextRoles, 
+                    roleId: checked ? r.id : (nextRoles.length > 0 ? reviewForm.roleId : "") 
+                  });
+                }}
+                className={cn(
+                  "p-2 rounded-xl border text-left transition-all duration-200 flex items-start gap-2 cursor-pointer select-none",
+                  isChecked ? "border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 ring-2 ring-indigo-600/10" : "border-slate-200 dark:border-slate-800 hover:bg-neutral-50 dark:hover:bg-slate-800/60"
+                )}
+              >
+                <span className={cn(
+                  "w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 mt-0.5",
+                  isChecked ? "border-indigo-600 bg-indigo-600 text-white" : "border-neutral-300 dark:border-slate-600"
+                )}>
+                  {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                </span>
+                <div>
+                  <div className="text-[11px] font-bold text-neutral-900 dark:text-white leading-tight">{r.name}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="p-3 text-center text-[11px] text-neutral-500 bg-neutral-50 dark:bg-slate-800 rounded-xl border border-neutral-200 dark:border-slate-800">
+          No roles configured for this unit yet.
+        </div>
+      )}
+    </div>
+  )}
+</div>
+
+              </div>
+              {/* Modal Footer */}
+            <div className="px-6 py-3.5 border-t border-neutral-200 dark:border-slate-800 flex items-center justify-between bg-neutral-50/80 dark:bg-slate-800/50">
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                onClick={() => {
+                  if (reviewUser) {
+                    setIsReviewModalOpen(false);
+                    handleRejectUser(reviewUser);
+                  }
+                }}
+                className="text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+              >
+                Reject Request
+              </Button>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => {
+                    setIsReviewModalOpen(false);
+                    setReviewUser(null);
+                  }}
+                  className="text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  type="button"
+                  onClick={handleConfirmApproval}
+                  disabled={submittingId === reviewUser.id}
+                  className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  {submittingId === reviewUser.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  )}
+                  Approve & Activate
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ADD MEMBER MODAL */}
       {isAddModalOpen && (
@@ -1942,6 +2543,7 @@ export default function UserManagementPage() {
                         setAddForm((prev) => ({
                           ...prev,
                           branchId: newBranchId,
+                          businessUnitId: "", // reset unit when branch changes
                           roles: prev.roles.filter((roleName) => validRolesForNewBranch.includes(roleName)),
                         }));
                       }}
@@ -1962,18 +2564,27 @@ export default function UserManagementPage() {
               {/* Business Unit Selection */}
               <div className="space-y-1 mb-4">
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Unit (Optional)</label>
-                <select
-                  value={addForm.businessUnitId}
-                  onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
-                  className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
-                >
-                  <option value="">-- No Unit Assigned (Branch Admin) --</option>
-                  {businessUnits
-                    .filter((bu) => !addForm.branchId || bu.branchId === addForm.branchId)
-                    .map((bu) => (
-                      <option key={bu.id} value={bu.id}>{bu.name}</option>
-                    ))}
-                </select>
+                {addForm.branchId ? (
+                  <select
+                    value={addForm.businessUnitId}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
+                    className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer"
+                  >
+                    {!isUnitAdmin && <option value="">-- No Unit Assigned (Branch Admin) --</option>}
+                    {assignedBusinessUnits
+                      .filter((bu) => bu.branchId === addForm.branchId || bu.branch_id === addForm.branchId)
+                      .map((bu) => (
+                        <option key={bu.id} value={bu.id}>{bu.name}</option>
+                      ))}
+                  </select>
+                ) : (
+                  <select
+                    disabled
+                    className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+                  >
+                    <option>-- Select a Branch Office First --</option>
+                  </select>
+                )}
               </div>
 
               {/* CUSTOM ROLE SELECTION (STRICTLY ISOLATED PER SELECTED BRANCH) */}
@@ -1984,9 +2595,9 @@ export default function UserManagementPage() {
                     <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
                       Assigned Custom Role(s) <span className="text-red-500">*</span>
                     </label>
-                    {addForm.branchId && (
+                    {addForm.businessUnitId && (
                       <span className="text-[10.5px] text-neutral-400 font-medium">
-                        ({branches.find((b) => b.id === addForm.branchId)?.name || "Selected Branch"})
+                        ({businessUnits.find((u) => u.id === addForm.businessUnitId)?.name || "Selected Unit"})
                       </span>
                     )}
                   </div>
@@ -2010,9 +2621,10 @@ export default function UserManagementPage() {
                   const selectedBranch = branches.find((b) => b.id === addForm.branchId);
                   const branchRolesForAdd = (rolesList || []).filter((r) => {
                     if (r.isSystem) return false;
-                    const rBId = r.branchId || (r as any).branch_id;
-                    if (!rBId) return false;
-                    return String(rBId).toLowerCase() === String(addForm.branchId).toLowerCase();
+                    if (!addForm.businessUnitId) return false;
+                    const rBUId = r.businessUnitId || (r as any).business_unit_id;
+                    if (!rBUId) return false;
+                    return String(rBUId).toLowerCase() === String(addForm.businessUnitId).toLowerCase();
                   });
 
                   if (branchRolesForAdd.length === 0) {
@@ -2205,7 +2817,7 @@ export default function UserManagementPage() {
                   ) : (
                     <select
                       value={editForm.branchId}
-                      onChange={(e) => setEditForm({ ...editForm, branchId: e.target.value })}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, branchId: e.target.value, businessUnitId: "" }))}
                       className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
                       required
                     >
@@ -2222,18 +2834,27 @@ export default function UserManagementPage() {
                 {/* Business Unit Selection */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Unit (Optional)</label>
-                  <select
-                    value={editForm.businessUnitId}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
-                    className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500"
-                  >
-                    <option value="">-- No Unit Assigned (Branch Admin) --</option>
-                    {businessUnits
-                      .filter((bu) => !editForm.branchId || bu.branchId === editForm.branchId)
-                      .map((bu) => (
-                        <option key={bu.id} value={bu.id}>{bu.name}</option>
-                      ))}
-                  </select>
+                  {editForm.branchId ? (
+                    <select
+                      value={editForm.businessUnitId}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))}
+                      className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer"
+                    >
+                      {!isUnitAdmin && <option value="">-- No Unit Assigned (Branch Admin) --</option>}
+                      {assignedBusinessUnits
+                        .filter((bu) => bu.branchId === editForm.branchId || bu.branch_id === editForm.branchId)
+                        .map((bu) => (
+                          <option key={bu.id} value={bu.id}>{bu.name}</option>
+                        ))}
+                    </select>
+                  ) : (
+                    <select
+                      disabled
+                      className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+                    >
+                      <option>-- Select a Branch Office First --</option>
+                    </select>
+                  )}
                 </div>
               </div>
 
@@ -2245,9 +2866,9 @@ export default function UserManagementPage() {
                     <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
                       Assigned Custom Role(s) <span className="text-red-500">*</span>
                     </label>
-                    {editForm.branchId && (
+                    {editForm.businessUnitId && (
                       <span className="text-[10.5px] text-neutral-400 font-medium">
-                        ({branches.find((b) => b.id === editForm.branchId)?.name || "Selected Branch"})
+                        ({businessUnits.find((u) => u.id === editForm.businessUnitId)?.name || "Selected Unit"})
                       </span>
                     )}
                   </div>
@@ -2271,9 +2892,10 @@ export default function UserManagementPage() {
                   const selectedBranch = branches.find((b) => b.id === editForm.branchId);
                   const branchRolesForEdit = (rolesList || []).filter((r) => {
                     if (r.isSystem) return false;
-                    const rBId = r.branchId || (r as any).branch_id;
-                    if (!rBId) return false;
-                    return String(rBId).toLowerCase() === String(editForm.branchId).toLowerCase();
+                    if (!editForm.businessUnitId) return false;
+                    const rBUId = r.businessUnitId || (r as any).business_unit_id;
+                    if (!rBUId) return false;
+                    return String(rBUId).toLowerCase() === String(editForm.businessUnitId).toLowerCase();
                   });
 
                   if (branchRolesForEdit.length === 0) {

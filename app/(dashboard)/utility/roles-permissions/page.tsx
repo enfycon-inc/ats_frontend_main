@@ -340,6 +340,10 @@ export default function RolesPermissionsPage() {
   // Delete Modal State
   const [roleToDelete, setRoleToDelete] = useState<{ role: CustomRole; staffCount: number } | null>(null);
   const [targetRoleId, setTargetRoleId] = useState<string>("");
+  const [deleteModalBranchId, setDeleteModalBranchId] = useState<string>("");
+  const [deleteModalUnitId, setDeleteModalUnitId] = useState<string>("");
+  const [deleteModalReassignType, setDeleteModalReassignType] = useState<"custom" | "system">("custom");
+  const [deleteModalAdminRoleType, setDeleteModalAdminRoleType] = useState<"Tenant Admin" | "Branch Admin" | "Unit Admin" | "">("");
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [showBulkActionsMenu, setShowBulkActionsMenu] = useState(false);
   const [showBulkChangeUnit, setShowBulkChangeUnit] = useState(false);
@@ -522,6 +526,7 @@ export default function RolesPermissionsPage() {
         r.name.toLowerCase().includes(query) ||
         (r.systemRole && r.systemRole.toLowerCase().includes(query)) ||
         (r.branchName && r.branchName.toLowerCase().includes(query)) ||
+        (r.businessUnitName && r.businessUnitName.toLowerCase().includes(query)) ||
         (r.createdByName && r.createdByName.toLowerCase().includes(query)) ||
         (r.description && r.description.toLowerCase().includes(query))
       );
@@ -819,15 +824,19 @@ export default function RolesPermissionsPage() {
     const defaultTarget = availableTargets[0]?.id || "";
 
     setRoleToDelete({ role, staffCount: assigned.length });
-    setTargetRoleId(defaultTarget);
+    setDeleteModalBranchId("");
+    setDeleteModalUnitId("");
+    setTargetRoleId("");
+    setDeleteModalReassignType("custom");
+    setDeleteModalAdminRoleType("");
   };
 
   const handleConfirmDeleteRole = async () => {
     if (!roleToDelete) return;
     const { role, staffCount } = roleToDelete;
 
-    if (staffCount > 0 && !targetRoleId) {
-      return toast.error("Please select a target replacement role for assigned staff.");
+    if (staffCount > 0 && (!targetRoleId || targetRoleId === "NOT_FOUND")) {
+      return toast.error("Please select a valid target replacement role for assigned staff.");
     }
 
     try {
@@ -2729,21 +2738,191 @@ export default function RolesPermissionsPage() {
                   <span>{roleToDelete.staffCount} Staff Member(s) Currently Assigned</span>
                 </div>
                 <p className="text-[11px] text-amber-800 dark:text-amber-400 leading-relaxed">
-                  Please select a replacement custom role to automatically re-assign these staff members before deleting:
+                  Please select a replacement role to automatically re-assign these staff members before deleting:
                 </p>
-                <select
-                  value={targetRoleId}
-                  onChange={(e) => setTargetRoleId(e.target.value)}
-                  className="w-full text-xs font-semibold border border-amber-300 dark:border-amber-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                >
-                  {roles
-                    .filter((r) => r.id !== roleToDelete.role.id && !r.isSystem)
-                    .map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name} ({r.branchName || "Current Office"})
-                      </option>
-                    ))}
-                </select>
+
+                <div className="flex bg-white dark:bg-slate-800 p-1 rounded-lg border border-amber-300 dark:border-amber-700">
+                  <button
+                    type="button"
+                    onClick={() => { setDeleteModalReassignType("custom"); setTargetRoleId(""); }}
+                    className={`flex-1 text-[11px] font-bold py-1.5 rounded-md cursor-pointer transition-colors ${deleteModalReassignType === "custom" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100 shadow-sm" : "text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"}`}
+                  >
+                    Employee
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { 
+                        setDeleteModalReassignType("system"); 
+                        setTargetRoleId(""); 
+                        setDeleteModalAdminRoleType("");
+                        setDeleteModalBranchId("");
+                        setDeleteModalUnitId("");
+                    }}
+                    className={`flex-1 text-[11px] font-bold py-1.5 rounded-md cursor-pointer transition-colors ${deleteModalReassignType === "system" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100 shadow-sm" : "text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"}`}
+                  >
+                    Admin Role
+                  </button>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  {deleteModalReassignType === "system" ? (
+                    <div className="space-y-3 animate-in fade-in slide-in-from-top-1">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-amber-900/70 dark:text-amber-400/70 uppercase">Select Admin Role Type</label>
+                        <select
+                          value={deleteModalAdminRoleType}
+                          onChange={(e) => {
+                              const val = e.target.value as "Tenant Admin" | "Branch Admin" | "Unit Admin";
+                              setDeleteModalAdminRoleType(val);
+                              setDeleteModalBranchId("");
+                              setDeleteModalUnitId("");
+                              setTargetRoleId("");
+                              
+                              if (val === "Tenant Admin") {
+                                  const tenantAdminRole = roles.find(r => r.isSystem && r.name === "ADMIN");
+                                  if (tenantAdminRole) setTargetRoleId(tenantAdminRole.id);
+                                  else setTargetRoleId("NOT_FOUND");
+                              }
+                          }}
+                          className="w-full text-xs font-semibold border border-amber-300 dark:border-amber-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                        >
+                          <option value="" disabled>-- Select Admin Role --</option>
+                          <option value="Tenant Admin">Tenant Admin</option>
+                          <option value="Branch Admin">Branch Admin</option>
+                          <option value="Unit Admin">Unit Admin</option>
+                        </select>
+                        {deleteModalAdminRoleType === "Tenant Admin" && targetRoleId === "NOT_FOUND" && (
+                            <p className="text-[10px] text-red-600 dark:text-red-400 mt-1">No Tenant Admin role found in the system.</p>
+                        )}
+                      </div>
+
+                      {deleteModalAdminRoleType === "Branch Admin" && (
+                        <div className="space-y-1 animate-in fade-in slide-in-from-top-1">
+                          <label className="text-[10px] font-bold text-amber-900/70 dark:text-amber-400/70 uppercase">Filter by Branch</label>
+                          <select
+                            value={deleteModalBranchId}
+                            onChange={(e) => {
+                              setDeleteModalBranchId(e.target.value);
+                              const branchAdminRole = roles.find(r => r.name.toLowerCase() === "branch admin" && r.branchId === e.target.value);
+                              setTargetRoleId(branchAdminRole ? branchAdminRole.id : "NOT_FOUND");
+                            }}
+                            className="w-full text-xs font-semibold border border-amber-300 dark:border-amber-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                          >
+                            <option value="" disabled>-- Select Branch --</option>
+                            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                          </select>
+                          {deleteModalBranchId && targetRoleId === "NOT_FOUND" && (
+                              <p className="text-[10px] text-red-600 dark:text-red-400 mt-1">No Branch Admin role found for this branch.</p>
+                          )}
+                        </div>
+                      )}
+
+                      {deleteModalAdminRoleType === "Unit Admin" && (
+                        <>
+                          <div className="space-y-1 animate-in fade-in slide-in-from-top-1">
+                              <label className="text-[10px] font-bold text-amber-900/70 dark:text-amber-400/70 uppercase">1. Filter by Branch</label>
+                              <select
+                                value={deleteModalBranchId}
+                                onChange={(e) => {
+                                  setDeleteModalBranchId(e.target.value);
+                                  setDeleteModalUnitId("");
+                                  setTargetRoleId("");
+                                }}
+                                className="w-full text-xs font-semibold border border-amber-300 dark:border-amber-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                              >
+                                <option value="" disabled>-- Select Branch --</option>
+                                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                              </select>
+                          </div>
+                          {deleteModalBranchId && (
+                              <div className="space-y-1 animate-in fade-in slide-in-from-top-1">
+                                  <label className="text-[10px] font-bold text-amber-900/70 dark:text-amber-400/70 uppercase">2. Filter by Unit</label>
+                                  <select
+                                    value={deleteModalUnitId}
+                                    onChange={(e) => {
+                                      setDeleteModalUnitId(e.target.value);
+                                      const unitAdminRole = roles.find(r => r.name.toLowerCase() === "unit admin" && r.businessUnitId === e.target.value);
+                                      setTargetRoleId(unitAdminRole ? unitAdminRole.id : "NOT_FOUND");
+                                    }}
+                                    className="w-full text-xs font-semibold border border-amber-300 dark:border-amber-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                  >
+                                    <option value="" disabled>-- Select Unit --</option>
+                                    {businessUnits
+                                      .filter(bu => bu.branchId === deleteModalBranchId)
+                                      .map(bu => <option key={bu.id} value={bu.id}>{bu.name}</option>)}
+                                  </select>
+                                  {deleteModalUnitId && targetRoleId === "NOT_FOUND" && (
+                                      <p className="text-[10px] text-red-600 dark:text-red-400 mt-1">No Unit Admin role found for this unit.</p>
+                                  )}
+                              </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {/* Branch Filter */}
+                      <div className="space-y-1 animate-in fade-in slide-in-from-top-1">
+                        <label className="text-[10px] font-bold text-amber-900/70 dark:text-amber-400/70 uppercase">1. Filter by Branch</label>
+                        <select
+                          value={deleteModalBranchId}
+                          onChange={(e) => {
+                            setDeleteModalBranchId(e.target.value);
+                            setDeleteModalUnitId("");
+                            setTargetRoleId("");
+                          }}
+                          className="w-full text-xs font-semibold border border-amber-300 dark:border-amber-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                        >
+                          <option value="" disabled>-- Select Branch --</option>
+                          {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Unit Filter */}
+                      {deleteModalBranchId && (
+                        <div className="space-y-1 animate-in fade-in slide-in-from-top-1">
+                          <label className="text-[10px] font-bold text-amber-900/70 dark:text-amber-400/70 uppercase">2. Filter by Unit</label>
+                          <select
+                            value={deleteModalUnitId}
+                            onChange={(e) => {
+                              setDeleteModalUnitId(e.target.value);
+                              setTargetRoleId("");
+                            }}
+                            className="w-full text-xs font-semibold border border-amber-300 dark:border-amber-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                          >
+                            <option value="" disabled>-- Select Unit --</option>
+                            {businessUnits
+                              .filter(bu => bu.branchId === deleteModalBranchId)
+                              .map(bu => <option key={bu.id} value={bu.id}>{bu.name}</option>)}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Role Selection */}
+                      {deleteModalUnitId && (
+                        <div className="space-y-1 animate-in fade-in slide-in-from-top-1">
+                          <label className="text-[10px] font-bold text-amber-900/70 dark:text-amber-400/70 uppercase">3. Select Replacement Role</label>
+                          <select
+                            value={targetRoleId}
+                            onChange={(e) => setTargetRoleId(e.target.value)}
+                            className="w-full text-xs font-semibold border border-amber-300 dark:border-amber-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                          >
+                            <option value="" disabled>-- Select a custom role --</option>
+                            {roles
+                              .filter(r => r.id !== roleToDelete.role.id && !r.isSystem)
+                              .filter(r => r.branchId === deleteModalBranchId)
+                              .filter(r => r.businessUnitId === deleteModalUnitId)
+                              .map((r) => (
+                                <option key={r.id} value={r.id}>
+                                  {r.name}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             )}
 
@@ -2757,9 +2936,9 @@ export default function RolesPermissionsPage() {
                 Cancel
               </Button>
               <Button
-                disabled={submitting}
+                disabled={submitting || (roleToDelete.staffCount > 0 && !targetRoleId)}
                 onClick={handleConfirmDeleteRole}
-                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs h-9 px-5 shadow-xs cursor-pointer"
+                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs h-9 px-5 shadow-xs cursor-pointer disabled:opacity-50"
               >
                 {submitting ? "Deleting..." : "Confirm & Delete"}
               </Button>
