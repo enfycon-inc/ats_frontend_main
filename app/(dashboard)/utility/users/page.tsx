@@ -697,6 +697,14 @@ export default function UserManagementPage() {
       return toast.error(`Seat limit reached! (${userLimit} active licenses). Deactivate an inactive user first or upgrade plan.`);
     }
 
+    const isTenantOrBranchAdminAdd = addForm.roles.some(r => {
+      const sr = rolesList.find(rl => rl.name === r);
+      return sr && (sr.systemRole === 'ADMIN' || sr.systemRole === 'BRANCH_ADMIN');
+    });
+    if (!isTenantOrBranchAdminAdd && !addForm.businessUnitId) {
+      return toast.error('Branch Unit is mandatory for staffing roles.');
+    }
+
     try {
       setSubmitting(true);
       const tenantId = profile?.tenantId || currentUser?.tenantId || "";
@@ -764,6 +772,14 @@ export default function UserManagementPage() {
 
     if (!firstName || !lastName || !editEmail) {
       return toast.error("First Name, Last Name, and Work Email are required.");
+    }
+
+    const isTenantOrBranchAdminEdit = editForm.roles.some(r => {
+      const sr = rolesList.find(rl => rl.name === r || rl.id === r);
+      return sr && (sr.systemRole === 'ADMIN' || sr.systemRole === 'BRANCH_ADMIN');
+    });
+    if (!isTenantOrBranchAdminEdit && !editForm.businessUnitId) {
+      return toast.error('Branch Unit is mandatory for staffing roles.');
     }
 
     try {
@@ -2563,7 +2579,7 @@ export default function UserManagementPage() {
 
               {/* Business Unit Selection */}
               <div className="space-y-1 mb-4">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Unit (Optional)</label>
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Unit *</label>
                 {addForm.branchId ? (
                   <select
                     value={addForm.businessUnitId}
@@ -2593,7 +2609,7 @@ export default function UserManagementPage() {
                   <div className="flex items-center gap-1.5">
                     <Shield className="h-3.5 w-3.5 text-indigo-600" />
                     <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                      Assigned Custom Role(s) <span className="text-red-500">*</span>
+                      Assigned Role(s) <span className="text-red-500">*</span>
                     </label>
                     {addForm.businessUnitId && (
                       <span className="text-[10.5px] text-neutral-400 font-medium">
@@ -2620,7 +2636,10 @@ export default function UserManagementPage() {
 
                   const selectedBranch = branches.find((b) => b.id === addForm.branchId);
                   const branchRolesForAdd = (rolesList || []).filter((r) => {
-                    if (r.isSystem) return false;
+                    if (r.isSystem) {
+                      const sysKey = (r.systemRole || '').toUpperCase();
+                      return ['ADMIN', 'BRANCH_ADMIN', 'UNIT_ADMIN'].includes(sysKey);
+                    }
                     if (!addForm.businessUnitId) return false;
                     const rBUId = r.businessUnitId || (r as any).business_unit_id;
                     if (!rBUId) return false;
@@ -2833,7 +2852,7 @@ export default function UserManagementPage() {
 
                 {/* Business Unit Selection */}
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Unit (Optional)</label>
+                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Branch Unit *</label>
                   {editForm.branchId ? (
                     <select
                       value={editForm.businessUnitId}
@@ -2864,7 +2883,7 @@ export default function UserManagementPage() {
                   <div className="flex items-center gap-1.5">
                     <Shield className="h-3.5 w-3.5 text-indigo-600" />
                     <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                      Assigned Custom Role(s) <span className="text-red-500">*</span>
+                      Assigned Role(s) <span className="text-red-500">*</span>
                     </label>
                     {editForm.businessUnitId && (
                       <span className="text-[10.5px] text-neutral-400 font-medium">
@@ -2891,7 +2910,10 @@ export default function UserManagementPage() {
 
                   const selectedBranch = branches.find((b) => b.id === editForm.branchId);
                   const branchRolesForEdit = (rolesList || []).filter((r) => {
-                    if (r.isSystem) return false;
+                    if (r.isSystem) {
+                      const sysKey = (r.systemRole || '').toUpperCase();
+                      return ['ADMIN', 'BRANCH_ADMIN', 'UNIT_ADMIN'].includes(sysKey);
+                    }
                     if (!editForm.businessUnitId) return false;
                     const rBUId = r.businessUnitId || (r as any).business_unit_id;
                     if (!rBUId) return false;
