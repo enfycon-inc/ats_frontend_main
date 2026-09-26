@@ -2573,7 +2573,8 @@ export default function UserManagementPage() {
                     return sr?.isSystem;
                   });
                   if (!admin) return "NONE";
-                  const sysKey = rolesList.find(rl => rl.name === admin || rl.id === admin)?.systemRole;
+                  const matchedRole = rolesList.find(rl => rl.name === admin || rl.id === admin);
+                  const sysKey = matchedRole?.systemRole || matchedRole?.system_role;
                   if (sysKey === "ADMIN" || sysKey === "TENANT_ADMIN" || sysKey === "SUPER_ADMIN" || sysKey === "TENANTADMIN" || sysKey === "SUPERADMIN") return "ADMIN";
                   if (sysKey === "BRANCH_ADMIN" || sysKey === "BRANCHADMIN") return "BRANCH_ADMIN";
                   if (sysKey === "UNIT_ADMIN" || sysKey === "UNITADMIN") return "UNIT_ADMIN";
@@ -2587,16 +2588,17 @@ export default function UserManagementPage() {
                   });
                   if (sysKey !== "NONE") {
                     const sr = rolesList.find(rl => {
+                       const rSysKey = rl.systemRole || rl.system_role;
                        if (sysKey === "ADMIN") {
-                          return rl.systemRole === "ADMIN" || rl.systemRole === "TENANT_ADMIN" || rl.systemRole === "SUPER_ADMIN" || rl.systemRole === "TENANTADMIN" || rl.systemRole === "SUPERADMIN" || rl.name === "Tenant Admin" || rl.name === "Super Admin";
+                          return rSysKey === "ADMIN" || rSysKey === "TENANT_ADMIN" || rSysKey === "SUPER_ADMIN" || rSysKey === "TENANTADMIN" || rSysKey === "SUPERADMIN" || rl.name === "Tenant Admin" || rl.name === "Super Admin" || rl.name === "Admin";
                        }
                        if (sysKey === "BRANCH_ADMIN") {
-                          return rl.systemRole === "BRANCH_ADMIN" || rl.systemRole === "BRANCHADMIN" || rl.name === "Branch Admin";
+                          return rSysKey === "BRANCH_ADMIN" || rSysKey === "BRANCHADMIN" || rl.name === "Branch Admin";
                        }
                        if (sysKey === "UNIT_ADMIN") {
-                          return rl.systemRole === "UNIT_ADMIN" || rl.systemRole === "UNITADMIN" || rl.name === "Branch Unit Admin" || rl.name === "Unit Admin";
+                          return rSysKey === "UNIT_ADMIN" || rSysKey === "UNITADMIN" || rl.name === "Branch Unit Admin" || rl.name === "Unit Admin";
                        }
-                       return rl.systemRole === sysKey;
+                       return rSysKey === sysKey;
                     });
                     if (sr) nextRoles.push(sr.id || sr.name);
                   }
@@ -2625,10 +2627,10 @@ export default function UserManagementPage() {
                         <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block mb-2">Select Administrative Level</label>
                         <div className="flex flex-wrap gap-4">
                           {[
-                            { key: "ADMIN", label: "Tenant Admin" },
-                            { key: "BRANCH_ADMIN", label: "Branch Admin" },
-                            { key: "UNIT_ADMIN", label: "Branch Unit Admin" }
-                          ].map((role) => {
+                            { key: "ADMIN", label: "Tenant Admin", show: isTenantAdmin },
+                            { key: "BRANCH_ADMIN", label: "Branch Admin", show: isTenantAdmin || isBranchAdmin },
+                            { key: "UNIT_ADMIN", label: "Branch Unit Admin", show: true }
+                          ].filter(r => r.show).map((role) => {
                             const isChecked = addFormAdminRole === role.key;
                             return (
                               <label key={role.key} className="flex items-center gap-1.5 cursor-pointer">
@@ -2867,7 +2869,8 @@ export default function UserManagementPage() {
                     return sr?.isSystem;
                   });
                   if (!admin) return "NONE";
-                  const sysKey = rolesList.find(rl => rl.name === admin || rl.id === admin)?.systemRole;
+                  const matchedRole = rolesList.find(rl => rl.name === admin || rl.id === admin);
+                  const sysKey = matchedRole?.systemRole || matchedRole?.system_role;
                   if (sysKey === "ADMIN" || sysKey === "TENANT_ADMIN" || sysKey === "SUPER_ADMIN" || sysKey === "TENANTADMIN" || sysKey === "SUPERADMIN") return "ADMIN";
                   if (sysKey === "BRANCH_ADMIN" || sysKey === "BRANCHADMIN") return "BRANCH_ADMIN";
                   if (sysKey === "UNIT_ADMIN" || sysKey === "UNITADMIN") return "UNIT_ADMIN";
@@ -2881,16 +2884,17 @@ export default function UserManagementPage() {
                   });
                   if (sysKey !== "NONE") {
                     const sr = rolesList.find(rl => {
+                       const rSysKey = rl.systemRole || rl.system_role;
                        if (sysKey === "ADMIN") {
-                          return rl.systemRole === "ADMIN" || rl.systemRole === "TENANT_ADMIN" || rl.systemRole === "SUPER_ADMIN" || rl.systemRole === "TENANTADMIN" || rl.systemRole === "SUPERADMIN" || rl.name === "Tenant Admin" || rl.name === "Super Admin";
+                          return rSysKey === "ADMIN" || rSysKey === "TENANT_ADMIN" || rSysKey === "SUPER_ADMIN" || rSysKey === "TENANTADMIN" || rSysKey === "SUPERADMIN" || rl.name === "Tenant Admin" || rl.name === "Super Admin" || rl.name === "Admin";
                        }
                        if (sysKey === "BRANCH_ADMIN") {
-                          return rl.systemRole === "BRANCH_ADMIN" || rl.systemRole === "BRANCHADMIN" || rl.name === "Branch Admin";
+                          return rSysKey === "BRANCH_ADMIN" || rSysKey === "BRANCHADMIN" || rl.name === "Branch Admin";
                        }
                        if (sysKey === "UNIT_ADMIN") {
-                          return rl.systemRole === "UNIT_ADMIN" || rl.systemRole === "UNITADMIN" || rl.name === "Branch Unit Admin" || rl.name === "Unit Admin";
+                          return rSysKey === "UNIT_ADMIN" || rSysKey === "UNITADMIN" || rl.name === "Branch Unit Admin" || rl.name === "Unit Admin";
                        }
-                       return rl.systemRole === sysKey;
+                       return rSysKey === sysKey;
                     });
                     if (sr) nextRoles.push(sr.id || sr.name);
                   }
@@ -2919,10 +2923,10 @@ export default function UserManagementPage() {
                         <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block mb-2">Select Administrative Level</label>
                         <div className="flex flex-wrap gap-4">
                           {[
-                            { key: "ADMIN", label: "Tenant Admin" },
-                            { key: "BRANCH_ADMIN", label: "Branch Admin" },
-                            { key: "UNIT_ADMIN", label: "Branch Unit Admin" }
-                          ].map((role) => {
+                            { key: "ADMIN", label: "Tenant Admin", show: isTenantAdmin },
+                            { key: "BRANCH_ADMIN", label: "Branch Admin", show: isTenantAdmin || isBranchAdmin },
+                            { key: "UNIT_ADMIN", label: "Branch Unit Admin", show: true }
+                          ].filter(r => r.show).map((role) => {
                             const isChecked = editFormAdminRole === role.key;
                             return (
                               <label key={role.key} className="flex items-center gap-1.5 cursor-pointer">
