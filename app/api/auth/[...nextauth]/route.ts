@@ -58,5 +58,5 @@ async function wrapHandler(handler: (req: any) => Promise<Response>, req: NextRe
   return res;
 }
 
-export const GET = (req: NextRequest) => wrapHandler(handlers.GET, req);
-export const POST = (req: NextRequest) => wrapHandler(handlers.POST, req);
+export const GET = handlers.GET;
+export const POST = handlers.POST;
