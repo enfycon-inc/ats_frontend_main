@@ -3,18 +3,30 @@ import { NextRequest } from "next/server";
 
 function fixIncomingRequest(req: NextRequest | Request): NextRequest | Request {
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  const defaultProto = req.url.startsWith("https") ? "https" : (host?.includes("localhost") ? "http" : "https");
-  const proto = req.headers.get("x-forwarded-proto") || defaultProto;
+  const proto = req.headers.get("x-forwarded-proto") || "https";
 
   if (host) {
+    // Strip any internal port like :3000 that might have leaked
+    const cleanHost = host.split(":")[0];
     try {
       const parsed = new URL(req.url);
-      const targetProto = proto.endsWith(":") ? proto : `${proto}:`;
-      if (parsed.host !== host || parsed.protocol !== targetProto) {
-        parsed.host = host;
-        parsed.protocol = targetProto;
-        return new NextRequest(parsed.toString(), req as any);
-      }
+      parsed.host = cleanHost;
+      parsed.port = "";
+      parsed.protocol = proto.endsWith(":") ? proto : `${proto}:`;
+      
+      const newHeaders = new Headers(req.headers);
+      newHeaders.set("host", cleanHost);
+      newHeaders.set("x-forwarded-host", cleanHost);
+      newHeaders.set("x-forwarded-port", proto === "https" ? "443" : "80");
+
+      return new NextRequest(parsed.toString(), {
+        headers: newHeaders,
+        method: req.method,
+        // @ts-ignore
+        body: req.body,
+        duplex: "half",
+        signal: req.signal
+      } as any);
     } catch {
       return req;
     }
@@ -22,41 +34,5 @@ function fixIncomingRequest(req: NextRequest | Request): NextRequest | Request {
   return req;
 }
 
-async function wrapHandler(handler: (req: any) => Promise<Response>, req: NextRequest): Promise<Response> {
-  const fixedReq = fixIncomingRequest(req);
-  const res = await handler(fixedReq);
-  const location = res.headers.get("Location");
-  if (location) {
-    const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-    const defaultProto = req.url.startsWith("https") ? "https" : (host?.includes("localhost") ? "http" : "https");
-    const proto = req.headers.get("x-forwarded-proto") || defaultProto;
-
-    if (host) {
-      try {
-        const parsedLoc = new URL(location, `${proto}://${host}`);
-        // If redirecting internally or back to localhost / 127.0.0.1 / 0.0.0.0, preserve host
-        if (
-          parsedLoc.hostname === "localhost" ||
-          parsedLoc.hostname === "127.0.0.1" ||
-          parsedLoc.hostname === "0.0.0.0"
-        ) {
-          if (parsedLoc.host !== host) {
-            parsedLoc.host = host;
-            parsedLoc.protocol = proto.endsWith(":") ? proto : `${proto}:`;
-            const newHeaders = new Headers(res.headers);
-            newHeaders.set("Location", parsedLoc.toString());
-            return new Response(res.body, {
-              status: res.status,
-              statusText: res.statusText,
-              headers: newHeaders,
-            });
-          }
-        }
-      } catch {}
-    }
-  }
-  return res;
-}
-
-export const GET = handlers.GET;
-export const POST = handlers.POST;
+export const GET = (req: NextRequest) => handlers.GET(fixIncomingRequest(req) as any);
+export const POST = (req: NextRequest) => handlers.POST(fixIncomingRequest(req) as any);
