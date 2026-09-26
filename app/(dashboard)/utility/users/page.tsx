@@ -2567,17 +2567,21 @@ export default function UserManagementPage() {
 
               {/* ADMINISTRATIVE ACCESS & STAFF ROLES LOGIC */}
               {(() => {
-                const getAdminSysKey = (rolesArray: string[]) => {
+                const SYSTEM_ROLE_IDS = {
+  SUPER_ADMIN: "f2166291-efe5-402d-a2be-92cfb2e4c9e2",
+  ADMIN: "1c2025cc-4ab3-43b5-a785-9147a9dfe348",
+  BRANCH_ADMIN: "59cef5e8-d4cb-42eb-9be3-7d9ef43f04b7",
+  UNIT_ADMIN: "852f9ad5-3ea7-4c4e-bfcf-a27a22f27f0a"
+};
+
+const getAdminSysKey = (rolesArray: string[]) => {
   for (const r of rolesArray) {
-    const sr = rolesList.find(rl => rl.id === r || rl.name === r || (r === "Tenant Admin" && (rl.systemRole === "ADMIN" || rl.system_role === "ADMIN" || rl.name === "ADMIN" || rl.name === "Tenant Admin")) || (r === "Super Admin" && (rl.systemRole === "SUPER_ADMIN" || rl.system_role === "SUPER_ADMIN" || rl.name === "SUPER_ADMIN")));
-    if (sr) {
-      const sys = (sr.systemRole || sr.system_role || sr.systemKey || sr.system_key || sr.name || "").toUpperCase();
-      const isSys = sr.isSystem || ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "UNIT_ADMIN"].includes(sys);
-      if (isSys) {
-        if (["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "TENANT ADMIN", "SUPER ADMIN", "TENANTADMIN", "SUPERADMIN"].includes(sys)) return "ADMIN";
-        if (["BRANCH_ADMIN", "BRANCHADMIN", "BRANCH ADMIN"].includes(sys)) return "BRANCH_ADMIN";
-        if (["UNIT_ADMIN", "UNITADMIN", "UNIT ADMIN"].includes(sys)) return "UNIT_ADMIN";
-      }
+    const sr = rolesList.find(rl => rl.id === r);
+    if (sr && sr.isSystem) {
+      const sysId = sr.systemRoleId || sr.system_role_id;
+      if (sysId === SYSTEM_ROLE_IDS.ADMIN || sysId === SYSTEM_ROLE_IDS.SUPER_ADMIN) return "ADMIN";
+      if (sysId === SYSTEM_ROLE_IDS.BRANCH_ADMIN) return "BRANCH_ADMIN";
+      if (sysId === SYSTEM_ROLE_IDS.UNIT_ADMIN) return "UNIT_ADMIN";
     }
   }
   return "NONE";
@@ -2587,25 +2591,23 @@ export default function UserManagementPage() {
 
                 const handleAddAdminRoleChange = (targetSysKey: string) => {
                   let nextRoles = addForm.roles.filter(r => {
-                    const sr = rolesList.find(rl => rl.id === r || rl.name === r || (r === "Tenant Admin" && (rl.systemRole === "ADMIN" || rl.system_role === "ADMIN" || rl.name === "ADMIN" || rl.name === "Tenant Admin")) || (r === "Super Admin" && (rl.systemRole === "SUPER_ADMIN" || rl.system_role === "SUPER_ADMIN")));
-                    return !(sr && (sr.isSystem || sr.name === "ADMIN" || sr.name === "Tenant Admin" || sr.name === "SUPER_ADMIN"));
+                    const sr = rolesList.find(rl => rl.id === r);
+                    return !(sr && sr.isSystem);
                   });
 
                   if (targetSysKey !== "NONE") {
                     const newAdminRole = rolesList.find(rl => {
-                      const sys = (rl.systemRole || rl.system_role || rl.systemKey || rl.system_key || rl.name || "").toUpperCase();
-                      const isSys = rl.isSystem || ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "UNIT_ADMIN"].includes(sys);
-                      if (!isSys) return false;
-                      if (targetSysKey === "ADMIN") return ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "TENANT ADMIN", "SUPER ADMIN", "TENANTADMIN", "SUPERADMIN"].includes(sys);
-                      if (targetSysKey === "BRANCH_ADMIN") return ["BRANCH_ADMIN", "BRANCHADMIN", "BRANCH ADMIN"].includes(sys);
-                      if (targetSysKey === "UNIT_ADMIN") return ["UNIT_ADMIN", "UNITADMIN", "UNIT ADMIN"].includes(sys);
+                      if (!rl.isSystem) return false;
+                      const sysId = rl.systemRoleId || rl.system_role_id;
+                      if (targetSysKey === "ADMIN") return sysId === SYSTEM_ROLE_IDS.ADMIN || sysId === SYSTEM_ROLE_IDS.SUPER_ADMIN;
+                      if (targetSysKey === "BRANCH_ADMIN") return sysId === SYSTEM_ROLE_IDS.BRANCH_ADMIN;
+                      if (targetSysKey === "UNIT_ADMIN") return sysId === SYSTEM_ROLE_IDS.UNIT_ADMIN;
                       return false;
                     });
                     if (newAdminRole) {
                       nextRoles.push(newAdminRole.id);
                     } else {
-                      alert("Error: Could not find system role " + targetSysKey + " in the database. Please contact support.");
-                      console.error("DEBUG: Role not found for " + targetSysKey, rolesList);
+                      alert("Error: Could not find system role ID for " + targetSysKey + ". Please contact support.");
                     }
                   }
                   
@@ -2871,15 +2873,12 @@ export default function UserManagementPage() {
               {(() => {
                 const getAdminSysKey = (rolesArray: string[]) => {
   for (const r of rolesArray) {
-    const sr = rolesList.find(rl => rl.id === r || rl.name === r || (r === "Tenant Admin" && (rl.systemRole === "ADMIN" || rl.system_role === "ADMIN" || rl.name === "ADMIN" || rl.name === "Tenant Admin")) || (r === "Super Admin" && (rl.systemRole === "SUPER_ADMIN" || rl.system_role === "SUPER_ADMIN" || rl.name === "SUPER_ADMIN")));
-    if (sr) {
-      const sys = (sr.systemRole || sr.system_role || sr.systemKey || sr.system_key || sr.name || "").toUpperCase();
-      const isSys = sr.isSystem || ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "UNIT_ADMIN"].includes(sys);
-      if (isSys) {
-        if (["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "TENANT ADMIN", "SUPER ADMIN", "TENANTADMIN", "SUPERADMIN"].includes(sys)) return "ADMIN";
-        if (["BRANCH_ADMIN", "BRANCHADMIN", "BRANCH ADMIN"].includes(sys)) return "BRANCH_ADMIN";
-        if (["UNIT_ADMIN", "UNITADMIN", "UNIT ADMIN"].includes(sys)) return "UNIT_ADMIN";
-      }
+    const sr = rolesList.find(rl => rl.id === r);
+    if (sr && sr.isSystem) {
+      const sysId = sr.systemRoleId || sr.system_role_id;
+      if (sysId === SYSTEM_ROLE_IDS.ADMIN || sysId === SYSTEM_ROLE_IDS.SUPER_ADMIN) return "ADMIN";
+      if (sysId === SYSTEM_ROLE_IDS.BRANCH_ADMIN) return "BRANCH_ADMIN";
+      if (sysId === SYSTEM_ROLE_IDS.UNIT_ADMIN) return "UNIT_ADMIN";
     }
   }
   return "NONE";
@@ -2889,25 +2888,23 @@ export default function UserManagementPage() {
 
                 const handleEditAdminRoleChange = (targetSysKey: string) => {
                   let nextRoles = editForm.roles.filter(r => {
-                    const sr = rolesList.find(rl => rl.id === r || rl.name === r || (r === "Tenant Admin" && (rl.systemRole === "ADMIN" || rl.system_role === "ADMIN" || rl.name === "ADMIN" || rl.name === "Tenant Admin")) || (r === "Super Admin" && (rl.systemRole === "SUPER_ADMIN" || rl.system_role === "SUPER_ADMIN")));
-                    return !(sr && (sr.isSystem || sr.name === "ADMIN" || sr.name === "Tenant Admin" || sr.name === "SUPER_ADMIN"));
+                    const sr = rolesList.find(rl => rl.id === r);
+                    return !(sr && sr.isSystem);
                   });
 
                   if (targetSysKey !== "NONE") {
                     const newAdminRole = rolesList.find(rl => {
-                      const sys = (rl.systemRole || rl.system_role || rl.systemKey || rl.system_key || rl.name || "").toUpperCase();
-                      const isSys = rl.isSystem || ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "UNIT_ADMIN"].includes(sys);
-                      if (!isSys) return false;
-                      if (targetSysKey === "ADMIN") return ["ADMIN", "TENANT_ADMIN", "SUPER_ADMIN", "TENANT ADMIN", "SUPER ADMIN", "TENANTADMIN", "SUPERADMIN"].includes(sys);
-                      if (targetSysKey === "BRANCH_ADMIN") return ["BRANCH_ADMIN", "BRANCHADMIN", "BRANCH ADMIN"].includes(sys);
-                      if (targetSysKey === "UNIT_ADMIN") return ["UNIT_ADMIN", "UNITADMIN", "UNIT ADMIN"].includes(sys);
+                      if (!rl.isSystem) return false;
+                      const sysId = rl.systemRoleId || rl.system_role_id;
+                      if (targetSysKey === "ADMIN") return sysId === SYSTEM_ROLE_IDS.ADMIN || sysId === SYSTEM_ROLE_IDS.SUPER_ADMIN;
+                      if (targetSysKey === "BRANCH_ADMIN") return sysId === SYSTEM_ROLE_IDS.BRANCH_ADMIN;
+                      if (targetSysKey === "UNIT_ADMIN") return sysId === SYSTEM_ROLE_IDS.UNIT_ADMIN;
                       return false;
                     });
                     if (newAdminRole) {
                       nextRoles.push(newAdminRole.id);
                     } else {
-                      alert("Error: Could not find system role " + targetSysKey + " in the database. Please contact support.");
-                      console.error("DEBUG: Role not found for " + targetSysKey, rolesList);
+                      alert("Error: Could not find system role ID for " + targetSysKey + ". Please contact support.");
                     }
                   }
                   
