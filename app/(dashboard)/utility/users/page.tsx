@@ -2574,9 +2574,9 @@ export default function UserManagementPage() {
                   });
                   if (!admin) return "NONE";
                   const sysKey = rolesList.find(rl => rl.name === admin || rl.id === admin)?.systemRole;
-                  if (sysKey === "ADMIN" || sysKey === "TENANT_ADMIN") return "ADMIN";
-                  if (sysKey === "BRANCH_ADMIN") return "BRANCH_ADMIN";
-                  if (sysKey === "UNIT_ADMIN") return "UNIT_ADMIN";
+                  if (sysKey === "ADMIN" || sysKey === "TENANT_ADMIN" || sysKey === "SUPER_ADMIN" || sysKey === "TENANTADMIN" || sysKey === "SUPERADMIN") return "ADMIN";
+                  if (sysKey === "BRANCH_ADMIN" || sysKey === "BRANCHADMIN") return "BRANCH_ADMIN";
+                  if (sysKey === "UNIT_ADMIN" || sysKey === "UNITADMIN") return "UNIT_ADMIN";
                   return "NONE";
                 })();
 
@@ -2586,14 +2586,27 @@ export default function UserManagementPage() {
                     return !sr?.isSystem;
                   });
                   if (sysKey !== "NONE") {
-                    const sr = rolesList.find(rl => rl.systemRole === sysKey || (sysKey === "ADMIN" && (rl.systemRole === "TENANT_ADMIN" || rl.name === "Tenant Admin")));
+                    const sr = rolesList.find(rl => {
+                       if (sysKey === "ADMIN") {
+                          return rl.systemRole === "ADMIN" || rl.systemRole === "TENANT_ADMIN" || rl.systemRole === "SUPER_ADMIN" || rl.systemRole === "TENANTADMIN" || rl.systemRole === "SUPERADMIN" || rl.name === "Tenant Admin" || rl.name === "Super Admin";
+                       }
+                       if (sysKey === "BRANCH_ADMIN") {
+                          return rl.systemRole === "BRANCH_ADMIN" || rl.systemRole === "BRANCHADMIN" || rl.name === "Branch Admin";
+                       }
+                       if (sysKey === "UNIT_ADMIN") {
+                          return rl.systemRole === "UNIT_ADMIN" || rl.systemRole === "UNITADMIN" || rl.name === "Branch Unit Admin" || rl.name === "Unit Admin";
+                       }
+                       return rl.systemRole === sysKey;
+                    });
                     if (sr) nextRoles.push(sr.id || sr.name);
                   }
+                  
+                  // Retain business unit for Branch Admin so they can also have custom roles (like Recruiter)
                   setAddForm(prev => ({
                     ...prev, 
                     roles: nextRoles,
                     branchId: sysKey === "ADMIN" ? "" : prev.branchId,
-                    businessUnitId: (sysKey === "ADMIN" || sysKey === "BRANCH_ADMIN") ? "" : prev.businessUnitId
+                    businessUnitId: sysKey === "ADMIN" ? "" : prev.businessUnitId
                   }));
                 };
 
@@ -2612,16 +2625,26 @@ export default function UserManagementPage() {
                         <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block mb-2">Select Administrative Level</label>
                         <div className="flex flex-wrap gap-4">
                           {[
-                            { key: "NONE", label: "None" },
                             { key: "ADMIN", label: "Tenant Admin" },
                             { key: "BRANCH_ADMIN", label: "Branch Admin" },
                             { key: "UNIT_ADMIN", label: "Branch Unit Admin" }
-                          ].map((role) => (
-                            <label key={role.key} className="flex items-center gap-1.5 cursor-pointer">
-                              <input type="radio" name="addForm_adminRole" value={role.key} checked={addFormAdminRole === role.key} onChange={() => handleAddAdminRoleChange(role.key)} className="h-4 w-4 accent-indigo-600 cursor-pointer" />
-                              <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 select-none">{role.label}</span>
-                            </label>
-                          ))}
+                          ].map((role) => {
+                            const isChecked = addFormAdminRole === role.key;
+                            return (
+                              <label key={role.key} className="flex items-center gap-1.5 cursor-pointer">
+                                <input 
+                                  type="checkbox" 
+                                  checked={isChecked} 
+                                  onChange={() => {
+                                    if (isChecked) handleAddAdminRoleChange("NONE");
+                                    else handleAddAdminRoleChange(role.key);
+                                  }} 
+                                  className="h-4 w-4 accent-indigo-600 cursor-pointer rounded" 
+                                />
+                                <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 select-none">{role.label}</span>
+                              </label>
+                            );
+                          })}
                         </div>
                         <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-2">Administrative roles grant system-wide permissions across the entire scope (Tenant, Branch, or Unit).</p>
                       </div>
@@ -2652,19 +2675,21 @@ export default function UserManagementPage() {
                             </div>
                           )}
 
-                          {addFormAdminRole === "ADMIN" || addFormAdminRole === "BRANCH_ADMIN" ? (
+                          {addFormAdminRole === "ADMIN" ? (
                             <div className="space-y-1 opacity-50">
                               <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Branch Unit</label>
-                              <div className="text-[10px] py-2">Not Applicable ({addFormAdminRole === "ADMIN" ? "Tenant Scope" : "Branch Scope"})</div>
+                              <div className="text-[10px] py-2">Not Applicable (Tenant Scope)</div>
                             </div>
                           ) : (
                             <div className="space-y-1">
-                              <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Branch Unit *</label>
+                              <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
+                                Branch Unit {addFormAdminRole !== "BRANCH_ADMIN" && "*"}
+                              </label>
                               {!addForm.branchId ? (
                                 <select disabled className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"><option>-- Select a Branch Office First --</option></select>
                               ) : (
-                                <select value={addForm.businessUnitId} onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer">
-                                  {!isUnitAdmin && <option value="">-- Select a Unit --</option>}
+                                <select value={addForm.businessUnitId} onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer" required={addFormAdminRole !== "BRANCH_ADMIN"}>
+                                  <option value="">-- Select a Unit{addFormAdminRole === "BRANCH_ADMIN" ? " (Optional for Custom Roles)" : ""} --</option>
                                   {assignedBusinessUnits.filter((bu) => bu.branchId === addForm.branchId || bu.branch_id === addForm.branchId).map((bu) => (<option key={bu.id} value={bu.id}>{bu.name}</option>))}
                                 </select>
                               )}
@@ -2672,14 +2697,14 @@ export default function UserManagementPage() {
                           )}
                         </div>
 
-                        {(addFormAdminRole === "NONE" || addFormAdminRole === "UNIT_ADMIN") && (
+                        {addFormAdminRole !== "ADMIN" && (
                           <div className="space-y-2 pt-4 border-t border-neutral-100 dark:border-slate-800">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-indigo-600" /><label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Custom / Business Roles</label></div>
                               {addForm.businessUnitId && (<a href={`/utility/roles-permissions?branch=${addForm.branchId}`} className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">+ Manage Custom Roles</a>)}
                             </div>
                             {!addForm.branchId || !addForm.businessUnitId ? (
-                              <div className="p-3 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-lg text-xs text-neutral-500 text-center">Please select a Branch and Unit above to view its custom staffing roles.</div>
+                              <div className="p-3 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-lg text-xs text-neutral-500 text-center">Please select a Branch Unit above to view and assign custom staffing roles.</div>
                             ) : branchRolesForAdd.length === 0 ? (
                               <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                                 <div><span className="font-bold block">No custom roles configured for this unit yet.</span><span className="text-[10.5px] text-amber-700/80 dark:text-amber-400">Custom roles are isolated per Branch Unit.</span></div>
@@ -2705,7 +2730,6 @@ export default function UserManagementPage() {
                   </div>
                 );
               })()}
-
               {/* PASSWORD + CONFIRM PASSWORD GRID */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div className="space-y-1">
@@ -2844,9 +2868,9 @@ export default function UserManagementPage() {
                   });
                   if (!admin) return "NONE";
                   const sysKey = rolesList.find(rl => rl.name === admin || rl.id === admin)?.systemRole;
-                  if (sysKey === "ADMIN" || sysKey === "TENANT_ADMIN") return "ADMIN";
-                  if (sysKey === "BRANCH_ADMIN") return "BRANCH_ADMIN";
-                  if (sysKey === "UNIT_ADMIN") return "UNIT_ADMIN";
+                  if (sysKey === "ADMIN" || sysKey === "TENANT_ADMIN" || sysKey === "SUPER_ADMIN" || sysKey === "TENANTADMIN" || sysKey === "SUPERADMIN") return "ADMIN";
+                  if (sysKey === "BRANCH_ADMIN" || sysKey === "BRANCHADMIN") return "BRANCH_ADMIN";
+                  if (sysKey === "UNIT_ADMIN" || sysKey === "UNITADMIN") return "UNIT_ADMIN";
                   return "NONE";
                 })();
 
@@ -2856,14 +2880,27 @@ export default function UserManagementPage() {
                     return !sr?.isSystem;
                   });
                   if (sysKey !== "NONE") {
-                    const sr = rolesList.find(rl => rl.systemRole === sysKey || (sysKey === "ADMIN" && (rl.systemRole === "TENANT_ADMIN" || rl.name === "Tenant Admin")));
+                    const sr = rolesList.find(rl => {
+                       if (sysKey === "ADMIN") {
+                          return rl.systemRole === "ADMIN" || rl.systemRole === "TENANT_ADMIN" || rl.systemRole === "SUPER_ADMIN" || rl.systemRole === "TENANTADMIN" || rl.systemRole === "SUPERADMIN" || rl.name === "Tenant Admin" || rl.name === "Super Admin";
+                       }
+                       if (sysKey === "BRANCH_ADMIN") {
+                          return rl.systemRole === "BRANCH_ADMIN" || rl.systemRole === "BRANCHADMIN" || rl.name === "Branch Admin";
+                       }
+                       if (sysKey === "UNIT_ADMIN") {
+                          return rl.systemRole === "UNIT_ADMIN" || rl.systemRole === "UNITADMIN" || rl.name === "Branch Unit Admin" || rl.name === "Unit Admin";
+                       }
+                       return rl.systemRole === sysKey;
+                    });
                     if (sr) nextRoles.push(sr.id || sr.name);
                   }
+                  
+                  // Retain business unit for Branch Admin so they can also have custom roles (like Recruiter)
                   setEditForm(prev => ({
                     ...prev, 
                     roles: nextRoles,
                     branchId: sysKey === "ADMIN" ? "" : prev.branchId,
-                    businessUnitId: (sysKey === "ADMIN" || sysKey === "BRANCH_ADMIN") ? "" : prev.businessUnitId
+                    businessUnitId: sysKey === "ADMIN" ? "" : prev.businessUnitId
                   }));
                 };
 
@@ -2882,16 +2919,26 @@ export default function UserManagementPage() {
                         <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block mb-2">Select Administrative Level</label>
                         <div className="flex flex-wrap gap-4">
                           {[
-                            { key: "NONE", label: "None" },
                             { key: "ADMIN", label: "Tenant Admin" },
                             { key: "BRANCH_ADMIN", label: "Branch Admin" },
                             { key: "UNIT_ADMIN", label: "Branch Unit Admin" }
-                          ].map((role) => (
-                            <label key={role.key} className="flex items-center gap-1.5 cursor-pointer">
-                              <input type="radio" name="editForm_adminRole" value={role.key} checked={editFormAdminRole === role.key} onChange={() => handleAddAdminRoleChange(role.key)} className="h-4 w-4 accent-indigo-600 cursor-pointer" />
-                              <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 select-none">{role.label}</span>
-                            </label>
-                          ))}
+                          ].map((role) => {
+                            const isChecked = editFormAdminRole === role.key;
+                            return (
+                              <label key={role.key} className="flex items-center gap-1.5 cursor-pointer">
+                                <input 
+                                  type="checkbox" 
+                                  checked={isChecked} 
+                                  onChange={() => {
+                                    if (isChecked) handleAddAdminRoleChange("NONE");
+                                    else handleAddAdminRoleChange(role.key);
+                                  }} 
+                                  className="h-4 w-4 accent-indigo-600 cursor-pointer rounded" 
+                                />
+                                <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 select-none">{role.label}</span>
+                              </label>
+                            );
+                          })}
                         </div>
                         <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-2">Administrative roles grant system-wide permissions across the entire scope (Tenant, Branch, or Unit).</p>
                       </div>
@@ -2922,19 +2969,21 @@ export default function UserManagementPage() {
                             </div>
                           )}
 
-                          {editFormAdminRole === "ADMIN" || editFormAdminRole === "BRANCH_ADMIN" ? (
+                          {editFormAdminRole === "ADMIN" ? (
                             <div className="space-y-1 opacity-50">
                               <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Branch Unit</label>
-                              <div className="text-[10px] py-2">Not Applicable ({editFormAdminRole === "ADMIN" ? "Tenant Scope" : "Branch Scope"})</div>
+                              <div className="text-[10px] py-2">Not Applicable (Tenant Scope)</div>
                             </div>
                           ) : (
                             <div className="space-y-1">
-                              <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Branch Unit *</label>
+                              <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">
+                                Branch Unit {editFormAdminRole !== "BRANCH_ADMIN" && "*"}
+                              </label>
                               {!editForm.branchId ? (
                                 <select disabled className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"><option>-- Select a Branch Office First --</option></select>
                               ) : (
-                                <select value={editForm.businessUnitId} onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer">
-                                  {!isUnitAdmin && <option value="">-- Select a Unit --</option>}
+                                <select value={editForm.businessUnitId} onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer" required={editFormAdminRole !== "BRANCH_ADMIN"}>
+                                  <option value="">-- Select a Unit{editFormAdminRole === "BRANCH_ADMIN" ? " (Optional for Custom Roles)" : ""} --</option>
                                   {assignedBusinessUnits.filter((bu) => bu.branchId === editForm.branchId || bu.branch_id === editForm.branchId).map((bu) => (<option key={bu.id} value={bu.id}>{bu.name}</option>))}
                                 </select>
                               )}
@@ -2942,14 +2991,14 @@ export default function UserManagementPage() {
                           )}
                         </div>
 
-                        {(editFormAdminRole === "NONE" || editFormAdminRole === "UNIT_ADMIN") && (
+                        {editFormAdminRole !== "ADMIN" && (
                           <div className="space-y-2 pt-4 border-t border-neutral-100 dark:border-slate-800">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-indigo-600" /><label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Custom / Business Roles</label></div>
                               {editForm.businessUnitId && (<a href={`/utility/roles-permissions?branch=${editForm.branchId}`} className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">+ Manage Custom Roles</a>)}
                             </div>
                             {!editForm.branchId || !editForm.businessUnitId ? (
-                              <div className="p-3 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-lg text-xs text-neutral-500 text-center">Please select a Branch and Unit above to view its custom staffing roles.</div>
+                              <div className="p-3 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-lg text-xs text-neutral-500 text-center">Please select a Branch Unit above to view and assign custom staffing roles.</div>
                             ) : branchRolesForEdit.length === 0 ? (
                               <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                                 <div><span className="font-bold block">No custom roles configured for this unit yet.</span><span className="text-[10.5px] text-amber-700/80 dark:text-amber-400">Custom roles are isolated per Branch Unit.</span></div>
@@ -2975,7 +3024,6 @@ export default function UserManagementPage() {
                   </div>
                 );
               })()}
-
               {/* DESIGNATED MANAGER */}
               <div className="space-y-2 pt-3 border-t border-neutral-100 dark:border-slate-800">
                 <div className="flex justify-between items-center">
