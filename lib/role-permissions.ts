@@ -5,6 +5,7 @@ export type SystemRoleType =
   | "ADMIN"
   | "TENANT_ADMIN"
   | "BRANCH_ADMIN"
+  | "UNIT_ADMIN"
   | "DELIVERY_HEAD"
   | "ACCOUNT_MANAGER"
   | "POD_LEAD"
@@ -43,7 +44,7 @@ export function resolveActiveSystemRole(
     for (const r of roleInput) {
       if (typeof r === "string" && r.trim()) {
         const resolved = resolveActiveSystemRole(r, availableRoles, userProfile);
-        if (resolved === "ACCOUNT_MANAGER" || resolved === "DELIVERY_HEAD" || resolved === "POD_LEAD" || resolved === "BRANCH_ADMIN" || resolved === "ADMIN" || resolved === "SUPER_ADMIN") {
+        if (resolved === "ACCOUNT_MANAGER" || resolved === "DELIVERY_HEAD" || resolved === "UNIT_ADMIN" || resolved === "POD_LEAD" || resolved === "BRANCH_ADMIN" || resolved === "ADMIN" || resolved === "SUPER_ADMIN") {
           return resolved;
         }
       }
@@ -130,6 +131,10 @@ export function resolveActiveSystemRole(
     return "BRANCH_ADMIN";
   }
 
+  if ((upper.includes("UNIT") && upper.includes("ADMIN")) || upper.includes("UNIT HEAD")) {
+    return "UNIT_ADMIN";
+  }
+
   if (upper.includes("ADMIN") || upper.includes("DIRECTOR") || upper.includes("WORKSPACE ADMIN")) {
     return "ADMIN";
   }
@@ -201,6 +206,16 @@ export function getActiveRolePermissions(
         "branch_admin:manage", "candidate:search_all_branches", "job:view_all_branches",
         "client:view", "client:create", "client:edit", "placement:view", "placement:create",
         "report:view"
+      ];
+    case "UNIT_ADMIN":
+      return [
+        "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+        "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
+        "candidate:create", "candidate:view",
+        "submission:create", "submission:view", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+        "unit_admin:manage", "user:manage",
+        "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
+        "client:view", "placement:view", "report:view"
       ];
     case "BRANCH_ADMIN":
       return [
@@ -304,6 +319,18 @@ export function getFilteredPrimaryNav(
       "onboarding",
       "reports",
       "branch-units",
+    ],
+    UNIT_ADMIN: [
+      "dashboard",
+      "job-posting",
+      "applicants",
+      "submissions-tracker",
+      "placements",
+      "clients",
+      "talent-bench",
+      "vendors",
+      "onboarding",
+      "reports",
     ],
     BRANCH_ADMIN: [
       "dashboard",
@@ -415,13 +442,18 @@ export function getFilteredPrimaryNav(
         ],
       };
     }
-    if (item.id === "branch-units") {
-      if (!permissions.includes("tenant:settings")) {
-        return {
-          ...item,
-          children: item.children ? item.children.filter((child) => child.href !== "/management/markets") : undefined,
-        };
+        if (item.id === "branch-units") {
+      let filteredChildren = item.children;
+      if (filteredChildren && !permissions.includes("tenant:settings")) {
+        filteredChildren = filteredChildren.filter((child) => child.href !== "/management/markets");
       }
+      if (filteredChildren && !permissions.includes("tenant:settings") && !permissions.includes("branch_admin:manage") && !permissions.includes("branch:edit")) {
+        filteredChildren = filteredChildren.filter((child) => child.href !== "/management/branch");
+      }
+      return {
+        ...item,
+        children: filteredChildren,
+      };
     }
     return item;
   });
@@ -450,6 +482,7 @@ export function getFilteredMoreNav(
   const isBranchAdmin = sysRole === "BRANCH_ADMIN";
   const isDeliveryHead = sysRole === "DELIVERY_HEAD";
   const isPodLead = sysRole === "POD_LEAD";
+  const isUnitAdmin = sysRole === "UNIT_ADMIN";
 
   // Role specific More items
   if (isAdmin) {
@@ -463,6 +496,9 @@ export function getFilteredMoreNav(
     allowedIds.add("user-management");
     allowedIds.add("pod-management");
     allowedIds.add("tenant-management");
+  } else if (isUnitAdmin) {
+    allowedIds.add("user-management");
+    allowedIds.add("role-management");
   } else if (isDeliveryHead) {
     allowedIds.add("pod-management");
   } else if (isPodLead) {
@@ -483,7 +519,7 @@ export function getFilteredMoreNav(
   ) {
     allowedIds.add("pod-management");
   }
-  if (permissions.includes("user:manage") && (isAdmin || isBranchAdmin)) {
+  if (permissions.includes("user:manage") && (isAdmin || isBranchAdmin || isUnitAdmin)) {
     allowedIds.add("user-management");
   }
   if (permissions.includes("tenant:settings") && isAdmin) {

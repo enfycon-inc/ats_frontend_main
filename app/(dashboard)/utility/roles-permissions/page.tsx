@@ -194,15 +194,16 @@ export default function RolesPermissionsPage() {
     [sessionPerms]
   );
   // The branches the current user is assigned to (used to filter dropdowns)
+  const isUnitAdmin = useMemo(() => !sessionPerms.includes("tenant:settings") && !sessionPerms.includes("branch_admin:manage") && sessionPerms.includes("user:manage"), [sessionPerms]);
   const assignedBranches = useMemo(() => {
-    if (!isBranchAdmin) return branches;
+    if (sessionPerms.includes("tenant:settings")) return branches;
     const u = atsApi.auth.getCurrentUser();
     const ids: string[] = Array.isArray(u?.assignedBranchIds) && u.assignedBranchIds.length > 0
       ? u.assignedBranchIds
       : (u?.branchId ? [u.branchId] : []);
     if (ids.length === 0) return branches;
     return branches.filter((b) => ids.includes(b.id));
-  }, [isBranchAdmin, branches]);
+  }, [sessionPerms, branches]);
 
   // Helper: can the current user edit/delete a role?
   const canManageRole = (role: CustomRole): boolean => {
@@ -355,7 +356,7 @@ export default function RolesPermissionsPage() {
 
     const hasAccess = override
       ? isRoleAdmin(override, roles, user)
-      : (user?.roles?.includes("ADMIN") || user?.roles?.includes("SUPER_ADMIN") || user?.roles?.includes("BRANCH_ADMIN") || user?.permissions?.includes("user:manage"));
+      : (user?.roles?.includes("ADMIN") || user?.roles?.includes("SUPER_ADMIN") || user?.roles?.includes("BRANCH_ADMIN") || user?.roles?.includes("UNIT_ADMIN") || user?.roles?.some(r => r.toUpperCase().includes("UNIT ADMIN")) || user?.permissions?.includes("user:manage") || (user?.roles && user.roles.some(r => typeof r === "string" && r.toUpperCase().includes("UNIT"))));
 
     setIsAdmin(hasAccess);
 
@@ -382,9 +383,9 @@ export default function RolesPermissionsPage() {
       const handleRoleChanged = () => {
         const u = atsApi.auth.getCurrentUser();
         const ov = typeof window !== "undefined" ? localStorage.getItem("override_role") : null;
-        const access = ov
-          ? isRoleAdmin(ov, roles, u)
-          : (u?.roles?.includes("ADMIN") || u?.roles?.includes("SUPER_ADMIN") || u?.roles?.includes("BRANCH_ADMIN") || u?.permissions?.includes("user:manage"));
+        const access = override
+      ? isRoleAdmin(override, roles, u)
+      : (u?.roles?.includes("ADMIN") || u?.roles?.includes("SUPER_ADMIN") || u?.roles?.includes("BRANCH_ADMIN") || u?.roles?.includes("UNIT_ADMIN") || u?.roles?.some(r => r.toUpperCase().includes("UNIT ADMIN")) || u?.permissions?.includes("u:manage") || (u?.roles && u.roles.some(r => typeof r === "string" && r.toUpperCase().includes("UNIT"))));
         setIsAdmin(access);
       };
 

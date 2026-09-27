@@ -756,17 +756,24 @@ const getInitialActiveBranchContext = () => {
             branchesList = bList || [];
             
             let finalUnits = unitsList || [];
+            let finalBranches = branchesList || [];
             const isAdmin = prof ? isRoleAdmin(resolveActiveSystemRole(prof.roles)) : false;
             
             if (!isAdmin) {
               if (prof?.businessUnitId) {
                 finalUnits = finalUnits.filter((u: any) => u.id === prof.businessUnitId);
-              } else if (activeBranchId) {
+              } else if (activeBranchId && activeBranchId !== "all") {
                 finalUnits = finalUnits.filter((u: any) => u.branchId === activeBranchId);
+              }
+              
+              if (prof?.branchId) {
+                finalBranches = finalBranches.filter((b: any) => b.id === prof.branchId);
+              } else if (activeBranchId && activeBranchId !== "all") {
+                finalBranches = finalBranches.filter((b: any) => b.id === activeBranchId);
               }
             }
             
-            setAvailableBranches(branchesList);
+            setAvailableBranches(finalBranches);
             setAvailableUnits(finalUnits);
 
             if (activeBranchId) {
@@ -1956,11 +1963,7 @@ const getInitialActiveBranchContext = () => {
                     <div className="space-y-1">
                       <Label className="font-bold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
                         <span>Business Unit <span className="text-red-500">*</span></span>
-                        {selectedUnitObj && (
-                          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
-                            {selectedUnitObj.market || market} • {selectedUnitObj.shiftTiming || 'General Shift'}
-                          </span>
-                        )}
+                        
                       </Label>
                       {availableUnits.length === 1 ? (
                         <div className="w-full h-8 text-xs bg-slate-50 dark:bg-slate-800/50 border border-neutral-300 dark:border-slate-700 rounded px-2 font-semibold text-neutral-800 dark:text-neutral-200 flex items-center select-none opacity-80 cursor-not-allowed">

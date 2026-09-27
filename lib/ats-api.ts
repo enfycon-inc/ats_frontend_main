@@ -556,7 +556,8 @@ const auth = {
     if (branchId) params.append('branchId', branchId);
     if (includeSystem !== undefined) params.append('includeSystem', String(includeSystem));
     const query = params.toString() ? `?${params.toString()}` : '';
-    return apiFetch<any[]>(`/api/auth/rbac/roles${query}`);
+    const headers: Record<string, string> = branchId === 'ALL' ? { 'x-branch-id': 'ALL' } : {};
+    return apiFetch<any[]>(`/api/auth/rbac/roles${query}`, { headers });
   },
 
   async listAssignableRoles(branchId?: string): Promise<any[]> {
@@ -1207,7 +1208,7 @@ const candidates = {
     const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (activeBranchId) headers['x-branch-id'] = activeBranchId;
+    if (activeBranchId && !headers['x-branch-id']) headers['x-branch-id'] = activeBranchId;
 
     const res = await fetch(`${getApiBase()}/api/candidates/upload`, {
       method: 'POST',

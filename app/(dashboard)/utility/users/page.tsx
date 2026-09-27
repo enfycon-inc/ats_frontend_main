@@ -651,7 +651,7 @@ export default function UserManagementPage() {
         atsApi.auth.listUsers().then((u) => { if (u) setUsers(u); return u; }).catch(() => []),
         atsApi.branches.list().then((b) => { if (b) setBranches(b); return b; }).catch(() => []),
           atsApi.businessUnits.list().then((bu) => { if (bu) setBusinessUnits(bu); return bu; }).catch(() => []),
-        atsApi.auth.listRoles(undefined, true).then((r) => { if (r) setRolesList(r); return r; }).catch(() => []),
+        atsApi.auth.listRoles("ALL", true).then((r) => { if (r) setRolesList(r); return r; }).catch(() => []),
         atsApi.auth.me().then((p) => { if (p) setProfile(p); return p; }).catch(() => null),
       ]);
       setUsers(usersData || []);
@@ -707,8 +707,16 @@ export default function UserManagementPage() {
       return toast.error(`Seat limit reached! (${userLimit} active licenses). Deactivate an inactive user first or upgrade plan.`);
     }
 
-    const addAdminRole = addForm.roles.find(r => rolesList.find(rl => rl.name === r)?.isSystem);
-    const addSysKey = addAdminRole ? rolesList.find(rl => rl.name === addAdminRole)?.systemRole : "NONE";
+    let addSysKey = "NONE";
+    for (const r of addForm.roles) {
+      const sr = rolesList.find(rl => rl.id === r || rl.name === r);
+      if (sr && sr.isSystem) {
+        const sysId = sr.systemRoleId || sr.system_role_id;
+        if (sysId === SYSTEM_ROLE_IDS.ADMIN || sysId === SYSTEM_ROLE_IDS.SUPER_ADMIN) addSysKey = "ADMIN";
+        else if (sysId === SYSTEM_ROLE_IDS.BRANCH_ADMIN) addSysKey = "BRANCH_ADMIN";
+        else if (sysId === SYSTEM_ROLE_IDS.UNIT_ADMIN) addSysKey = "UNIT_ADMIN";
+      }
+    }
     const isTenantOrBranchAdminAdd = addSysKey === 'ADMIN' || addSysKey === 'BRANCH_ADMIN';
     
     if (!isTenantOrBranchAdminAdd && !addForm.businessUnitId) {
@@ -784,8 +792,16 @@ export default function UserManagementPage() {
       return toast.error("First Name, Last Name, and Work Email are required.");
     }
 
-    const editAdminRole = editForm.roles.find(r => rolesList.find(rl => rl.name === r || rl.id === r)?.isSystem);
-    const editSysKey = editAdminRole ? rolesList.find(rl => rl.name === editAdminRole || rl.id === editAdminRole)?.systemRole : "NONE";
+    let editSysKey = "NONE";
+    for (const r of editForm.roles) {
+      const sr = rolesList.find(rl => rl.id === r || rl.name === r);
+      if (sr && sr.isSystem) {
+        const sysId = sr.systemRoleId || sr.system_role_id;
+        if (sysId === SYSTEM_ROLE_IDS.ADMIN || sysId === SYSTEM_ROLE_IDS.SUPER_ADMIN) editSysKey = "ADMIN";
+        else if (sysId === SYSTEM_ROLE_IDS.BRANCH_ADMIN) editSysKey = "BRANCH_ADMIN";
+        else if (sysId === SYSTEM_ROLE_IDS.UNIT_ADMIN) editSysKey = "UNIT_ADMIN";
+      }
+    }
     const isTenantOrBranchAdminEdit = editSysKey === 'ADMIN' || editSysKey === 'BRANCH_ADMIN';
     
     if (!isTenantOrBranchAdminEdit && !editForm.businessUnitId) {
@@ -1438,7 +1454,7 @@ export default function UserManagementPage() {
 
   const openAddModal = async () => {
     try {
-      const freshRoles = await atsApi.auth.listRoles(undefined, true);
+      const freshRoles = await atsApi.auth.listRoles("ALL", true);
       if (freshRoles && Array.isArray(freshRoles)) {
         setRolesList(freshRoles);
       }
@@ -1468,7 +1484,7 @@ export default function UserManagementPage() {
 
   const openEditModal = (user: UserItem) => {
     if (!user) return;
-    atsApi.auth.listRoles(undefined, true).then((freshRoles) => {
+    atsApi.auth.listRoles("ALL", true).then((freshRoles) => {
       if (freshRoles && Array.isArray(freshRoles)) {
         setRolesList(freshRoles);
       }
@@ -2351,7 +2367,7 @@ export default function UserManagementPage() {
             </SelectTrigger>
             <SelectContent>
               {branches.map(b => (
-                <SelectItem key={b.id} value={b.id} className="text-xs">{b.name}</SelectItem>
+                <SelectItem key={b.id} value={b.id} className="text-xs">{b.name}{b.city ? ` - ${b.city}` : ""}{b.state ? `, ${b.state}` : ""}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -2608,7 +2624,7 @@ export default function UserManagementPage() {
                     if (newAdminRole) {
                       nextRoles.push(newAdminRole.id);
                     } else {
-                      alert("Error: Could not find system role ID for " + targetSysKey + ". Please contact support.");
+                      alert("Error: Could not find system role ID for " + targetSysKey + ". Available: " + rolesList.filter(r => r.isSystem).map(r => r.name + ":" + (r.systemRoleId || r.system_role_id)).join(", "));
                     }
                   }
                   
@@ -2638,7 +2654,7 @@ export default function UserManagementPage() {
                           {[
                             { key: "ADMIN", label: "Tenant Admin", show: isTenantAdmin },
                             { key: "BRANCH_ADMIN", label: "Branch Admin", show: isTenantAdmin || isBranchAdmin },
-                            { key: "UNIT_ADMIN", label: "Branch Unit Admin", show: true }
+                            { key: "UNIT_ADMIN", label: "Branch Unit Admin", show: isTenantAdmin || isBranchAdmin || isUnitAdmin }
                           ].filter(r => r.show).map((role) => {
                             const isChecked = addFormAdminRole === role.key;
                             return (
@@ -2658,6 +2674,60 @@ export default function UserManagementPage() {
                           })}
                         </div>
                         <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-2">Administrative roles grant system-wide permissions across the entire scope (Tenant, Branch, or Unit).</p>
+
+                        {(addFormAdminRole === "BRANCH_ADMIN" || addFormAdminRole === "UNIT_ADMIN") && (
+                           <div className="space-y-3 pt-3 mt-4 border-t border-neutral-100 dark:border-slate-800">
+                             <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Assign Administrative Scope</label>
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch *</label>
+                                  {isBranchAdmin ? (
+                                    <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                                      <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
+                                      <span>
+                                        {(() => {
+                                          const b = assignedBranches.find((b) => b.id === addForm.branchId) || branches.find((b) => b.id === addForm.branchId);
+                                          if (!b) return "Assigned Branch";
+                                          return `${b.name}${b.city ? ` - ${b.city}` : ""}${b.state ? `, ${b.state}` : ""}`;
+                                        })()}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <Select value={addForm.branchId || ""} onValueChange={(val) => setAddForm((prev) => ({ ...prev, branchId: val, businessUnitId: "" }))} required>
+                                      <SelectTrigger className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500">
+                                        <SelectValue placeholder="Select Primary Branch..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {assignedBranches.map((b) => (
+                                          <SelectItem key={b.id} value={b.id} className="text-xs">
+                                            <div className="flex flex-col text-left">
+                                              <span className="font-semibold text-neutral-900 dark:text-white">{b.name}</span>
+                                              {(b.city || b.state) && (
+                                                <span className="text-[9.5px] font-normal text-neutral-500 dark:text-neutral-400 -mt-0.5">{b.city}{b.city && b.state ? ', ' : ''}{b.state}</span>
+                                              )}
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  )}
+                                </div>
+                                {addFormAdminRole === "UNIT_ADMIN" && (
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Branch Unit *</label>
+                                  {!addForm.branchId ? (
+                                    <select disabled className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"><option>-- Select a Branch Office First --</option></select>
+                                  ) : (
+                                    <select value={addForm.businessUnitId} onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer" required>
+                                      <option value="">-- Select a Unit --</option>
+                                      {assignedBusinessUnits.filter((bu) => bu.branchId === addForm.branchId || bu.branch_id === addForm.branchId).map((bu) => (<option key={bu.id} value={bu.id}>{bu.name}</option>))}
+                                    </select>
+                                  )}
+                                </div>
+                                )}
+                             </div>
+                           </div>
+                        )}
                       </div>
                     )}
 
@@ -2675,13 +2745,32 @@ export default function UserManagementPage() {
                               {isBranchAdmin ? (
                                 <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                                   <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
-                                  <span>{assignedBranches.find((b) => b.id === addForm.branchId)?.name || branches.find((b) => b.id === addForm.branchId)?.name || "Assigned Branch"}</span>
+                                  <span>
+                                        {(() => {
+                                          const b = assignedBranches.find((b) => b.id === addForm.branchId) || branches.find((b) => b.id === addForm.branchId);
+                                          if (!b) return "Assigned Branch";
+                                          return `${b.name}${b.city ? ` - ${b.city}` : ""}${b.state ? `, ${b.state}` : ""}`;
+                                        })()}
+                                      </span>
                                 </div>
                               ) : (
-                                <select value={addForm.branchId} onChange={(e) => setAddForm((prev) => ({ ...prev, branchId: e.target.value, businessUnitId: "" }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500" required>
-                                  <option value="">Select Primary Branch...</option>
-                                  {assignedBranches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
-                                </select>
+                                <Select value={addForm.branchId || ""} onValueChange={(val) => setAddForm((prev) => ({ ...prev, branchId: val, businessUnitId: "" }))} required>
+                                  <SelectTrigger className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500">
+                                    <SelectValue placeholder="Select Primary Branch..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {assignedBranches.map((b) => (
+                                      <SelectItem key={b.id} value={b.id} className="text-xs">
+                                        <div className="flex flex-col text-left py-0.5">
+                                          <span className="font-semibold text-neutral-900 dark:text-white">{b.name}</span>
+                                          {(b.city || b.state) && (
+                                            <span className="text-[10.5px] font-medium text-neutral-500 dark:text-neutral-400 mt-0.5">{b.city}{b.city && b.state ? ', ' : ''}{b.state}</span>
+                                          )}
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               )}
                             </div>
                           )}
@@ -2699,7 +2788,7 @@ export default function UserManagementPage() {
                               {!addForm.branchId ? (
                                 <select disabled className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"><option>-- Select a Branch Office First --</option></select>
                               ) : (
-                                <select value={addForm.businessUnitId} onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer" required={addFormAdminRole !== "BRANCH_ADMIN"}>
+                                <select value={addForm.businessUnitId} onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer" required>
                                   <option value="">-- Select a Unit{addFormAdminRole === "BRANCH_ADMIN" ? " (Optional for Custom Roles)" : ""} --</option>
                                   {assignedBusinessUnits.filter((bu) => bu.branchId === addForm.branchId || bu.branch_id === addForm.branchId).map((bu) => (<option key={bu.id} value={bu.id}>{bu.name}</option>))}
                                 </select>
@@ -2905,7 +2994,7 @@ export default function UserManagementPage() {
                     if (newAdminRole) {
                       nextRoles.push(newAdminRole.id);
                     } else {
-                      alert("Error: Could not find system role ID for " + targetSysKey + ". Please contact support.");
+                      alert("Error: Could not find system role ID for " + targetSysKey + ". Available: " + rolesList.filter(r => r.isSystem).map(r => r.name + ":" + (r.systemRoleId || r.system_role_id)).join(", "));
                     }
                   }
                   
@@ -2935,7 +3024,7 @@ export default function UserManagementPage() {
                           {[
                             { key: "ADMIN", label: "Tenant Admin", show: isTenantAdmin },
                             { key: "BRANCH_ADMIN", label: "Branch Admin", show: isTenantAdmin || isBranchAdmin },
-                            { key: "UNIT_ADMIN", label: "Branch Unit Admin", show: true }
+                            { key: "UNIT_ADMIN", label: "Branch Unit Admin", show: isTenantAdmin || isBranchAdmin || isUnitAdmin }
                           ].filter(r => r.show).map((role) => {
                             const isChecked = editFormAdminRole === role.key;
                             return (
@@ -2955,6 +3044,60 @@ export default function UserManagementPage() {
                           })}
                         </div>
                         <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-2">Administrative roles grant system-wide permissions across the entire scope (Tenant, Branch, or Unit).</p>
+                        
+                        {(editFormAdminRole === "BRANCH_ADMIN" || editFormAdminRole === "UNIT_ADMIN") && (
+                           <div className="space-y-3 pt-3 mt-4 border-t border-neutral-100 dark:border-slate-800">
+                             <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Assign Administrative Scope</label>
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch *</label>
+                                  {isBranchAdmin ? (
+                                    <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                                      <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
+                                      <span>
+                                        {(() => {
+                                          const b = assignedBranches.find((b) => b.id === editForm.branchId) || branches.find((b) => b.id === editForm.branchId);
+                                          if (!b) return "Assigned Branch";
+                                          return `${b.name}${b.city ? ` - ${b.city}` : ""}${b.state ? `, ${b.state}` : ""}`;
+                                        })()}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <Select value={editForm.branchId || ""} onValueChange={(val) => setEditForm((prev) => ({ ...prev, branchId: val, businessUnitId: "" }))} required>
+                                      <SelectTrigger className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500">
+                                        <SelectValue placeholder="Select Primary Branch..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {assignedBranches.map((b) => (
+                                          <SelectItem key={b.id} value={b.id} className="text-xs">
+                                            <div className="flex flex-col text-left">
+                                              <span className="font-semibold text-neutral-900 dark:text-white">{b.name}</span>
+                                              {(b.city || b.state) && (
+                                                <span className="text-[9.5px] font-normal text-neutral-500 dark:text-neutral-400 -mt-0.5">{b.city}{b.city && b.state ? ', ' : ''}{b.state}</span>
+                                              )}
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  )}
+                                </div>
+                                {editFormAdminRole === "UNIT_ADMIN" && (
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Branch Unit *</label>
+                                  {!editForm.branchId ? (
+                                    <select disabled className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"><option>-- Select a Branch Office First --</option></select>
+                                  ) : (
+                                    <select value={editForm.businessUnitId} onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer" required>
+                                      <option value="">-- Select a Unit --</option>
+                                      {assignedBusinessUnits.filter((bu) => bu.branchId === editForm.branchId || bu.branch_id === editForm.branchId).map((bu) => (<option key={bu.id} value={bu.id}>{bu.name}</option>))}
+                                    </select>
+                                  )}
+                                </div>
+                                )}
+                             </div>
+                           </div>
+                        )}
                       </div>
                     )}
 
@@ -2972,13 +3115,32 @@ export default function UserManagementPage() {
                               {isBranchAdmin ? (
                                 <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                                   <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
-                                  <span>{assignedBranches.find((b) => b.id === editForm.branchId)?.name || branches.find((b) => b.id === editForm.branchId)?.name || "Assigned Branch"}</span>
+                                  <span>
+                                        {(() => {
+                                          const b = assignedBranches.find((b) => b.id === editForm.branchId) || branches.find((b) => b.id === editForm.branchId);
+                                          if (!b) return "Assigned Branch";
+                                          return `${b.name}${b.city ? ` - ${b.city}` : ""}${b.state ? `, ${b.state}` : ""}`;
+                                        })()}
+                                      </span>
                                 </div>
                               ) : (
-                                <select value={editForm.branchId} onChange={(e) => setEditForm((prev) => ({ ...prev, branchId: e.target.value, businessUnitId: "" }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500" required>
-                                  <option value="">Select Primary Branch...</option>
-                                  {assignedBranches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
-                                </select>
+                                <Select value={editForm.branchId || ""} onValueChange={(val) => setEditForm((prev) => ({ ...prev, branchId: val, businessUnitId: "" }))} required>
+                                  <SelectTrigger className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500">
+                                    <SelectValue placeholder="Select Primary Branch..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {assignedBranches.map((b) => (
+                                      <SelectItem key={b.id} value={b.id} className="text-xs">
+                                        <div className="flex flex-col text-left py-0.5">
+                                          <span className="font-semibold text-neutral-900 dark:text-white">{b.name}</span>
+                                          {(b.city || b.state) && (
+                                            <span className="text-[10.5px] font-medium text-neutral-500 dark:text-neutral-400 mt-0.5">{b.city}{b.city && b.state ? ', ' : ''}{b.state}</span>
+                                          )}
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               )}
                             </div>
                           )}
@@ -2996,7 +3158,7 @@ export default function UserManagementPage() {
                               {!editForm.branchId ? (
                                 <select disabled className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"><option>-- Select a Branch Office First --</option></select>
                               ) : (
-                                <select value={editForm.businessUnitId} onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer" required={editFormAdminRole !== "BRANCH_ADMIN"}>
+                                <select value={editForm.businessUnitId} onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer" required>
                                   <option value="">-- Select a Unit{editFormAdminRole === "BRANCH_ADMIN" ? " (Optional for Custom Roles)" : ""} --</option>
                                   {assignedBusinessUnits.filter((bu) => bu.branchId === editForm.branchId || bu.branch_id === editForm.branchId).map((bu) => (<option key={bu.id} value={bu.id}>{bu.name}</option>))}
                                 </select>

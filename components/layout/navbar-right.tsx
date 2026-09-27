@@ -108,6 +108,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { resolveActiveSystemRole } from "@/lib/role-permissions";
 
 // ─── Notification dropdown ────────────────────────────────────────────────────
 function NotificationDropdownNav() {
@@ -1581,7 +1582,8 @@ function BranchSwitcher() {
   }, []);
 
   const currentUser = typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null;
-  const systemRole = overrideRole || currentUser?.systemRole || (session as any)?.user?.systemRole || "RECRUITER";
+  const rawRoleStr = overrideRole || (currentUser?.roles && currentUser.roles[0]);
+  const systemRole = resolveActiveSystemRole(rawRoleStr, undefined, currentUser);
   const perms = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
   const isTenantAdmin = systemRole === "ADMIN" || systemRole === "SUPER_ADMIN" || systemRole === "TENANT_ADMIN" || perms.includes("tenant:settings") || perms.includes("tenant:manage");
 
@@ -1612,22 +1614,42 @@ function BranchSwitcher() {
     }
   }, [isTenantAdmin]);
 
+  const [city, setCity] = useState<string>("");
+  const [unitName, setUnitName] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && !isTenantAdmin) {
+      atsApi.auth.getProfile().then(p => {
+        if (p?.branch?.city) setCity(p.branch.city);
+        if (p?.businessUnit?.name) setUnitName(p.businessUnit.name);
+        else if (p?.businessUnitName) setUnitName(p.businessUnitName);
+        else if (p?.business_unit?.name) setUnitName(p.business_unit.name);
+      }).catch(() => {});
+    }
+  }, [isTenantAdmin]);
+
   if (isTenantAdmin) return null;
 
   return (
     <div 
       title="Your branch context is fixed to your assigned home office."
       className="
-        flex items-center gap-1.5
-        h-7 px-2.5 rounded-lg
-        text-[11px] font-bold tracking-wide
+        flex flex-col items-center justify-center
+        h-9 px-2.5 rounded-lg
         bg-white/10 text-white/90
         border border-white/15 shadow-2xs
         cursor-default select-none
       "
     >
-      <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-indigo-200" />
-      <span suppressHydrationWarning>Office: {activeBranch}</span>
+      <div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide">
+        <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-indigo-200" />
+        <span suppressHydrationWarning>Office: {activeBranch}{city ? ` - ${city}` : ""}</span>
+      </div>
+      {unitName && (
+        <div className="text-[9.5px] font-medium text-white/70 -mt-1" suppressHydrationWarning>
+          Unit: {unitName}
+        </div>
+      )}
     </div>
   );
 }
