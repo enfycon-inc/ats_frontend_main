@@ -503,7 +503,7 @@ export default function JobDetailPage() {
     return getActiveRolePermissions(activeRoleName, availableRoles, currentUser);
   }, [activeRoleName, availableRoles, currentUser]);
 
-  const isAdmin = activeSystemRole === "ADMIN" || activeSystemRole === "SUPER_ADMIN" || activeSystemRole === "TENANT_ADMIN";
+  const isAdmin = activeSystemRole === "TENANT_ADMIN" || activeSystemRole === "SUPER_ADMIN";
   const isDeliveryHead = activeSystemRole === "DELIVERY_HEAD";
   const isAM = activeSystemRole === "ACCOUNT_MANAGER";
   const isPodLead = activeSystemRole === "POD_LEAD";
@@ -598,7 +598,7 @@ export default function JobDetailPage() {
     const normalizedRoles = (roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
     const isSuperOrAdmin = Boolean(
       normalizedRoles.includes("SUPERADMIN") ||
-      normalizedRoles.includes("ADMIN") ||
+      normalizedRoles.includes("TENANT_ADMIN") ||
       normalizedRoles.includes("SUPER_ADMIN")
     );
     const hasJobApprovePerm = permissions.includes("job:approve") || (permissions.length === 0 && isSuperOrAdmin);

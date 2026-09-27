@@ -129,8 +129,7 @@ export default function ProfileDropdown() {
 
   const systemRoleLabels: Record<string, string> = {
     SUPER_ADMIN: "Global Admin",
-    ADMIN: "Admin",
-    TENANT_ADMIN: "Admin",
+    TENANT_ADMIN: "Tenant Admin",
     BRANCH_ADMIN: "Branch Admin",
     ACCOUNT_MANAGER: "Account Manager",
     POD_LEAD: "Pod Lead",
@@ -209,10 +208,10 @@ export default function ProfileDropdown() {
 
   const isUserAdmin = useMemo(() => {
     const sRole = (currentUser?.systemRole || systemRole || "").toUpperCase();
-    if (sRole === "ADMIN" || sRole === "SUPER_ADMIN" || sRole === "TENANT_ADMIN") return true;
+    if (sRole === "TENANT_ADMIN" || sRole === "SUPER_ADMIN") return true;
     return userAssignedRoleObjs.some((r: any) => {
       const u = (r.systemRole || r.name || "").toUpperCase();
-      return u.includes("ADMIN");
+      return u.includes("TENANT_ADMIN");
     });
   }, [currentUser, systemRole, userAssignedRoleObjs]);
 
@@ -224,7 +223,7 @@ export default function ProfileDropdown() {
     const u = rawSys.toUpperCase().replace(/[\s\-_]/g, "");
 
     // Admin / Super Admin / Branch Admin
-    if (u.includes("ADMIN")) {
+    if (u.includes("TENANT_ADMIN")) {
       return {
         Icon: ShieldCheck,
         colorClass:

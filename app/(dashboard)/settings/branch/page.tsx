@@ -68,7 +68,7 @@ function getRoleBadge(role: string) {
       </span>
     );
   }
-  if (norm.includes("ADMIN") || norm.includes("SUPER_ADMIN")) {
+  if (norm.includes("TENANT_ADMIN") || norm.includes("SUPER_ADMIN")) {
     return (
       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
         {role === "BRANCH_ADMIN" ? "Branch Admin" : role.replace(/_/g, " ")}
@@ -2895,7 +2895,7 @@ function BranchManagementPageContent() {
 
                 {(() => {
                   const customRolesList = tenantRoles.filter(
-                    (r: any) => !r.isSystem && !["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.name)
+                    (r: any) => !r.isSystem && !["TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.name)
                   );
 
                   if (customRolesList.length === 0) {

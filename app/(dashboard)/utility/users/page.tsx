@@ -306,12 +306,6 @@ let cachedUsersData: {
 } | null = null;
 
 
-const SYSTEM_ROLE_IDS = {
-  SUPER_ADMIN: "f2166291-efe5-402d-a2be-92cfb2e4c9e2",
-  ADMIN: "1c2025cc-4ab3-43b5-a785-9147a9dfe348",
-  BRANCH_ADMIN: "59cef5e8-d4cb-42eb-9be3-7d9ef43f04b7",
-  UNIT_ADMIN: "852f9ad5-3ea7-4c4e-bfcf-a27a22f27f0a"
-};
 
 export default function UserManagementPage() {
   const [addModalTab, setAddModalTab] = useState("STAFF");
@@ -360,7 +354,7 @@ export default function UserManagementPage() {
     if (overrideRole) {
       const norm = overrideRole.toUpperCase().replace(/[\s-_]/g, "");
       if (norm === "BRANCHADMIN") return true;
-      if (norm === "ADMIN" || norm === "SUPERADMIN" || norm === "TENANTADMIN") return false;
+      if (norm === "TENANT_ADMIN" || norm === "SUPERADMIN" || norm === "TENANTADMIN") return false;
     }
     if (sessionPerms.length > 0) {
       return sessionPerms.includes('branch_admin:manage') && !sessionPerms.includes('tenant:settings');
@@ -369,7 +363,7 @@ export default function UserManagementPage() {
     return userRole === "BRANCHADMIN";
   }, [overrideRole, sessionPerms, currentUser]);
 
-  const isTenantAdmin = sessionPerms.includes('tenant:settings') || (!isBranchAdmin && (overrideRole === 'ADMIN' || overrideRole === 'Tenant Admin'));
+  const isTenantAdmin = sessionPerms.includes('tenant:settings') || (!isBranchAdmin && (overrideRole === 'TENANT_ADMIN' || overrideRole === 'Tenant Admin'));
 
   // The branches the current user is assigned to (for filtering dropdowns)
   const assignedBranches = useMemo(() => {
@@ -443,7 +437,7 @@ export default function UserManagementPage() {
       }
       const rawRoles = Array.isArray(u.roles) && u.roles.length > 0 ? u.roles : [u.roleName || ""];
       const upperRoles = rawRoles.map((r) => String(r).toUpperCase().replace(/[\s-_]/g, ""));
-      const managerRoles = ["ADMIN", "TENANTADMIN", "SUPERADMIN", "BRANCHADMIN", "DELIVERYHEAD", "ACCOUNTMANAGER", "PODLEAD", "BDM"];
+      const managerRoles = ["TENANT_ADMIN", "TENANTADMIN", "SUPERADMIN", "BRANCHADMIN", "DELIVERYHEAD", "ACCOUNTMANAGER", "PODLEAD", "BDM"];
       return upperRoles.some((r) => managerRoles.includes(r));
     });
   }, [users]);
@@ -490,7 +484,7 @@ export default function UserManagementPage() {
           const sysNorm = (r.systemRole || "").toUpperCase().replace(/[\s-_]/g, "");
           const nameNorm = (r.name || "").toUpperCase().replace(/[\s-_]/g, "");
           if (coveredArchetypes.has(sysNorm) || coveredArchetypes.has(nameNorm)) return false;
-          if (nameNorm === "ADMIN" || nameNorm === "SUPERADMIN" || nameNorm === "TENANTADMIN") return false;
+          if (nameNorm === "TENANT_ADMIN" || nameNorm === "SUPERADMIN" || nameNorm === "TENANTADMIN") return false;
           return true;
         }
         return false;
@@ -711,13 +705,13 @@ export default function UserManagementPage() {
     for (const r of addForm.roles) {
       const sr = rolesList.find(rl => rl.id === r || rl.name === r);
       if (sr && sr.isSystem) {
-        const sysId = sr.systemRoleId || sr.system_role_id;
-        if (sysId === SYSTEM_ROLE_IDS.ADMIN || sysId === SYSTEM_ROLE_IDS.SUPER_ADMIN) addSysKey = "ADMIN";
-        else if (sysId === SYSTEM_ROLE_IDS.BRANCH_ADMIN) addSysKey = "BRANCH_ADMIN";
-        else if (sysId === SYSTEM_ROLE_IDS.UNIT_ADMIN) addSysKey = "UNIT_ADMIN";
+        const sysId = sr.systemRole || sr.system_role;
+        if (sysId === "TENANT_ADMIN" || sysId === "SUPER_ADMIN") addSysKey = "TENANT_ADMIN";
+        else if (sysId === "BRANCH_ADMIN") addSysKey = "BRANCH_ADMIN";
+        else if (sysId === "UNIT_ADMIN") addSysKey = "UNIT_ADMIN";
       }
     }
-    const isTenantOrBranchAdminAdd = addSysKey === 'ADMIN' || addSysKey === 'BRANCH_ADMIN';
+    const isTenantOrBranchAdminAdd = addSysKey === 'TENANT_ADMIN' || addSysKey === 'BRANCH_ADMIN';
     
     if (!isTenantOrBranchAdminAdd && !addForm.businessUnitId) {
       return toast.error('Branch Unit is mandatory for staffing roles.');
@@ -796,13 +790,13 @@ export default function UserManagementPage() {
     for (const r of editForm.roles) {
       const sr = rolesList.find(rl => rl.id === r || rl.name === r);
       if (sr && sr.isSystem) {
-        const sysId = sr.systemRoleId || sr.system_role_id;
-        if (sysId === SYSTEM_ROLE_IDS.ADMIN || sysId === SYSTEM_ROLE_IDS.SUPER_ADMIN) editSysKey = "ADMIN";
-        else if (sysId === SYSTEM_ROLE_IDS.BRANCH_ADMIN) editSysKey = "BRANCH_ADMIN";
-        else if (sysId === SYSTEM_ROLE_IDS.UNIT_ADMIN) editSysKey = "UNIT_ADMIN";
+        const sysId = sr.systemRole || sr.system_role;
+        if (sysId === "TENANT_ADMIN" || sysId === "SUPER_ADMIN") editSysKey = "TENANT_ADMIN";
+        else if (sysId === "BRANCH_ADMIN") editSysKey = "BRANCH_ADMIN";
+        else if (sysId === "UNIT_ADMIN") editSysKey = "UNIT_ADMIN";
       }
     }
-    const isTenantOrBranchAdminEdit = editSysKey === 'ADMIN' || editSysKey === 'BRANCH_ADMIN';
+    const isTenantOrBranchAdminEdit = editSysKey === 'TENANT_ADMIN' || editSysKey === 'BRANCH_ADMIN';
     
     if (!isTenantOrBranchAdminEdit && !editForm.businessUnitId) {
       return toast.error('Branch Unit is mandatory for staffing roles.');
@@ -919,8 +913,8 @@ export default function UserManagementPage() {
   const availableReviewRoles = useMemo(() => {
     // 1. Tenant Admin (No Branch)
     if (reviewForm.branchId === "none") {
-      const tenantRole = rolesList.find(r => r.isSystem && (r.name === 'Tenant Admin' || r.name === 'ADMIN' || r.systemRole === 'ADMIN'));
-      return [{ id: tenantRole?.id || 'ADMIN', name: 'Tenant Admin', systemRole: 'ADMIN' }];
+      const tenantRole = rolesList.find(r => r.isSystem && (r.name === 'Tenant Admin' || r.name === 'TENANT_ADMIN' || r.systemRole === 'TENANT_ADMIN'));
+      return [{ id: tenantRole?.id || 'TENANT_ADMIN', name: 'Tenant Admin', systemRole: 'TENANT_ADMIN' }];
     }
 
     if (!reviewForm.branchId) {
@@ -960,7 +954,7 @@ export default function UserManagementPage() {
   const openReviewModal = (user: UserItem) => {
     setReviewUser(user);
     const reqUpper = (user.requestedRole || "").toUpperCase();
-    const isReqTenant = reqUpper === 'ADMIN' || reqUpper === 'TENANT_ADMIN' || reqUpper === 'TENANT ADMIN' || reqUpper === 'WORKSPACE_ADMIN' || reqUpper === 'WORKSPACE ADMINISTRATOR';
+    const isReqTenant = reqUpper === 'TENANT_ADMIN' || reqUpper === 'TENANT_ADMIN' || reqUpper === 'TENANT ADMIN' || reqUpper === 'WORKSPACE_ADMIN' || reqUpper === 'WORKSPACE ADMINISTRATOR';
     const isReqBranchAdmin = reqUpper === 'BRANCH_ADMIN' || reqUpper === 'BRANCH ADMIN' || reqUpper === 'BRANCH ADMINISTRATOR';
 
     const initialBranchId = user.branchId || (isReqTenant ? 'none' : (branches[0]?.id || ''));
@@ -969,7 +963,7 @@ export default function UserManagementPage() {
     // Resolve matching role
     let matchedRoleId = user.roleId || '';
     if (isReqTenant) {
-      matchedRoleId = 'ADMIN';
+      matchedRoleId = 'TENANT_ADMIN';
     } else if (isReqBranchAdmin) {
       matchedRoleId = 'BRANCH_ADMIN';
     } else if (reqUpper === 'UNIT_ADMIN' || reqUpper === 'UNIT ADMIN') {
@@ -994,7 +988,7 @@ export default function UserManagementPage() {
   const handleConfirmApproval = async () => {
     if (!reviewUser) return;
 
-    const isTenantAdmin = reviewForm.branchId === "none" || reviewForm.roles.some(r => r.toUpperCase() === "ADMIN" || r.toUpperCase() === "TENANT ADMIN");
+    const isTenantAdmin = reviewForm.branchId === "none" || reviewForm.roles.some(r => r.toUpperCase() === "TENANT_ADMIN" || r.toUpperCase() === "TENANT ADMIN");
     const isBranchAdmin = reviewForm.businessUnitId === "none" || reviewForm.roles.some(r => r.toUpperCase() === "BRANCH_ADMIN" || r.toUpperCase() === "BRANCH ADMIN");
     const isUnitAdminOrEmployee = !isTenantAdmin && !isBranchAdmin;
 
@@ -1267,7 +1261,7 @@ export default function UserManagementPage() {
       return customRole.name;
     }
 
-    if (upper === "ADMIN" || upper === "TENANT_ADMIN" || upper === "SUPER_ADMIN" || upper === "TENANT ADMIN") {
+    if (upper === "TENANT_ADMIN" || upper === "SUPER_ADMIN" || upper === "TENANT ADMIN") {
       return "Tenant Admin";
     }
     if (upper === "RECRUITER") return "Recruiter";
@@ -1401,7 +1395,7 @@ export default function UserManagementPage() {
       rolesList.find(
         (r) =>
           r.isSystem &&
-          (r.systemRole === "ADMIN" ||
+          (r.systemRole === "TENANT_ADMIN" ||
             r.name?.toLowerCase().includes("tenant admin") ||
             r.name?.toLowerCase().includes("administrator"))
       )?.name || "Tenant Admin";
@@ -1535,7 +1529,7 @@ export default function UserManagementPage() {
         const rNorm = r.toUpperCase().replace(/[\s-_]/g, "");
         const filterNorm = roleFilter.toUpperCase().replace(/[\s-_]/g, "");
         if (rNorm === filterNorm || r.toUpperCase() === roleFilter.toUpperCase()) return true;
-        if ((filterNorm === "TENANTADMIN" || filterNorm === "ADMIN") && (rNorm === "TENANTADMIN" || rNorm === "ADMIN")) return true;
+        if ((filterNorm === "TENANTADMIN" || filterNorm === "TENANT_ADMIN") && (rNorm === "TENANTADMIN" || rNorm === "TENANT_ADMIN")) return true;
         return false;
       });
 
@@ -2270,7 +2264,7 @@ export default function UserManagementPage() {
                   <div>
                     <span className="text-neutral-400 block text-[10px] font-medium">Requested Branch:</span>
                     <span className="font-semibold text-neutral-700 dark:text-neutral-300">
-                      {branches.find(b => b.id === reviewUser.branchId)?.name || (reviewUser.requestedRole?.toUpperCase() === 'ADMIN' ? "None (HQ)" : "None")}
+                      {branches.find(b => b.id === reviewUser.branchId)?.name || (reviewUser.requestedRole?.toUpperCase() === 'TENANT_ADMIN' ? "None (HQ)" : "None")}
                     </span>
                   </div>
                   <div>
@@ -2309,7 +2303,7 @@ export default function UserManagementPage() {
                   updates.branchId = "none";
                   updates.businessUnitId = "none";
                   updates.roles = ["Tenant Admin"];
-                  updates.roleId = "ADMIN";
+                  updates.roleId = "TENANT_ADMIN";
                 } else if (cat.id === "BRANCH_ADMIN") {
                   updates.businessUnitId = "none";
                   updates.roles = ["Branch Admin"];
@@ -2586,7 +2580,7 @@ export default function UserManagementPage() {
               {/* TABS FOR ADD MODAL */}
               <div className="flex border-b border-neutral-200 dark:border-slate-800 mb-4 pt-4">
                 <button type="button" onClick={() => setAddModalTab("STAFF")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${addModalTab === "STAFF" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Staff & Business Roles</button>
-                <button type="button" onClick={() => setAddModalTab("ADMIN")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${addModalTab === "ADMIN" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Administrative Access</button>
+                <button type="button" onClick={() => setAddModalTab("TENANT_ADMIN")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${addModalTab === "TENANT_ADMIN" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Administrative Access</button>
               </div>
 
               {/* ADMINISTRATIVE ACCESS & STAFF ROLES LOGIC */}
@@ -2595,10 +2589,10 @@ export default function UserManagementPage() {
   for (const r of rolesArray) {
     const sr = rolesList.find(rl => rl.id === r);
     if (sr && sr.isSystem) {
-      const sysId = sr.systemRoleId || sr.system_role_id;
-      if (sysId === SYSTEM_ROLE_IDS.ADMIN || sysId === SYSTEM_ROLE_IDS.SUPER_ADMIN) return "ADMIN";
-      if (sysId === SYSTEM_ROLE_IDS.BRANCH_ADMIN) return "BRANCH_ADMIN";
-      if (sysId === SYSTEM_ROLE_IDS.UNIT_ADMIN) return "UNIT_ADMIN";
+      const sysId = sr.systemRole || sr.system_role;
+      if (sysId === "TENANT_ADMIN" || sysId === "SUPER_ADMIN") return "TENANT_ADMIN";
+      if (sysId === "BRANCH_ADMIN") return "BRANCH_ADMIN";
+      if (sysId === "UNIT_ADMIN") return "UNIT_ADMIN";
     }
   }
   return "NONE";
@@ -2615,10 +2609,10 @@ export default function UserManagementPage() {
                   if (targetSysKey !== "NONE") {
                     const newAdminRole = rolesList.find(rl => {
                       if (!rl.isSystem) return false;
-                      const sysId = rl.systemRoleId || rl.system_role_id;
-                      if (targetSysKey === "ADMIN") return sysId === SYSTEM_ROLE_IDS.ADMIN || sysId === SYSTEM_ROLE_IDS.SUPER_ADMIN;
-                      if (targetSysKey === "BRANCH_ADMIN") return sysId === SYSTEM_ROLE_IDS.BRANCH_ADMIN;
-                      if (targetSysKey === "UNIT_ADMIN") return sysId === SYSTEM_ROLE_IDS.UNIT_ADMIN;
+                      const sysId = rl.systemRole || rl.system_role;
+                      if (targetSysKey === "TENANT_ADMIN") return sysId === "TENANT_ADMIN" || sysId === "SUPER_ADMIN";
+                      if (targetSysKey === "BRANCH_ADMIN") return sysId === "BRANCH_ADMIN";
+                      if (targetSysKey === "UNIT_ADMIN") return sysId === "UNIT_ADMIN";
                       return false;
                     });
                     if (newAdminRole) {
@@ -2632,8 +2626,8 @@ export default function UserManagementPage() {
                   setAddForm(prev => ({
                     ...prev, 
                     roles: nextRoles,
-                    branchId: targetSysKey === "ADMIN" ? "" : prev.branchId,
-                    businessUnitId: targetSysKey === "ADMIN" ? "" : prev.businessUnitId
+                    branchId: targetSysKey === "TENANT_ADMIN" ? "" : prev.branchId,
+                    businessUnitId: targetSysKey === "TENANT_ADMIN" ? "" : prev.businessUnitId
                   }));
                 };
 
@@ -2647,12 +2641,12 @@ export default function UserManagementPage() {
 
                 return (
                   <div>
-                    {addModalTab === "ADMIN" && (
+                    {addModalTab === "TENANT_ADMIN" && (
                       <div className="space-y-4 mb-4">
                         <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block mb-2">Select Administrative Level</label>
                         <div className="flex flex-wrap gap-4">
                           {[
-                            { key: "ADMIN", label: "Tenant Admin", show: isTenantAdmin },
+                            { key: "TENANT_ADMIN", label: "Tenant Admin", show: isTenantAdmin },
                             { key: "BRANCH_ADMIN", label: "Branch Admin", show: isTenantAdmin || isBranchAdmin },
                             { key: "UNIT_ADMIN", label: "Branch Unit Admin", show: isTenantAdmin || isBranchAdmin || isUnitAdmin }
                           ].filter(r => r.show).map((role) => {
@@ -2734,7 +2728,7 @@ export default function UserManagementPage() {
                     {addModalTab === "STAFF" && (
                       <div className="space-y-4 mb-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {addFormAdminRole === "ADMIN" ? (
+                          {addFormAdminRole === "TENANT_ADMIN" ? (
                             <div className="space-y-1 opacity-50">
                               <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch</label>
                               <div className="text-[10px] py-2">Not Applicable (Tenant Scope)</div>
@@ -2775,7 +2769,7 @@ export default function UserManagementPage() {
                             </div>
                           )}
 
-                          {addFormAdminRole === "ADMIN" ? (
+                          {addFormAdminRole === "TENANT_ADMIN" ? (
                             <div className="space-y-1 opacity-50">
                               <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Branch Unit</label>
                               <div className="text-[10px] py-2">Not Applicable (Tenant Scope)</div>
@@ -2797,7 +2791,7 @@ export default function UserManagementPage() {
                           )}
                         </div>
 
-                        {addFormAdminRole !== "ADMIN" && (
+                        {addFormAdminRole !== "TENANT_ADMIN" && (
                           <div className="space-y-2 pt-4 border-t border-neutral-100 dark:border-slate-800">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-indigo-600" /><label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Custom / Business Roles</label></div>
@@ -2956,7 +2950,7 @@ export default function UserManagementPage() {
               {/* TABS FOR EDIT MODAL */}
               <div className="flex border-b border-neutral-200 dark:border-slate-800 mb-4 pt-4">
                 <button type="button" onClick={() => setEditModalTab("STAFF")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${editModalTab === "STAFF" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Staff & Business Roles</button>
-                <button type="button" onClick={() => setEditModalTab("ADMIN")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${editModalTab === "ADMIN" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Administrative Access</button>
+                <button type="button" onClick={() => setEditModalTab("TENANT_ADMIN")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${editModalTab === "TENANT_ADMIN" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Administrative Access</button>
               </div>
 
               {/* ADMINISTRATIVE ACCESS & STAFF ROLES LOGIC */}
@@ -2965,10 +2959,10 @@ export default function UserManagementPage() {
   for (const r of rolesArray) {
     const sr = rolesList.find(rl => rl.id === r);
     if (sr && sr.isSystem) {
-      const sysId = sr.systemRoleId || sr.system_role_id;
-      if (sysId === SYSTEM_ROLE_IDS.ADMIN || sysId === SYSTEM_ROLE_IDS.SUPER_ADMIN) return "ADMIN";
-      if (sysId === SYSTEM_ROLE_IDS.BRANCH_ADMIN) return "BRANCH_ADMIN";
-      if (sysId === SYSTEM_ROLE_IDS.UNIT_ADMIN) return "UNIT_ADMIN";
+      const sysId = sr.systemRole || sr.system_role;
+      if (sysId === "TENANT_ADMIN" || sysId === "SUPER_ADMIN") return "TENANT_ADMIN";
+      if (sysId === "BRANCH_ADMIN") return "BRANCH_ADMIN";
+      if (sysId === "UNIT_ADMIN") return "UNIT_ADMIN";
     }
   }
   return "NONE";
@@ -2985,10 +2979,10 @@ export default function UserManagementPage() {
                   if (targetSysKey !== "NONE") {
                     const newAdminRole = rolesList.find(rl => {
                       if (!rl.isSystem) return false;
-                      const sysId = rl.systemRoleId || rl.system_role_id;
-                      if (targetSysKey === "ADMIN") return sysId === SYSTEM_ROLE_IDS.ADMIN || sysId === SYSTEM_ROLE_IDS.SUPER_ADMIN;
-                      if (targetSysKey === "BRANCH_ADMIN") return sysId === SYSTEM_ROLE_IDS.BRANCH_ADMIN;
-                      if (targetSysKey === "UNIT_ADMIN") return sysId === SYSTEM_ROLE_IDS.UNIT_ADMIN;
+                      const sysId = rl.systemRole || rl.system_role;
+                      if (targetSysKey === "TENANT_ADMIN") return sysId === "TENANT_ADMIN" || sysId === "SUPER_ADMIN";
+                      if (targetSysKey === "BRANCH_ADMIN") return sysId === "BRANCH_ADMIN";
+                      if (targetSysKey === "UNIT_ADMIN") return sysId === "UNIT_ADMIN";
                       return false;
                     });
                     if (newAdminRole) {
@@ -3002,8 +2996,8 @@ export default function UserManagementPage() {
                   setEditForm(prev => ({
                     ...prev, 
                     roles: nextRoles,
-                    branchId: targetSysKey === "ADMIN" ? "" : prev.branchId,
-                    businessUnitId: targetSysKey === "ADMIN" ? "" : prev.businessUnitId
+                    branchId: targetSysKey === "TENANT_ADMIN" ? "" : prev.branchId,
+                    businessUnitId: targetSysKey === "TENANT_ADMIN" ? "" : prev.businessUnitId
                   }));
                 };
 
@@ -3017,12 +3011,12 @@ export default function UserManagementPage() {
 
                 return (
                   <div>
-                    {editModalTab === "ADMIN" && (
+                    {editModalTab === "TENANT_ADMIN" && (
                       <div className="space-y-4 mb-4">
                         <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block mb-2">Select Administrative Level</label>
                         <div className="flex flex-wrap gap-4">
                           {[
-                            { key: "ADMIN", label: "Tenant Admin", show: isTenantAdmin },
+                            { key: "TENANT_ADMIN", label: "Tenant Admin", show: isTenantAdmin },
                             { key: "BRANCH_ADMIN", label: "Branch Admin", show: isTenantAdmin || isBranchAdmin },
                             { key: "UNIT_ADMIN", label: "Branch Unit Admin", show: isTenantAdmin || isBranchAdmin || isUnitAdmin }
                           ].filter(r => r.show).map((role) => {
@@ -3104,7 +3098,7 @@ export default function UserManagementPage() {
                     {editModalTab === "STAFF" && (
                       <div className="space-y-4 mb-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {editFormAdminRole === "ADMIN" ? (
+                          {editFormAdminRole === "TENANT_ADMIN" ? (
                             <div className="space-y-1 opacity-50">
                               <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch</label>
                               <div className="text-[10px] py-2">Not Applicable (Tenant Scope)</div>
@@ -3145,7 +3139,7 @@ export default function UserManagementPage() {
                             </div>
                           )}
 
-                          {editFormAdminRole === "ADMIN" ? (
+                          {editFormAdminRole === "TENANT_ADMIN" ? (
                             <div className="space-y-1 opacity-50">
                               <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Branch Unit</label>
                               <div className="text-[10px] py-2">Not Applicable (Tenant Scope)</div>
@@ -3167,7 +3161,7 @@ export default function UserManagementPage() {
                           )}
                         </div>
 
-                        {editFormAdminRole !== "ADMIN" && (
+                        {editFormAdminRole !== "TENANT_ADMIN" && (
                           <div className="space-y-2 pt-4 border-t border-neutral-100 dark:border-slate-800">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-indigo-600" /><label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Custom / Business Roles</label></div>

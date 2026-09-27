@@ -110,7 +110,7 @@ export default function ClientDashboard() {
 
   const userRoles = (currentUser?.roles || []).map((r: string) => String(r).toUpperCase().replace(/[\s-_]+/g, ''));
   const userPermissions = currentUser?.permissions || [];
-  const isSuperOrAdmin = userRoles.includes('ADMIN') || userRoles.includes('SUPERADMIN') || userRoles.includes('SUPER_ADMIN');
+  const isSuperOrAdmin = userRoles.includes('TENANT_ADMIN') || userRoles.includes('SUPERADMIN') || userRoles.includes('SUPER_ADMIN');
   const canApproveRejectClient = 
     userPermissions.includes('client:approve') || 
     userPermissions.includes('client:reject') ||

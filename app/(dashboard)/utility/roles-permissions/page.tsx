@@ -145,8 +145,8 @@ const SYSTEM_ARCHETYPES = [
     ]
   },
   {
-    key: "ADMIN",
-    label: "Admin / Workspace Director Template",
+    key: "TENANT_ADMIN",
+    label: "Tenant Admin Template",
     badge: "Full Admin",
     desc: "Full company administration privileges across jobs, clients (create, direct add, approve, reject, delete), candidates, pods, users, and branch offices.",
     perms: [
@@ -354,9 +354,7 @@ export default function RolesPermissionsPage() {
     const user = atsApi.auth.getCurrentUser();
     const override = typeof window !== "undefined" ? localStorage.getItem("override_role") : null;
 
-    const hasAccess = override
-      ? isRoleAdmin(override, roles, user)
-      : (user?.roles?.includes("ADMIN") || user?.roles?.includes("SUPER_ADMIN") || user?.roles?.includes("BRANCH_ADMIN") || user?.roles?.includes("UNIT_ADMIN") || user?.roles?.some(r => r.toUpperCase().includes("UNIT ADMIN")) || user?.permissions?.includes("user:manage") || (user?.roles && user.roles.some(r => typeof r === "string" && r.toUpperCase().includes("UNIT"))));
+    const hasAccess = Array.isArray(user?.permissions) && user.permissions.some((p: string) => ['user:manage', 'platform:manage'].includes(p));
 
     setIsAdmin(hasAccess);
 
@@ -383,9 +381,7 @@ export default function RolesPermissionsPage() {
       const handleRoleChanged = () => {
         const u = atsApi.auth.getCurrentUser();
         const ov = typeof window !== "undefined" ? localStorage.getItem("override_role") : null;
-        const access = override
-      ? isRoleAdmin(override, roles, u)
-      : (u?.roles?.includes("ADMIN") || u?.roles?.includes("SUPER_ADMIN") || u?.roles?.includes("BRANCH_ADMIN") || u?.roles?.includes("UNIT_ADMIN") || u?.roles?.some(r => r.toUpperCase().includes("UNIT ADMIN")) || u?.permissions?.includes("u:manage") || (u?.roles && u.roles.some(r => typeof r === "string" && r.toUpperCase().includes("UNIT"))));
+        const access = Array.isArray(u?.permissions) && u.permissions.some((p: string) => ['user:manage', 'platform:manage'].includes(p));
         setIsAdmin(access);
       };
 
@@ -1627,7 +1623,7 @@ export default function RolesPermissionsPage() {
                   onChange={(e) => handleCreateArchetypeChange(e.target.value)}
                   className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN" && a.key !== "ADMIN").map((arch) => (
+                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN" && a.key !== "TENANT_ADMIN").map((arch) => (
                       <option key={arch.key} value={arch.key}>
                         {arch.label.replace(" Template", "")}
                       </option>
@@ -1996,7 +1992,7 @@ export default function RolesPermissionsPage() {
                   onChange={(e) => handleEditArchetypeChange(e.target.value)}
                   className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN" && a.key !== "ADMIN").map((arch) => (
+                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN" && a.key !== "TENANT_ADMIN").map((arch) => (
                       <option key={arch.key} value={arch.key}>
                         {arch.label.replace(" Template", "")}
                       </option>
@@ -2780,7 +2776,7 @@ export default function RolesPermissionsPage() {
                               setTargetRoleId("");
                               
                               if (val === "Tenant Admin") {
-                                  const tenantAdminRole = roles.find(r => r.isSystem && r.name === "ADMIN");
+                                  const tenantAdminRole = roles.find(r => r.isSystem && r.name === "TENANT_ADMIN");
                                   if (tenantAdminRole) setTargetRoleId(tenantAdminRole.id);
                                   else setTargetRoleId("NOT_FOUND");
                               }

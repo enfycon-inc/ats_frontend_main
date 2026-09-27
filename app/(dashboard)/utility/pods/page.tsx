@@ -58,9 +58,9 @@ function checkIsTenantAdmin(user: any): boolean {
   const roles: string[] = Array.isArray(user.roles) ? user.roles.map((r: string) => r.toUpperCase()) : [];
   const perms: string[] = Array.isArray(user.permissions) ? user.permissions : [];
   return (
-    roles.includes("ADMIN") ||
+    roles.includes("TENANT_ADMIN") ||
     roles.includes("SUPER_ADMIN") ||
-    sysRole === "ADMIN" ||
+    sysRole === "TENANT_ADMIN" ||
     sysRole === "SUPER_ADMIN" ||
     perms.includes("tenant:settings") ||
     perms.includes("tenant:manage")
@@ -438,13 +438,13 @@ export default function PodsPage() {
 
     // Exclude higher-privilege roles
     const isHigherPrivilege =
-      rawRoles.includes("ADMIN") ||
+      rawRoles.includes("TENANT_ADMIN") ||
       rawRoles.includes("SUPER_ADMIN") ||
       rawRoles.includes("TENANT_ADMIN") ||
       rawRoles.includes("BRANCH_ADMIN") ||
       rawRoles.includes("DELIVERY_HEAD") ||
       rawRoles.includes("ACCOUNT_MANAGER") ||
-      systemRoleArchetype === "ADMIN" ||
+      systemRoleArchetype === "TENANT_ADMIN" ||
       systemRoleArchetype === "SUPER_ADMIN" ||
       systemRoleArchetype === "TENANT_ADMIN" ||
       systemRoleArchetype === "BRANCH_ADMIN" ||
@@ -467,7 +467,7 @@ export default function PodsPage() {
         return "Delivery Head";
       case "BRANCH_ADMIN":
         return "Branch Admin";
-      case "ADMIN":
+      case "TENANT_ADMIN":
         return "Admin";
       default:
         return roleName;
@@ -508,7 +508,7 @@ export default function PodsPage() {
       u.roles?.includes("RECRUITER") ||
       u.roles?.includes("POD_LEAD");
 
-    if (!isRecruiterTemplate || u.roles?.includes("ADMIN") || u.roles?.includes("SUPER_ADMIN")) {
+    if (!isRecruiterTemplate || u.roles?.includes("TENANT_ADMIN") || u.roles?.includes("SUPER_ADMIN")) {
       return false;
     }
 

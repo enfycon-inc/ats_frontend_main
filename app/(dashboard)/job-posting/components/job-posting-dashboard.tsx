@@ -96,7 +96,7 @@ export default function JobPostingDashboard({
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
-    return permissions.includes("job:edit") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("ADMIN");
+    return permissions.includes("job:edit") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("TENANT_ADMIN");
   }, [currentUser]);
 
   const userPermissions = useMemo<string[]>(() => {
@@ -121,13 +121,13 @@ export default function JobPostingDashboard({
 
     const hasAdminRole =
       userRoles.includes("SUPERADMIN") ||
-      userRoles.includes("ADMIN") ||
+      userRoles.includes("TENANT_ADMIN") ||
       userRoles.includes("TENANTADMIN") ||
       userRoles.includes("BRANCHADMIN") ||
       userRoles.includes("DELIVERYHEAD") ||
       systemRole === "BRANCH_ADMIN" ||
       systemRole === "DELIVERY_HEAD" ||
-      systemRole === "ADMIN" ||
+      systemRole === "TENANT_ADMIN" ||
       systemRole === "SUPER_ADMIN";
 
     return Boolean(hasAdminPerm || hasAdminRole);
@@ -137,10 +137,9 @@ export default function JobPostingDashboard({
     if (!canManageBranchJobs) return false;
     const isGlobalAdmin = 
       systemRole === "SUPER_ADMIN" || 
-      systemRole === "ADMIN" || 
       systemRole === "TENANT_ADMIN" ||
       userRoles.includes("SUPERADMIN") ||
-      userRoles.includes("ADMIN") ||
+      userRoles.includes("TENANT_ADMIN") ||
       userRoles.includes("TENANTADMIN");
     return !isGlobalAdmin;
   }, [canManageBranchJobs, systemRole, userRoles]);

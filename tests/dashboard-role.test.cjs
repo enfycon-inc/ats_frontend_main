@@ -49,7 +49,7 @@ test('switching uses the exact assigned ID and preserves the custom display name
   assert.equal(result.systemRole, 'ACCOUNT_MANAGER');
 });
 test('revoked or foreign saved overrides fall back to the current primary', () => {
-  assert.equal(select(profile, [...roles, { id: 'foreign', name: 'Other Admin', systemRole: 'ADMIN' }], 'foreign').active.id, 'admin');
+  assert.equal(select(profile, [...roles, { id: 'foreign', name: 'Other Admin', systemRole: 'TENANT_ADMIN' }], 'foreign').active.id, 'admin');
 });
 test('legacy saved role names still resolve only within assigned roles', () => {
   assert.equal(select(profile, roles, 'Recruiter').systemRole, 'RECRUITER');
@@ -61,10 +61,10 @@ test('duplicate display names are distinguished by ID', () => {
 });
 
 test('the configured primary survives omission from the branch management catalog', () => {
-  const user = { roleId: 'owner', assignedRoleIds: ['owner', 'recruiter'], roleName: 'Workspace Owner', systemRole: 'ADMIN' };
+  const user = { roleId: 'owner', assignedRoleIds: ['owner', 'recruiter'], roleName: 'Workspace Owner', systemRole: 'TENANT_ADMIN' };
   const result = select(user, [roles[0]], null, false);
   assert.equal(result.active.id, 'owner');
-  assert.equal(result.systemRole, 'ADMIN');
+  assert.equal(result.systemRole, 'TENANT_ADMIN');
 });
 
 test('sidebar hydration uses the server-selected role despite different browser storage', () => {

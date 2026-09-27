@@ -20,25 +20,26 @@ const ids = items => items.map(item => item.id);
 const children = (items, id) => items.find(item => item.id === id)?.children?.map(item => item.href) || [];
 
 test('an admin omitted from the branch catalog retains navigation from the live profile', () => {
-  const profile = { roleId: 'tenant-admin-id', systemRole: 'ADMIN', permissions: ['job:view', 'client:view', 'user:manage', 'tenant:settings'] };
+  const profile = { roleId: 'tenant-admin-id', systemRole: 'TENANT_ADMIN', permissions: ['job:view', 'client:view', 'user:manage', 'tenant:settings'] };
   assert.deepEqual(getActiveRolePermissions(profile.roleId, [], profile), profile.permissions);
   assert.ok(ids(getFilteredPrimaryNav(profile.roleId, [], profile)).includes('clients'));
+  assert.ok(children(getFilteredPrimaryNav(profile.roleId, [], profile), 'branch-units').includes('/management/branch'));
   const more = ids(getFilteredMoreNav(profile.roleId, [], profile));
-  for (const id of ['user-management', 'role-management', 'branch-management', 'dictionaries']) assert.ok(more.includes(id), id);
+  for (const id of ['user-management', 'role-management', 'dictionaries']) assert.ok(more.includes(id), id);
 });
 
 test('renaming an inherited role never grants or hides capabilities', () => {
   const profile = { permissions: ['job:view', 'client:view', 'user:manage'] };
   const role = { id: 'branch-role', name: 'Recruiting Partner', systemRole: 'ACCOUNT_MANAGER', permissions: ['candidate:view'] };
   const before = getFilteredMoreNav(role.id, [role], profile);
-  const after = getFilteredMoreNav(role.id, [{ ...role, name: 'Office Director', systemRole: 'ADMIN' }], profile);
+  const after = getFilteredMoreNav(role.id, [{ ...role, name: 'Office Director', systemRole: 'TENANT_ADMIN' }], profile);
   assert.deepEqual(after, before);
   assert.ok(ids(before).includes('user-management'));
   assert.ok(!ids(getFilteredPrimaryNav(role.id, [role], profile)).includes('applicants'));
 });
 
 test('an explicit empty live permission set revokes role defaults and stale catalog grants', () => {
-  const roles = [{ id: 'admin', name: 'ADMIN', systemRole: 'ADMIN', permissions: ['job:view', 'user:manage'] }];
+  const roles = [{ id: 'admin', name: 'TENANT_ADMIN', systemRole: 'TENANT_ADMIN', permissions: ['job:view', 'user:manage'] }];
   const profile = { permissions: [] };
   assert.deepEqual(getActiveRolePermissions('admin', roles, profile), []);
   assert.deepEqual(ids(getFilteredPrimaryNav('admin', roles, profile)), ['dashboard']);
@@ -47,7 +48,7 @@ test('an explicit empty live permission set revokes role defaults and stale cata
 });
 
 test('unknown role IDs and system names cannot fabricate a recruiter permission set', () => {
-  for (const role of ['missing-role-id', 'RECRUITER', 'ADMIN', 'SUPER_ADMIN']) {
+  for (const role of ['missing-role-id', 'RECRUITER', 'TENANT_ADMIN', 'SUPER_ADMIN']) {
     assert.deepEqual(getActiveRolePermissions(role, []), [], role);
     assert.deepEqual(ids(getFilteredPrimaryNav(role, [])), ['dashboard'], role);
   }
@@ -70,7 +71,7 @@ test('catalog fallback unions only assigned explicit permissions and preserves e
   const roles = [
     { id: 'one', name: 'First', permissions: ['job:view', 'candidate:view'] },
     { id: 'two', name: 'Second', permissions: ['candidate:view', 'client:view'] },
-    { id: 'empty', name: 'ADMIN', permissions: [] },
+    { id: 'empty', name: 'TENANT_ADMIN', permissions: [] },
   ];
   assert.deepEqual(getActiveRolePermissions('one', roles, { assignedRoleIds: ['one', 'two'] }), ['job:view', 'candidate:view', 'client:view']);
   assert.deepEqual(getActiveRolePermissions('empty', roles), []);
@@ -78,14 +79,14 @@ test('catalog fallback unions only assigned explicit permissions and preserves e
 
 test('revoked child actions and administrative capabilities disappear despite an admin archetype', () => {
   const profile = { permissions: ['candidate:view', 'job:view', 'report:view'] };
-  const primary = getFilteredPrimaryNav('ADMIN', [], profile);
+  const primary = getFilteredPrimaryNav('TENANT_ADMIN', [], profile);
   assert.ok(ids(primary).includes('reports'));
   assert.ok(!children(primary, 'applicants').includes('/applicants/new'));
   assert.ok(!children(primary, 'applicants').includes('/applicants/bulk'));
   assert.ok(!children(primary, 'applicants').includes('/applicants/pipeline'));
   assert.ok(!children(primary, 'job-posting').includes('/job-posting/boards'));
-  assert.ok(!ids(getFilteredMoreNav('ADMIN', [], profile)).includes('role-management'));
-  assert.equal(isRoleAdmin('ADMIN', [], profile), false);
+  assert.ok(!ids(getFilteredMoreNav('TENANT_ADMIN', [], profile)).includes('role-management'));
+  assert.equal(isRoleAdmin('TENANT_ADMIN', [], profile), false);
 });
 
 test('branch administration links to its settings without granting the tenant branch directory', () => {

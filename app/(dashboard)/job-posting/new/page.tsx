@@ -462,7 +462,7 @@ const getInitialActiveBranchContext = () => {
     if (permissions.includes("job:publish_direct")) return false;
 
     // 2. Admins bypass approval
-    if (userPerspective === "SUPER_ADMIN" || userPerspective === "ADMIN" || userPerspective === "BRANCH_ADMIN") {
+    if (userPerspective === "SUPER_ADMIN" || userPerspective === "TENANT_ADMIN" || userPerspective === "BRANCH_ADMIN") {
       return false;
     }
 
@@ -477,7 +477,7 @@ const getInitialActiveBranchContext = () => {
       const uid = u.id || u.email;
       if (!uid || seen.has(uid)) continue;
       const r = (u.roles || []).map((x: string) => x.toUpperCase());
-      if (r.includes("DELIVERY_HEAD") || r.includes("ADMIN") || r.includes("BRANCH_ADMIN") || r.includes("SUPER_ADMIN")) {
+      if (r.includes("DELIVERY_HEAD") || r.includes("TENANT_ADMIN") || r.includes("BRANCH_ADMIN") || r.includes("SUPER_ADMIN")) {
         seen.add(uid);
         list.push(u);
       }
@@ -1345,7 +1345,7 @@ const getInitialActiveBranchContext = () => {
 
       // Determine initial approval status based on creator's permissions
       const hasDirectPublish = currentUserProfile?.permissions?.includes("job:publish_direct") || 
-        currentUserProfile?.roles?.some((r: string) => ["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
+        currentUserProfile?.roles?.some((r: string) => ["TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
       const hasDesignatedReviewer = Boolean(currentUserProfile?.jobReviewerId || currentUserProfile?.jobReviewerName || currentUserProfile?.job_reviewer_id);
 
       const shouldRequireApproval = !hasDirectPublish;
@@ -1872,7 +1872,7 @@ const getInitialActiveBranchContext = () => {
               </Button>
               {(() => {
                 const hasDirectPublish = currentUserProfile?.permissions?.includes("job:publish_direct") || 
-                  currentUserProfile?.roles?.some((r: string) => ["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
+                  currentUserProfile?.roles?.some((r: string) => ["TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
                 const requiresApproval = !hasDirectPublish;
 
                 return (
@@ -3331,7 +3331,7 @@ const getInitialActiveBranchContext = () => {
                 </Button>
                 {(() => {
                   const hasDirectPublish = currentUserProfile?.permissions?.includes("job:publish_direct") || 
-                    currentUserProfile?.roles?.some((r: string) => ["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
+                    currentUserProfile?.roles?.some((r: string) => ["TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
                   const requiresApproval = !hasDirectPublish;
 
                   return (

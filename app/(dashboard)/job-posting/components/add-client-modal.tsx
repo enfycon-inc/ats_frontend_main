@@ -72,7 +72,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
 
             const userRoles = (prof.roles || []).map((r: string) => String(r).toUpperCase().replace(/[\s-_]+/g, ''));
             const userPermissions = prof.permissions || [];
-            const isSuperOrAdmin = userRoles.includes('ADMIN') || userRoles.includes('SUPERADMIN');
+            const isSuperOrAdmin = userRoles.includes('TENANT_ADMIN') || userRoles.includes('SUPERADMIN');
             const directAdd = 
               userPermissions.includes('client:direct_add') || 
               userPermissions.includes('client:approve') || 

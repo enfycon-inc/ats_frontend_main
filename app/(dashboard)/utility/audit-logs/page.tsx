@@ -32,7 +32,7 @@ export default function AuditLogsPage() {
   const userRoles: string[] = sessionUser?.roles || [sessionUser?.systemRole || "RECRUITER"];
 
   const canViewAuditLogs =
-    userRoles.some((r: string) => ["ADMIN", "SUPER_ADMIN", "TENANT_ADMIN"].includes(r)) ||
+    userRoles.some((r: string) => ["TENANT_ADMIN", "SUPER_ADMIN", "TENANT_ADMIN"].includes(r)) ||
     userPerms.includes("tenant:audit_logs") ||
     userPerms.includes("audit:view");
 

@@ -263,7 +263,7 @@ export function MassMailSettingsModal({
               ) : (
                 <div className="space-y-2">
                   {accounts.map(acc => {
-                    const privileged = ["SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "BRANCH_ADMIN"];
+                    const privileged = ["SUPER_ADMIN", "TENANT_ADMIN", "TENANT_ADMIN", "BRANCH_ADMIN"];
                     const mainRole = String(user?.role || user?.roleName || "").toUpperCase();
                     const rolesArr: string[] = Array.isArray(user?.roles) ? user.roles.map((r: any) => String(r).toUpperCase()) : [];
                     const isAdmin = privileged.includes(mainRole) || rolesArr.some((r) => privileged.includes(r));

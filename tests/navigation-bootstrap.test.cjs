@@ -8,7 +8,7 @@ const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../lib/nav
 }).outputText;
 function loader(fetch) {
   const module = { exports: {} };
-  new Function('module', 'exports', 'fetch', code)(module, module.exports, fetch);
+  new Function('module', 'exports', 'fetch', 'require', code)(module, module.exports, fetch, name => name === 'react' ? { cache: fn => fn } : {});
   return module.exports.loadNavigationBootstrap;
 }
 test('server navigation includes live profile and role definitions with authenticated uncached requests', async () => {
@@ -36,7 +36,7 @@ test('failed bootstrap does not serialize partial or unauthenticated navigation'
 
 test('assigned role metadata from the profile does not depend on the branch-filtered role catalog', async () => {
   const profile = { id: 'admin', permissions: ['tenant:settings'], assignedRoles: [
-    { id: 'tenant-admin-id', name: 'Workspace Owner', systemRole: 'ADMIN' },
+    { id: 'tenant-admin-id', name: 'Workspace Owner', systemRole: 'TENANT_ADMIN' },
   ] };
   const load = loader(async url => {
     if (!url.endsWith('/me')) throw new Error('Role catalog unavailable');

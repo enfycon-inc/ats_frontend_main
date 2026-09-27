@@ -48,6 +48,8 @@ export function UnitsContent({
   const queryBranchId = searchParams?.get("branchId") || initialBranchId || "";
 
   const [loading, setLoading] = useState(true);
+  const [canManageUnits, setCanManageUnits] = useState(false);
+  const [canViewBranchSettings, setCanViewBranchSettings] = useState(false);
   const [branches, setBranches] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string>(queryBranchId);
@@ -71,7 +73,10 @@ export function UnitsContent({
   const loadData = async () => {
     setLoading(true);
     try {
-      const currentUser = atsApi.auth.getCurrentUser();
+      const currentUser = await atsApi.auth.getProfile();
+      const permissions: string[] = currentUser?.permissions || [];
+      setCanManageUnits(permissions.some(p => ["tenant:settings", "tenant:manage", "platform:manage", "branch_admin:manage"].includes(p)));
+      setCanViewBranchSettings(permissions.some(p => ["tenant:settings", "tenant:manage", "platform:manage", "branch_admin:manage", "branch:edit"].includes(p)));
       const isGlobalAdmin = currentUser?.permissions?.includes("tenant:settings");
       const userBranchId = currentUser?.branchId;
 
@@ -184,7 +189,7 @@ export function UnitsContent({
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
+            {canManageUnits && (<Button
               onClick={() => {
                 const url = selectedBranchId && selectedBranchId !== "ALL"
                   ? `/management/units/new?branchId=${selectedBranchId}`
@@ -194,7 +199,7 @@ export function UnitsContent({
               className="h-8.5 px-3.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Plus className="h-3.5 w-3.5" /> Add Branch Unit
-            </Button>
+            </Button>)}
           </div>
         </div>
       ) : (
@@ -212,7 +217,7 @@ export function UnitsContent({
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
+            {canViewBranchSettings && (<Button
               variant="outline"
               onClick={() => {
                 if (onSwitchTab) {
@@ -224,9 +229,9 @@ export function UnitsContent({
               className="h-8.5 px-3 text-xs font-semibold border-neutral-200 dark:border-slate-700 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Building2 className="h-3.5 w-3.5 text-neutral-500" /> View Branches
-            </Button>
+            </Button>)}
 
-            <Button
+            {canManageUnits && (<Button
               onClick={() => {
                 const url = selectedBranchId && selectedBranchId !== "ALL"
                   ? `/management/units/new?branchId=${selectedBranchId}`
@@ -236,7 +241,7 @@ export function UnitsContent({
               className="h-8.5 px-3.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Plus className="h-3.5 w-3.5" /> Add Branch Unit
-            </Button>
+            </Button>)}
           </div>
         </div>
       )}
@@ -402,7 +407,7 @@ export function UnitsContent({
                           ? "Try clearing your filters or search query to see all units."
                           : "Create your first Branch Unit to establish market shifts and recruitment pods."}
                       </p>
-                      <Button
+                      {canManageUnits && (<Button
                         onClick={() => {
                           const url = selectedBranchId && selectedBranchId !== "ALL"
                             ? `/management/units/new?branchId=${selectedBranchId}`
@@ -412,7 +417,7 @@ export function UnitsContent({
                         className="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs h-8 px-3 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
                       >
                         <Plus className="h-3.5 w-3.5" /> Add Branch Unit
-                      </Button>
+                      </Button>)}
                     </div>
                   </td>
                 </tr>
@@ -610,7 +615,7 @@ export function UnitsContent({
                                 <span>Assign Staff</span>
                               </DropdownMenuItem>
 
-                              {branchId && (
+                              {branchId && canViewBranchSettings && (
                                 <DropdownMenuItem
                                   onClick={() => router.push(`/management/branch/${branchId}/edit`)}
                                   className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -624,7 +629,7 @@ export function UnitsContent({
 
                               <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
 
-                              <DropdownMenuItem
+                              {canManageUnits && (<DropdownMenuItem
                                 onClick={() => setUnitToDelete(u)}
                                 className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                               >
@@ -632,7 +637,7 @@ export function UnitsContent({
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </div>
                                 <span>Delete Unit</span>
-                              </DropdownMenuItem>
+                              </DropdownMenuItem>)}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>

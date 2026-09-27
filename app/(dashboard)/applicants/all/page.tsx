@@ -104,7 +104,7 @@ export default function AllApplicantsPage() {
     loadCandidates();
   }, [loadCandidates]);
 
-  const isTenantAdmin = systemRole === "TENANT_ADMIN" || systemRole === "ADMIN" || systemRole === "SUPER_ADMIN";
+  const isTenantAdmin = systemRole === "TENANT_ADMIN" || systemRole === "SUPER_ADMIN";
 
   // Source Counts for KPI banner
   const sourceCounts = useMemo(() => {

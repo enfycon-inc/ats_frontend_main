@@ -373,13 +373,13 @@ export default function DataTable({
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
-    return permissions.includes("job:edit") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("ADMIN");
+    return permissions.includes("job:edit") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("TENANT_ADMIN");
   }, [currentUser]);
 
   const hasCreatePermission = useMemo(() => {
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
-    return permissions.includes("job:create") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("ADMIN");
+    return permissions.includes("job:create") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("TENANT_ADMIN");
   }, [currentUser]);
 
 
@@ -398,7 +398,7 @@ export default function DataTable({
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
     const roles = (currentUser.roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
-    const isSuperOrAdmin = roles.includes("SUPERADMIN") || roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
+    const isSuperOrAdmin = roles.includes("SUPERADMIN") || roles.includes("TENANT_ADMIN") || roles.includes("SUPER_ADMIN");
     return permissions.includes("job:approve") || (permissions.length === 0 && isSuperOrAdmin);
   }, [currentUser]);
 
@@ -2314,7 +2314,7 @@ export default function DataTable({
                               const isAdminOrDeliveryHead = Boolean(
                                 currentUser?.roles?.some((r: string) => {
                                   const norm = r.toUpperCase().replace(/[\s-_]+/g, "");
-                                  return norm === "SUPERADMIN" || norm === "ADMIN" || norm === "DELIVERYHEAD" || norm === "BRANCHADMIN";
+                                  return norm === "SUPERADMIN" || norm === "TENANT_ADMIN" || norm === "DELIVERYHEAD" || norm === "BRANCHADMIN";
                                 })
                               );
 

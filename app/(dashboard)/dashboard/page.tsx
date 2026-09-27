@@ -63,6 +63,7 @@ const GlobalAdminDashboardView = dynamic(() => import("./components/global-admin
 const BranchAdminDashboardView = dynamic(() => import("./components/branch-admin-dashboard-view"), {
   ssr: false, loading: () => <DashboardViewSkeleton />,
 });
+const UnitAdminDashboardView = dynamic(() => import("./components/unit-admin-dashboard-view"));
 const AdminDashboardView = dynamic(() => import("./components/admin-dashboard-view"), {
   ssr: false, loading: () => <DashboardViewSkeleton />,
 });
@@ -265,16 +266,18 @@ export default function DashboardPage() {
 
 
       {/* Render Dashboard Widgets based on resolved systemRole */}
-      {systemRole === "SUPER_ADMIN" ? (
+      {systemRole === "SUPER_ADMIN" && profile.permissions?.includes("platform:manage") ? (
         <GlobalAdminDashboardView profile={profile} />
-      ) : systemRole === "BRANCH_ADMIN" ? (
+      ) : (systemRole === "UNIT_ADMIN" || profile.permissions?.includes("unit_admin:manage")) && !profile.permissions?.some((p: string) => ["tenant:settings", "tenant:manage", "platform:manage", "branch_admin:manage"].includes(p)) ? (
+        <UnitAdminDashboardView profile={profile} jobs={jobs} />
+      ) : systemRole === "BRANCH_ADMIN" && profile.permissions?.includes("branch_admin:manage") ? (
         <BranchAdminDashboardView 
           profile={profile} 
           jobs={jobs} 
           activeJobs={activeJobs} 
           onUpdateJob={handleUpdateJob} 
         />
-      ) : systemRole === "ADMIN" || systemRole === "TENANT_ADMIN" ? (
+      ) : systemRole === "TENANT_ADMIN" && profile.permissions?.some((p: string) => ["tenant:settings", "tenant:manage", "platform:manage"].includes(p)) ? (
         <AdminDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
       ) : systemRole === "ACCOUNT_MANAGER" ? (
         <AccountManagerDashboardView 

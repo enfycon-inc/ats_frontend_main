@@ -114,7 +114,7 @@ export function MassMailForm() {
     const rolesArr: string[] = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toUpperCase()) : [];
     
     const privileged = [
-      "SUPER_ADMIN", "TENANT_ADMIN", "ADMIN", "BRANCH_ADMIN"
+      "SUPER_ADMIN", "TENANT_ADMIN", "TENANT_ADMIN", "BRANCH_ADMIN"
     ];
     
     if (privileged.includes(mainRole)) return true;

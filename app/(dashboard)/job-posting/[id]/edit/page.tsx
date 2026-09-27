@@ -347,7 +347,7 @@ export default function EditJobPostingPage() {
       const uid = u.id || u.email;
       if (!uid || seen.has(uid)) continue;
       const r = (u.roles || []).map((x: string) => x.toUpperCase());
-      if (r.includes("DELIVERY_HEAD") || r.includes("ADMIN") || r.includes("BRANCH_ADMIN") || r.includes("SUPER_ADMIN")) {
+      if (r.includes("DELIVERY_HEAD") || r.includes("TENANT_ADMIN") || r.includes("BRANCH_ADMIN") || r.includes("SUPER_ADMIN")) {
         seen.add(uid);
         list.push(u);
       }

@@ -432,12 +432,12 @@ function CompanySettingsContent() {
   // Active perspective resolution
   const activeRoleName = overrideRole || profile?.roles?.[0] || profile?.systemRole || "RECRUITER";
   const systemRole = resolveActiveSystemRole(activeRoleName, availableRoles, profile);
-  const isSuperAdmin = activeRoleName === "SUPER_ADMIN";
+  const isSuperAdmin = profile?.permissions?.includes("platform:manage") === true;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-neutral-100 dark:bg-[#1e2734]">
       {/* Role-Specific Settings View Rendering */}
-      {systemRole === "ADMIN" || systemRole === "TENANT_ADMIN" || systemRole === "SUPER_ADMIN" ? (
+      {profile?.permissions?.some((p: string) => ["tenant:settings", "tenant:manage", "platform:manage"].includes(p)) ? (
         <TenantAdminSettingsView
           profile={profile}
           companyName={companyName}

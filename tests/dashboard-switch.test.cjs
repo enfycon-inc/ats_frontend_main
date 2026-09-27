@@ -52,6 +52,8 @@ for (const file of ['app-sidebar.tsx', 'top-navbar.tsx']) {
     const profile = { roleId: 'assigned-role-id' };
     const run = callback(`components/layout/${file}`, node => ts.isCallExpression(node) && node.expression.getText() === 'useEffect', {
       initialNavigation: null,
+      setIsLoadingProfile: () => {},
+      localStorage: { setItem: () => {} },
       atsApi: { auth: { me: () => Promise.resolve(profile), listRoles: () => new Promise(resolve => { resolveRoles = resolve; }) } },
       setLiveProfile: value => commits.push(['profile', value]),
       setAvailableRoles: value => commits.push(['roles', value]),

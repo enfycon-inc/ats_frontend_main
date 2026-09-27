@@ -6,9 +6,9 @@ import { Clock } from "lucide-react";
 export function OfficeClock() {
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
-  const [timeZoneString, setTimeZoneString] = useState("America/New_York");
-  const [shiftStart, setShiftStart] = useState("09:00 AM");
-  const [shiftEnd, setShiftEnd] = useState("06:00 PM");
+  const [timeZoneString, setTimeZoneString] = useState("UTC");
+  const [shiftStart, setShiftStart] = useState("");
+  const [shiftEnd, setShiftEnd] = useState("");
 
   const syncBranchConfig = () => {
     if (typeof window === "undefined") return;
@@ -17,7 +17,7 @@ export function OfficeClock() {
     const start = localStorage.getItem("active_branch_start_time");
     const end = localStorage.getItem("active_branch_end_time");
 
-    let resolvedTz = "America/New_York";
+    let resolvedTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     if (branchTz) {
       if (branchTz === "India" || branchTz === "IST") resolvedTz = "Asia/Kolkata";
       else if (branchTz === "USA" || branchTz === "EST" || branchTz === "EDT") resolvedTz = "America/New_York";
@@ -29,10 +29,10 @@ export function OfficeClock() {
 
     setTimeZoneString(resolvedTz);
     if (start) setShiftStart(start);
-    else setShiftStart(resolvedTz === "Asia/Kolkata" ? "09:30 AM" : "09:00 AM");
+    else setShiftStart("");
 
     if (end) setShiftEnd(end);
-    else setShiftEnd(resolvedTz === "Asia/Kolkata" ? "06:30 PM" : "06:00 PM");
+    else setShiftEnd("");
   };
 
   useEffect(() => {
@@ -177,7 +177,7 @@ export function OfficeClock() {
       </div>
       <div className={`text-[9px] font-semibold leading-tight flex items-center gap-1 ${isOpen ? "text-emerald-300" : "text-slate-300"}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? "bg-emerald-400 animate-pulse" : "bg-slate-400"}`} />
-        <span>{statusText}</span>
+        <span>{shiftStart && shiftEnd ? statusText : "Office hours unavailable"}</span>
       </div>
     </div>
   );

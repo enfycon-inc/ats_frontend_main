@@ -80,9 +80,9 @@ export default function GlobalRemarksPage() {
       userPermissions.includes("tenant:settings") ||
       userPermissions.includes("tenant:manage") ||
       userPermissions.includes("system:admin") ||
-      roles.some((r: string) => ["ADMIN", "SUPER_ADMIN", "TENANT_ADMIN"].includes(String(r).toUpperCase())) ||
-      ["ADMIN", "SUPER_ADMIN", "TENANT_ADMIN"].includes(String(sysRole || "").toUpperCase()) ||
-      ["ADMIN", "SUPER_ADMIN", "TENANT_ADMIN"].includes(String(overrideRole || "").toUpperCase())
+      roles.some((r: string) => ["TENANT_ADMIN", "SUPER_ADMIN", "TENANT_ADMIN"].includes(String(r).toUpperCase())) ||
+      ["TENANT_ADMIN", "SUPER_ADMIN", "TENANT_ADMIN"].includes(String(sysRole || "").toUpperCase()) ||
+      ["TENANT_ADMIN", "SUPER_ADMIN", "TENANT_ADMIN"].includes(String(overrideRole || "").toUpperCase())
     );
   }, [sessionUser, userPermissions, overrideRole]);
 

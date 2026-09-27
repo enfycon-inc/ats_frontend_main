@@ -159,7 +159,7 @@ export default function PendingApprovalView({
     let unitToSend: string | undefined = selectedUnitId || undefined;
 
     if (roleCategory === "TENANT_ADMIN") {
-      effectiveRole = "ADMIN";
+      effectiveRole = "TENANT_ADMIN";
       branchToSend = undefined;
       unitToSend = undefined;
     } else if (roleCategory === "BRANCH_ADMIN") {

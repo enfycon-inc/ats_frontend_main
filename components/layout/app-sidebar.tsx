@@ -103,10 +103,8 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
 
   const userProfile = liveProfile;
   const { active } = getDashboardRoleSelection(userProfile, availableRoles, overrideRole, false);
-  // Prefer systemRole (e.g. "ADMIN") over the UUID so that resolveActiveSystemRole can
-  // always resolve the correct sidebar even when availableRoles hasn't loaded yet.
-  // UUID lookup only works when availableRoles is populated; systemRole works unconditionally.
-  const activeRoleName = active.name || active.systemRole || active.id;
+  // Use the exact assigned ID; names can be duplicated across branches.
+  const activeRoleName = active.id || active.systemRole;
 
   const filteredPrimaryNav = useMemo(() => {
     return userProfile ? getFilteredPrimaryNav(activeRoleName, availableRoles, userProfile) : [];

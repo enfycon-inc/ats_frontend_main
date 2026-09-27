@@ -33,6 +33,7 @@ import { atsApi } from "@/lib/ats-api";
 import { isRoleAdmin } from "@/lib/role-permissions";
 import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 import { getSavedDashboardRole, saveDashboardRole } from "@/lib/dashboard-preference";
+import { syncAssignedOffice } from "@/lib/assigned-office";
 import { OfficeClock } from "./office-clock";
 
 // ─── Shared icon button base ─────────────────────────────────────────────────
@@ -132,7 +133,7 @@ function NotificationDropdownNav() {
   const userPerms: string[] = sessionUser?.permissions || [];
   const userRoles: string[] = sessionUser?.roles || [sessionUser?.systemRole || "RECRUITER"];
   const canViewActivityStream =
-    userRoles.some((r: string) => ["ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "DELIVERY_HEAD"].includes(r)) ||
+    userRoles.some((r: string) => ["TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN", "DELIVERY_HEAD"].includes(r)) ||
     userPerms.includes("notification:view_all") ||
     userPerms.includes("notification:broadcast") ||
     userPerms.includes("audit:view");
@@ -976,8 +977,7 @@ function ProfileDropdownNav() {
 
   const systemRoleLabels: Record<string, string> = {
     SUPER_ADMIN: "Global Admin",
-    ADMIN: "Admin",
-    TENANT_ADMIN: "Admin",
+    TENANT_ADMIN: "Tenant Admin",
     BRANCH_ADMIN: "Branch Admin",
     ACCOUNT_MANAGER: "Account Manager",
     POD_LEAD: "Pod Lead",
@@ -1056,10 +1056,10 @@ function ProfileDropdownNav() {
 
   const isUserAdmin = useMemo(() => {
     const sRole = (currentUser?.systemRole || systemRole || "").toUpperCase();
-    if (sRole === "ADMIN" || sRole === "SUPER_ADMIN" || sRole === "TENANT_ADMIN") return true;
+    if (sRole === "TENANT_ADMIN" || sRole === "SUPER_ADMIN") return true;
     return userAssignedRoleObjs.some((r: any) => {
       const u = (r.systemRole || r.name || "").toUpperCase();
-      return u.includes("ADMIN");
+      return u.includes("TENANT_ADMIN");
     });
   }, [currentUser, systemRole, userAssignedRoleObjs]);
 
@@ -1071,7 +1071,7 @@ function ProfileDropdownNav() {
     const u = rawSys.toUpperCase().replace(/[\s\-_]/g, "");
 
     // Admin / Super Admin / Branch Admin
-    if (u.includes("ADMIN")) {
+    if (u.includes("TENANT_ADMIN")) {
       return {
         Icon: ShieldCheck,
         colorClass:
@@ -1512,7 +1512,7 @@ function SandboxSwitcher() {
             const seen = new Set<string>();
             const list: { key: string; name: string; icon: string }[] = [];
             const baseRoles = [
-              { key: "ADMIN", name: "Tenant Admin", icon: "⚙️" },
+              { key: "TENANT_ADMIN", name: "Tenant Admin", icon: "⚙️" },
               { key: "ACCOUNT_MANAGER", name: "Account Manager", icon: "💼" },
               { key: "BRANCH_ADMIN", name: "Branch Admin", icon: "🏢" },
               { key: "DELIVERY_HEAD", name: "Delivery Head", icon: "🚀" },
@@ -1557,104 +1557,36 @@ function SandboxSwitcher() {
 
 function BranchSwitcher() {
   const { data: session } = useSession();
-  const [activeBranch, setActiveBranch] = useState<string>("Domestic Branch");
-
-  const [overrideRole] = useState<string | null>(() => {
-    if (typeof window !== "undefined") return localStorage.getItem("override_role");
-    return null;
-  });
-
+  const [profile, setProfile] = useState<any>(null);
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedId = localStorage.getItem("active_branch_id");
-      if (savedId === "all") {
-        setActiveBranch("All Branches");
-      } else {
-        const savedName = localStorage.getItem("active_branch_name");
-        if (savedName) {
-          setActiveBranch(savedName);
-        } else {
-          const user = atsApi.auth.getCurrentUser();
-          if (user?.branchName) setActiveBranch(user.branchName);
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const fresh = await atsApi.auth.getProfile();
+        if (cancelled || !fresh) return;
+        setProfile(fresh);
+        const permissions = fresh.permissions || [];
+        if (!permissions.some((p: string) => ["tenant:settings", "tenant:manage", "platform:manage"].includes(p))) {
+          if (syncAssignedOffice(fresh, localStorage)) window.dispatchEvent(new Event("branchChanged"));
         }
-      }
-    }
-  }, []);
-
-  const currentUser = typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null;
-  const rawRoleStr = overrideRole || (currentUser?.roles && currentUser.roles[0]);
-  const systemRole = resolveActiveSystemRole(rawRoleStr, undefined, currentUser);
-  const perms = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
-  const isTenantAdmin = systemRole === "ADMIN" || systemRole === "SUPER_ADMIN" || systemRole === "TENANT_ADMIN" || perms.includes("tenant:settings") || perms.includes("tenant:manage");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const currentId = localStorage.getItem("active_branch_id");
-      
-      if (isTenantAdmin) {
-        if (currentId !== "all") {
-          localStorage.setItem("active_branch_id", "all");
-          localStorage.setItem("active_branch_name", "All Branches");
-          window.dispatchEvent(new Event("branchChanged"));
-          setTimeout(() => window.location.reload(), 50);
-        }
-      } else {
-        // Enforce assigned branch for non-admins to prevent them from being stuck on 'all'
-        if (currentId === "all" || !currentId) {
-          const user = atsApi.auth.getCurrentUser();
-          if (user?.branchId) {
-            localStorage.setItem("active_branch_id", user.branchId);
-            localStorage.setItem("active_branch_name", user.branchName || "Assigned Office");
-            setActiveBranch(user.branchName || "Assigned Office");
-            window.dispatchEvent(new Event("branchChanged"));
-            // setTimeout(() => window.location.reload(), 50);
-          }
-        }
-      }
-    }
-  }, [isTenantAdmin]);
-
-  const [city, setCity] = useState<string>("");
-  const [unitName, setUnitName] = useState<string>("");
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && !isTenantAdmin) {
-      atsApi.auth.getProfile().then(p => {
-        if (p?.branch?.city) setCity(p.branch.city);
-        if (p?.businessUnit?.name) setUnitName(p.businessUnit.name);
-        else if (p?.businessUnitName) setUnitName(p.businessUnitName);
-        else if (p?.business_unit?.name) setUnitName(p.business_unit.name);
-      }).catch(() => {});
-    }
-  }, [isTenantAdmin]);
-
-  if (isTenantAdmin) return null;
-
+      } catch { if (!cancelled) setProfile(null); }
+    };
+    refresh();
+    window.addEventListener("app:refresh", refresh);
+    return () => { cancelled = true; window.removeEventListener("app:refresh", refresh); };
+  }, [session?.user?.email]);
+  if (!profile || isRoleAdmin(null, [], profile)) return null;
   return (
-    <div 
-      title="Your branch context is fixed to your assigned home office."
-      className="
-        flex flex-col items-center justify-center
-        h-9 px-2.5 rounded-lg
-        bg-white/10 text-white/90
-        border border-white/15 shadow-2xs
-        cursor-default select-none
-      "
-    >
-      <div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide">
-        <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-indigo-200" />
-        <span suppressHydrationWarning>Office: {activeBranch}{city ? ` - ${city}` : ""}</span>
+    <div title="Your assigned office and unit" className="flex flex-col items-center justify-center h-9 px-2.5 rounded-lg bg-white/10 text-white/90 border border-white/15">
+      <div className="flex items-center gap-1.5 text-[11px] font-bold">
+        <MapPin className="w-3.5 h-3.5 text-indigo-200" />
+        <span>Office: {profile.branchName || "No office assigned"}</span>
       </div>
-      {unitName && (
-        <div className="text-[9.5px] font-medium text-white/70 -mt-1" suppressHydrationWarning>
-          Unit: {unitName}
-        </div>
-      )}
+      {profile.businessUnitName && <span className="text-[10px]">Unit: {profile.businessUnitName}</span>}
     </div>
   );
 }
 
-  // ---------------------------
   export function NavbarRight() {
   return (
     <div className="flex items-center gap-1.5">

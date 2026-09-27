@@ -1169,7 +1169,7 @@ export default function SubmissionsPage() {
     return getActiveRolePermissions(activeRoleName, availableRoles, currentUser);
   }, [activeRoleName, availableRoles, currentUser]);
 
-  const isAdmin = activeSystemRole === "ADMIN" || activeSystemRole === "SUPER_ADMIN" || activeSystemRole === "TENANT_ADMIN";
+  const isAdmin = activeSystemRole === "TENANT_ADMIN" || activeSystemRole === "SUPER_ADMIN";
   const isDeliveryHead = activeSystemRole === "DELIVERY_HEAD";
   const isAm = activeSystemRole === "ACCOUNT_MANAGER";
   const isPodLead = activeSystemRole === "POD_LEAD";

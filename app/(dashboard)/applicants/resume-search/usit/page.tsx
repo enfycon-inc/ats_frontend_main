@@ -42,7 +42,7 @@ export default function UsItSearchPage() {
   useEffect(() => {
     const currentUser = atsApi.auth.getCurrentUser();
     if (currentUser) {
-      const isAuth = currentUser.roles?.includes("ADMIN") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.permissions?.includes("candidate:search_all_markets");
+      const isAuth = currentUser.roles?.includes("TENANT_ADMIN") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.permissions?.includes("candidate:search_all_markets");
       setCanSearchAllMarkets(!!isAuth);
     }
   }, []);
