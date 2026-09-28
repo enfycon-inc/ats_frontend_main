@@ -235,7 +235,7 @@ export default function PendingApprovalView({
   // ─── STATE 1: Already Requested Role (Hang Tight Screen) ───────────────────
   if (requestedRole) {
     return (
-      <div className="flex min-h-[calc(100vh-6rem)] w-full items-center justify-center p-4">
+      <div className="w-full p-4 py-8 md:py-12">
         <div className="w-full max-w-lg mx-auto p-8 sm:p-10 bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-neutral-100 dark:border-slate-800 text-center animate-in fade-in zoom-in duration-300">
           <div className="flex justify-center mb-6 relative">
             <div className="absolute inset-0 bg-amber-400/20 blur-2xl rounded-full w-28 h-28 mx-auto animate-pulse" />
@@ -326,7 +326,7 @@ export default function PendingApprovalView({
   })();
 
   return (
-    <div className="flex min-h-[calc(100vh-6rem)] w-full items-center justify-center p-4 py-8">
+    <div className="w-full p-4 py-8 md:py-12">
       <div className="w-full max-w-4xl mx-auto animate-in fade-in zoom-in duration-300">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold uppercase tracking-wider mb-4">

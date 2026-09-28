@@ -161,13 +161,15 @@ export function ClientRoot({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="min-h-screen bg-neutral-50 dark:bg-[#121820] flex flex-col justify-center items-center">
-            <PendingApprovalView
-              initialRequestedRole={requestedRole}
-              userEmail={(session as any)?.user?.email || initialNavigation?.profile?.email}
-              userName={(session as any)?.user?.name || initialNavigation?.profile?.fullName}
-              tenantName={initialNavigation?.profile?.tenant?.name}
-            />
+          <div className="min-h-screen bg-neutral-50 dark:bg-[#121820] flex flex-col overflow-y-auto overflow-x-hidden">
+            <div className="my-auto w-full">
+              <PendingApprovalView
+                initialRequestedRole={requestedRole}
+                userEmail={(session as any)?.user?.email || initialNavigation?.profile?.email}
+                userName={(session as any)?.user?.name || initialNavigation?.profile?.fullName}
+                tenantName={initialNavigation?.profile?.tenant?.name}
+              />
+            </div>
             <Toaster position="top-center" reverseOrder={false} />
           </div>
         </ThemeProvider>
