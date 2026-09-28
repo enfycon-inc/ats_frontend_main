@@ -65,6 +65,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
     const children = item.children.filter(child => {
       if (["/applicants/new", "/applicants/bulk"].includes(child.href)) return has("candidate:create");
       if (child.href === "/applicants/pipeline") return has("submission:view");
+      if (child.href === "/job-posting/drafts") return has("job:create");
       if (child.href === "/job-posting/boards") return has("job:publish_direct");
       if (child.href === "/management/branch") return has("tenant:settings", "tenant:manage", "branch:create");
       if (child.href === "/management/markets") return has("tenant:settings", "tenant:manage");
