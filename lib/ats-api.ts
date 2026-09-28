@@ -221,7 +221,24 @@ async function apiFetch<T = any>(
   }
   const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
   const tenantDomain = typeof window !== 'undefined' ? (window.location.hostname === 'localhost' ? '' : window.location.hostname.split('.')[0]) : null;
-  const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null;
+  let tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null;
+
+  if (typeof window !== 'undefined' && tenantId) {
+    try {
+      const userStr = localStorage.getItem('ats_current_user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        const isSuperAdmin = user.systemRole === 'SUPER_ADMIN' || (user.roles && user.roles.includes('SUPER_ADMIN'));
+        if (!isSuperAdmin && user.tenantId && user.tenantId !== tenantId) {
+          // If a non-super-admin has a stale impersonation tenant_id from a previous session, do not send it.
+          tenantId = null;
+          localStorage.removeItem('tenant_id');
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
