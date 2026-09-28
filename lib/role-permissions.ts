@@ -29,19 +29,27 @@ export function resolveActiveSystemRole(input: any, roles: CustomRoleDefinition[
 }
 
 export function getActiveRolePermissions(input: any, roles: CustomRoleDefinition[] = [], profile?: any): string[] {
-  // The live backend union is authoritative, including an explicitly empty array.
+  const catalog = [...(profile?.assignedRoles || []), ...roles];
+
+  if (input) {
+    const inputs = Array.isArray(input) ? input : [input];
+    let foundRole = false;
+    const resolvedPerms = inputs.flatMap(value => {
+      const exact = catalog.find(r => r.id === value);
+      const matches = catalog.filter(r => r.name?.toLowerCase() === String(value).toLowerCase());
+      const role = exact || (matches.length === 1 ? matches[0] : undefined);
+      if (role) foundRole = true;
+      return Array.isArray(role?.permissions) ? role.permissions : [];
+    });
+    if (foundRole) return [...new Set(resolvedPerms)];
+  }
+
+  // Fallback to the live backend union
   if (Array.isArray(profile?.permissions)) return profile.permissions;
   const assigned = new Set<string>([...(profile?.assignedRoleIds || []), profile?.roleId].filter(Boolean));
-  const catalog = [...(profile?.assignedRoles || []), ...roles];
   if (assigned.size) return [...new Set<string>(catalog.filter(r => assigned.has(r.id)).flatMap(r => Array.isArray(r.permissions) ? r.permissions : []))];
-  // A supplied catalog can provide explicit capabilities, never fabricated defaults.
-  const inputs = Array.isArray(input) ? input : [input];
-  return [...new Set<string>(inputs.flatMap(value => {
-    const exact = catalog.find(r => r.id === value);
-    const matches = catalog.filter(r => r.name?.toLowerCase() === String(value).toLowerCase());
-    const role = exact || (matches.length === 1 ? matches[0] : undefined);
-    return Array.isArray(role?.permissions) ? role.permissions : [];
-  }))];
+  
+  return [];
 }
 
 export function isRoleAdmin(input: any, roles: CustomRoleDefinition[] = [], profile?: any): boolean {
