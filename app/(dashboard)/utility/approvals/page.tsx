@@ -14,6 +14,9 @@ import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { getBaseDomain } from "@/utils/subdomain-helper";
 import { CrossBranchApprovalsView } from "./cross-branch-approvals";
+import DataTable from "@/components/shared/data-table";
+import { MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 interface PendingUser {
   id: string;
@@ -52,6 +55,15 @@ export default function ApprovalsPage() {
   const [isBranchAdmin, setIsBranchAdmin] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"pending" | "tenants" | "cross-branch">(initialTab === "cross-branch" ? "cross-branch" : (initialTab === "pending" ? "pending" : "tenants"));
+
+  const [selectedTenantColumns] = useState(["company", "domain", "status", "seats", "branches"]);
+  const allTenantColumns = [
+    { id: "company", label: "Company Details" },
+    { id: "domain", label: "Assigned Domain" },
+    { id: "status", label: "Status" },
+    { id: "seats", label: "Seats Limit" },
+    { id: "branches", label: "Max Branches" },
+  ];
 
   useEffect(() => {
     if (initialTab === "pending") {
@@ -665,129 +677,91 @@ export default function ApprovalsPage() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-default-50 dark:bg-slate-800/50 border-b border-default-100">
-                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Company Details</th>
-                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Assigned Domain</th>
-                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Status</th>
-                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Seats Limit</th>
-                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Max Branches</th>
-                        
-                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-default-100">
-                      {activeTenants.map((tenant) => {
+                <DataTable
+                  data={activeTenants}
+                  selectedColumns={selectedTenantColumns}
+                  allColumns={allTenantColumns}
+                  onOpenFilters={() => {}}
+                  onOpenColumns={() => {}}
+                  onRefresh={loadData}
+                  onSaveView={() => {}}
+                  savedViews={[]}
+                  activeView="Default"
+                  onSelectView={() => {}}
+                  searchFilterOptions={[{ label: "Company Name", value: "All" }]}
+                  customCellRenderer={(row, colId) => {
+                    switch (colId) {
+                      case "company":
                         return (
-                          <tr key={tenant.id} className="hover:bg-default-50/50 dark:hover:bg-slate-800/10 transition-colors">
-                            <td className="py-4 px-6">
-                              <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-lg bg-indigo-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg border border-indigo-100 dark:border-slate-700">
-                                  <Icon icon="heroicons:building-office-2" className="h-5 w-5" />
-                                </div>
-                                <div>
-                                  <div className="font-semibold text-default-900 text-sm">{tenant.name}</div>
-                                  <div className="text-[10px] text-default-400">ID: {tenant.id}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-4 px-6">
-                              <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-slate-800/60 px-2.5 py-1 rounded border border-indigo-100 dark:border-slate-700">
-                                {tenant.domain}
-                              </span>
-                            </td>
-                            <td className="py-4 px-6">
-                              <div className="flex items-center gap-2">
-                                <Switch
-                                  id={`tenant-status-${tenant.id}`}
-                                  checked={tenant.status === "ACTIVE"}
-                                  onCheckedChange={() => handleTenantStatusToggle(tenant.id, tenant.status)}
-                                  disabled={submittingId === tenant.id}
-                                />
-                                <span className={`text-xs font-bold ${tenant.status === "ACTIVE" ? "text-emerald-600" : "text-amber-600"}`}>
-                                  {tenant.status}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-4 px-6">
-                              <div className="flex items-center gap-1.5">
-                                <input
-                                  type="number"
-                                  min="1"
-                                  defaultValue={tenant.userLimit || 20}
-                                  onBlur={(e) => {
-                                    const val = parseInt(e.target.value, 10);
-                                    if (!isNaN(val) && val !== tenant.userLimit) {
-                                      handleTenantUserLimitChange(tenant.id, val);
-                                    }
-                                  }}
-                                  className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-indigo-600 bg-transparent text-default-850"
-                                />
-                                <span className="text-[10px] text-default-500 font-medium">seats</span>
-                              </div>
-                            </td>
-                            <td className="py-4 px-6">
-                              <div className="flex items-center gap-1.5">
-                                <input
-                                  type="number"
-                                  min="1"
-                                  defaultValue={tenant.maxBranches || 5}
-                                  onBlur={(e) => {
-                                    const val = parseInt(e.target.value, 10);
-                                    if (!isNaN(val) && val !== tenant.maxBranches) {
-                                      handleTenantBranchLimitChange(tenant.id, val);
-                                    }
-                                  }}
-                                  className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-indigo-600 bg-transparent text-default-850"
-                                />
-                                <span className="text-[10px] text-default-500 font-medium">branches</span>
-                              </div>
-                            </td>
-                            <td className="py-4 px-6">
-                              <div className="flex bg-default-100 dark:bg-slate-800 p-0.5 rounded-lg border border-default-200/50 w-fit">
-                                <button
-                                  onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
-                                  disabled={submittingId === tenant.id}
-                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-                                    tenant.defaultMarket === "US"
-                                      ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs"
-                                      : "text-default-500 hover:text-default-800"
-                                  }`}
-                                >
-                                  🇺🇸 US IT
-                                </button>
-                                <button
-                                  onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
-                                  disabled={submittingId === tenant.id}
-                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-                                    tenant.defaultMarket === "IN"
-                                      ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs"
-                                      : "text-default-500 hover:text-default-800"
-                                  }`}
-                                >
-                                  🇮🇳 India
-                                </button>
-                              </div>
-                            </td>
-                            <td className="py-4 px-6 text-right">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleViewTenantDetails(tenant)}
-                                className="font-semibold text-xs flex items-center gap-1.5 ml-auto cursor-pointer"
-                              >
-                                <Icon icon="heroicons:eye" className="h-3.5 w-3.5 text-indigo-600" />
-                                Details & Users
-                              </Button>
-                            </td>
-                          </tr>
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-indigo-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg border border-indigo-100 dark:border-slate-700">
+                              <Icon icon="heroicons:building-office-2" className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-default-900 text-sm">{row.name}</div>
+                              <div className="text-[10px] text-default-400">ID: {row.id}</div>
+                            </div>
+                          </div>
                         );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                      case "domain":
+                        return (
+                          <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-slate-800/60 px-2.5 py-1 rounded border border-indigo-100 dark:border-slate-700">
+                            {row.domain}
+                          </span>
+                        );
+                      case "status":
+                        return (
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              id={`tenant-status-${row.id}`}
+                              checked={row.status === "ACTIVE"}
+                              onCheckedChange={() => handleTenantStatusToggle(row.id, row.status)}
+                              disabled={submittingId === row.id}
+                            />
+                            <span className={`text-xs font-bold ${row.status === "ACTIVE" ? "text-emerald-600" : "text-amber-600"}`}>
+                              {row.status}
+                            </span>
+                          </div>
+                        );
+                      case "seats":
+                        return (
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-16 text-xs font-semibold text-default-850">{row.userLimit || 20}</span>
+                            <span className="text-[10px] text-default-500 font-medium">seats</span>
+                          </div>
+                        );
+                      case "branches":
+                        return (
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-16 text-xs font-semibold text-default-850">{row.maxBranches || 5}</span>
+                            <span className="text-[10px] text-default-500 font-medium">branches</span>
+                          </div>
+                        );
+                      default:
+                        return null;
+                    }
+                  }}
+                  actionsRenderer={(row) => (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleViewTenantDetails(row)} className="cursor-pointer font-medium text-xs">
+                          <Icon icon="heroicons:eye" className="h-4 w-4 mr-2 text-indigo-500" />
+                          Details & Users
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                  topRightActions={
+                    <Button onClick={() => setShowCreateTenantModal(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-semibold h-9 px-4 gap-2 text-xs rounded-lg">
+                      <Icon icon="heroicons:plus-circle" className="h-4 w-4" /> Create Manual Tenant
+                    </Button>
+                  }
+                />
               )}
             </CardContent>
           </Card>
