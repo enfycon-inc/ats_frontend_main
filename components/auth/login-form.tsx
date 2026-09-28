@@ -308,15 +308,26 @@ const LoginForm = () => {
     });
   };
 
-  if (isAuthorizingSso) {
+  if (isAuthorizingSso || isPending) {
     return (
-      <div className="flex flex-col items-center justify-center py-10 space-y-4 text-center">
-        <div className="relative flex items-center justify-center">
-          <div className="w-10 h-10 rounded-full border-2 border-indigo-600/20 border-t-indigo-600 animate-spin" />
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm">
+        <div className="relative mb-6">
+          <div className="w-14 h-14 rounded-full border-4 border-indigo-100 dark:border-indigo-900/30" />
+          <div className="absolute inset-0 w-14 h-14 rounded-full border-4 border-transparent border-t-indigo-600 animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+          </div>
         </div>
-        <div className="space-y-1">
-          <p className="text-sm font-semibold text-slate-800">Signing into workspace...</p>
-          <p className="text-xs text-slate-400">Taking you directly to your dashboard</p>
+        <div className="text-center space-y-1.5 px-8 max-w-xs">
+          <p className="text-base font-semibold text-slate-800 dark:text-slate-100">Signing in to workspace…</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {isAuthorizingSso ? "Taking you directly to your dashboard." : "Verifying your credentials, please wait."}
+          </p>
+        </div>
+        <div className="mt-6 flex items-center gap-1.5">
+          {[0, 0.2, 0.4].map((delay, i) => (
+            <div key={i} className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: `${delay}s` }} />
+          ))}
         </div>
       </div>
     );

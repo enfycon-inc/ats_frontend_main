@@ -8,14 +8,13 @@ import { ReactNode, useEffect, useMemo, useState, Suspense } from "react";
 import type { NavigationBootstrap } from "@/lib/navigation-bootstrap";
 import { useRadixScrollLockFix } from "@/hooks/use-radix-scroll-lock-fix";
 import { Toaster } from "react-hot-toast";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopNavbar } from "@/components/layout/top-navbar";
 import { SitePageHeader } from "@/components/layout/site-page-header";
-import PendingApprovalView from "@/components/auth/pending-approval-view";
 import { SocketProvider } from "@/contexts/SocketContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -36,6 +35,13 @@ const GlobalErrorModal = dynamic(
   () => import("@/components/shared/global-error-modal").then(m => ({ default: m.GlobalErrorModal })),
   { ssr: false }
 );
+
+/** Immediately redirects to a given path on mount — used for client-side imperative navigation. */
+function AutoRedirect({ to }: { to: string }) {
+  const router = useRouter();
+  useEffect(() => { router.replace(to); }, [to, router]);
+  return null;
+}
 
 export function ClientRoot({
   children,
@@ -154,26 +160,16 @@ export function ClientRoot({
 
   if (!isApproved) {
     return (
-      <TenantBrandingProvider initialBranding={initialNavigation?.profile?.tenant}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <div className="min-h-screen bg-neutral-50 dark:bg-[#121820] flex flex-col overflow-y-auto overflow-x-hidden">
-            <div className="w-full py-8 md:py-16">
-              <PendingApprovalView
-                initialRequestedRole={requestedRole}
-                userEmail={(session as any)?.user?.email || initialNavigation?.profile?.email}
-                userName={(session as any)?.user?.name || initialNavigation?.profile?.fullName}
-                tenantName={initialNavigation?.profile?.tenant?.name}
-              />
-            </div>
-            <Toaster position="top-center" reverseOrder={false} />
+      <div className="min-h-screen w-full bg-neutral-50 dark:bg-[#121820] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full border-4 border-indigo-100 dark:border-indigo-900/30" />
+            <div className="absolute inset-0 w-12 h-12 rounded-full border-4 border-transparent border-t-indigo-600 animate-spin" />
           </div>
-        </ThemeProvider>
-      </TenantBrandingProvider>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Redirecting to setup…</p>
+        </div>
+        <AutoRedirect to="/onboarding/new-user" />
+      </div>
     );
   }
 
