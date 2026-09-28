@@ -981,14 +981,14 @@ export default function JobDetailPage() {
               </>
             )}
             {canSubmitCandidate && (
-<Button
-              size="sm"
-              onClick={() => setUploadSubmitOpen(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 text-xs cursor-pointer"
-            >
-              <Upload className="h-3.5 w-3.5" /> Submit New Candidate
-            </Button>
-)}
+              <Button
+                size="sm"
+                onClick={() => setUploadSubmitOpen(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 text-xs cursor-pointer"
+              >
+                <Upload className="h-3.5 w-3.5" /> Submit New Candidate
+              </Button>
+            )}
             {hasEditPermission && (
               <Link href={`/job-posting/${job.id}/edit`}>
                 <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 cursor-pointer">
@@ -1162,14 +1162,14 @@ export default function JobDetailPage() {
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                   {canSubmitCandidate && (
-<Button
-                    size="sm"
-                    onClick={() => setUploadSubmitOpen(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1 text-xs h-8 shadow-xs rounded-lg cursor-pointer"
-                  >
-                    <Upload className="h-3.5 w-3.5" /> Submit New Candidate
-                  </Button>
-)}
+                    <Button
+                      size="sm"
+                      onClick={() => setUploadSubmitOpen(true)}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1 text-xs h-8 shadow-xs rounded-lg cursor-pointer"
+                    >
+                      <Upload className="h-3.5 w-3.5" /> Submit New Candidate
+                    </Button>
+                  )}
                   {submissions.length > 0 && (
                     <Button
                       size="sm"
@@ -1194,14 +1194,14 @@ export default function JobDetailPage() {
                   </p>
                   <div className="flex items-center justify-center gap-2">
                     {canSubmitCandidate && (
-<Button
-                      size="sm"
-                      onClick={() => setUploadSubmitOpen(true)}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 text-xs h-8.5 rounded-lg shadow-sm cursor-pointer"
-                    >
-                      <Upload className="h-3.5 w-3.5" /> Upload &amp; Submit Candidate CV
-                    </Button>
-)}
+                      <Button
+                        size="sm"
+                        onClick={() => setUploadSubmitOpen(true)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 text-xs h-8.5 rounded-lg shadow-sm cursor-pointer"
+                      >
+                        <Upload className="h-3.5 w-3.5" /> Upload &amp; Submit Candidate CV
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
