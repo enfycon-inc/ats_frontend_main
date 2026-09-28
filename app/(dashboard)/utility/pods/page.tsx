@@ -97,6 +97,9 @@ export default function PodsPage() {
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
   const [activeView, setActiveView] = useState<"all" | "cycle">("all");
 
+  const userPerms = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+  const canManage = isTenantAdmin || isUnitScoped || userPerms.includes("pod:manage") || userPerms.includes("pod:create") || userPerms.includes("pod:edit") || currentUser?.systemRole === "BRANCH_ADMIN";
+
   // Modal Pop-up state
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [selectedPod, setSelectedPod] = useState<Pod | null>(null);
@@ -496,11 +499,11 @@ export default function PodsPage() {
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Unit Scope Display: Locked Badge for Unit Admins / Delivery Heads */}
-          {isUnitScoped ? (
+          {!isTenantAdmin ? (
             <div className="flex items-center gap-1.5 bg-indigo-50/70 dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-2xs">
               <Icon icon="heroicons:rectangle-group" className="h-4 w-4 text-indigo-600 shrink-0" />
               <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                Unit: <strong className="text-indigo-700 dark:text-indigo-400 font-bold">{assignedUnitName}</strong>
+                Unit: <strong className="text-indigo-700 dark:text-indigo-400 font-bold">{assignedUnitName || "My Unit"}</strong>
               </span>
             </div>
           ) : (
@@ -544,24 +547,28 @@ export default function PodsPage() {
             </div>
           )}
 
-          <Button
-            onClick={handleResetRR}
-            disabled={submitting}
-            variant="outline"
-            className="flex items-center gap-1.5 border-neutral-300 dark:border-slate-700 font-semibold text-xs h-8.5 px-3 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"
-          >
-            <Icon icon="heroicons:arrow-path" className="h-3.5 w-3.5" />
-            Reset Cycle
-          </Button>
+          {canManage && (
+            <>
+              <Button
+                onClick={handleResetRR}
+                disabled={submitting}
+                variant="outline"
+                className="flex items-center gap-1.5 border-neutral-300 dark:border-slate-700 font-semibold text-xs h-8.5 px-3 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-800"
+              >
+                <Icon icon="heroicons:arrow-path" className="h-3.5 w-3.5" />
+                Reset Cycle
+              </Button>
 
-          <Button
-            onClick={openCreateModal}
-            disabled={submitting}
-            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs text-xs h-8.5 px-3.5 cursor-pointer"
-          >
-            <Icon icon="heroicons:plus" className="h-3.5 w-3.5" />
-            Create Pod
-          </Button>
+              <Button
+                onClick={openCreateModal}
+                disabled={submitting}
+                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs text-xs h-8.5 px-3.5 cursor-pointer"
+              >
+                <Icon icon="heroicons:plus" className="h-3.5 w-3.5" />
+                Create Pod
+              </Button>
+            </</>
+          )}
         </div>
       </div>
 
@@ -613,9 +620,11 @@ export default function PodsPage() {
                   <th className="py-3 px-4 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-center">
                     Cycle Status
                   </th>
-                  <th className="py-3 px-4 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-right">
-                    Actions
-                  </th>
+                  {canManage && (
+                    <th className="py-3 px-4 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-right">
+                      Actions
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-slate-800 text-xs">
@@ -745,24 +754,26 @@ export default function PodsPage() {
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3 px-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => openEditModal(pod)}
-                            className="p-1 rounded-md border border-neutral-200 dark:border-slate-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 transition cursor-pointer"
-                            title="Edit Pod Details & Members"
-                          >
-                            <Icon icon="heroicons:pencil-square" className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeletePod(pod.id, pod.name)}
-                            className="p-1 rounded-md border border-neutral-200 dark:border-slate-700 hover:border-red-500 hover:bg-red-50 dark:hover:bg-slate-800 text-neutral-400 hover:text-red-600 transition cursor-pointer"
-                            title="Delete Pod"
-                          >
-                            <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </td>
+                      {canManage && (
+                        <td className="py-3 px-4 whitespace-nowrap text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => openEditModal(pod)}
+                              className="p-1 rounded-md border border-neutral-200 dark:border-slate-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 transition cursor-pointer"
+                              title="Edit Pod Details & Members"
+                            >
+                              <Icon icon="heroicons:pencil-square" className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeletePod(pod.id, pod.name)}
+                              className="p-1 rounded-md border border-neutral-200 dark:border-slate-700 hover:border-red-500 hover:bg-red-50 dark:hover:bg-slate-800 text-neutral-400 hover:text-red-600 transition cursor-pointer"
+                              title="Delete Pod"
+                            >
+                              <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
