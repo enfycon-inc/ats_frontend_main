@@ -69,7 +69,7 @@ export default async function OnboardingNewUserPage() {
     <SessionProvider session={session}>
       <TenantBrandingProvider initialBranding={initialNavigation?.profile?.tenant}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <div className="min-h-screen w-full bg-neutral-50 dark:bg-[#121820] flex flex-col">
+          <div className="h-screen w-full bg-neutral-50 dark:bg-[#121820] flex flex-col overflow-hidden">
             <OnboardingNewUserClient
               session={session}
               initialNavigation={initialNavigation}
