@@ -567,7 +567,7 @@ export default function PodsPage() {
                 <Icon icon="heroicons:plus" className="h-3.5 w-3.5" />
                 Create Pod
               </Button>
-            </</>
+            </>
           )}
         </div>
       </div>
