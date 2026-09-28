@@ -64,7 +64,7 @@ const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, 
             <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
             <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
           </svg>
-          <span>{isSingle ? "Continue with Microsoft 365" : "Microsoft"}</span>
+          <span>{isSingle ? "Continue with Microsoft" : "Microsoft"}</span>
         </button>
       )}
     </div>

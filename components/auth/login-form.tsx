@@ -331,14 +331,18 @@ const LoginForm = () => {
   const hasSocial = showGoogle || showMicrosoft;
   const socialLogin = (
     <div className="space-y-2">
-      <Social
-        showGoogle={showGoogle}
-        showMicrosoft={showMicrosoft}
-        tenantId={authPolicy.tenantId}
-        microsoftReady={authPolicyStatus === "ready" && showMicrosoft && microsoftConfigured}
-      />
-      {authPolicyStatus === "loading" && (
-        <p role="status" className="text-xs text-slate-500">Checking workspace sign-in options...</p>
+      {authPolicyStatus === "loading" ? (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="h-11 rounded-xl bg-slate-200/50 dark:bg-slate-800/50 animate-pulse w-full"></div>
+          <div className="h-11 rounded-xl bg-slate-200/50 dark:bg-slate-800/50 animate-pulse w-full"></div>
+        </div>
+      ) : (
+        <Social
+          showGoogle={showGoogle}
+          showMicrosoft={showMicrosoft}
+          tenantId={authPolicy.tenantId}
+          microsoftReady={authPolicyStatus === "ready" && showMicrosoft && microsoftConfigured}
+        />
       )}
       {authPolicyStatus === "error" && (
         <p role="alert" className="text-xs text-red-600">
