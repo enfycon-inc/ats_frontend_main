@@ -90,18 +90,31 @@ export default function JobPostingDashboard({
     return resolveActiveSystemRole(currentUser.roles, [], currentUser);
   }, [currentUser]);
 
-  const isRecruiter = systemRole === "RECRUITER" || systemRole === "POD_LEAD";
-  const isAccountManager = systemRole === "ACCOUNT_MANAGER";
-
-  const hasEditPermission = useMemo(() => {
-    if (!currentUser) return false;
-    const permissions = currentUser.permissions || [];
-    return permissions.includes("job:edit") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("TENANT_ADMIN");
-  }, [currentUser]);
-
   const userPermissions = useMemo<string[]>(() => {
     return Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
   }, [currentUser]);
+
+  const isGlobalOrBranchAdmin = useMemo(() => {
+    return userPermissions.some(p => [
+      'tenant:manage', 'tenant:settings', 'branch_admin:manage', 'job:view_all',
+      'platform:manage', 'unit_admin:manage', 'job:view_all_branches'
+    ].includes(p));
+  }, [userPermissions]);
+
+  const isAccountManager = !isGlobalOrBranchAdmin && (
+    systemRole === "ACCOUNT_MANAGER" || 
+    currentUser?.roles?.includes('AM') ||
+    currentUser?.roles?.includes('ACCOUNT_MANAGER') ||
+    userPermissions.includes('job:create')
+  );
+
+  const isRecruiter = !isGlobalOrBranchAdmin && !isAccountManager;
+
+  const hasEditPermission = useMemo(() => {
+    if (!currentUser) return false;
+    return userPermissions.includes("job:edit") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("TENANT_ADMIN");
+  }, [currentUser, userPermissions]);
+
 
   const userRoles = useMemo<string[]>(() => {
     return Array.isArray(currentUser?.roles)
