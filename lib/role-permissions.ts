@@ -63,6 +63,22 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
   return PRIMARY_NAV_ITEMS.filter(item => allowed[item.id]).map(item => {
     if (!item.children) return item;
     const children = item.children.filter(child => {
+      const isGlobalOrBranchAdmin = has('tenant:manage', 'tenant:settings', 'branch_admin:manage', 'job:view_all', 'platform:manage', 'unit_admin:manage', 'job:view_all_branches');
+      const isAccountManager = !isGlobalOrBranchAdmin && (
+        resolveActiveSystemRole(input, roles, profile) === "ACCOUNT_MANAGER" || 
+        profile?.roles?.includes('AM') || 
+        profile?.roles?.includes('ACCOUNT_MANAGER') || 
+        has("job:create")
+      );
+
+      // ── Specific Removals for Account Manager ──
+      if (isAccountManager) {
+        if (child.href === "/job-posting?filter=pod") return false;
+        if (child.href === "/job-posting/boards") return false;
+        if (child.href === "/utility/submissions?view=pod") return false;
+        if (child.href === "/applicants/resume-search/usit") return false;
+      }
+
       if (["/applicants/new", "/applicants/bulk"].includes(child.href)) return has("candidate:create");
       if (child.href === "/applicants/pipeline") return has("submission:view");
       if (child.href === "/job-posting/drafts") return has("job:create");
