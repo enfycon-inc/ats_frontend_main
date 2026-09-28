@@ -6,18 +6,21 @@ function fixIncomingRequest(req: NextRequest | Request): NextRequest | Request {
   const proto = req.headers.get("x-forwarded-proto") || "https";
 
   if (host) {
-    // Strip any internal port like :3000 that might have leaked
-    const cleanHost = host.split(":")[0];
+    // Keep port for local development so redirects don't break
+    const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
+    const cleanHost = isLocal ? host : host.split(":")[0];
+    const finalPort = isLocal ? (host.split(":")[1] || "") : "";
+    
     try {
       const parsed = new URL(req.url);
       parsed.host = cleanHost;
-      parsed.port = "";
-      parsed.protocol = proto.endsWith(":") ? proto : `${proto}:`;
+      parsed.port = finalPort;
+      parsed.protocol = isLocal ? "http:" : (proto.endsWith(":") ? proto : `${proto}:`);
       
       const newHeaders = new Headers(req.headers);
       newHeaders.set("host", cleanHost);
       newHeaders.set("x-forwarded-host", cleanHost);
-      newHeaders.set("x-forwarded-port", proto === "https" ? "443" : "80");
+      newHeaders.set("x-forwarded-port", isLocal ? (finalPort || "80") : (proto === "https" ? "443" : "80"));
 
       return new NextRequest(parsed.toString(), {
         headers: newHeaders,

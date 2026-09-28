@@ -1687,7 +1687,7 @@ export default function UserManagementPage() {
             </select>
 
             {/* BRANCH FILTER — hidden for Branch Admins (backend already scopes to their branch) */}
-            {!isBranchAdmin && (
+            {!isBranchAdmin && !isUnitAdmin && (
               <select
                 value={branchFilter}
                 onChange={(e) => setBranchFilter(e.target.value)}
@@ -1908,8 +1908,8 @@ export default function UserManagementPage() {
                   <th className="py-3 px-4">Staff Member</th>
                   <th className="py-3 px-4">Work Email</th>
                   <th className="py-3 px-4">Assigned Role(s)</th>
-                  <th className="py-3 px-4">Branch Location</th>
-                  <th className="py-3 px-4">Branch Unit</th>
+                  {!isUnitAdmin && <th className="py-3 px-4">Branch Location</th>}
+                  {!isUnitAdmin && <th className="py-3 px-4">Branch Unit</th>}
                   <th className="py-3 px-4">Manager</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
@@ -2026,7 +2026,7 @@ export default function UserManagementPage() {
                       </td>
 
                       {/* Branch Location — Plain Comma-Separated Text */}
-                      <td className="py-3 px-4 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                      {(!isUnitAdmin) && <td className="py-3 px-4 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                         {(() => {
                           const assignedIds = (user.assignedBranchIds && user.assignedBranchIds.length > 0)
                             ? user.assignedBranchIds
@@ -2046,10 +2046,10 @@ export default function UserManagementPage() {
                             </span>
                           );
                         })()}
-                      </td>
+                      </td>}
 
                       {/* Branch Unit */}
-                      <td className="py-3 px-4 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                      {(!isUnitAdmin) && <td className="py-3 px-4 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                         {user.businessUnitName ? (
                           <span className="truncate max-w-[150px] inline-block font-medium">
                             {user.businessUnitName}
@@ -2057,7 +2057,7 @@ export default function UserManagementPage() {
                         ) : (
                           <span className="text-neutral-400 font-normal">--</span>
                         )}
-                      </td>
+                      </td>}
 
                       {/* Designated Job Reviewer */}
                       <td className="py-3 px-4 text-xs font-semibold">
@@ -2350,6 +2350,17 @@ export default function UserManagementPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1">
           <label className="block text-[10px] font-bold text-neutral-700 dark:text-neutral-300 mb-1">Office Branch *</label>
+          {isBranchAdmin || isUnitAdmin ? (
+             <div className="flex items-center gap-2 h-9 px-3 rounded-xl border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
+                <span>
+                   {(() => {
+                      const b = branches.find((b) => b.id === reviewForm.branchId);
+                      return b ? b.name : "Assigned Branch";
+                   })()}
+                </span>
+             </div>
+          ) : (
           <Select
             value={reviewForm.branchId || undefined}
             onValueChange={(val) => {
@@ -2365,10 +2376,21 @@ export default function UserManagementPage() {
               ))}
             </SelectContent>
           </Select>
+          )}
         </div>
         {reviewForm.roleCategory !== "BRANCH_ADMIN" && (
           <div className="flex-1">
             <label className="block text-[10px] font-bold text-neutral-700 dark:text-neutral-300 mb-1">Branch Unit *</label>
+            {isUnitAdmin ? (
+               <div className="flex items-center gap-2 h-9 px-3 rounded-xl border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                  <span>
+                     {(() => {
+                        const bu = businessUnits.find((u) => u.id === reviewForm.businessUnitId);
+                        return bu ? bu.name : "Assigned Unit";
+                     })()}
+                  </span>
+               </div>
+            ) : (
             <select
               value={reviewForm.businessUnitId}
               onChange={(e) => setReviewForm(prev => ({ ...prev, businessUnitId: e.target.value }))}
@@ -2380,6 +2402,7 @@ export default function UserManagementPage() {
                 <option key={u.id} value={u.id}>{u.name}</option>
               ))}
             </select>
+            )}
           </div>
         )}
       </div>
@@ -2675,7 +2698,7 @@ export default function UserManagementPage() {
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                   <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch *</label>
-                                  {isBranchAdmin ? (
+                                  {isBranchAdmin || isUnitAdmin ? (
                                     <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                                       <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
                                       <span>
@@ -2736,7 +2759,7 @@ export default function UserManagementPage() {
                           ) : (
                             <div className="space-y-1">
                               <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch *</label>
-                              {isBranchAdmin ? (
+                              {isBranchAdmin || isUnitAdmin ? (
                                 <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                                   <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
                                   <span>
@@ -2781,6 +2804,15 @@ export default function UserManagementPage() {
                               </label>
                               {!addForm.branchId ? (
                                 <select disabled className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"><option>-- Select a Branch Office First --</option></select>
+                              ) : isUnitAdmin ? (
+                                <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                                   <span>
+                                     {(() => {
+                                        const bu = assignedBusinessUnits.find((u) => u.id === addForm.businessUnitId);
+                                        return bu ? bu.name : "Assigned Unit";
+                                     })()}
+                                   </span>
+                                </div>
                               ) : (
                                 <select value={addForm.businessUnitId} onChange={(e) => setAddForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer" required>
                                   <option value="">-- Select a Unit{addFormAdminRole === "BRANCH_ADMIN" ? " (Optional for Custom Roles)" : ""} --</option>
@@ -3045,7 +3077,7 @@ export default function UserManagementPage() {
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                   <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch *</label>
-                                  {isBranchAdmin ? (
+                                  {isBranchAdmin || isUnitAdmin ? (
                                     <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                                       <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
                                       <span>
@@ -3106,7 +3138,7 @@ export default function UserManagementPage() {
                           ) : (
                             <div className="space-y-1">
                               <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch *</label>
-                              {isBranchAdmin ? (
+                              {isBranchAdmin || isUnitAdmin ? (
                                 <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                                   <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
                                   <span>
@@ -3151,6 +3183,15 @@ export default function UserManagementPage() {
                               </label>
                               {!editForm.branchId ? (
                                 <select disabled className="w-full h-8.5 text-xs rounded-lg border border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-800/40 px-2.5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"><option>-- Select a Branch Office First --</option></select>
+                              ) : isUnitAdmin ? (
+                                <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                                   <span>
+                                     {(() => {
+                                        const bu = assignedBusinessUnits.find((u) => u.id === editForm.businessUnitId);
+                                        return bu ? bu.name : "Assigned Unit";
+                                     })()}
+                                   </span>
+                                </div>
                               ) : (
                                 <select value={editForm.businessUnitId} onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer" required>
                                   <option value="">-- Select a Unit{editFormAdminRole === "BRANCH_ADMIN" ? " (Optional for Custom Roles)" : ""} --</option>
