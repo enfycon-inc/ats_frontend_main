@@ -42,9 +42,11 @@ export function getActiveRolePermissions(input: any, roles: CustomRoleDefinition
       return Array.isArray(role?.permissions) ? role.permissions : [];
     });
     if (foundRole) return [...new Set(resolvedPerms)];
+    // If an explicit role was requested but not found, do not fall back to the union.
+    return [];
   }
 
-  // Fallback to the live backend union
+  // Fallback to the live backend union if no specific role was requested
   if (Array.isArray(profile?.permissions)) return profile.permissions;
   const assigned = new Set<string>([...(profile?.assignedRoleIds || []), profile?.roleId].filter(Boolean));
   if (assigned.size) return [...new Set<string>(catalog.filter(r => assigned.has(r.id)).flatMap(r => Array.isArray(r.permissions) ? r.permissions : []))];

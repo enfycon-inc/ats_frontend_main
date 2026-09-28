@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { mockJobs, mockJobsIN, mapApiJobToJob, Job } from "../data/mock-jobs";
 import { atsApi } from "@/lib/ats-api";
-import { resolveActiveSystemRole } from "@/lib/role-permissions";
+import { resolveActiveSystemRole, getActiveRolePermissions } from "@/lib/role-permissions";
+import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 import DataTable from "./data-table";
 import { PendingDelegationRequests } from "./pending-delegation-requests";
 import FilterDrawer, { SelectedFilters } from "./filter-drawer";
@@ -91,7 +92,9 @@ export default function JobPostingDashboard({
   }, [currentUser]);
 
   const userPermissions = useMemo<string[]>(() => {
-    return Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+    if (!currentUser) return [];
+    const { active } = getDashboardRoleSelection(currentUser, currentUser.assignedRoles || []);
+    return getActiveRolePermissions(active.id, currentUser.assignedRoles || [], currentUser);
   }, [currentUser]);
 
   const isGlobalOrBranchAdmin = useMemo(() => {
@@ -112,7 +115,10 @@ export default function JobPostingDashboard({
 
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
-    return userPermissions.includes("job:edit") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("TENANT_ADMIN");
+    const { active } = getDashboardRoleSelection(currentUser, currentUser.assignedRoles || []);
+    const sysRole = resolveActiveSystemRole(active.id, currentUser.assignedRoles || [], currentUser);
+    const isAdmin = sysRole === "TENANT_ADMIN" || sysRole === "SUPER_ADMIN";
+    return isAdmin || userPermissions.includes("job:edit");
   }, [currentUser, userPermissions]);
 
 

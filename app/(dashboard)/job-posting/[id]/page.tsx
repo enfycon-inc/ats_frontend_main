@@ -76,6 +76,7 @@ import toast from "react-hot-toast";
 import { ScheduleInterviewModal } from "@/components/interviews/schedule-interview-modal";
 import { DelegateJobModal } from "@/components/shared/delegate-job-modal";
 import { getActiveRolePermissions, resolveActiveSystemRole, CustomRoleDefinition } from "@/lib/role-permissions";
+import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 
 const TIER_STYLES: Record<string, { chip: string; label: string; text: string }> = {
   Strong: { chip: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900", label: "Strong Match", text: "text-emerald-600 dark:text-emerald-400" },
@@ -488,12 +489,10 @@ export default function JobDetailPage() {
   }, []);
 
   const activeRoleName = useMemo(() => {
-    if (typeof window !== "undefined") {
-      const override = localStorage.getItem("override_role");
-      if (override) return override;
-    }
-    return currentUser?.systemRole || currentUser?.roles?.[0] || "RECRUITER";
-  }, [currentUser]);
+    if (!currentUser) return "RECRUITER";
+    const { active } = getDashboardRoleSelection(currentUser, availableRoles);
+    return active.id;
+  }, [currentUser, availableRoles]);
 
   const activeSystemRole = useMemo(() => {
     return resolveActiveSystemRole(activeRoleName, availableRoles, currentUser);
@@ -981,7 +980,7 @@ export default function JobDetailPage() {
                 </Button>
               </>
             )}
-            {canSubmitCandidate && (
+            canSubmitCandidate ? (
 <Button
               size="sm"
               onClick={() => setUploadSubmitOpen(true)}
@@ -1134,6 +1133,10 @@ export default function JobDetailPage() {
             <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850 gap-3">
                 <div className="flex items-center gap-3">
+          {/* DEBUG INFO */}
+          <div className="text-[10px] text-red-500 font-bold">
+            isAdmin: {String(isAdmin)} | canSubmit: {String(canSubmitCandidate)} | roleName: {activeRoleName} | perms: {effectivePerms.includes("submission:create") ? "yes" : "no"} | total perms: {effectivePerms.length} | currentUser.perms: {currentUser?.permissions?.length}
+          </div>
                   <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-650 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/60">
                     <Users className="h-4.5 w-4.5" />
                   </div>
@@ -1158,7 +1161,7 @@ export default function JobDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                  {canSubmitCandidate && (
+                  canSubmitCandidate ? (
 <Button
                     size="sm"
                     onClick={() => setUploadSubmitOpen(true)}
@@ -1190,7 +1193,7 @@ export default function JobDetailPage() {
                     This requirement is actively accepting submissions (0 of {job.submissionRequired || 5} required candidates). Upload a resume or select candidates from AI Matches to start client screening.
                   </p>
                   <div className="flex items-center justify-center gap-2">
-                    {canSubmitCandidate && (
+                    canSubmitCandidate ? (
 <Button
                       size="sm"
                       onClick={() => setUploadSubmitOpen(true)}
@@ -1861,9 +1864,8 @@ export default function JobDetailPage() {
                           <Button size="sm" disabled className="h-8 bg-neutral-100 text-neutral-400 text-xs font-bold border-none">
                             Submitted
                           </Button>
-                        ) : (
-                          {canSubmitCandidate && (
-<Button
+                        ) : canSubmitCandidate ? (
+                          <Button
                             size="sm"
                             onClick={() => {
                               setSelectedMatch(match);
@@ -1875,8 +1877,7 @@ export default function JobDetailPage() {
                           >
                             Submit Profile
                           </Button>
-)}
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   );
