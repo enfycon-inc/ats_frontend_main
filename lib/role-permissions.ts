@@ -77,6 +77,8 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
         if (child.href === "/job-posting/boards") return false;
         if (child.href === "/utility/submissions?view=pod") return false;
         if (child.href === "/applicants/resume-search/usit") return false;
+        
+        if (child.href === "/utility/submissions?view=my" && !has("submission:create")) return false;
       }
 
       if (["/applicants/new", "/applicants/bulk"].includes(child.href)) return has("candidate:create");
