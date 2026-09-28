@@ -980,7 +980,7 @@ export default function JobDetailPage() {
                 </Button>
               </>
             )}
-            canSubmitCandidate ? (
+            {canSubmitCandidate && (
 <Button
               size="sm"
               onClick={() => setUploadSubmitOpen(true)}
@@ -1161,7 +1161,7 @@ export default function JobDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                  canSubmitCandidate ? (
+                  {canSubmitCandidate && (
 <Button
                     size="sm"
                     onClick={() => setUploadSubmitOpen(true)}
@@ -1193,7 +1193,7 @@ export default function JobDetailPage() {
                     This requirement is actively accepting submissions (0 of {job.submissionRequired || 5} required candidates). Upload a resume or select candidates from AI Matches to start client screening.
                   </p>
                   <div className="flex items-center justify-center gap-2">
-                    canSubmitCandidate ? (
+                    {canSubmitCandidate && (
 <Button
                       size="sm"
                       onClick={() => setUploadSubmitOpen(true)}
