@@ -65,6 +65,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
+import { getActiveRolePermissions } from "@/lib/role-permissions";
+import { getSavedDashboardRole } from "@/lib/dashboard-preference";
 import { Job } from "../data/mock-jobs";
 import AddCandidateModal from "@/components/dashboard/AddCandidateModal";
 import { AddClientModal } from "./add-client-modal";
@@ -380,6 +382,13 @@ export default function DataTable({
     if (!currentUser) return false;
     const permissions = currentUser.permissions || [];
     return permissions.includes("job:create") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("TENANT_ADMIN");
+  }, [currentUser]);
+
+  const hasSubmitCandidatePermission = useMemo(() => {
+    if (!currentUser) return false;
+    const override = getSavedDashboardRole(currentUser);
+    const perms = getActiveRolePermissions(override, currentUser.assignedRoles || [], currentUser);
+    return perms.includes("submission:create") || currentUser.roles?.includes("SUPER_ADMIN") || currentUser.roles?.includes("TENANT_ADMIN");
   }, [currentUser]);
 
 
@@ -2666,7 +2675,8 @@ export default function DataTable({
                                   Sourcing & Pipeline
                                 </div>
 
-                                <DropdownMenuItem
+                                {hasSubmitCandidatePermission && (
+<DropdownMenuItem
                                   onClick={() => handleOpenSourceModal(job)}
                                   className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
                                 >
@@ -2675,6 +2685,7 @@ export default function DataTable({
                                   </div>
                                   <span className="font-semibold">Submit Candidate</span>
                                 </DropdownMenuItem>
+)}
 
                                 <DropdownMenuItem
                                   onClick={() => router.push(`/job-posting/${job.id}/matches`)}
@@ -2953,7 +2964,8 @@ export default function DataTable({
               Quick Actions
             </div>
 
-            <button
+            {hasSubmitCandidatePermission && (
+<button
               onClick={() => {
                 const job = data.find((j) => j.id === contextMenu.jobId);
                 if (job) handleOpenSourceModal(job);
@@ -2966,6 +2978,7 @@ export default function DataTable({
               </div>
               <span>Submit Candidate</span>
             </button>
+)}
 
             <button
               onClick={() => {

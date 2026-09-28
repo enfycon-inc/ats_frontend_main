@@ -507,6 +507,7 @@ export default function JobDetailPage() {
   const isDeliveryHead = activeSystemRole === "DELIVERY_HEAD";
   const isAM = activeSystemRole === "ACCOUNT_MANAGER";
   const isPodLead = activeSystemRole === "POD_LEAD";
+  const canSubmitCandidate = useMemo(() => isAdmin || effectivePerms.includes("submission:create"), [isAdmin, effectivePerms]);
 
   const canAuditRounds = useMemo(() => isAdmin || isDeliveryHead || effectivePerms.includes("submission:audit_rounds"), [isAdmin, isDeliveryHead, effectivePerms]);
   const canAuditL1 = useMemo(() => canAuditRounds || isPodLead || effectivePerms.includes("submission:audit_l1"), [canAuditRounds, isPodLead, effectivePerms]);
@@ -980,13 +981,15 @@ export default function JobDetailPage() {
                 </Button>
               </>
             )}
-            <Button
+            {canSubmitCandidate && (
+<Button
               size="sm"
               onClick={() => setUploadSubmitOpen(true)}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 text-xs cursor-pointer"
             >
               <Upload className="h-3.5 w-3.5" /> Submit New Candidate
             </Button>
+)}
             {hasEditPermission && (
               <Link href={`/job-posting/${job.id}/edit`}>
                 <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 cursor-pointer">
@@ -1155,13 +1158,15 @@ export default function JobDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                  <Button
+                  {canSubmitCandidate && (
+<Button
                     size="sm"
                     onClick={() => setUploadSubmitOpen(true)}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1 text-xs h-8 shadow-xs rounded-lg cursor-pointer"
                   >
                     <Upload className="h-3.5 w-3.5" /> Submit New Candidate
                   </Button>
+)}
                   {submissions.length > 0 && (
                     <Button
                       size="sm"
@@ -1185,13 +1190,15 @@ export default function JobDetailPage() {
                     This requirement is actively accepting submissions (0 of {job.submissionRequired || 5} required candidates). Upload a resume or select candidates from AI Matches to start client screening.
                   </p>
                   <div className="flex items-center justify-center gap-2">
-                    <Button
+                    {canSubmitCandidate && (
+<Button
                       size="sm"
                       onClick={() => setUploadSubmitOpen(true)}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 text-xs h-8.5 rounded-lg shadow-sm cursor-pointer"
                     >
                       <Upload className="h-3.5 w-3.5" /> Upload &amp; Submit Candidate CV
                     </Button>
+)}
                     <Button
                       size="sm"
                       variant="outline"
@@ -1855,7 +1862,8 @@ export default function JobDetailPage() {
                             Submitted
                           </Button>
                         ) : (
-                          <Button
+                          {canSubmitCandidate && (
+<Button
                             size="sm"
                             onClick={() => {
                               setSelectedMatch(match);
@@ -1867,6 +1875,7 @@ export default function JobDetailPage() {
                           >
                             Submit Profile
                           </Button>
+)}
                         )}
                       </div>
                     </div>
