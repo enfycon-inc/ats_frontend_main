@@ -162,7 +162,7 @@ export function ClientRoot({
           disableTransitionOnChange
         >
           <div className="min-h-screen bg-neutral-50 dark:bg-[#121820] flex flex-col overflow-y-auto overflow-x-hidden">
-            <div className="my-auto w-full">
+            <div className="w-full py-8 md:py-16">
               <PendingApprovalView
                 initialRequestedRole={requestedRole}
                 userEmail={(session as any)?.user?.email || initialNavigation?.profile?.email}
