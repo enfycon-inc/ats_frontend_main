@@ -467,7 +467,7 @@ export default function ApprovalsPage() {
                         <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Status</th>
                         <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Seats Limit</th>
                         <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Max Branches</th>
-                        <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider">Market Layout</th>
+                        
                         <th className="py-3.5 px-6 text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider text-right">Actions</th>
                       </tr>
                     </thead>
@@ -531,22 +531,7 @@ export default function ApprovalsPage() {
                                 className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-amber-600 bg-white dark:bg-slate-800 text-default-850"
                               />
                             </td>
-                            <td className="py-3.5 px-6">
-                              <div className="flex bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-amber-500/20 w-fit">
-                                <button
-                                  onClick={() => handleMarketChange(user.id, "US")}
-                                  className={`px-2.5 py-1 rounded text-xs font-semibold ${selectedMarket === "US" ? "bg-indigo-600 text-white" : "text-default-500"}`}
-                                >
-                                  US
-                                </button>
-                                <button
-                                  onClick={() => handleMarketChange(user.id, "IN")}
-                                  className={`px-2.5 py-1 rounded text-xs font-semibold ${selectedMarket === "IN" ? "bg-emerald-600 text-white" : "text-default-500"}`}
-                                >
-                                  IN
-                                </button>
-                              </div>
-                            </td>
+
                             <td className="py-3.5 px-6 text-right">
                               <Button
                                 size="sm"
@@ -614,22 +599,7 @@ export default function ApprovalsPage() {
                                 className="w-16 border border-default-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-amber-600 bg-white dark:bg-slate-800 text-default-850"
                               />
                             </td>
-                            <td className="py-3.5 px-6">
-                              <div className="flex bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-amber-500/20 w-fit">
-                                <button
-                                  onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
-                                  className={`px-2.5 py-1 rounded text-xs font-semibold ${tenant.defaultMarket === "US" ? "bg-indigo-600 text-white" : "text-default-500"}`}
-                                >
-                                  US
-                                </button>
-                                <button
-                                  onClick={() => handleTenantMarketToggle(tenant.id, tenant.defaultMarket)}
-                                  className={`px-2.5 py-1 rounded text-xs font-semibold ${tenant.defaultMarket === "IN" ? "bg-emerald-600 text-white" : "text-default-500"}`}
-                                >
-                                  IN
-                                </button>
-                              </div>
-                            </td>
+
                             <td className="py-3.5 px-6 text-right">
                               <Button
                                 size="sm"
@@ -704,7 +674,7 @@ export default function ApprovalsPage() {
                         <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Status</th>
                         <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Seats Limit</th>
                         <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Max Branches</th>
-                        <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider">Staffing Market Layout Configuration</th>
+                        
                         <th className="py-4 px-6 text-xs font-bold text-default-700 uppercase tracking-wider text-right">Actions</th>
                       </tr>
                     </thead>

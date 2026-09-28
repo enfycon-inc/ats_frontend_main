@@ -268,7 +268,7 @@ function GlobalAdminDashboardView({ profile }: { profile: any }) {
                   <tr className="bg-default-50 border-b border-default-100 text-xs font-semibold text-default-700">
                     <th className="py-3 px-4">Company / User</th>
                     <th className="py-3 px-4">Subdomain</th>
-                    <th className="py-3 px-4">Market Mode</th>
+                    
                     <th className="py-3 px-4">User Limit</th>
                     <th className="py-3 px-4">Actions</th>
                   </tr>
@@ -366,7 +366,7 @@ function GlobalAdminDashboardView({ profile }: { profile: any }) {
                       <tr className="bg-default-50 border-b border-default-100 text-xs font-semibold text-default-700">
                         <th className="py-2.5 px-4">Company Name</th>
                         <th className="py-2.5 px-4">Domain / Subdomain</th>
-                        <th className="py-2.5 px-4">Market</th>
+                        
                         <th className="py-2.5 px-4">Seats Limit</th>
                         <th className="py-2.5 px-4">Status</th>
                       </tr>
