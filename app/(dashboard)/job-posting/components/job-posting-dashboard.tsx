@@ -370,21 +370,8 @@ export default function JobPostingDashboard({
           });
         }
 
-        // ── Account Manager scoping (frontend safety net) ────────────────────
-        // Account managers should strictly NOT see jobs posted by other members.
-        if (isAccountManager && currentUser?.id) {
-          jobsToDisplay = jobsToDisplay.filter((job) => {
-            const createdById = (job as any).createdById || job.createdBy;
-            const recMgrId = job.recruitmentManagerId;
-            return (
-              createdById === currentUser.id ||
-              createdById === currentUser.email ||
-              recMgrId === currentUser.id ||
-              (job.createdBy && currentUser.fullName && job.createdBy.toLowerCase() === currentUser.fullName.toLowerCase())
-            );
-          });
-        }
-        // ────────────────────────────────────────────────────────────────────
+        // Account Manager scoping handled entirely by backend API jobs.service.ts
+        // Frontend safety net removed to allow unit-wide job visibility.
 
         // ── Filter by Priority / Urgency (Hot / Warm / Cold) ───────────────
         if (priorityParam) {
