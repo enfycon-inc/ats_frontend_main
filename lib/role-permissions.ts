@@ -83,7 +83,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
 
       // ── Specific Removals for Account Manager ──
       if (isAccountManager) {
-        if (child.href === "/job-posting?filter=pod") return false;
+        if (child.href === "/job-posting/pod-jobs") return false;
         if (child.href === "/job-posting/boards") return false;
         if (child.href === "/utility/submissions?view=pod") return false;
         if (child.href === "/applicants/resume-search/usit") return false;

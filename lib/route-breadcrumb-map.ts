@@ -89,6 +89,32 @@ export function getRouteBreadcrumbInfo(
     };
   }
 
+  if (cleanPath === "/job-posting/my-jobs") {
+    return {
+      pageTitle: "My Jobs",
+      breadcrumbs: [
+        { label: "ATS", href: "/dashboard" },
+        { label: "Job Posting", href: "/job-posting" },
+        { label: "My Jobs", isCurrent: true },
+      ],
+      showBackButton: true,
+      backHref: "/job-posting",
+    };
+  }
+
+  if (cleanPath === "/job-posting/pod-jobs") {
+    return {
+      pageTitle: "Pod Jobs",
+      breadcrumbs: [
+        { label: "ATS", href: "/dashboard" },
+        { label: "Job Posting", href: "/job-posting" },
+        { label: "Pod Jobs", isCurrent: true },
+      ],
+      showBackButton: true,
+      backHref: "/job-posting",
+    };
+  }
+
   if (cleanPath === "/job-posting/boards") {
     return {
       pageTitle: "Job Boards & Syndication",

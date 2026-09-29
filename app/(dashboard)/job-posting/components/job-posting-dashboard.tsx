@@ -54,14 +54,17 @@ const matchStatus = (jobStatus: string, filter: string) => {
 
 interface JobPostingDashboardProps {
   initialStatusFilter?: string;
+  initialFilter?: string; // Prop-based filter for dedicated pages (e.g. "my", "pod")
 }
 
 export default function JobPostingDashboard({
   initialStatusFilter = "All",
+  initialFilter,
 }: JobPostingDashboardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const filterParam = searchParams.get("filter"); // e.g. "direct", "pod", "unassigned", etc.
+  // Prefer prop-based initialFilter (from dedicated pages like /my-jobs) over URL query param
+  const filterParam = initialFilter || searchParams.get("filter"); // e.g. "direct", "pod", "unassigned", "my"
   const priorityParam = searchParams.get("priority") || searchParams.get("urgency");
 
   // Drawer States
