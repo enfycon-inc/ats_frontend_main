@@ -520,6 +520,7 @@ export default function JobPostingDashboard({
           return (
             job.creatorEmail === currentUser?.email ||
             job.createdBy === currentUser?.id ||
+            job.accountManagerId === currentUser?.id ||
             (currentUser?.fullName && job.createdBy === currentUser.fullName) ||
             job.recruitmentManagerId === currentUser?.id
           );
