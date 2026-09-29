@@ -187,7 +187,7 @@ export default function SharedJobsTable({ onRefresh, branchUsesPods }: { onRefre
                     </td>
                     <td className="py-3 px-4">
                       <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                        <Building2 className="h-3.5 w-3.5" /> {(job as any).clientName || 'N/A' || "Direct"}
+                        <Building2 className="h-3.5 w-3.5" /> {(job as any).clientName || "Direct"}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
                         <MapPin className="h-3 w-3" /> {job.location || job.workSetup || "Remote"}

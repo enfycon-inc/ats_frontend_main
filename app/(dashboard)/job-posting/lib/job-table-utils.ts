@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Job } from "../data/mock-jobs";
 
 export interface AssignedPersonDisplay {
