@@ -274,7 +274,7 @@ export default function AdminDashboardView({ profile, jobs, activeJobs }: { prof
                   <tr key={job.id || i} className="hover:bg-default-50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="p-3">
                       <Badge variant="outline" className="text-[10px] bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300">
-                        {job.businessUnit || job.branchName || "Global"}
+                        {(job as any).businessUnit || 'N/A' || job.branchName || "Global"}
                       </Badge>
                     </td>
                     <td className="p-3">

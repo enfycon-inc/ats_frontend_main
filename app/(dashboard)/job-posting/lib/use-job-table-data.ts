@@ -182,9 +182,9 @@ export function useJobTableData({ data, branchUsesPods }: UseJobTableDataOptions
           (job.jobTitle || "").toLowerCase().includes(q) ||
           (job.jobCode || "").toLowerCase().includes(q) ||
           (job.client || "").toLowerCase().includes(q) ||
-          (job.endClientName || "").toLowerCase().includes(q) ||
+          ((job as any).endClientName || 'N/A' || "").toLowerCase().includes(q) ||
           (job.location || "").toLowerCase().includes(q) ||
-          (job.businessUnit || "").toLowerCase().includes(q) ||
+          ((job as any).businessUnit || 'N/A' || "").toLowerCase().includes(q) ||
           assignedLabel.includes(q)
         );
       });
@@ -224,7 +224,7 @@ export function useJobTableData({ data, branchUsesPods }: UseJobTableDataOptions
       result = result.filter(
         (job) =>
           (job.client && job.client.toLowerCase() === selectedClient.toLowerCase()) ||
-          (job.endClientName && job.endClientName.toLowerCase() === selectedClient.toLowerCase())
+          ((job as any).endClientName || 'N/A' && (job as any).endClientName || 'N/A'.toLowerCase() === selectedClient.toLowerCase())
       );
     }
 

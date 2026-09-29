@@ -666,7 +666,7 @@ function BranchAdminDashboardView({
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                        Client: <span className="font-medium text-slate-700 dark:text-slate-300">{job.clientName || job.client || "Direct"}</span> • Assigned: <span className="font-semibold text-slate-700 dark:text-slate-300">{job.assignedTo || "Unassigned"}</span>
+                        Client: <span className="font-medium text-slate-700 dark:text-slate-300">{(job as any).clientName || 'N/A' || job.client || "Direct"}</span> • Assigned: <span className="font-semibold text-slate-700 dark:text-slate-300">{(job as any).assignedTo || 'N/A' || "Unassigned"}</span>
                       </p>
                     </div>
                     <Button

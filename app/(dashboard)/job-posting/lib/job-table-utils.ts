@@ -19,7 +19,7 @@ export interface AssignedPersonDisplay {
 }
 
 export function getAssignedPersonDisplay(job: Job): AssignedPersonDisplay {
-  const rawAssigned = (job.assignedTo || "").trim();
+  const rawAssigned = ((job as any).assignedTo || 'N/A' || "").trim();
   const rawUpper = rawAssigned.toUpperCase();
 
   // 1. Check if assigned to ALL branch recruiters

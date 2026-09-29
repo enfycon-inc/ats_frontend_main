@@ -130,8 +130,8 @@ export function ApproveJobModal({
                 </span>
                 <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
                   {job.client}{" "}
-                  {job.endClientName && job.endClientName !== job.client
-                    ? `(${job.endClientName})`
+                  {(job as any).endClientName || 'N/A' && (job as any).endClientName || 'N/A' !== job.client
+                    ? `(${(job as any).endClientName || 'N/A'})`
                     : ""}
                 </span>
               </div>
@@ -173,7 +173,7 @@ export function ApproveJobModal({
                   Assigned Pod / Recruiter
                 </span>
                 <span className="font-medium text-slate-800 dark:text-slate-200">
-                  {job.podName || job.assignedTo || "Unassigned"}
+                  {job.podName || (job as any).assignedTo || 'N/A' || "Unassigned"}
                 </span>
               </div>
             </div>
@@ -362,8 +362,8 @@ export function RejectJobModal({
                 </span>
                 <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
                   {job.client}{" "}
-                  {job.endClientName && job.endClientName !== job.client
-                    ? `(${job.endClientName})`
+                  {(job as any).endClientName || 'N/A' && (job as any).endClientName || 'N/A' !== job.client
+                    ? `(${(job as any).endClientName || 'N/A'})`
                     : ""}
                 </span>
               </div>
@@ -405,7 +405,7 @@ export function RejectJobModal({
                   Assigned Pod / Recruiter
                 </span>
                 <span className="font-medium text-slate-800 dark:text-slate-200">
-                  {job.podName || job.assignedTo || "Unassigned"}
+                  {job.podName || (job as any).assignedTo || 'N/A' || "Unassigned"}
                 </span>
               </div>
             </div>

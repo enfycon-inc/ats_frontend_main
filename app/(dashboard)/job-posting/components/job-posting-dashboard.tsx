@@ -465,7 +465,7 @@ export default function JobPostingDashboard({
     // Business Unit filter
     if (filters.businessUnit !== "All selected") {
       filtered = filtered.filter(
-        (job) => job.businessUnit === filters.businessUnit
+        (job) => (job as any).businessUnit || 'N/A' === filters.businessUnit
       );
     }
 
@@ -543,7 +543,7 @@ export default function JobPostingDashboard({
       const unassigned = baseData.filter((job) => {
         const hasNoRecruiter = !job.primaryRecruiterId || job.primaryRecruiter === "N/A" || !job.primaryRecruiter;
         const hasNoPod = !job.podId && (!job.podName || job.podName === "Unassigned" || job.podName === "N/A");
-        const assignedToUpper = (job.assignedTo || "").trim().toUpperCase();
+        const assignedToUpper = ((job as any).assignedTo || 'N/A' || "").trim().toUpperCase();
         const hasNoAssignedTo = !assignedToUpper || assignedToUpper === "UNASSIGNED" || assignedToUpper === "NONE" || assignedToUpper === "N/A";
         return hasNoRecruiter && hasNoPod && hasNoAssignedTo;
       });

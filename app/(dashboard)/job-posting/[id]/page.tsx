@@ -1393,7 +1393,7 @@ export default function JobDetailPage() {
                       </div>
                       <div>
                         <span className="text-[9px] uppercase font-bold text-neutral-450 block tracking-wider mb-0.5">Requirement Type</span>
-                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 block">{job.jobType || job.businessUnit}</span>
+                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 block">{job.jobType || (job as any).businessUnit || 'N/A'}</span>
                       </div>
                     </div>
                   </CardContent>
