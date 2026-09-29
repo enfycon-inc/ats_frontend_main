@@ -236,7 +236,7 @@ export default function ApplicantsTable({
     }
     if (!confirm(`Are you sure you want to delete candidate ${applicant.applicantName}?`)) return;
     try {
-      await atsApi.candidates.delete(parseInt(candidateId, 10));
+      await atsApi.candidates.delete(candidateId);
       toast.success(`Candidate ${applicant.applicantName} deleted successfully.`);
       window.location.reload();
     } catch (err: any) {
@@ -277,7 +277,7 @@ export default function ApplicantsTable({
     try {
       // Extract candidate integer ID
       const parts = selectedApplicant.applicantId.split("-");
-      const candidateIdNum = parseInt(parts[parts.length - 1], 10);
+      const candidateIdNum = parts[parts.length - 1];
 
       const currentUser = atsApi.auth.getCurrentUser();
       if (!currentUser?.id) {

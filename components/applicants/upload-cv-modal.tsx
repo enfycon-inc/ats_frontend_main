@@ -62,11 +62,11 @@ export default function UploadCvModal({ onClose, onDone }: UploadCvModalProps) {
         if (typeof parsedCandidateId === "string") {
           const parts = parsedCandidateId.split("-");
           const rawNum = parts[parts.length - 1];
-          parsedCandidateId = parseInt(rawNum, 10);
+          parsedCandidateId = rawNum;
         } else if (candidate.applicantId && typeof candidate.applicantId === "string") {
           const parts = candidate.applicantId.split("-");
           const rawNum = parts[parts.length - 1];
-          parsedCandidateId = parseInt(rawNum, 10);
+          parsedCandidateId = rawNum;
         }
 
         const currentUser = atsApi.auth.getCurrentUser();
