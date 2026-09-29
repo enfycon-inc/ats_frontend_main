@@ -514,12 +514,23 @@ export default function JobPostingDashboard({
       setJobsData(baseData);
       setCurrentFilters({ businessUnit: "All selected", predefined: [] });
     } else if (viewName === "My Jobs" || viewName === "Assigned to Me") {
-      const myJobs = baseData.filter(
-        (job) =>
+      const myJobs = baseData.filter((job) => {
+        // Account Managers: jobs they created (created_by stored as UUID)
+        if (isAccountManager) {
+          return (
+            job.creatorEmail === currentUser?.email ||
+            job.createdBy === currentUser?.id ||
+            (currentUser?.fullName && job.createdBy === currentUser.fullName) ||
+            job.recruitmentManagerId === currentUser?.id
+          );
+        }
+        // Recruiters: jobs directly assigned to them or primary recruiter
+        return (
           job.primaryRecruiterId === currentUser?.id ||
           (currentUser?.fullName && job.primaryRecruiter === currentUser.fullName) ||
           job.recruitmentManagerId === currentUser?.id
-      );
+        );
+      });
       setJobsData(myJobs);
     } else if (viewName === "Pod Jobs" || viewName === "My Pod Jobs") {
       const userPodId = (currentUser as any)?.podId;
