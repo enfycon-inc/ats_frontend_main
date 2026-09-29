@@ -248,7 +248,7 @@ export default function JobPostingDashboard({
 
   const initialActiveView = useMemo(() => {
     if (isRecruiter) {
-      if (filterParam === "direct") return "My Jobs";
+      if (filterParam === "direct" || filterParam === "my") return "My Jobs";
       if (filterParam === "pod") return "Pod Jobs";
       return "All Jobs";
     }
@@ -473,7 +473,10 @@ export default function JobPostingDashboard({
           if (pref === "Active Jobs") return job.jobStatus === "Active";
           if (pref === "Archived Jobs") return job.jobStatus === "Archived";
           if (pref === "Closed Jobs") return job.jobStatus === "Closed" || job.jobStatus === "Close";
-          if (pref === "My Jobs") return job.primaryRecruiter === "Sahadeb Sen";
+          if (pref === "My Jobs") {
+            if (isAccountManager) return job.creatorEmail === currentUser?.email || (currentUser?.fullName && job.createdBy === currentUser.fullName) || job.recruitmentManagerId === currentUser?.id;
+            return job.primaryRecruiterId === currentUser?.id || (currentUser?.fullName && job.primaryRecruiter === currentUser.fullName) || job.recruitmentManagerId === currentUser?.id;
+          }
           if (pref === "Jobs with submissions") return job.submissionsCount > 0;
           if (pref === "Jobs without submissions") return job.submissionsCount === 0;
           if (pref === "Jobs with Pipeline")
