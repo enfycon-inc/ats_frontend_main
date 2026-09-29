@@ -899,8 +899,7 @@ export interface JobPayload {
   clientBillRate: string;
   payRate: string;
   taxTerms: string;
-  endClientName: string;
-  noOfPositions: number;
+    noOfPositions: number;
   submissionRequired: number;
   submissionDone: number;
   priority: string;
@@ -914,8 +913,7 @@ export interface JobPayload {
   recruitmentManager: string;
   primaryRecruiterId: string;
   primaryRecruiter: string;
-  assignedTo: string;
-  createdBy: string;
+    createdBy: string;
   industry: string;
   degree: string;
   expMin: number;
@@ -936,10 +934,7 @@ export interface JobPayload {
   approvedBy?: string | null;
   approvedAt?: string | null;
   jobTimezone?: string;
-  workStartTime?: string;
-  workEndTime?: string;
-  workingDays?: string[];
-  shiftTiming?: string;
+        shiftTiming?: string;
   timingSnapshotAt?: string;
   rejectionReason?: string | null;
   isCoSourced?: boolean;
@@ -1478,10 +1473,7 @@ const branches = {
     country?: string;
     market?: string;
     timezone?: string;
-    workStartTime?: string;
-    workEndTime?: string;
-    workingDays?: string[];
-    shiftTiming?: string;
+                shiftTiming?: string;
     breakDurationMinutes?: number;
     enableGlobalRemarks?: boolean;
   }): Promise<any> {
@@ -1510,10 +1502,7 @@ const branches = {
     allowedJobApproverRoles?: string[];
     approvalRoutingMode?: 'FLEXIBLE' | 'ENFORCE_DEFAULT';
     timezone?: string;
-    workStartTime?: string;
-    workEndTime?: string;
-    workingDays?: string[];
-    shiftTiming?: string;
+                shiftTiming?: string;
     breakDurationMinutes?: number;
   }): Promise<any> {
     return apiFetch<any>(`/api/branches/${id}`, {
@@ -1582,11 +1571,8 @@ const businessUnits = {
     jobCodePattern?: string | null;
     currency?: string;
     shiftTiming?: string;
-    workStartTime?: string;
-    workEndTime?: string;
-    timezone?: string;
-    workingDays?: string[];
-    breakDurationMinutes?: number;
+            timezone?: string;
+        breakDurationMinutes?: number;
     allowNone?: boolean;
     allowPods?: boolean;
     allowAll?: boolean;
@@ -1609,11 +1595,8 @@ const businessUnits = {
       jobCodePattern?: string | null;
       currency?: string;
       shiftTiming?: string;
-      workStartTime?: string;
-      workEndTime?: string;
-      timezone?: string;
-      workingDays?: string[];
-      breakDurationMinutes?: number;
+                  timezone?: string;
+            breakDurationMinutes?: number;
       allowNone?: boolean;
       allowPods?: boolean;
       allowAll?: boolean;
