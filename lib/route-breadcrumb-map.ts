@@ -63,6 +63,19 @@ export function getRouteBreadcrumbInfo(
     };
   }
 
+  if (cleanPath === "/job-posting/all") {
+    return {
+      pageTitle: "All Jobs",
+      breadcrumbs: [
+        { label: "ATS", href: "/dashboard" },
+        { label: "Job Posting", href: "/job-posting/all" },
+        { label: "All Jobs", isCurrent: true },
+      ],
+      showBackButton: true,
+      backHref: "/dashboard",
+    };
+  }
+
   if (cleanPath === "/job-posting/active") {
     return {
       pageTitle: "Active Jobs",

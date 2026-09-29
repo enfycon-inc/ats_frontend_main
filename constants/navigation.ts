@@ -77,7 +77,7 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
     href: "/job-posting",
     icon: Briefcase,
     children: [
-      { label: "All Jobs", href: "/job-posting" },
+      { label: "All Jobs", href: "/job-posting/all" },
       { label: "Active Jobs", href: "/job-posting/active" },
       { label: "My Jobs", href: "/job-posting/my-jobs" },
       { label: "Pod Jobs", href: "/job-posting/pod-jobs" },
