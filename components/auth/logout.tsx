@@ -13,16 +13,18 @@ const Logout = () => {
     try {
       setLoading(true);
       try {
-        atsApi.auth.logout();
+        await atsApi.auth.logout();
       } catch (logoutErr) {
         console.error("Local token clear failed:", logoutErr);
       }
 
       if (typeof window !== "undefined") {
         localStorage.removeItem("ats_access_token");
+        localStorage.removeItem("ats_refresh_token");
         localStorage.removeItem("ats_current_user");
         localStorage.removeItem("active_branch_id");
         localStorage.removeItem("override_role");
+        localStorage.removeItem("tenant_id");
       }
 
       await signOut({ redirect: false });

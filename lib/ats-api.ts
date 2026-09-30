@@ -281,23 +281,38 @@ async function apiFetch<T = any>(
     // Attempt automatic token refresh / session recovery if token expired and retry once
     if (isExpired && !isRetry && !isPublicAuthPolicy) {
       if (getRefreshToken()) {
-        if (!isRefreshing) {
-          isRefreshing = true;
-          const newToken = await tryAutoRefresh();
-          isRefreshing = false;
-          if (newToken) {
-            onRefreshed(newToken);
-            return apiFetch<T>(path, options, true);
-          }
-        } else {
-          // Wait for active refresh to finish
-          const retryObj = new Promise<T>((resolve, reject) => {
-            refreshSubscribers.push((newToken: string) => {
-              apiFetch<T>(path, options, true).then(resolve).catch(reject);
+        const executeRefresh = async () => {
+          if (!isRefreshing) {
+            isRefreshing = true;
+            const newToken = await tryAutoRefresh();
+            isRefreshing = false;
+            if (newToken) {
+              onRefreshed(newToken);
+              return apiFetch<T>(path, options, true);
+            }
+          } else {
+            return new Promise<T>((resolve, reject) => {
+              refreshSubscribers.push((newToken: string) => {
+                apiFetch<T>(path, options, true).then(resolve).catch(reject);
+              });
             });
+          }
+          return null;
+        };
+
+        let retryResult;
+        if (typeof navigator !== 'undefined' && navigator.locks) {
+          retryResult = await navigator.locks.request('ats_token_refresh', async () => {
+            const currentToken = getToken();
+            if (currentToken && currentToken !== token) {
+              return apiFetch<T>(path, options, true);
+            }
+            return await executeRefresh();
           });
-          return retryObj;
+        } else {
+          retryResult = await executeRefresh();
         }
+        if (retryResult) return retryResult;
       }
 
       // If no refresh token or refresh failed, fetch a fresh session token from NextAuth
@@ -367,7 +382,17 @@ const auth = {
     return apiFetch('/api/auth/me');
   },
 
-  logout() {
+  async logout() {
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      try {
+        await fetch(getApiBase() + '/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken })
+        }).catch(() => null);
+      } catch (e) {}
+    }
     clearToken();
   },
 
