@@ -85,14 +85,11 @@ export function ClientRoot({
   // Fix Radix UI scroll-lock padding-right injection on body
   useRadixScrollLockFix();
 
-  const [overrideRole, setOverrideRole] = useState<string | null>(null);
-
+  
   useEffect(() => {
     if (typeof window !== "undefined") {
       // Listen for local storage changes if they switch roles
-      const override = localStorage.getItem("override_role");
-      setOverrideRole(override);
-      
+            
       // Also listen to storage events to re-render immediately across components
       const handleStorageChange = () => {
         setOverrideRole(localStorage.getItem("override_role"));
