@@ -58,59 +58,15 @@ import { resolveActiveSystemRole, isRoleAdmin } from "@/lib/role-permissions";
 
 import { Country, State, City } from "country-state-city";
 import ReactCountryFlag from "react-country-flag";
+import { WORK_AUTHORIZATION_OPTIONS, INDIAN_WORK_AUTHORIZATION_OPTIONS, INDIA_STATES_CITIES, US_STATES_CITIES } from "@/lib/job-form-constants";
 
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
 import { showErrorModal } from "@/components/shared/global-error-modal";
 
-const WORK_AUTHORIZATION_OPTIONS = [
-  "B1",
-  "Can work for any employer",
-  "Canada Authorized",
-  "Canadian",
-  "Canadian Citizen",
-  "Citizen",
-  "CPT EAD",
-  "Employment Auth. Document",
-  "Employment Authorization Document",
-  "GC",
-  "GC EAD",
-  "GC-EAD",
-  "Green Card",
-  "Green Card Holder",
-  "H EAD",
-  "H1-B",
-  "H4 EAD",
-  "H4EAD",
-  "Have H1 Visa",
-  "HB Work Permit",
-  "L1-A",
-  "L1-B",
-  "L2",
-  "L2 EAD",
-  "L2-EAD",
-  "Need H1 Visa",
-  "Need H1 Visa Sponsor",
-  "Not specified",
-  "OPT",
-  "OPT EAD",
-  "OPT-EAD",
-  "Security Clearance",
-  "TN EAD",
-  "TN Permit Holder",
-  "TN Visa",
-  "Unspecified",
-  "US Authorized",
-  "US"
-];
 
-const INDIAN_WORK_AUTHORIZATION_OPTIONS = [
-  "Indian Citizen",
-  "OCI Card Holder",
-  "Employment Visa",
-  "Work Permit (PR)",
-  "Not specified"
-];
+
+
 
 // Zod Validation Schema matching all manual form fields
 const formSchema = zod.object({
@@ -184,51 +140,7 @@ const formSchema = zod.object({
 type FormValues = zod.infer<typeof formSchema>;
 
 
-// India states with cities
-const INDIA_STATES_CITIES: Record<string, string[]> = {
-  "Karnataka": ["Bengaluru", "Mysuru", "Hubli-Dharwad", "Mangaluru", "Belagavi", "Ballari"],
-  "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Nashik", "Aurangabad", "Solapur", "Thane", "Navi Mumbai"],
-  "Telangana": ["Hyderabad", "Warangal", "Nizamabad", "Karimnagar", "Khammam"],
-  "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli"],
-  "Delhi NCR": ["New Delhi", "Noida", "Gurugram", "Faridabad", "Ghaziabad", "Greater Noida"],
-  "Haryana": ["Gurugram", "Faridabad", "Panipat", "Ambala", "Rohtak", "Sonipat"],
-  "Gujarat": ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Gandhinagar"],
-  "Uttar Pradesh": ["Lucknow", "Kanpur", "Agra", "Varanasi", "Noida", "Prayagraj", "Ghaziabad"],
-  "Rajasthan": ["Jaipur", "Jodhpur", "Udaipur", "Ajmer", "Kota", "Bikaner"],
-  "Punjab": ["Chandigarh", "Ludhiana", "Amritsar", "Jalandhar", "Patiala"],
-  "West Bengal": ["Kolkata", "Howrah", "Durgapur", "Asansol", "Siliguri"],
-  "Andhra Pradesh": ["Visakhapatnam", "Vijayawada", "Guntur", "Tirupati", "Nellore"],
-  "Madhya Pradesh": ["Bhopal", "Indore", "Gwalior", "Jabalpur", "Ujjain"],
-  "Kerala": ["Thiruvananthapuram", "Kochi", "Kozhikode", "Thrissur", "Kollam"],
-  "Bihar": ["Patna", "Gaya", "Bhagalpur", "Muzaffarpur"],
-  "Jharkhand": ["Ranchi", "Jamshedpur", "Dhanbad", "Bokaro"],
-  "Odisha": ["Bhubaneswar", "Cuttack", "Rourkela", "Puri"],
-  "Assam": ["Guwahati", "Silchar", "Dibrugarh", "Jorhat"],
-  "Chandigarh": ["Chandigarh"],
-  "Goa": ["Panaji", "Margao", "Vasco da Gama"],
-};
 
-// US states with cities
-const US_STATES_CITIES: Record<string, string[]> = {
-  "Texas": ["Dallas", "Houston", "Austin", "San Antonio", "Fort Worth", "Plano", "Irving", "Frisco"],
-  "California": ["Los Angeles", "San Francisco", "San Jose", "San Diego", "Sacramento", "Irvine", "Fremont"],
-  "New York": ["New York City", "Buffalo", "Rochester", "Albany", "Syracuse", "Yonkers"],
-  "New Jersey": ["Newark", "Jersey City", "Trenton", "Edison", "Woodbridge", "Parsippany"],
-  "Georgia": ["Atlanta", "Augusta", "Columbus", "Savannah", "Sandy Springs", "Alpharetta"],
-  "Illinois": ["Chicago", "Aurora", "Naperville", "Joliet", "Rockford", "Springfield"],
-  "Florida": ["Miami", "Orlando", "Tampa", "Jacksonville", "St. Petersburg", "Fort Lauderdale"],
-  "Washington": ["Seattle", "Spokane", "Tacoma", "Bellevue", "Kirkland", "Redmond"],
-  "Virginia": ["Virginia Beach", "Norfolk", "Chesapeake", "Richmond", "Arlington", "McLean"],
-  "North Carolina": ["Charlotte", "Raleigh", "Greensboro", "Durham", "Winston-Salem"],
-  "Pennsylvania": ["Philadelphia", "Pittsburgh", "Allentown", "Erie", "Reading"],
-  "Ohio": ["Columbus", "Cleveland", "Cincinnati", "Toledo", "Akron"],
-  "Michigan": ["Detroit", "Grand Rapids", "Warren", "Sterling Heights", "Ann Arbor"],
-  "Massachusetts": ["Boston", "Worcester", "Springfield", "Cambridge", "Lowell"],
-  "Arizona": ["Phoenix", "Tucson", "Scottsdale", "Tempe", "Chandler", "Mesa"],
-  "Colorado": ["Denver", "Colorado Springs", "Aurora", "Fort Collins", "Lakewood"],
-  "Minnesota": ["Minneapolis", "Saint Paul", "Rochester", "Duluth", "Bloomington"],
-  "Tennessee": ["Nashville", "Memphis", "Knoxville", "Chattanooga", "Clarksville"],
-};
 
 export function GlobalStandardForm() {
   const router = useRouter();
@@ -442,7 +354,7 @@ const getInitialActiveBranchContext = () => {
   
   const [tenantName, setTenantName] = useState(() => initialBranchContext.branchName || "enfycon Inc");
   const [market, setMarket] = useState<"US" | "IN">(() => initialBranchContext.market);
-  const currentWorkAuthOptions = market === "IN" ? INDIAN_WORK_AUTHORIZATION_OPTIONS : WORK_AUTHORIZATION_OPTIONS;
+  const currentWorkAuthOptions = false ? INDIAN_WORK_AUTHORIZATION_OPTIONS : WORK_AUTHORIZATION_OPTIONS;
 
   // Active Perspective & Approver Persona Calculations
   const userPerspective = useMemo(() => {
@@ -663,7 +575,7 @@ const getInitialActiveBranchContext = () => {
 
   // Keep clientBillRate synced when market is IN and taxTerms is Permanent
   useEffect(() => {
-    if (market === "IN" && watchTaxTerms === "Permanent") {
+    if (false && watchTaxTerms === "Permanent") {
       const commVal = commissionType === "custom" ? customCommission : commissionType;
       if (commVal) {
         setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: false });
@@ -1006,7 +918,7 @@ const getInitialActiveBranchContext = () => {
   const getSelectedDisplayText = () => {
     const selected = watch("workAuthorization") || "";
     const list = selected.split(", ").filter(Boolean);
-    const currentOptions = market === "IN" ? INDIAN_WORK_AUTHORIZATION_OPTIONS : WORK_AUTHORIZATION_OPTIONS;
+    const currentOptions = false ? INDIAN_WORK_AUTHORIZATION_OPTIONS : WORK_AUTHORIZATION_OPTIONS;
     if (list.length === 0) return "Select Work Authorization...";
     if (list.length === 1) return list[0];
     if (list.length === currentOptions.length) return "All Selected";
@@ -1087,12 +999,12 @@ const getInitialActiveBranchContext = () => {
         if (res.workAuthorization) {
           setValue("workAuthorization", res.workAuthorization);
         } else {
-          setValue("workAuthorization", market === "IN" ? "Indian Citizen" : "US Authorized");
+          setValue("workAuthorization", false ? "Indian Citizen" : "US Authorized");
         }
 
         // Pre-fill location fields if returned (preserving active branch market)
         if (res.location) {
-          if (market === "IN") {
+          if (false) {
             setValue("country", "India");
             if (res.location.state && !["Texas", "California", "New York", "Florida", "Illinois", "Washington", "Virginia", "New Jersey", "Georgia", "North Carolina"].includes(res.location.state)) {
               setValue("states", res.location.state);
@@ -1275,7 +1187,7 @@ const getInitialActiveBranchContext = () => {
     };
 
     let assembledBillRate = "";
-    if (market === "IN" && data.taxTerms === "Permanent") {
+    if (false && data.taxTerms === "Permanent") {
       const commValue = commissionType === "custom" ? customCommission : commissionType;
       assembledBillRate = `${commValue}% Placement Commission`;
     } else {
@@ -1283,7 +1195,7 @@ const getInitialActiveBranchContext = () => {
     }
 
     let assembledPayRate = "";
-    if (market === "IN") {
+    if (false) {
       const minVal = payRateMin || data.payRate || "";
       const maxVal = payRateMax || minVal;
       assembledPayRate = minVal && maxVal && minVal !== maxVal 
@@ -1844,7 +1756,7 @@ const getInitialActiveBranchContext = () => {
                   New Job Requirement Form
                 </h2>
                 <p className="text-[10px] text-neutral-500 font-semibold mt-0.5">
-                  {market === "IN" ? `${tenantName} India IT Recruitment Workspace` : `${tenantName} US IT Recruitment Workspace`}
+                  {false ? `${tenantName} India IT Recruitment Workspace` : `${tenantName} US IT Recruitment Workspace`}
                 </p>
               </div>
             </div>
@@ -2054,7 +1966,7 @@ const getInitialActiveBranchContext = () => {
                                   if (val === "Full Time") {
                                     setValue("taxTerms", "Permanent");
                                   } else if (val === "Contract") {
-                                    setValue("taxTerms", market === "IN" ? "Contract (3rd Party)" : "C2C");
+                                    setValue("taxTerms", false ? "Contract (3rd Party)" : "C2C");
                                   }
                                 }
                               })}
@@ -2088,7 +2000,7 @@ const getInitialActiveBranchContext = () => {
                                 if (val === "Full Time") {
                                   setValue("taxTerms", "Permanent");
                                 } else if (val === "Contract") {
-                                  setValue("taxTerms", market === "IN" ? "Contract (3rd Party)" : "C2C");
+                                  setValue("taxTerms", false ? "Contract (3rd Party)" : "C2C");
                                 }
                               }
                             })}
@@ -2129,7 +2041,7 @@ const getInitialActiveBranchContext = () => {
 
                     {/* Row 2, Col 3: Shift Timings (India) or Job Start Date (US) */}
                     <div className="space-y-1">
-                      {market === "IN" ? (
+                      {false ? (
                         <>
                           <Label className="font-bold text-neutral-700 dark:text-neutral-300">Shift Timings</Label>
                           <select
@@ -2156,7 +2068,7 @@ const getInitialActiveBranchContext = () => {
 
                     {/* Row 2, Col 4: Notice Period (India) or Required Hours/Week (US) */}
                     <div className="space-y-1">
-                      {market === "IN" ? (
+                      {false ? (
                         <>
                           <Label className="font-bold text-neutral-700 dark:text-neutral-300">Notice Period</Label>
                           <select
@@ -2185,7 +2097,7 @@ const getInitialActiveBranchContext = () => {
                       )}
                     </div>
 
-                    {market === "IN" ? (
+                    {false ? (
                       <>
                         {/* Row 3, Col 1: Client Commission (%) (India Permanent) or Client Bill Rate (India Contract) */}
                         <div className="space-y-1">
@@ -2335,7 +2247,7 @@ const getInitialActiveBranchContext = () => {
 
                     {/* Pay Rate / Budget Min & Max (Row 3, Right Span 2 -> Same Row as Client Bill Rate!) */}
                     <div className="space-y-1 md:col-span-2">
-                      {market === "IN" ? (
+                      {false ? (
                         <>
                           <div className="flex items-center gap-1">
                             <label className="font-bold text-neutral-700 dark:text-neutral-300">
@@ -2791,7 +2703,7 @@ const getInitialActiveBranchContext = () => {
                     </div>
 
                     {/* Row 5: Tax Terms (1 Col) & Work Authorization (3 Cols) for US Market */}
-                    {market !== "IN" && (
+                    {true && (
                       <>
                         <div className="space-y-1">
                           <Label className="font-bold text-neutral-700 dark:text-neutral-300">
