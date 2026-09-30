@@ -152,8 +152,8 @@ const formSchema = zod.object({
   employmentLevel: zod.string().optional(),
   clientManager: zod.string().optional(),
   recruitmentManager: zod.string().optional(),
-  primaryRecruiter: zod.string().optional(),
-  assignedTo: zod.string().optional(),
+  recruiter: zod.string().optional(),
+  
 
   // Skills Section
   industry: zod.string().optional(),
@@ -334,10 +334,7 @@ export default function EditJobPostingPage() {
   const [activeBranch, setActiveBranch] = useState<any>(null);
   const [jobTiming, setJobTiming] = useState<{
     jobTimezone?: string;
-    workStartTime?: string;
-    workEndTime?: string;
-    workingDays?: string[];
-    shiftTiming?: string;
+                shiftTiming?: string;
     timingSnapshotAt?: string;
   } | null>(null);
 
@@ -674,10 +671,7 @@ export default function EditJobPostingPage() {
 
           setJobTiming({
             jobTimezone: jobData.jobTimezone,
-            workStartTime: jobData.workStartTime,
-            workEndTime: jobData.workEndTime,
-            workingDays: jobData.workingDays,
-            shiftTiming: jobData.shiftTiming,
+                                                shiftTiming: jobData.shiftTiming,
             timingSnapshotAt: jobData.timingSnapshotAt,
           });
 
@@ -741,8 +735,8 @@ export default function EditJobPostingPage() {
           setValue("hoursPerWeek", jobData.hoursPerWeek || 40);
           setValue("duration", jobData.duration || "");
           setValue("recruitmentManager", jobData.recruitmentManagerId || "");
-          setValue("primaryRecruiter", jobData.primaryRecruiterId || "");
-          setValue("assignedTo", jobData.assignedTo || "");
+          setValue("recruiter", jobData.recruiterId || "");
+          setValue( jobData.assignedTo || "");
           setValue("accountManager", jobData.accountManagerId || "");
           setValue("industry", jobData.industry || "");
           setValue("degree", jobData.degree || "");
@@ -752,8 +746,8 @@ export default function EditJobPostingPage() {
           
           if (jobData.podId) {
             setSelectedPodId(`pod:${jobData.podId}`);
-          } else if (jobData.primaryRecruiterId) {
-            setSelectedPodId(`rec:${jobData.primaryRecruiterId}`);
+          } else if (jobData.recruiterId) {
+            setSelectedPodId(`rec:${jobData.recruiterId}`);
           } else if (jobData.assignedTo === "ALL" || jobData.assignedTo === "All Branch Recruiters") {
             setSelectedPodId("all");
           } else if (jobData.assignedTo === "Unassigned") {
@@ -1008,7 +1002,7 @@ export default function EditJobPostingPage() {
       let finalDescription = data.jobDescription;
 
       let resolvedPodId: string | undefined = undefined;
-      let resolvedPrimaryRecruiterId: string | undefined = data.primaryRecruiter || undefined;
+      let resolvedPrimaryRecruiterId: string | undefined = data.recruiter || undefined;
       let resolvedAssignedTo: string | undefined = data.assignedTo || undefined;
 
       if (selectedPodId.startsWith("pod:")) {
@@ -1056,8 +1050,8 @@ export default function EditJobPostingPage() {
         hoursPerWeek: data.hoursPerWeek,
         duration: data.duration || undefined,
         recruitmentManagerId: data.recruitmentManager || undefined,
-        primaryRecruiterId: resolvedPrimaryRecruiterId,
-        assignedTo: resolvedAssignedTo,
+        recruiterId: resolvedPrimaryRecruiterId,
+        
         accountManagerId: data.accountManager || undefined,
         industry: data.industry || undefined,
         degree: data.degree || undefined,

@@ -91,6 +91,12 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
         if (child.href === "/utility/submissions?view=my" && !has("submission:create")) return false;
       }
 
+      // ── Specific Removals for Recruiters ──
+      const isRecruiter = !isGlobalOrBranchAdmin && !isAccountManager && resolveActiveSystemRole(input, roles, profile) === "RECRUITER";
+      if (isRecruiter) {
+        if (child.href === "/job-posting/active") return false;
+      }
+
       if (["/applicants/new", "/applicants/bulk"].includes(child.href)) return has("candidate:create");
       if (child.href === "/applicants/pipeline") return has("submission:view");
       if (child.href === "/job-posting/drafts") return has("job:create");

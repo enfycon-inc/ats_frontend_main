@@ -30,7 +30,7 @@ const getBaseJobColumns = (usesPods: boolean) => [
   "businessUnit",
   "jobStatus",
   "createdBy",
-  "assignedTo",
+  
   "client",
   "endClientName",
   "location",
@@ -194,10 +194,10 @@ export default function JobPostingDashboard({
     return () => window.removeEventListener("branchChanged", handleBranchChange);
   }, []);
 
-  // Sanitize user columns: remove legacy primaryRecruiter / recruitmentManager,
+  // Sanitize user columns: remove legacy recruiter / recruitmentManager,
   // and remove podName only if the current branch does not use pods.
   const sanitizeColumns = useCallback((cols: string[], usesPods: boolean) => {
-    let clean = cols.filter((c) => c !== "primaryRecruiter" && c !== "recruitmentManager");
+    let clean = cols.filter((c) => c !== "recruiter" && c !== "recruitmentManager");
     if (!usesPods) {
       clean = clean.filter((c) => c !== "podName");
     }
@@ -348,28 +348,6 @@ export default function JobPostingDashboard({
         // Prefer shift-filtered jobs; if empty, show all real tenant API jobs so real DB jobs are never hidden by mock data
         let jobsToDisplay = shiftJobs.length > 0 ? shiftJobs : mapped;
 
-        // ── Recruiter scoping (frontend safety net) ──────────────────────────
-        // Backend strictly isolates in SQL. This client-side guard provides defense-in-depth.
-        // NOTE: Open pool (assignedTo = 'ALL') is completely removed for recruiters per user requirement!
-        if (isRecruiter && currentUser?.id) {
-          const userPodId = (currentUser as any)?.podId;
-          jobsToDisplay = jobsToDisplay.filter((job) => {
-            // 1. Assigned directly as primary recruiter or recruitment manager
-            if (job.primaryRecruiterId === currentUser.id || job.recruitmentManagerId === currentUser.id) {
-              return true;
-            }
-            if (currentUser.fullName && (job.primaryRecruiter === currentUser.fullName || job.recruitmentManager === currentUser.fullName)) {
-              return true;
-            }
-            // 2. Assigned to user's Pod
-            if (userPodId && job.podId && job.podId === userPodId) {
-              return true;
-            }
-            // Open pool / 'ALL' is REMOVED for recruiters!
-            return false;
-          });
-        }
-
         // Account Manager scoping handled entirely by backend API jobs.service.ts
         // Frontend safety net removed to allow unit-wide job visibility.
 
@@ -414,7 +392,6 @@ export default function JobPostingDashboard({
       { id: "businessUnit", label: "Business Unit" },
       { id: "jobStatus", label: "Job Status" },
       { id: "createdBy", label: "Job Created By" },
-      { id: "assignedTo", label: "Pods & Recruiters" },
       { id: "client", label: "Client" },
       { id: "endClientName", label: "End Client" },
       { id: "clientJobId", label: "Client Job ID" },
@@ -466,7 +443,7 @@ export default function JobPostingDashboard({
           if (pref === "Closed Jobs") return job.jobStatus === "Closed" || job.jobStatus === "Close";
           if (pref === "My Jobs") {
             if (isAccountManager) return job.creatorEmail === currentUser?.email || (currentUser?.fullName && job.createdBy === currentUser.fullName) || job.recruitmentManagerId === currentUser?.id;
-            return job.primaryRecruiterId === currentUser?.id || (currentUser?.fullName && job.primaryRecruiter === currentUser.fullName) || job.recruitmentManagerId === currentUser?.id;
+            return job.recruiterId === currentUser?.id || (currentUser?.fullName && job.recruiter === currentUser.fullName) || job.recruitmentManagerId === currentUser?.id;
           }
           if (pref === "Jobs with submissions") return job.submissionsCount > 0;
           if (pref === "Jobs without submissions") return job.submissionsCount === 0;
@@ -515,8 +492,8 @@ export default function JobPostingDashboard({
         }
         // Recruiters: jobs directly assigned to them or primary recruiter
         return (
-          job.primaryRecruiterId === currentUser?.id ||
-          (currentUser?.fullName && job.primaryRecruiter === currentUser.fullName) ||
+          job.recruiterId === currentUser?.id ||
+          (currentUser?.fullName && job.recruiter === currentUser.fullName) ||
           job.recruitmentManagerId === currentUser?.id
         );
       });
@@ -529,7 +506,7 @@ export default function JobPostingDashboard({
       setJobsData(podJobs);
     } else if (viewName === "Unassigned Jobs") {
       const unassigned = baseData.filter((job) => {
-        const hasNoRecruiter = !job.primaryRecruiterId || job.primaryRecruiter === "N/A" || !job.primaryRecruiter;
+        const hasNoRecruiter = !job.recruiterId || job.recruiter === "N/A" || !job.recruiter;
         const hasNoPod = !job.podId && (!job.podName || job.podName === "Unassigned" || job.podName === "N/A");
         const assignedToUpper = ((job as any).assignedTo || 'N/A' || "").trim().toUpperCase();
         const hasNoAssignedTo = !assignedToUpper || assignedToUpper === "UNASSIGNED" || assignedToUpper === "NONE" || assignedToUpper === "N/A";
@@ -543,7 +520,7 @@ export default function JobPostingDashboard({
     } else if (viewName === "My Open Requirements") {
       const myJobs = baseData.filter(
         (job) =>
-          job.jobStatus === "Active" && job.primaryRecruiter !== "N/A"
+          job.jobStatus === "Active" && job.recruiter !== "N/A"
       );
       setJobsData(myJobs);
     } else if (viewName === "Hot IT Jobs") {
@@ -579,19 +556,19 @@ export default function JobPostingDashboard({
 
       if (updatedFields.podId !== undefined) apiPayload.podId = updatedFields.podId;
 
-      if (updatedFields.primaryRecruiterId !== undefined) {
-        apiPayload.primaryRecruiterId = updatedFields.primaryRecruiterId;
-      } else if (updatedFields.primaryRecruiter !== undefined) {
-        const recruiterName = updatedFields.primaryRecruiter;
+      if (updatedFields.recruiterId !== undefined) {
+        apiPayload.recruiterId = updatedFields.recruiterId;
+      } else if (updatedFields.recruiter !== undefined) {
+        const recruiterName = updatedFields.recruiter;
         if (recruiterName === "N/A" || !recruiterName) {
-          apiPayload.primaryRecruiterId = null;
+          apiPayload.recruiterId = null;
         } else {
           const users = await atsApi.auth.listUsers();
           const foundUser = users.find((u: any) => u.fullName === recruiterName);
           if (foundUser) {
-            apiPayload.primaryRecruiterId = foundUser.id;
+            apiPayload.recruiterId = foundUser.id;
           } else {
-            apiPayload.primaryRecruiterId = null;
+            apiPayload.recruiterId = null;
           }
         }
       }

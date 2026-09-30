@@ -134,7 +134,7 @@ export default function DashboardPage() {
       if (updatedFields.payRate !== undefined) apiPayload.payRate = updatedFields.payRate;
       if (updatedFields.assignedTo !== undefined) apiPayload.assignedTo = updatedFields.assignedTo;
       if (updatedFields.podId !== undefined) apiPayload.podId = updatedFields.podId;
-      if (updatedFields.primaryRecruiterId !== undefined) apiPayload.primaryRecruiterId = updatedFields.primaryRecruiterId;
+      if (updatedFields.recruiterId !== undefined) apiPayload.recruiterId = updatedFields.recruiterId;
 
       await atsApi.jobs.update(jobId, apiPayload);
       toast.success("Job updated successfully.");

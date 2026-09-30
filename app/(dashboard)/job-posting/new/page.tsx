@@ -153,8 +153,8 @@ const formSchema = zod.object({
   employmentLevel: zod.string().optional(),
   clientManager: zod.string().optional(),
   recruitmentManager: zod.string().optional(),
-  primaryRecruiter: zod.string().optional(),
-  assignedTo: zod.string().optional(),
+  recruiter: zod.string().optional(),
+  
 
   // Skills Section
   industry: zod.string().optional(),
@@ -1317,7 +1317,7 @@ const getInitialActiveBranchContext = () => {
       let resolvedPodId: string | undefined = undefined;
       let resolvedApproverId: string | undefined = selectedApproverId || undefined;
       let resolvedApproverRole: string = selectedApproverRole || "POD_LEAD";
-      let resolvedPrimaryRecruiterId: string | undefined = data.primaryRecruiter || undefined;
+      let resolvedPrimaryRecruiterId: string | undefined = data.recruiter || undefined;
       let resolvedAssignedTo: string | undefined = data.assignedTo || undefined;
 
       if (selectedPodId.startsWith("pod:")) {
@@ -1375,7 +1375,7 @@ const getInitialActiveBranchContext = () => {
         status: initialJobStatus,
         approvalStatus: initialApprovalStatus,
         assignedApproverId: finalApproverId,
-        assignedApproverRole: finalApproverRole,
+        
         visaType: data.workAuthorization,
         clientBillRate: assembledBillRate,
         payRate: assembledPayRate,
@@ -1389,8 +1389,8 @@ const getInitialActiveBranchContext = () => {
         hoursPerWeek: data.hoursPerWeek,
         duration: data.duration || undefined,
         recruitmentManagerId: data.recruitmentManager || undefined,
-        primaryRecruiterId: resolvedPrimaryRecruiterId,
-        assignedTo: resolvedAssignedTo,
+        recruiterId: resolvedPrimaryRecruiterId,
+        
         accountManagerId: data.accountManager || undefined,
         industry: data.industry || undefined,
         degree: data.degree || undefined,

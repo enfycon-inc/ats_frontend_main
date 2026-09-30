@@ -402,8 +402,8 @@ export function JobAssignModal({
 
     // Initial selected user IDs (recruiters)
     const initialSelected: string[] = [];
-    if (job.primaryRecruiterId) {
-      initialSelected.push(job.primaryRecruiterId);
+    if (job.recruiterId) {
+      initialSelected.push(job.recruiterId);
     }
 
     if (
@@ -539,8 +539,8 @@ export function JobAssignModal({
         payload.podIds = [];
         payload.podName = "N/A";
         payload.assignedTo = "Unassigned";
-        payload.primaryRecruiter = "N/A";
-        payload.primaryRecruiterId = null;
+        payload.recruiter = "N/A";
+        payload.recruiterId = null;
       } else {
         // 1. Pods assignment:
         if (selectedPodIds.length > 0) {
@@ -563,13 +563,13 @@ export function JobAssignModal({
           const selectedUsers = usersList.filter((u) => selectedUserIds.includes(u.id));
           const recruiterNames = selectedUsers.map((u) => u.fullName || u.name || u.email);
           payload.assignedTo = recruiterNames.join(", ");
-          payload.primaryRecruiterId = selectedUserIds[0];
-          payload.primaryRecruiter =
+          payload.recruiterId = selectedUserIds[0];
+          payload.recruiter =
             selectedUsers[0]?.fullName || selectedUsers[0]?.name || recruiterNames[0];
         } else {
           payload.assignedTo = "Unassigned";
-          payload.primaryRecruiter = "N/A";
-          payload.primaryRecruiterId = null;
+          payload.recruiter = "N/A";
+          payload.recruiterId = null;
         }
       }
 
@@ -579,8 +579,8 @@ export function JobAssignModal({
         podId: payload.podId,
         podName: payload.podName,
         assignedTo: payload.assignedTo,
-        primaryRecruiter: payload.primaryRecruiter,
-        primaryRecruiterId: payload.primaryRecruiterId,
+        recruiter: payload.recruiter,
+        recruiterId: payload.recruiterId,
       } as any);
 
       const summaryParts: string[] = [];
@@ -1184,7 +1184,7 @@ export function JobAssignModal({
             filteredUsers.map((u: any) => {
               const isSelected = selectedUserIds.includes(u.id);
               const isCurrent =
-                job.primaryRecruiterId === u.id ||
+                job.recruiterId === u.id ||
                 ((job as any).assignedTo || "N/A")?.toLowerCase().includes((u.fullName || u.name || "").toLowerCase()) ||
                 ((job as any).assignedTo || "N/A")?.toLowerCase().includes((u.email || "").toLowerCase());
               const roleLabel = getUserRoleLabel(u, targetBranch?.id);

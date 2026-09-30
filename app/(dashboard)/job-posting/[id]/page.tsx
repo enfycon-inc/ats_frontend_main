@@ -1026,7 +1026,7 @@ export default function JobDetailPage() {
                 </Badge>
               </div>
               <p className="text-[11px] text-amber-800/90 dark:text-amber-300/80 mt-0.5">
-                Created by <strong>{job.createdBy || "Account Manager"}</strong>. Assigned Reviewer: <strong>{job.assignedApproverName || (job.assignedApproverRole === "POD_LEAD" ? "Recruitment Pod Lead" : job.assignedApproverRole === "DELIVERY_HEAD" ? "Delivery Head" : "Assigned Reviewer")}</strong>. This requirement is <strong>hidden from recruiters</strong> until approved.
+                Created by <strong>{job.createdBy || "Account Manager"}</strong>. Assigned Reviewer: <strong>{job.assignedApproverName || ("Assigned Reviewer")}</strong>. This requirement is <strong>hidden from recruiters</strong> until approved.
               </p>
             </div>
           </div>
@@ -2366,7 +2366,7 @@ export default function JobDetailPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-neutral-500 font-medium">Assigned To:</span>
-              <span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.assignedTo || "Pod / Recruiter"}</span>
+              <span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.podName || job?.recruiter || "Unassigned"}</span>
             </div>
           </div>
 

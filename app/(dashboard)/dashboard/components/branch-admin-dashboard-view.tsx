@@ -332,7 +332,7 @@ function BranchAdminDashboardView({
         payload.podId = targetId;
         payload.assignedTo = targetName;
       } else if (type === "user") {
-        payload.primaryRecruiterId = targetId;
+        payload.recruiterId = targetId;
         payload.assignedTo = targetName;
         payload.podId = "none";
       } else {
@@ -350,7 +350,7 @@ function BranchAdminDashboardView({
                 ...j,
                 assignedTo: targetName,
                 podId: type === "pod" ? targetId : undefined,
-                primaryRecruiterId: type === "user" ? targetId : undefined,
+                recruiterId: type === "user" ? targetId : undefined,
               }
             : j
         )
@@ -1004,7 +1004,7 @@ function BranchAdminDashboardView({
               ) : (
                 filteredUsers.map((u: any) => {
                   const isCurrent =
-                    selectedJobForAssign?.primaryRecruiterId === u.id ||
+                    selectedJobForAssign?.recruiterId === u.id ||
                     selectedJobForAssign?.assignedTo?.toLowerCase() === (u.fullName || u.name || "").toLowerCase() ||
                     selectedJobForAssign?.assignedTo?.toLowerCase() === u.email?.toLowerCase();
                   const roleLabel = u.roleName || (u.roles && u.roles[0]) || u.systemRole || "Staff";

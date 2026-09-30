@@ -459,6 +459,15 @@ export function JobTableRow({
                   </span>
                 )}
               </div>
+            ) : colId === "businessUnit" ? (
+              <div className="flex flex-col leading-tight py-0.5 min-w-[120px]">
+                <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs truncate max-w-[160px]">
+                  {job.branchName || "Main Office"}
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[160px]">
+                  ({job.businessUnit || "N/A"})
+                </span>
+              </div>
             ) : colId === "location" ? (
               <div className="flex flex-col leading-tight py-0.5">
                 <span className="font-medium text-slate-800 dark:text-slate-200 text-xs">
@@ -523,9 +532,9 @@ export function JobTableRow({
               <span className="font-medium text-slate-800 dark:text-slate-200 text-xs">
                 {job.noOfPositions || 1}
               </span>
-            ) : colId === "primaryRecruiter" ? (
+            ) : colId === "recruiter" ? (
               <span className="text-xs text-neutral-800 dark:text-neutral-200">
-                {String(job.primaryRecruiter || "N/A")}
+                {String(job.recruiter || "N/A")}
               </span>
             ) : colId === "assignedTo" ? (
               <div className="flex items-center justify-between gap-1.5 w-full min-w-0 py-0.5">

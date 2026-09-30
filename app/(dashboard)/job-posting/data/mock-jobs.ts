@@ -17,9 +17,9 @@ export interface Job {
   payRate: string;
   recruitmentManager: string;
   recruitmentManagerId?: string;
-  primaryRecruiter: string;
-  primaryRecruiterId?: string | null;
-  assignedTo: string;
+  recruiter: string;
+  recruiterId?: string | null;
+  
   createdBy: string;
   createdOn: string;
   modifiedOn: string;
@@ -51,7 +51,7 @@ export interface Job {
   approvalStatus?: "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
   assignedApproverId?: string | null;
   assignedApproverName?: string | null;
-  assignedApproverRole?: string | null;
+  
   approvedBy?: string | null;
   approvedAt?: string | null;
   rejectionReason?: string | null;
@@ -90,9 +90,9 @@ export function mapApiJobToJob(api: any): Job {
     payRate: api.payRate || "N/A",
     recruitmentManager: api.recruitmentManager || "N/A",
     recruitmentManagerId: api.recruitmentManagerId || undefined,
-    primaryRecruiter: api.primaryRecruiter || "N/A",
-    primaryRecruiterId: api.primaryRecruiterId || undefined,
-    assignedTo: api.assignedTo || "N/A",
+    recruiter: api.recruiter || "N/A",
+    recruiterId: api.recruiterId || undefined,
+    
     createdBy: api.createdBy || "System Admin",
     createdOn: api.createdAt || api.createdOn || new Date().toISOString(),
     modifiedOn: api.updatedAt || api.modifiedOn || api.createdAt || api.createdOn || new Date().toISOString(),
@@ -119,7 +119,7 @@ export function mapApiJobToJob(api: any): Job {
     approvalStatus: api.approvalStatus || (api.status === "Pending Approval" ? "PENDING_APPROVAL" : "APPROVED"),
     assignedApproverId: api.assignedApproverId || null,
     assignedApproverName: api.assignedApproverName || null,
-    assignedApproverRole: api.assignedApproverRole || null,
+    
     approvedBy: api.approvedBy || null,
     approvedAt: api.approvedAt || null,
     rejectionReason: api.rejectionReason || null,

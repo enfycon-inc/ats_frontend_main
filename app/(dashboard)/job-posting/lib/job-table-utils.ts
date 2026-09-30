@@ -81,15 +81,15 @@ export function getAssignedPersonDisplay(job: Job): AssignedPersonDisplay {
 
   if (
     !recruitersInfo &&
-    job.primaryRecruiter &&
-    job.primaryRecruiter !== "N/A" &&
-    job.primaryRecruiter.toLowerCase() !== "unassigned"
+    job.recruiter &&
+    job.recruiter !== "N/A" &&
+    job.recruiter.toLowerCase() !== "unassigned"
   ) {
-    if (!podNamesLower.includes(job.primaryRecruiter.toLowerCase())) {
+    if (!podNamesLower.includes(job.recruiter.toLowerCase())) {
       recruitersInfo = {
-        names: [job.primaryRecruiter],
+        names: [job.recruiter],
         count: 1,
-        label: job.primaryRecruiter,
+        label: job.recruiter,
       };
     }
   }
