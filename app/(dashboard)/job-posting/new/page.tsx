@@ -38,7 +38,7 @@ export default function NewJobPostingPage() {
 
         if (matchedUnit) {
           const segmentCode = (matchedUnit.marketSegment?.code || matchedUnit.marketSegmentCode || matchedUnit.market || "").toUpperCase();
-          if (segmentCode === "DOM" || segmentCode === "INDIA" || segmentCode === "IN") {
+          if (segmentCode === "IND" || segmentCode === "INDIA" || segmentCode === "IN") {
             setMarketVariant("INDIA");
           } else if (segmentCode === "USIT" || segmentCode === "US" || segmentCode === "USA") {
             setMarketVariant("USIT");
