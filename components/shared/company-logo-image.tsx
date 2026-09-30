@@ -34,7 +34,7 @@ export function CompanyLogoImage({ src, alt, className, onDimensions }: {
   }
 
   if (!measured || measured.src !== src) {
-    return <img src={src} alt={alt} onLoad={measure} className={`${className || ''} object-contain object-left`} />;
+    return <img src={src} alt={alt} onLoad={measure} crossOrigin="anonymous" className={`${className || ''} object-contain object-left`} />;
   }
   return (
     <svg role="img" aria-label={alt} viewBox={measured.viewBox} preserveAspectRatio="xMinYMid meet" className={className}>

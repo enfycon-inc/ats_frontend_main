@@ -6,6 +6,8 @@ import EnfyconLogo from "@/components/shared/enfycon-logo";
 import LoginForm from "@/components/auth/login-form";
 import Social from "@/components/auth/social";
 import { Building2 } from "lucide-react";
+import { atsApi } from "@/lib/ats-api";
+import { CompanyLogoImage } from "@/components/shared/company-logo-image";
 
 const MAIN_DOMAINS = [
   "localhost",
@@ -28,17 +30,35 @@ function checkIsSubdomain(hostname: string): boolean {
 
 function Copyright() {
   const currentYear = new Date().getFullYear();
-  return <>Copyright © {currentYear} Enfycon Inc. All Rights Reserved.</>;
+  return <>Copyright © {currentYear} {tenantBranding?.name || "Enfycon Inc."} All Rights Reserved.</>;
 }
 
 const Login = () => {
   const [mounted, setMounted] = React.useState(false);
   const [isSubdomain, setIsSubdomain] = React.useState(false);
+  const [tenantBranding, setTenantBranding] = React.useState<any>(null);
 
   React.useEffect(() => {
     setMounted(true);
     if (typeof window !== "undefined") {
-      setIsSubdomain(checkIsSubdomain(window.location.hostname));
+      const hostname = window.location.hostname;
+      const isSub = checkIsSubdomain(hostname);
+      setIsSubdomain(isSub);
+      
+      if (isSub) {
+        atsApi.auth.getTenantAuthPolicy(hostname).then(policy => {
+          if (policy?.siteTitle || policy?.logoUrl) {
+            setTenantBranding({
+              name: policy.name,
+              siteTitle: policy.siteTitle,
+              logoUrl: policy.logoUrl,
+            });
+            if (policy.siteTitle) {
+              document.title = policy.siteTitle;
+            }
+          }
+        }).catch(() => {});
+      }
     }
   }, []);
   return (
@@ -58,7 +78,11 @@ const Login = () => {
           {/* Top Brand Header */}
           <div className="flex items-center justify-between">
             <Link href="/" className="inline-block transition-transform hover:scale-105">
-              <EnfyconLogo variant="light" width={190} height={42} />
+              {tenantBranding?.logoUrl ? (
+                <CompanyLogoImage src={tenantBranding.logoUrl} alt={tenantBranding.siteTitle || "Company Logo"} className="h-10 w-auto max-w-[200px]" />
+              ) : (
+                <EnfyconLogo variant="light" width={190} height={42} />
+              )}
             </Link>
           </div>
 
@@ -87,7 +111,11 @@ const Login = () => {
             {/* Mobile Header Logo */}
             <div className="flex justify-center mb-6 lg:hidden">
               <Link href="/">
-                <EnfyconLogo variant="light" width={180} height={40} />
+                {tenantBranding?.logoUrl ? (
+                  <CompanyLogoImage src={tenantBranding.logoUrl} alt={tenantBranding.siteTitle || "Company Logo"} className="h-10 w-auto max-w-[180px]" />
+                ) : (
+                  <EnfyconLogo variant="light" width={180} height={40} />
+                )}
               </Link>
             </div>
 
@@ -133,7 +161,7 @@ const Login = () => {
 
           {/* Right Footer Copyright */}
           <div className="text-xs text-center text-slate-400 pt-8">
-            <Copyright />
+            <Copyright tenantBranding={tenantBranding} />
           </div>
 
         </div>
