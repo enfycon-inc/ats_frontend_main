@@ -91,15 +91,7 @@ export function ClientRoot({
       // Listen for local storage changes if they switch roles
             
       // Also listen to storage events to re-render immediately across components
-      const handleStorageChange = () => {
-        setOverrideRole(localStorage.getItem("override_role"));
-      };
-      window.addEventListener("storage", handleStorageChange);
-      window.addEventListener("overrideRoleChanged", handleStorageChange);
-      return () => {
-        window.removeEventListener("storage", handleStorageChange);
-        window.removeEventListener("overrideRoleChanged", handleStorageChange);
-      };
+      
     }
   }, []);
 
@@ -119,14 +111,11 @@ export function ClientRoot({
   }, [initialNavigation, session]);
 
   const isSuperAdmin = useMemo(() => {
-    if (overrideRole === "SUPER_ADMIN") return true;
-    if (overrideRole && overrideRole !== "SUPER_ADMIN") return false;
-    
     if (!session || !(session as any).user) return false;
     const roles = (session as any).user.roles || [];
     const systemRole = (session as any).user.systemRole;
     return roles.includes("SUPER_ADMIN") || systemRole === "SUPER_ADMIN";
-  }, [session, overrideRole]);
+  }, [session]);
 
   const isViewportLocked = 
     (pathname?.startsWith("/job-posting") && !pathname.endsWith("/new") && !pathname.includes("/matches")) ||
