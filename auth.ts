@@ -229,7 +229,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             body: JSON.stringify({
               provider,
               subdomain,
-              ...(provider === 'keycloak' ? { accessToken: account.access_token } : {}),
+              ...(provider === 'keycloak' ? { accessToken: account.access_token } : { idToken: account.id_token }),
               email: user.email,
               name: user.name,
               picture: user.image,
