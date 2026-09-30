@@ -342,7 +342,7 @@ export default function MarketsPage() {
   useEffect(() => {
     load();
     const user = atsApi.auth.getCurrentUser();
-    const isGlobal = !!user?.permissions?.includes('tenant:settings');
+    const isGlobal = !!user?.roles?.includes('SUPER_ADMIN');
     setIsGlobalAdmin(isGlobal);
     if (!isGlobal) {
       router.push('/management/branch');
