@@ -354,7 +354,8 @@ const LoginForm = () => {
   const microsoftTenantConfigured = !!authPolicy.microsoftTenantId &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(authPolicy.microsoftTenantId);
   const microsoftConfigured = microsoftTenantConfigured && !!authPolicy.microsoftClientId;
-  const hasSocial = showGoogle || showMicrosoft;
+  const isGlobalPortal = !getTenantIdentifier();
+  const hasSocial = (showGoogle || showMicrosoft) && !isGlobalPortal;
   const socialLogin = (
     <div className="space-y-2">
       {authPolicyStatus === "loading" ? (

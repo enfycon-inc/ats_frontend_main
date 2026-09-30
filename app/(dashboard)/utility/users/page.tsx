@@ -590,17 +590,28 @@ export default function UserManagementPage() {
     }
 
     setEmailStatus("checking");
-    const timer = setTimeout(() => {
-      const isTaken = users.some((u) => (u.email || "").toLowerCase() === rawEmail);
-
-      if (isTaken) {
+    const timer = setTimeout(async () => {
+      const isLocallyTaken = users.some((u) => (u.email || "").toLowerCase() === rawEmail);
+      if (isLocallyTaken) {
         setEmailStatus("taken");
-        setEmailCheckMsg(`Email ${rawEmail} is already registered.`);
-      } else {
-        setEmailStatus("available");
-        setEmailCheckMsg(`Email ${rawEmail} is available!`);
+        setEmailCheckMsg(`is already registered in your workspace.`);
+        return;
       }
-    }, 300);
+
+      try {
+        const res = await atsApi.auth.checkEmailAvailability(rawEmail);
+        if (!res.available) {
+          setEmailStatus("taken");
+          setEmailCheckMsg(`is already registered in the system.`);
+        } else {
+          setEmailStatus("available");
+          setEmailCheckMsg(`is available!`);
+        }
+      } catch (err) {
+        console.error("Email check failed", err);
+        setEmailStatus("idle");
+      }
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [addForm.email, users]);
@@ -2584,14 +2595,16 @@ export default function UserManagementPage() {
                         </span>
                       )}
                       {emailStatus === "taken" && (
-                        <span className="text-red-600 dark:text-red-400 flex items-center gap-1 font-bold">
-                          <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" /> Registered
-                        </span>
+                        <span className="text-red-500 dark:text-red-400 flex items-center gap-1.5 font-medium">
+                            <XCircle className="h-3.5 w-3.5 shrink-0" />
+                            <span>Email <span className="font-bold text-slate-700 dark:text-slate-200">{addForm.email}</span> {emailCheckMsg}</span>
+                          </span>
                       )}
                       {emailStatus === "available" && (
-                        <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-bold">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> Available!
-                        </span>
+                        <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium">
+                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                            <span>Email <span className="font-bold text-slate-700 dark:text-slate-200">{addForm.email}</span> {emailCheckMsg}</span>
+                          </span>
                       )}
                     </div>
                   )}
