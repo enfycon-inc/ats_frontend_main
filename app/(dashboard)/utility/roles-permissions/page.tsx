@@ -629,7 +629,7 @@ export default function RolesPermissionsPage() {
     const handleCreateRole = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRoleName.trim()) return toast.error("Please provide a role name.");
-      if (!newRoleBusinessUnitId) return toast.error("Please select a Branch Unit.");
+      // businessUnitId is optional — branch admins may not have a unit assigned
     try {
       setSubmitting(true);
       const baseSystemRoleObj = roles.find(r => r.isSystem && r.name.toUpperCase() === newRoleSystemRole.toUpperCase());
@@ -682,7 +682,7 @@ export default function RolesPermissionsPage() {
     e.preventDefault();
     if (!editingRole) return;
     if (!editRoleName.trim()) return toast.error("Role name cannot be empty.");
-      if (!editRoleBusinessUnitId) return toast.error("Please select a Branch Unit.");
+      // businessUnitId is optional — branch admins may not have a unit assigned
 
     try {
       setSubmitting(true);
@@ -1581,7 +1581,7 @@ export default function RolesPermissionsPage() {
                   <Input
                     placeholder="e.g. Senior Recruiter, Lead BDM, Operations Head..."
                     value={newRoleName}
-                    onChange={(e) => setNewRoleName(e.target.value)} className="text-xs h-10 font-medium" disabled={!newRoleBusinessUnitId}
+                    onChange={(e) => setNewRoleName(e.target.value)} className="text-xs h-10 font-medium"
                     required
                   />
                 </div>
@@ -1940,7 +1940,7 @@ export default function RolesPermissionsPage() {
                   </label>
                   <Input
                     value={editRoleName}
-                    onChange={(e) => setEditRoleName(e.target.value)} className="text-xs h-10 font-medium" disabled={!editRoleBusinessUnitId}
+                    onChange={(e) => setEditRoleName(e.target.value)} className="text-xs h-10 font-medium"
                     required
                   />
                 </div>
