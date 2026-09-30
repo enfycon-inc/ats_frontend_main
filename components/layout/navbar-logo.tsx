@@ -29,7 +29,7 @@ export function NavbarLogo({ className }: { className?: string }) {
     >
       {branding.logoUrl ? (
         <CompanyLogoImage src={branding.logoUrl} alt={`${branding.name || 'Company'} Logo`}
-          className="h-[34px] w-full max-w-[240px] min-w-0 group-data-[collapsible=icon]:w-7 group-data-[collapsible=icon]:h-7" />
+          className="h-[34px] w-auto max-w-[240px] min-w-0 group-data-[collapsible=icon]:w-7 group-data-[collapsible=icon]:h-7" />
       ) : <>
       {/* Brand Logo Icon */}
       <div className="flex-shrink-0 flex items-center justify-center h-7 w-7 rounded-md bg-white/15 border border-white/20 p-1 shadow-xs transition-transform duration-150 group-hover/logo:scale-105">

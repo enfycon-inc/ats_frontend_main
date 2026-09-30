@@ -9,7 +9,7 @@ type Dimensions = { width: number; height: number };
 export function CompanyLogoImage({ src, alt, className, onDimensions }: {
   src: string; alt: string; className?: string; onDimensions?: (size: Dimensions) => void;
 }) {
-  const [measured, setMeasured] = useState<{ src: string; size: Dimensions; viewBox: string } | null>(null);
+  const [measured, setMeasured] = useState<{ src: string; size: Dimensions; viewBox: string; intrinsic?: Dimensions } | null>(null);
   function measure(event: SyntheticEvent<HTMLImageElement>) {
     const image = event.currentTarget;
     const size = { width: image.naturalWidth, height: image.naturalHeight };
@@ -29,7 +29,9 @@ export function CompanyLogoImage({ src, alt, className, onDimensions }: {
         viewBox = `${bounds.x * sx} ${bounds.y * sy} ${bounds.width * sx} ${bounds.height * sy}`;
       }
     } catch { /* External images without canvas access retain their full bounds. */ }
-    setMeasured({ src, size, viewBox });
+    const parts = viewBox.split(' ').map(Number);
+    const intrinsic = { width: parts[2], height: parts[3] };
+    setMeasured({ src, size, viewBox, intrinsic });
     onDimensions?.(size);
   }
 
@@ -37,7 +39,7 @@ export function CompanyLogoImage({ src, alt, className, onDimensions }: {
     return <img src={src} alt={alt} onLoad={measure} crossOrigin="anonymous" className={`${className || ''} object-contain object-left`} />;
   }
   return (
-    <svg role="img" aria-label={alt} viewBox={measured.viewBox} preserveAspectRatio="xMinYMid meet" className={className}>
+    <svg role="img" aria-label={alt} viewBox={measured.viewBox} preserveAspectRatio="xMinYMid meet" className={className} width={measured.intrinsic?.width} height={measured.intrinsic?.height}>
       <image href={src} width={measured.size.width} height={measured.size.height} />
     </svg>
   );

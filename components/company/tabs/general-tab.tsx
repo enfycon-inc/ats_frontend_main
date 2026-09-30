@@ -96,7 +96,7 @@ export function GeneralTab({
                   className="w-full h-[60px] rounded-lg border border-blue-800 bg-[#1a4fa0] dark:bg-[#0f2d6b] px-2.5 flex items-center justify-start overflow-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
                 {logoUrl ? (
                   <CompanyLogoImage src={logoUrl} alt="Company logo header preview" onDimensions={setLogoSize}
-                    className="h-[34px] w-full max-w-[240px]" />
+                    className="h-[34px] w-auto max-w-[240px]" />
                 ) : (
                   <span className="flex items-center gap-2 text-xs text-white"><ImageIcon className="h-5 w-5" />Upload logo</span>
                 )}
