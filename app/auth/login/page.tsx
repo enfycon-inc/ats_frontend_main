@@ -31,7 +31,6 @@ function checkIsSubdomain(hostname: string): boolean {
 function Copyright({ tenantBranding }: { tenantBranding?: any }) {
   const currentYear = new Date().getFullYear();
   return <>Copyright &copy; {currentYear} {tenantBranding?.name || "Enfycon Inc."} All Rights Reserved.</>;
-} {tenantBranding?.name || "Enfycon Inc."} All Rights Reserved.</>;
 }
 
 const Login = () => {
