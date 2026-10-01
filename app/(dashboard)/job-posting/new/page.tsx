@@ -27,7 +27,7 @@ export default function NewJobPostingPage() {
       try {
         const [units, prof] = await Promise.all([
           atsApi.businessUnits.list().catch(() => []),
-          atsApi.auth.getMe().catch(() => null)
+          atsApi.auth.me().catch(() => null)
         ]);
         
         const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
