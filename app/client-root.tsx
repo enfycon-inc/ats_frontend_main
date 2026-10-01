@@ -97,6 +97,14 @@ export function ClientRoot({
   }, []);
 
 
+  // Run synchronously during initial render to prevent children from using stale storage in their initial fetch
+  if (typeof window !== "undefined" && initialNavigation?.profile) {
+    const permissions = initialNavigation.profile.permissions || [];
+    if (!permissions.some((p: string) => ["tenant:settings", "tenant:manage", "platform:manage"].includes(p))) {
+      syncAssignedOffice(initialNavigation.profile, window.localStorage);
+    }
+  }
+
   const isApproved = useMemo(() => {
     if (initialNavigation?.profile?.isApproved !== undefined) {
       return initialNavigation.profile.isApproved !== false;
