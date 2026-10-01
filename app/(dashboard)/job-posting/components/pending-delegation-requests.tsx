@@ -68,35 +68,49 @@ export function PendingDelegationRequests({ onRefresh }: { onRefresh: () => void
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-amber-100 dark:border-amber-900/50">
-              <th className="py-2 px-6 text-[11px] font-bold text-amber-700/70 uppercase">Job</th>
-              <th className="py-2 px-6 text-[11px] font-bold text-amber-700/70 uppercase">Source Unit / Branch</th>
-              <th className="py-2 px-6 text-[11px] font-bold text-amber-700/70 uppercase">SLA & Margin</th>
-              <th className="py-2 px-6 text-[11px] font-bold text-amber-700/70 uppercase text-right">Actions</th>
+            <tr className="border-b border-amber-100 dark:border-amber-900/50 whitespace-nowrap bg-amber-50/50 dark:bg-amber-950/20">
+              <th className="py-2.5 px-4 text-[10px] font-bold text-amber-700/80 uppercase tracking-wider">Job Code</th>
+              <th className="py-2.5 px-4 text-[10px] font-bold text-amber-700/80 uppercase tracking-wider">Job Title</th>
+              <th className="py-2.5 px-4 text-[10px] font-bold text-amber-700/80 uppercase tracking-wider">Client</th>
+              <th className="py-2.5 px-4 text-[10px] font-bold text-amber-700/80 uppercase tracking-wider">End Client</th>
+              <th className="py-2.5 px-4 text-[10px] font-bold text-amber-700/80 uppercase tracking-wider">Priority</th>
+              <th className="py-2.5 px-4 text-[10px] font-bold text-amber-700/80 uppercase tracking-wider">Job Status</th>
+              <th className="py-2.5 px-4 text-[10px] font-bold text-amber-700/80 uppercase tracking-wider">Branch</th>
+              <th className="py-2.5 px-4 text-[10px] font-bold text-amber-700/80 uppercase tracking-wider">Branch Unit</th>
+              <th className="py-2.5 px-4 text-[10px] font-bold text-amber-700/80 uppercase tracking-wider">Shared By</th>
+              <th className="py-2.5 px-4 text-[10px] font-bold text-amber-700/80 uppercase tracking-wider">Created By</th>
+              <th className="py-2.5 px-4 text-[10px] font-bold text-amber-700/80 uppercase tracking-wider text-center">Positions</th>
+              <th className="py-2.5 px-4 text-[10px] font-bold text-amber-700/80 uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-amber-100 dark:divide-amber-900/30">
             {pendingRequests.map(req => (
-              <tr key={req.id} className="hover:bg-amber-100/30 transition-colors">
-                <td className="py-3 px-6">
-                  <Link href={`/job-posting/${req.job?.id}`} className="font-semibold text-sm text-indigo-600 hover:underline">{req.job?.jobCode} - {req.job?.jobTitle}</Link>
-                  <div className="text-xs text-default-500 mt-0.5 truncate max-w-xs">{req.notes || 'No notes'}</div>
+              <tr key={req.id} className="hover:bg-amber-100/30 transition-colors whitespace-nowrap">
+                <td className="py-3 px-4 text-xs font-semibold text-slate-800 dark:text-slate-200">{req.job?.jobCode || '-'}</td>
+                <td className="py-3 px-4 max-w-[200px] truncate" title={req.job?.jobTitle}>
+                  <Link href={`/job-posting/${req.job?.id}`} className="font-bold text-xs text-indigo-600 hover:underline">{req.job?.jobTitle || '-'}</Link>
                 </td>
-                <td className="py-3 px-6">
-                  <Badge variant="outline" className="text-xs border-amber-200 text-amber-700 bg-white">
-                    {req.sourceUnit?.name ? `${req.sourceBranch?.name ? req.sourceBranch.name + ' — ' : ''}${req.sourceUnit.name}` : (req.sourceBranch?.name || 'Branch')}
+                <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{req.job?.client || '-'}</td>
+                <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300">{req.job?.endClient || req.job?.endClientName || '-'}</td>
+                <td className="py-3 px-4">
+                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${req.job?.priority?.toUpperCase() === 'HOT' ? 'text-rose-600 bg-rose-50 border-rose-200' : req.job?.priority?.toUpperCase() === 'COLD' ? 'text-sky-600 bg-sky-50 border-sky-200' : 'text-amber-600 bg-amber-50 border-amber-200'}`}>
+                    {req.job?.priority || req.job?.urgency || 'WARM'}
                   </Badge>
                 </td>
-                <td className="py-3 px-6 text-xs text-default-700">
-                  <div className="font-medium">AM: {req.marginSplitAmPct ?? 0}% / REC: {req.marginSplitRecPct ?? 0}%</div>
-                  <div className="text-default-500">{req.slaDaysTarget ? `${req.slaDaysTarget} Days SLA` : 'No SLA'}</div>
+                <td className="py-3 px-4">
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">{req.job?.status || req.job?.jobStatus || 'ACTIVE'}</Badge>
                 </td>
-                <td className="py-3 px-6 text-right space-x-2">
-                  <Button size="sm" onClick={() => handleReject(req.id)} disabled={submittingId === req.id} className="bg-red-600 hover:bg-red-700 text-white">
+                <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300">{req.sourceBranch?.name || '-'}</td>
+                <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300">{req.sourceUnit?.name || '-'}</td>
+                <td className="py-3 px-4 text-xs font-medium text-slate-700 dark:text-slate-300">{req.job?.createdBy || req.job?.accountManagerName || req.job?.accountManager?.name || '-'}</td>
+                <td className="py-3 px-4 text-xs font-medium text-slate-700 dark:text-slate-300">{req.job?.createdBy || req.job?.accountManagerName || req.job?.accountManager?.name || '-'}</td>
+                <td className="py-3 px-4 text-xs text-center font-bold text-slate-800 dark:text-slate-100">{req.job?.noOfPositions || req.job?.positions || req.job?.submissionRequired || 1}</td>
+                <td className="py-3 px-4 text-right space-x-2">
+                  <Button size="sm" onClick={() => handleReject(req.id)} disabled={submittingId === req.id} className="bg-red-600 hover:bg-red-700 text-white h-7 text-[11px] px-3 shadow-xs cursor-pointer">
                     Reject
                   </Button>
-                  <Button size="sm" onClick={() => handleAccept(req.id)} disabled={submittingId === req.id} className="bg-green-600 hover:bg-green-700 text-white">
-                    {submittingId === req.id ? 'Accepting...' : 'Accept'}
+                  <Button size="sm" onClick={() => handleAccept(req.id)} disabled={submittingId === req.id} className="bg-green-600 hover:bg-green-700 text-white h-7 text-[11px] px-3 shadow-xs cursor-pointer">
+                    {submittingId === req.id ? '...' : 'Accept'}
                   </Button>
                 </td>
               </tr>
