@@ -85,8 +85,8 @@ const formSchema = zod.object({
   remoteJob: zod.string().min(1, "Work Mode is required"),
   hoursPerWeek: zod.union([zod.number().min(1).max(168), zod.nan().transform(() => undefined)]).optional(),
   jobStatus: zod.string(),
-  client: zod.string().optional(),
-  endClientName: zod.string().min(1, "End Client is required"),
+  client: zod.string().min(1, "Client is required"),
+  endClientName: zod.string().optional(),
   clientJobId: zod.string().optional(),
   priority: zod.enum(["Hot", "Warm", "Cold"]),
   additionalDetails: zod.string().optional(),
@@ -2302,7 +2302,7 @@ const getInitialActiveBranchContext = () => {
 
                     {/* Client */}
                     <div className="space-y-1 flex flex-col">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Client</label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Client <span className="text-red-500">*</span></label>
                       <Popover open={clientDropdownOpen} onOpenChange={(open) => {
                         setClientDropdownOpen(open);
                         if (!open) {
@@ -2467,7 +2467,7 @@ const getInitialActiveBranchContext = () => {
 
                     {/* End Client */}
                     <div className="space-y-1 flex flex-col">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">End Client <span className="text-red-500">*</span></label>
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">End Client</label>
                       <Popover open={endClientDropdownOpen} onOpenChange={(open) => {
                         setEndClientDropdownOpen(open);
                         if (!open) {
