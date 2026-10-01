@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 import { atsApi } from '@/lib/ats-api';
 import toast from 'react-hot-toast';
 
@@ -78,7 +79,7 @@ export function PendingDelegationRequests({ onRefresh }: { onRefresh: () => void
             {pendingRequests.map(req => (
               <tr key={req.id} className="hover:bg-amber-100/30 transition-colors">
                 <td className="py-3 px-6">
-                  <div className="font-semibold text-sm text-default-900">{req.job?.jobCode} - {req.job?.jobTitle}</div>
+                  <Link href={`/job-posting/${req.job?.id}`} className="font-semibold text-sm text-indigo-600 hover:underline">{req.job?.jobCode} - {req.job?.jobTitle}</Link>
                   <div className="text-xs text-default-500 mt-0.5 truncate max-w-xs">{req.notes || 'No notes'}</div>
                 </td>
                 <td className="py-3 px-6">
@@ -91,10 +92,10 @@ export function PendingDelegationRequests({ onRefresh }: { onRefresh: () => void
                   <div className="text-default-500">{req.slaDaysTarget ? `${req.slaDaysTarget} Days SLA` : 'No SLA'}</div>
                 </td>
                 <td className="py-3 px-6 text-right space-x-2">
-                  <Button size="sm" variant="outline" onClick={() => handleReject(req.id)} disabled={submittingId === req.id} className="text-rose-600 hover:bg-rose-50 border-rose-200">
+                  <Button size="sm" onClick={() => handleReject(req.id)} disabled={submittingId === req.id} className="bg-red-600 hover:bg-red-700 text-white">
                     Reject
                   </Button>
-                  <Button size="sm" onClick={() => handleAccept(req.id)} disabled={submittingId === req.id} className="bg-amber-600 hover:bg-amber-700 text-white">
+                  <Button size="sm" onClick={() => handleAccept(req.id)} disabled={submittingId === req.id} className="bg-green-600 hover:bg-green-700 text-white">
                     {submittingId === req.id ? 'Accepting...' : 'Accept'}
                   </Button>
                 </td>

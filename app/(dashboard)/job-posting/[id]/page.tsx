@@ -504,6 +504,14 @@ export default function JobDetailPage() {
 
   const isAdmin = activeSystemRole === "TENANT_ADMIN" || activeSystemRole === "SUPER_ADMIN";
   const isDeliveryHead = activeSystemRole === "DELIVERY_HEAD";
+    const isDelegatedView = useMemo(() => {
+    if (!currentUser || !job) return false;
+    const permissions = currentUser.permissions || [];
+    const isTenantAdmin = permissions.some((p: string) => ["tenant:manage", "tenant:settings"].includes(p));
+    if (isTenantAdmin) return false;
+    return Boolean(currentUser.branchId && job.branchId && currentUser.branchId !== job.branchId);
+  }, [currentUser, job]);
+
   const isAM = activeSystemRole === "ACCOUNT_MANAGER";
   const isPodLead = activeSystemRole === "POD_LEAD";
   const canSubmitCandidate = useMemo(() => isAdmin || effectivePerms.includes("submission:create"), [isAdmin, effectivePerms]);
@@ -2365,8 +2373,8 @@ export default function JobDetailPage() {
               <span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.createdBy || "Account Manager"}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-neutral-500 font-medium">Assigned To:</span>
-              <span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.podName || job?.recruiter || "Unassigned"}</span>
+              {!isDelegatedView && (<><span className="text-neutral-500 font-medium">Assigned To:</span>
+<span className="text-neutral-800 dark:text-neutral-200 font-semibold">{job?.podName || job?.recruiter || "Unassigned"}</span></>)}
             </div>
           </div>
 
