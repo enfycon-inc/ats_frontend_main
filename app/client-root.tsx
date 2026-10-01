@@ -1,5 +1,5 @@
-import { syncAssignedOffice } from "@/lib/assigned-office";
 "use client";
+import { syncAssignedOffice } from "@/lib/assigned-office";
 
 import Footer from "@/components/layout/footer";
 import { TenantBrandingProvider } from "@/contexts/tenant-branding";
