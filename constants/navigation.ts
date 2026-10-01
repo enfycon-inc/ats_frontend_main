@@ -258,6 +258,12 @@ export const GLOBAL_ADMIN_NAV_ITEMS: NavItem[] = [
       { label: "Active Tenants", href: "/utility/approvals?tab=tenants" },
     ],
   },
+    {
+      id: "platform-markets",
+      label: "Markets",
+      href: "/management/markets",
+      icon: Globe,
+    },
   {
     id: "security-audit",
     label: "Audit Logs",
