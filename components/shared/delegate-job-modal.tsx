@@ -24,37 +24,38 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
   const [error, setError] = useState<string | null>(null);
 
   const [targetUnitId, setTargetUnitId] = useState("");
+  const [targetBranchId, setTargetBranchId] = useState("");
   const [noOfPositions, setNoOfPositions] = useState("");
   const [slaDaysTarget, setSlaDaysTarget] = useState("");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     if (isOpen) {
-      loadTargets();
+      setLoading(true);
+      setTargetUnits([]);
+      atsApi.businessUnits.delegationTargets(jobId).then(res => {
+        if (!cancelled) setTargetUnits(Array.isArray(res) ? res : []);
+      }).catch(err => {
+        if (!cancelled) setError(err.message || "Unable to load delegation targets. Please reopen to retry.");
+      }).finally(() => { if (!cancelled) setLoading(false); });
       // Reset state
       setTargetUnitId("");
+      setTargetBranchId("");
       setNoOfPositions("");
       setSlaDaysTarget("");
       setNotes("");
       setError(null);
     }
-  }, [isOpen]);
+    return () => { cancelled = true; };
+  }, [isOpen, jobId]);
 
-  const loadTargets = async () => {
-    setLoading(true);
-    try {
-      const res = await atsApi.businessUnits.delegationTargets(jobId);
-      setTargetUnits(res || []);
-    } catch (err) {
-      console.error("Failed to load delegation targets", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const branches = Array.from(new Map(targetUnits.filter(u => u.branchId).map(u => [u.branchId, { id: u.branchId, name: u.branchName || u.branch?.name || "Branch" }])).values());
+  const visibleUnits = targetUnits.filter(u => u.branchId === targetBranchId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetUnitId) {
+    if (loading || !visibleUnits.some(u => u.id === targetUnitId)) {
       setError("Please select a target operating unit.");
       return;
     }
@@ -68,6 +69,7 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
     try {
       await atsApi.jobs.delegate(jobId, {
         targetUnitId,
+        targetBranchId,
         slaDaysTarget: slaDaysTarget ? parseInt(slaDaysTarget) : undefined,
         notes: [`Positions requested: ${parseInt(noOfPositions)}`, notes.trim()].filter(Boolean).join("\n"),
       });
@@ -80,7 +82,7 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
     }
   };
 
-  const isFormValid = !!targetUnitId && !!noOfPositions && parseInt(noOfPositions) >= 1;
+  const isFormValid = !loading && visibleUnits.some(u => u.id === targetUnitId) && !!noOfPositions && parseInt(noOfPositions) >= 1;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -90,7 +92,7 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
             <Share2 className="h-5 w-5" /> Delegate Job (Unit-to-Unit)
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Send a delegation request to another operating unit in the same market domain to work on <strong>{jobCode} - {jobTitle}</strong>.
+            Select a branch and an operating unit in the job’s market segment to work on <strong>{jobCode} - {jobTitle}</strong>.
           </DialogDescription>
         </DialogHeader>
 
@@ -103,27 +105,38 @@ export function DelegateJobModal({ isOpen, onClose, jobId, jobCode, jobTitle, on
           )}
 
           <div className="space-y-2">
-            <Label className="text-xs font-bold text-neutral-700">Target Operating Unit (Same Domain) <span className="text-red-500">*</span></Label>
-            <Select value={targetUnitId} onValueChange={setTargetUnitId} disabled={loading}>
+            <Label className="text-xs font-bold text-neutral-700">Target Branch <span className="text-red-500">*</span></Label>
+            <Select value={targetBranchId} onValueChange={id => { setTargetBranchId(id); setTargetUnitId(""); }} disabled={loading || submitting}>
+              <SelectTrigger className="w-full text-xs h-9"><SelectValue placeholder={loading ? "Loading branches..." : "Select branch..."} /></SelectTrigger>
+              <SelectContent>
+                {branches.map(branch => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {!loading && !error && branches.length === 0 && <p className="text-xs text-muted-foreground">No other branch has an operating unit in this job’s market segment.</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-bold text-neutral-700">Target Operating Unit (Same Market Segment) <span className="text-red-500">*</span></Label>
+            <Select value={targetUnitId} onValueChange={setTargetUnitId} disabled={loading || submitting || !targetBranchId}>
               <SelectTrigger className="w-full text-xs h-9">
-                <SelectValue placeholder={loading ? "Loading target units..." : "Select operating unit..."} />
+                <SelectValue placeholder={!targetBranchId ? "Select a branch first..." : "Select operating unit..."} />
               </SelectTrigger>
               <SelectContent>
-                {targetUnits.length === 0 ? (
+                {visibleUnits.length === 0 ? (
                   <div className="p-3 text-xs text-muted-foreground text-center">
-                    No eligible operating units found in the same market domain.
+                    No eligible operating units found in this branch.
                   </div>
                 ) : (
-                  targetUnits.map((u) => (
+                  visibleUnits.map((u) => (
                     <SelectItem key={u.id} value={u.id}>
-                      {u.branch?.name ? `${u.branch.name} — ` : ''}{u.name} ({u.market})
+                      {u.name} ({u.market})
                     </SelectItem>
                   ))
                 )}
               </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground">
-              Delegation is unit-to-unit and strictly preserved within the same market domain.
+              Only units matching the job’s market segment are available.
             </p>
           </div>
 
