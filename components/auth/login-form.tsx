@@ -26,6 +26,7 @@ const schema = z.object({
 const LoginForm = () => {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const [isNavigating, setIsNavigating] = useState(false);
   const [passwordType, setPasswordType] = useState("password");
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -217,6 +218,18 @@ const LoginForm = () => {
    * We poll /api/auth/session (same origin) for up to ~3 s to confirm the cookie
    * is readable, then navigate. Falls back to immediate navigation on timeout.
    */
+  // A document navigation outlives the sign-in transition. Keep the overlay
+  // mounted until this page unloads instead of revealing the form again.
+  const navigateToDashboard = (destination: string) => {
+    setIsNavigating(true);
+    try {
+      window.location.href = destination;
+    } catch (error) {
+      setIsNavigating(false);
+      throw error;
+    }
+  };
+
   const navigateAfterLogin = async (destination: string) => {
     const MAX_ATTEMPTS = 12;
     const POLL_INTERVAL_MS = 250;
@@ -226,7 +239,7 @@ const LoginForm = () => {
         if (res.ok) {
           const session = await res.json();
           if (session?.user) {
-            window.location.href = destination;
+            navigateToDashboard(destination);
             return;
           }
         }
@@ -236,7 +249,7 @@ const LoginForm = () => {
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     }
     // Session didn't appear within timeout — navigate anyway (best-effort)
-    window.location.href = destination;
+    navigateToDashboard(destination);
   };
 
   const onSubmit = (data: z.infer<typeof schema>) => {
@@ -294,7 +307,7 @@ const LoginForm = () => {
               document.cookie = `ats_sso_handoff=${encodeURIComponent(handoffPayload)}; Domain=.${base}; Path=/; Max-Age=30; SameSite=Lax`;
             }
             
-            window.location.href = `${protocol}//${userTenantDomain}.${base}/auth/login${cbParam}`;
+            navigateToDashboard(`${protocol}//${userTenantDomain}.${base}/auth/login${cbParam}`);
           return;
         }
 
@@ -323,7 +336,7 @@ const LoginForm = () => {
     });
   };
 
-  if (isAuthorizingSso || isPending) {
+  if (isAuthorizingSso || isPending || isNavigating) {
     return (
       <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm">
         <div className="relative mb-6">
@@ -336,7 +349,7 @@ const LoginForm = () => {
         <div className="text-center space-y-1.5 px-8 max-w-xs">
           <p className="text-base font-semibold text-slate-800 dark:text-slate-100">Signing in to workspace…</p>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            {isAuthorizingSso ? "Taking you directly to your dashboard." : "Verifying your credentials, please wait."}
+            {isAuthorizingSso || isNavigating ? "Taking you directly to your dashboard." : "Verifying your credentials, please wait."}
           </p>
         </div>
         <div className="mt-6 flex items-center gap-1.5">
