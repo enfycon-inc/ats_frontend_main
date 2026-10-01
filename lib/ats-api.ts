@@ -1705,7 +1705,7 @@ const integrations = {
 // ─── Market Segments ────────────────────────────────────────────────
 const marketSegments = {
   async list(): Promise<any[]> {
-    return apiFetch<any[]>('/api/market-segments').catch(() => []);
+    return apiFetch<any[]>('/api/market-segments');
   },
   async get(id: string): Promise<any> {
     return apiFetch<any>(`/api/market-segments/${id}`);

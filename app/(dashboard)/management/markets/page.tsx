@@ -53,7 +53,7 @@ export default function MarketsManagementPage() {
   const fetchMarkets = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await atsApi.marketSegments.list();
+      const data = await atsApi.marketSegments.list(); console.log("RAW MARKET DATA FETCHED:", data);
       setMarkets(data.sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0)));
     } catch (err: any) {
       setError(err.message || 'Failed to fetch market segments');
