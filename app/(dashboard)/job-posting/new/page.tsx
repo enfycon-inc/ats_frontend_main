@@ -23,15 +23,26 @@ export default function NewJobPostingPage() {
 
   useEffect(() => {
     async function determineMarket() {
+
       try {
-        const units = await atsApi.businessUnits.list().catch(() => []);
-        // Determine the initial unit to load based on active branch or first available
+        const [units, prof] = await Promise.all([
+          atsApi.businessUnits.list().catch(() => []),
+          atsApi.auth.getMe().catch(() => null)
+        ]);
+        
         const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
         let matchedUnit = null;
 
-        if (activeBranchId && activeBranchId !== "all") {
+        // 1. If user has a hardcoded business unit assignment (Account Manager, etc), use that strictly
+        if (prof && prof.businessUnitId) {
+          matchedUnit = units.find((u: any) => u.id === prof.businessUnitId);
+        }
+
+        // 2. Otherwise fallback to the branch selection
+        if (!matchedUnit && activeBranchId && activeBranchId !== "all") {
           matchedUnit = units.find((u: any) => u.branchId === activeBranchId);
         }
+
         if (!matchedUnit && units.length > 0) {
           matchedUnit = units[0];
         }
