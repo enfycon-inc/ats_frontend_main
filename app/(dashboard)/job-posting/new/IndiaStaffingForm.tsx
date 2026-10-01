@@ -255,22 +255,12 @@ export function IndiaStaffingForm() {
   
 const getInitialActiveBranchContext = () => {
   if (typeof window === "undefined") {
-    return {
-      market: "IN" as "US" | "IN",
-      
-      branchName: "",
-      branchId: "",
-    };
+    return { branchName: "", branchId: "" };
   }
   const bId = localStorage.getItem("active_branch_id") || "";
   const bName = localStorage.getItem("active_branch_name") || "";
-  
-
-  branchName: bName,
-    branchId: bId,
-  };
+  return { branchName: bName, branchId: bId };
 };
-
   const initialBranchContext = useMemo(() => getInitialActiveBranchContext(), []);
 
   // Pod & User selection and approver routing
