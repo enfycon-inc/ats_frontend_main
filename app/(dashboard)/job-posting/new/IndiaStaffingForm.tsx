@@ -1240,7 +1240,7 @@ const getInitialActiveBranchContext = () => {
         city: data.city || undefined,
         country: data.country,
         status: initialJobStatus,
-          market: "IN",
+          market: selectedUnitObj?.market || "IN",
         approvalStatus: initialApprovalStatus,
         assignedApproverId: finalApproverId,
         
