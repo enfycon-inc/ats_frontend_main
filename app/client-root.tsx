@@ -17,6 +17,7 @@ import { TopNavbar } from "@/components/layout/top-navbar";
 import { SitePageHeader } from "@/components/layout/site-page-header";
 import { SocketProvider } from "@/contexts/SocketContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { DashboardProvider } from "@/contexts/DashboardContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import dynamic from "next/dynamic";
 
@@ -160,6 +161,7 @@ export function ClientRoot({
   }
 
   return (
+    <DashboardProvider initialNavigation={initialNavigation}>
     <TenantBrandingProvider initialBranding={initialNavigation?.profile?.tenant}>
     <ThemeProvider
       attribute="class"
@@ -196,5 +198,6 @@ export function ClientRoot({
       </TooltipProvider>
     </ThemeProvider>
     </TenantBrandingProvider>
+    </DashboardProvider>
   );
 }

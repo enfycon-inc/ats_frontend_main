@@ -1,29 +1,5 @@
-import { DashboardProvider } from "@/contexts/DashboardContext";
-import { loadNavigationBootstrap } from "@/lib/navigation-bootstrap";
-import { getApiBase } from "@/lib/ats-api";
-import { auth } from "@/auth";
-import { cookies } from "next/headers";
-import { dashboardPreferenceCookie } from "@/lib/dashboard-preference";
-
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  let session = null;
-  try {
-    session = await Promise.race([
-      auth(),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
-    ]);
-  } catch {}
-
-  const initialNavigation = await loadNavigationBootstrap(getApiBase(), (session as any)?.user?.accessToken || "");
-  const cookieStore = await cookies();
-  
-  if (initialNavigation) {
-    const key = dashboardPreferenceCookie(initialNavigation.profile);
-    const saved = key ? cookieStore.get(key)?.value : null;
-    if (saved) {
-      try { initialNavigation.overrideRole = decodeURIComponent(saved); } catch { /* Ignore malformed preferences. */ }
-    }
-  }
-
-  return <DashboardProvider initialNavigation={initialNavigation}>{children}</DashboardProvider>;
+  // Navigation/profile data is loaded once by the parent dashboard layout and
+  // provided by ClientRoot. Loading it again here doubled auth/profile calls.
+  return children;
 }

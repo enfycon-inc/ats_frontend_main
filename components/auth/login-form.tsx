@@ -27,6 +27,7 @@ const LoginForm = () => {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [passwordType, setPasswordType] = useState("password");
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -67,6 +68,7 @@ const LoginForm = () => {
   });
 
   React.useEffect(() => {
+    setIsMounted(true);
     let active = true;
     setAuthPolicyStatus("loading");
     atsApi.auth.getTenantAuthPolicy().then((policy) => {
@@ -367,7 +369,10 @@ const LoginForm = () => {
   const microsoftTenantConfigured = !!authPolicy.microsoftTenantId &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(authPolicy.microsoftTenantId);
   const microsoftConfigured = microsoftTenantConfigured && !!authPolicy.microsoftClientId;
-  const isGlobalPortal = !getTenantIdentifier();
+  // Hostname-dependent options must wait until hydration. The server cannot
+  // see the browser host, so reading it during the first render causes a
+  // markup mismatch and React rebuilds the login form.
+  const isGlobalPortal = !isMounted || !getTenantIdentifier();
   const hasSocial = (showGoogle || showMicrosoft) && !isGlobalPortal;
   const socialLogin = (
     <div className="space-y-2">

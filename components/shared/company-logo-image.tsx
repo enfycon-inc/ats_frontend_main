@@ -36,7 +36,8 @@ export function CompanyLogoImage({ src, alt, className, onDimensions }: {
   }
 
   if (!measured || measured.src !== src) {
-    return <img src={src} alt={alt} onLoad={measure} crossOrigin="anonymous" className={`${className || ''} object-contain object-left`} />;
+    // Reserve the slot without painting padded artwork at a different scale.
+    return <img src={src} alt={alt} onLoad={measure} crossOrigin="anonymous" style={{ visibility: 'hidden' }} className={`${className || ''} object-contain object-left`} />;
   }
   return (
     <svg role="img" aria-label={alt} viewBox={measured.viewBox} preserveAspectRatio="xMinYMid meet" className={className} width={measured.intrinsic?.width} height={measured.intrinsic?.height}>

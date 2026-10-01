@@ -1,5 +1,6 @@
 import { ClientRoot } from "@/app/client-root";
 import type { Metadata } from "next";
+import { cache } from "react";
 import { auth } from "@/auth";
 import { SessionProvider } from "next-auth/react";
 import { redirect } from "next/navigation";
@@ -9,18 +10,23 @@ import { loadNavigationBootstrap } from "@/lib/navigation-bootstrap";
 import { dashboardPreferenceCookie } from "@/lib/dashboard-preference";
 import { getBaseDomain, getCurrentSubdomain } from "@/utils/subdomain-helper";
 
-// Fetch session with a safe timeout so a slow auth provider never hangs the route
-async function getSessionSafe() {
+// Share one session read between metadata and layout within this server request.
+const getSessionSafe = cache(async () => {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     const session = await Promise.race([
       auth(),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(() => resolve(null), 8000);
+      }),
     ]);
     return session;
   } catch {
     return null;
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
   }
-}
+});
 
 export async function generateMetadata(): Promise<Metadata> {
   const session = await getSessionSafe();
