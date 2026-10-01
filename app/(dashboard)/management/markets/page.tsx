@@ -38,12 +38,16 @@ export default function MarketsManagementPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   
   useEffect(() => {
-    atsApi.auth.getCurrentUser().then((user: any) => {
+    try {
+      const user = atsApi.auth.getCurrentUser();
       const active = localStorage.getItem("active_role_id") || user?.roles?.[0] || "";
       const isSuper = user?.roles?.includes("SUPER_ADMIN") || (isRoleAdmin(resolveActiveSystemRole(active, [], user)) && active === "SUPER_ADMIN");
       setIsSuperAdmin(isSuper);
+    } catch (e) {
+      console.error(e);
+    } finally {
       setPermsLoading(false);
-    }).catch(() => setPermsLoading(false));
+    }
   }, []);
 
   const fetchMarkets = useCallback(async () => {
