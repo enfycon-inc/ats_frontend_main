@@ -38,7 +38,7 @@ export default function MarketsManagementPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   
   useEffect(() => {
-    atsApi.auth.getCurrentUser().then(user => {
+    atsApi.auth.getCurrentUser().then((user: any) => {
       const active = localStorage.getItem("active_role_id") || user?.roles?.[0] || "";
       const isSuper = user?.roles?.includes("SUPER_ADMIN") || (isRoleAdmin(resolveActiveSystemRole(active, [], user)) && active === "SUPER_ADMIN");
       setIsSuperAdmin(isSuper);
