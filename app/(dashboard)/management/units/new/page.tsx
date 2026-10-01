@@ -123,6 +123,7 @@ function CreateUnitContent() {
               ...prev,
               marketSegmentId: prev.marketSegmentId || first.id,
               market: first.code,
+              code: prev.code || first.code, // Auto-populate initially
               currency: first.defaultCurrency || prev.currency,
               timezone: first.defaultTimezone || prev.timezone,
               shiftTiming: first.defaultShift || prev.shiftTiming,
@@ -169,6 +170,7 @@ function CreateUnitContent() {
         ...prev,
         marketSegmentId: segmentId,
         market: seg.code,
+        code: seg.code, // Auto-select unit code
         currency: seg.defaultCurrency || prev.currency,
         timezone: seg.defaultTimezone || prev.timezone,
         shiftTiming: seg.defaultShift || prev.shiftTiming,
@@ -244,7 +246,7 @@ function CreateUnitContent() {
             <Layers className="h-5 w-5 text-blue-600" /> Create Branch Unit
           </h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Establish a new practice division, configure operating shifts, market segment, and unit-isolated job routing policies.
+            Establish a new branch unit, configure operating shifts, market segment, and unit-isolated job routing policies.
           </p>
         </div>
 
@@ -316,7 +318,7 @@ function CreateUnitContent() {
                     </option>
                   ))}
                 </select>
-                <span className="text-[10px] text-neutral-400 block">The branch office hosting this operating practice division.</span>
+                <span className="text-[10px] text-neutral-400 block">The branch office hosting this operating branch unit.</span>
               </div>
 
               <div className="space-y-1.5">
@@ -334,7 +336,7 @@ function CreateUnitContent() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                  Unit Code (Unique Identifier) <span className="text-red-500">*</span>
+                  Unit Code (Market Segment) <span className="text-red-500">*</span>
                 </label>
                 <Input
                   value={formData.code}

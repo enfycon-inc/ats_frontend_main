@@ -255,6 +255,7 @@ function BranchManagementPageContent() {
   const [branchMembers, setBranchMembers] = useState<any[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [tenantRoles, setTenantRoles] = useState<any[]>([]);
+  const [marketSegments, setMarketSegments] = useState<any[]>([]);
 
   // Multi-role state for staff assignment
   const [selectedMember, setSelectedMember] = useState<any>(null);
@@ -313,14 +314,16 @@ function BranchManagementPageContent() {
       const profile = await atsApi.auth.me() as any;
       setLiveProfile(profile);
       const tenantManager = (profile.permissions || []).some((p: string) => ['tenant:settings', 'tenant:manage', 'platform:manage'].includes(p));
-      const [listData, hierData, rolesData] = await Promise.all([
+      const [listData, hierData, rolesData, msData] = await Promise.all([
         tenantManager ? atsApi.branches.list() : profile.branchId ? atsApi.branches.get(profile.branchId).then(branch => [branch]) : Promise.resolve([]),
         tenantManager ? atsApi.branches.getHierarchy().catch(() => null) : Promise.resolve(null),
         atsApi.auth.listRoles().catch(() => []),
+        atsApi.marketSegments.list().catch(() => []),
       ]);
       setBranches(listData || []);
       setHierarchyData(hierData);
       setTenantRoles(rolesData || []);
+      setMarketSegments(msData || []);
       if (!tenantManager && listData?.[0]) await openEditModal(listData[0]);
     } catch (err: any) {
       console.error("Failed to load branches:", err);
@@ -478,6 +481,7 @@ function BranchManagementPageContent() {
         market: unitFormData.market,
         currency: unitFormData.currency,
         shiftTiming: unitFormData.shiftTiming,
+        marketSegmentId: unitFormData.marketSegmentId || null,
         workStartTime: unitFormData.workStartTime,
         workEndTime: unitFormData.workEndTime,
         timezone: unitFormData.timezone,
@@ -545,6 +549,7 @@ function BranchManagementPageContent() {
       market: unit.market || (isUs ? "US" : "INDIA"),
       currency: unit.currency || (isUs ? "USD" : "INR"),
       shiftTiming: unit.shiftTiming || (isUs ? "US Shift" : "General Shift"),
+      marketSegmentId: unit.marketSegmentId || "",
       workStartTime: unit.workStartTime || (isUs ? "20:00" : "09:30"),
       workEndTime: unit.workEndTime || (isUs ? "05:00" : "18:30"),
       timezone: unit.timezone || (isUs ? "America/New_York" : "Asia/Kolkata"),
@@ -591,6 +596,7 @@ function BranchManagementPageContent() {
         market: editUnitFormData.market,
         currency: editUnitFormData.currency,
         shiftTiming: editUnitFormData.shiftTiming,
+        marketSegmentId: editUnitFormData.marketSegmentId || null,
         workStartTime: editUnitFormData.workStartTime,
         workEndTime: editUnitFormData.workEndTime,
         timezone: editUnitFormData.timezone,
@@ -626,7 +632,7 @@ function BranchManagementPageContent() {
     try {
       setSavingManager(true);
       await atsApi.branches.updateManagers(selectedBranch.id, selectedManagerIds);
-      toast.success("Branch Heads assigned successfully!");
+      toast.success("Branch Admins assigned successfully!");
       setIsChangeManagerOpen(false);
       await loadBranchesAndHierarchy();
       if (isMembersOpen && selectedBranch) openMembersModal(selectedBranch);
@@ -1061,6 +1067,58 @@ function BranchManagementPageContent() {
     { key: "DELIVERY_HEAD", label: "Delivery Head", desc: "Monitors overall branch delivery metrics" },
   ];
 
+  if (loading) {
+    return (
+      <div className="p-6 w-full max-w-full space-y-6">
+        <div className="animate-pulse">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-xl border border-neutral-200 dark:border-slate-800 shadow-sm mb-6">
+            <div className="space-y-2">
+              <div className="h-7 w-64 bg-slate-200 dark:bg-slate-700 rounded"></div>
+              <div className="h-4 w-96 bg-slate-100 dark:bg-slate-800 rounded"></div>
+            </div>
+            <div className="flex gap-2">
+              <div className="h-9 w-24 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
+              <div className="h-9 w-32 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
+            </div>
+          </div>
+          
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl overflow-hidden mt-6">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs whitespace-nowrap">
+                <thead className="bg-neutral-50/50 dark:bg-slate-850/50 text-neutral-500 font-bold uppercase tracking-wider border-b border-neutral-200 dark:border-slate-800">
+                  <tr>
+                    <th className="py-3.5 px-4 w-10"><div className="h-4 w-4 bg-slate-200 dark:bg-slate-700 rounded mx-auto"></div></th>
+                    <th className="py-3.5 px-4"><div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                    <th className="py-3.5 px-4"><div className="h-3 w-16 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                    <th className="py-3.5 px-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                    <th className="py-3.5 px-4"><div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                    <th className="py-3.5 px-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                    <th className="py-3.5 px-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                    <th className="py-3.5 px-4 text-right"><div className="h-3 w-12 bg-slate-200 dark:bg-slate-700 rounded ml-auto"></div></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 dark:divide-slate-800">
+                  {Array.from({ length: 6 }).map((_, idx) => (
+                    <tr key={idx}>
+                      <td className="py-4 px-4 text-center"><div className="h-4 w-4 bg-slate-200 dark:bg-slate-700 rounded mx-auto"></div></td>
+                      <td className="py-4 px-4"><div className="flex items-center gap-2"><div className="h-6 w-6 rounded-md bg-slate-200 dark:bg-slate-700"></div><div className="h-4 w-28 bg-slate-200 dark:bg-slate-700 rounded"></div></div></td>
+                      <td className="py-4 px-4"><div className="h-5 w-12 bg-blue-100 dark:bg-blue-900/40 rounded"></div></td>
+                      <td className="py-4 px-4"><div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
+                      <td className="py-4 px-4"><div className="h-6 w-16 bg-slate-200 dark:bg-slate-700 rounded-full border border-slate-300 dark:border-slate-600"></div></td>
+                      <td className="py-4 px-4"><div className="h-4 w-28 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
+                      <td className="py-4 px-4"><div className="flex items-center gap-1"><div className="h-4 w-4 rounded-full bg-slate-200 dark:bg-slate-700"></div><div className="h-4 w-12 bg-slate-200 dark:bg-slate-700 rounded"></div></div></td>
+                      <td className="py-4 px-4 text-right"><div className="h-6 w-6 bg-slate-200 dark:bg-slate-700 rounded ml-auto"></div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 w-full max-w-full space-y-6">
       {ownBranchSettings && (
@@ -1082,7 +1140,7 @@ function BranchManagementPageContent() {
             </h1>
           </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Configure dynamic branch structures, branch heads, staff allocations, and branch units.
+            Configure dynamic branch structures, branch admins, staff allocations, and branch units.
           </p>
         </div>
 
@@ -1158,9 +1216,39 @@ function BranchManagementPageContent() {
 
       {/* CONTENT AREA */}
       {loading ? (
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="text-xs text-neutral-500 mt-2 font-medium">Loading organization hierarchy...</p>
+        <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl overflow-hidden mt-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs whitespace-nowrap">
+              <thead className="bg-neutral-50/50 dark:bg-slate-850/50 text-neutral-500 dark:text-neutral-400 font-bold uppercase tracking-wider border-b border-neutral-200 dark:border-slate-800">
+                <tr>
+                  <th className="py-3.5 px-4 w-10"><div className="h-4 w-4 bg-slate-200 dark:bg-slate-700 rounded mx-auto"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-16 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4 text-right"><div className="h-3 w-12 bg-slate-200 dark:bg-slate-700 rounded ml-auto"></div></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100 dark:divide-slate-800">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="py-4 px-4 text-center"><div className="h-4 w-4 bg-slate-200 dark:bg-slate-700 rounded mx-auto"></div></td>
+                    <td className="py-4 px-4"><div className="flex items-center gap-2"><div className="h-6 w-6 rounded-md bg-slate-200 dark:bg-slate-700"></div><div className="h-4 w-28 bg-slate-200 dark:bg-slate-700 rounded"></div></div></td>
+                    <td className="py-4 px-4"><div className="h-5 w-12 bg-blue-100 dark:bg-blue-900/40 rounded"></div></td>
+                    <td className="py-4 px-4"><div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
+                    <td className="py-4 px-4"><div className="h-6 w-16 bg-slate-200 dark:bg-slate-700 rounded-full border border-slate-300 dark:border-slate-600"></div></td>
+                    <td className="py-4 px-4"><div className="h-4 w-28 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
+                    <td className="py-4 px-4"><div className="flex items-center gap-1"><div className="h-4 w-4 rounded-full bg-slate-200 dark:bg-slate-700"></div><div className="h-4 w-12 bg-slate-200 dark:bg-slate-700 rounded"></div></div></td>
+                    <td className="py-4 px-4"><div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
+                    <td className="py-4 px-4 text-right"><div className="h-6 w-6 bg-slate-200 dark:bg-slate-700 rounded ml-auto"></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : viewMode === "table" ? (
         /* ─── UNIVERSAL TABLE VIEW (DEFAULT) ─────────────────────────── */
@@ -1187,7 +1275,7 @@ function BranchManagementPageContent() {
                   <th className="py-3.5 px-4">Branch Code</th>
                   <th className="py-3.5 px-4">Office Location</th>
                   <th className="py-3.5 px-4">Branch Units</th>
-                  <th className="py-3.5 px-4">Branch Head</th>
+                  <th className="py-3.5 px-4">Branch Admin</th>
                   <th className="py-3.5 px-4">Staff Members</th>
                   <th className="py-3.5 px-4">Requisitions</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
@@ -1418,7 +1506,7 @@ function BranchManagementPageContent() {
                                     <div className="h-6 w-6 rounded-md bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 shadow-2xs">
                                       <Crown className="h-3.5 w-3.5" />
                                     </div>
-                                    <span>{b.managers && b.managers.length > 0 ? "Change Branch Heads" : "Assign Branch Heads"}</span>
+                                    <span>{b.managers && b.managers.length > 0 ? "Change Branch Admins" : "Assign Branch Admins"}</span>
                                   </DropdownMenuItem>
                                 )}
 
@@ -1574,7 +1662,7 @@ function BranchManagementPageContent() {
                           <div className="flex items-center gap-2">
                             <Crown className="h-4 w-4 text-amber-500" />
                             <span className="text-xs font-bold text-neutral-800 dark:text-white">
-                              Branch Heads: {b.managers && b.managers.length > 0 ? b.managers.map((m: any) => m.fullName).join(", ") : <span className="text-neutral-400 font-normal italic">Unassigned</span>}
+                              Branch Admins: {b.managers && b.managers.length > 0 ? b.managers.map((m: any) => m.fullName).join(", ") : <span className="text-neutral-400 font-normal italic">Unassigned</span>}
                             </span>
                           </div>
                           {canManageBranches && (
@@ -1687,7 +1775,7 @@ function BranchManagementPageContent() {
                   <div className="flex items-center gap-2">
                     <Crown className="h-4 w-4 text-amber-500 shrink-0" />
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Branch Heads</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Branch Admins</p>
                       <p className="text-xs font-bold text-neutral-800 dark:text-neutral-100">
                         {b.managers && b.managers.length > 0 ? b.managers.map((m: any) => m.fullName).join(", ") : <span className="text-neutral-400 font-normal italic">Unassigned</span>}
                       </p>
@@ -2047,7 +2135,7 @@ function BranchManagementPageContent() {
                     {ownBranchSettings ? 'Branch Office Details' : 'Edit Branch Office Details'}
                   </h3>
                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                    Configure office location parameters, city, address, and view operating practice divisions.
+                    Configure office location parameters, city, address, and view operating branch units.
                   </p>
                 </div>
               </div>
@@ -2176,7 +2264,7 @@ function BranchManagementPageContent() {
                   </div>
                 </div>
 
-                {/* 2. Branch Units (Practice Divisions) in Branch */}
+                {/* 2. Branch Units (Branch Units) in Branch */}
                 <div className="bg-blue-50/50 dark:bg-blue-950/20 p-4 rounded-xl border border-blue-200/70 dark:border-blue-900/60 space-y-3">
                   <div className="flex items-center justify-between border-b border-blue-200/50 dark:border-blue-900/40 pb-2">
                     <div className="flex items-center gap-2">
@@ -2203,7 +2291,7 @@ function BranchManagementPageContent() {
                   </div>
 
                   {selectedBranchUnits.length === 0 ? (
-                    <p className="text-xs text-neutral-400 italic">No operating practice divisions created for this branch yet.</p>
+                    <p className="text-xs text-neutral-400 italic">No operating branch units created for this branch yet.</p>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {selectedBranchUnits.map((u: any) => (
@@ -2371,7 +2459,7 @@ function BranchManagementPageContent() {
                   {branchMembers
                     .filter((u: any) => u.isActive !== false && u.is_active !== false)
                     .map((user) => {
-                      const isManager = selectedBranch.managerId === user.id;
+                      const isManager = selectedBranch.managers?.some((m: any) => m.id === user.id);
                       const rolesArray: string[] = getDisplayRoles(user.roles);
                       const initials = getInitials(user.fullName, user.email);
                       const online = isUserOnline(user.id) || isUserOnline(user.email);
@@ -2403,7 +2491,7 @@ function BranchManagementPageContent() {
                                 </p>
                                 {isManager && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 shrink-0">
-                                    <Crown className="h-3 w-3 text-amber-600 dark:text-amber-400" /> Branch Head
+                                    <Crown className="h-3 w-3 text-amber-600 dark:text-amber-400" /> Branch Admin
                                   </span>
                                 )}
                                 {(user.businessUnitName || user.businessUnit?.name) && (
@@ -2449,7 +2537,7 @@ function BranchManagementPageContent() {
                                     setSavingManager(true);
                                     try {
                                       await atsApi.branches.updateManagers(selectedBranch.id, [user.id]);
-                                      toast.success("Branch Head assigned successfully!");
+                                      toast.success("Branch Admin assigned successfully!");
                                       await loadBranchesAndHierarchy();
                                     } catch(e: any) {
                                       toast.error(e.message || "Failed to assign head");
@@ -2459,7 +2547,7 @@ function BranchManagementPageContent() {
                                   }}
                                   className="h-7 px-2.5 text-[10.5px] font-bold border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800"
                                 >
-                                  Set as Branch Head
+                                  Set as Branch Admin
                                 </Button>
                               )}
                               {canAssignUserRoles && (
@@ -2501,7 +2589,7 @@ function BranchManagementPageContent() {
         </div>
       )}
 
-      {/* DEDICATED CHANGE / ASSIGN BRANCH HEAD MODAL (CLEAN USER LIST ONLY) */}
+      {/* DEDICATED CHANGE / ASSIGN BRANCH ADMIN MODAL (CLEAN USER LIST ONLY) */}
       {isChangeManagerOpen && selectedBranch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in-0 zoom-in-95">
@@ -2510,10 +2598,10 @@ function BranchManagementPageContent() {
               <div>
                 <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
                   <Crown className="h-4 w-4 text-amber-500" />
-                  Assign Branch Head: {selectedBranch.name}
+                  Assign Branch Admin: {selectedBranch.name}
                 </h3>
                 <p className="text-[11px] text-neutral-400">
-                  Select a user to assign as the Branch Head
+                  Select a user to assign as the Branch Admin
                 </p>
               </div>
               <button
@@ -2592,7 +2680,7 @@ function BranchManagementPageContent() {
                       ∅
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Unassign Branch Head</p>
+                      <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Unassign Branch Admin</p>
                       <p className="text-[10px] text-neutral-400">Leave branch without assigned manager</p>
                     </div>
                   </div>
@@ -2749,7 +2837,7 @@ function BranchManagementPageContent() {
                 disabled={savingManager}
                 className="h-7 text-xs font-bold px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
               >
-                {savingManager ? "Saving..." : "Save Branch Heads"}
+                {savingManager ? "Saving..." : "Save Branch Admins"}
               </Button>
             </div>
           </div>
@@ -2834,7 +2922,7 @@ function BranchManagementPageContent() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-xs font-bold text-neutral-900 dark:text-white flex items-center gap-1">
-                        <Shield className="h-3.5 w-3.5 text-violet-500" /> Unit Admin (Practice Division Manager)
+                        <Shield className="h-3.5 w-3.5 text-violet-500" /> Unit Admin (Branch Unit Manager)
                       </p>
                       <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-violet-100 text-violet-900 dark:bg-violet-900/60 dark:text-violet-200">
                         Unit Level
@@ -2852,7 +2940,7 @@ function BranchManagementPageContent() {
                 <div className="flex items-center justify-between">
                   <label className="text-[10.5px] font-bold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
                     <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                    Branch Unit (Practice Division)
+                    Branch Unit (Branch Unit)
                   </label>
                   <span className="text-[10.5px] text-blue-600 dark:text-blue-400 font-medium">
                     Office: {selectedBranch?.name}
@@ -3821,7 +3909,7 @@ function BranchManagementPageContent() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
-                    Add Branch Unit / Practice Division
+                    Add Branch Unit / Branch Unit
                   </h3>
                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
                     Create a specialized business division within an office branch
@@ -3900,27 +3988,27 @@ function BranchManagementPageContent() {
                 {/* Market Segment */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                    Market Focus
+                    Market Segment Focus
                   </label>
                   <select
-                    value={unitFormData.market}
+                    value={unitFormData.marketSegmentId || ""}
                     onChange={(e) => {
-                      const m = e.target.value;
-                      const isUs = m === "US";
+                      const msId = e.target.value;
+                      const ms = marketSegments.find((m) => m.id === msId);
                       setUnitFormData({
                         ...unitFormData,
-                        market: m,
-                        currency: isUs ? "USD" : "INR",
-                        shiftTiming: isUs ? "US Shift" : "General Shift",
-                        workStartTime: isUs ? "20:00" : "09:30",
-                        workEndTime: isUs ? "05:00" : "18:30",
-                        timezone: isUs ? "America/New_York" : "Asia/Kolkata",
+                        marketSegmentId: msId,
+                        market: ms ? ms.code : "INDIA",
+                        code: ms ? ms.code : "", // Auto-populate unit code
+                        currency: ms ? ms.defaultCurrency : "INR"
                       });
                     }}
                     className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 font-semibold text-neutral-800 dark:text-neutral-200 outline-none focus:ring-1 focus:ring-blue-500"
                   >
-                    <option value="INDIA">Domestic India</option>
-                    <option value="US">US IT Staffing</option>
+                    <option value="">-- Select Market Segment --</option>
+                    {marketSegments.map((ms) => (
+                      <option key={ms.id} value={ms.id}>{ms.name} ({ms.defaultCurrency})</option>
+                    ))}
                   </select>
                 </div>
 
@@ -4235,26 +4323,27 @@ function BranchManagementPageContent() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block">
-                    Market Segment
+                    Global Market Segment
                   </label>
                   <select
-                    value={editUnitFormData.market}
+                    value={editUnitFormData.marketSegmentId || ""}
                     onChange={(e) => {
-                      const m = e.target.value;
+                      const msId = e.target.value;
+                      const ms = marketSegments.find((m) => m.id === msId);
                       setEditUnitFormData({
                         ...editUnitFormData,
-                        market: m,
-                        currency: m === "US" ? "USD" : "INR",
-                        timezone: m === "US" ? "America/New_York" : "Asia/Kolkata",
-                        shiftTiming: m === "US" ? "US Shift" : "General Shift",
-                        workStartTime: m === "US" ? "20:00" : "09:30",
-                        workEndTime: m === "US" ? "05:00" : "18:30",
+                        marketSegmentId: msId,
+                        market: ms ? ms.code : "INDIA",
+                        code: ms ? ms.code : "", // Auto-populate unit code
+                        currency: ms ? ms.defaultCurrency : "INR"
                       });
                     }}
                     className="w-full h-9 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-medium text-neutral-900 dark:text-white cursor-pointer"
                   >
-                    <option value="INDIA">Domestic IT (India)</option>
-                    <option value="US">US IT Staffing</option>
+                    <option value="">-- Select Market Segment --</option>
+                    {marketSegments.map((ms) => (
+                      <option key={ms.id} value={ms.id}>{ms.name} ({ms.defaultCurrency})</option>
+                    ))}
                   </select>
                 </div>
 

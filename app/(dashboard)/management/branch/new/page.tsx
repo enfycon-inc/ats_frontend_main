@@ -121,7 +121,7 @@ export default function CreateBranchPage() {
             <Building2 className="h-5 w-5 text-indigo-600" /> Create Branch
           </h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Add a new branch location. Operating practice divisions, shifts, and job routing are configured per Branch Unit.
+            Add a new branch location. Operating branch units, shifts, and job routing are configured per Branch Unit.
           </p>
         </div>
 

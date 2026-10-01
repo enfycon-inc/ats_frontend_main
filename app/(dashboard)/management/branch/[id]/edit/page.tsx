@@ -145,7 +145,7 @@ export default function EditBranchPage() {
             <Building2 className="h-5 w-5 text-indigo-600" /> Edit Branch
           </h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Configure branch details and local office governance. Operating practice divisions, shifts, and job routing are managed in the Units module.
+            Configure branch details and local office governance. Operating branch units, shifts, and job routing are managed in the Units module.
           </p>
         </div>
 

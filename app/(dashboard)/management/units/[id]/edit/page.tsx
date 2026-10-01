@@ -247,7 +247,7 @@ export default function EditUnitPage() {
             <Layers className="h-5 w-5 text-blue-600" /> Edit Branch Unit
           </h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Configure shifts, practice division attributes, recruitment pods, and isolated job assignment policies.
+            Configure shifts, branch unit attributes, recruitment pods, and isolated job assignment policies.
           </p>
         </div>
 
@@ -327,7 +327,7 @@ export default function EditUnitPage() {
                     </option>
                   ))}
                 </select>
-                <span className="text-[10px] text-neutral-400 block">The branch office hosting this operating practice division.</span>
+                <span className="text-[10px] text-neutral-400 block">The branch office hosting this operating branch unit.</span>
               </div>
 
               <div className="space-y-1.5">
@@ -416,6 +416,7 @@ export default function EditUnitPage() {
                         ...formData,
                         marketSegmentId: e.target.value,
                         market: seg.code,
+        code: seg.code, // Auto-select unit code
                         currency: seg.defaultCurrency || formData.currency,
                         timezone: seg.defaultTimezone || formData.timezone,
                         shiftTiming: seg.defaultShift || formData.shiftTiming,
