@@ -102,7 +102,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
       if (child.href === "/job-posting/drafts") return has("job:create");
       if (child.href === "/job-posting/boards") return has("job:publish_direct");
       if (child.href === "/management/branch") return has("tenant:settings", "tenant:manage", "branch:create");
-      if (child.href === "/management/markets") return user?.roles?.includes("SUPER_ADMIN") || has("platform:manage");
+      if (child.href === "/management/markets") return profile?.roles?.includes("SUPER_ADMIN") || has("platform:manage");
       if (child.href === "/management/units") return has("tenant:settings", "tenant:manage", "branch_admin:manage", "unit_admin:manage", "unit:view");
       if (item.id === "applicants") return has("candidate:view");
       return true;
