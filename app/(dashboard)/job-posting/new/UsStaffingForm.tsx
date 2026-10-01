@@ -646,6 +646,12 @@ const getInitialActiveBranchContext = () => {
             branchesList = bList || [];
             
             let finalUnits = unitsList || [];
+
+            finalUnits = finalUnits.filter((u: any) => {
+              const m = (u.market || u.marketSegmentCode || u.marketSegment?.code || "").toUpperCase();
+              return m === "US" || m === "USA" || m === "USIT";
+            });
+
             let finalBranches = branchesList || [];
             const isAdmin = prof ? isRoleAdmin(resolveActiveSystemRole(prof.roles)) : false;
             
