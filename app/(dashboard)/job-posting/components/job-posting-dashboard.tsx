@@ -335,18 +335,7 @@ export default function JobPostingDashboard({
       const apiJobs = await atsApi.jobs.list(filterParam ? { filter: filterParam } : undefined);
       if (apiJobs && apiJobs.length > 0) {
         const mapped = apiJobs.map(mapApiJobToJob);
-        // Filter by current market shift (matching IN/INDIA/DOMESTIC vs US/USA)
-        const shiftJobs = mapped.filter((job) => {
-          const jm = (job.market || "IN").toUpperCase();
-          if (market === "US") {
-            return jm === "US" || jm === "USA";
-          } else {
-            return jm === "IN" || jm === "INDIA" || jm === "DOMESTIC";
-          }
-        });
-        
-        // Prefer shift-filtered jobs; if empty, show all real tenant API jobs so real DB jobs are never hidden by mock data
-        let jobsToDisplay = shiftJobs.length > 0 ? shiftJobs : mapped;
+        let jobsToDisplay = mapped; // Frontend market filtering removed to allow cross-market delegations and prevent hiding valid jobs
 
         // Account Manager scoping handled entirely by backend API jobs.service.ts
         // Frontend safety net removed to allow unit-wide job visibility.
