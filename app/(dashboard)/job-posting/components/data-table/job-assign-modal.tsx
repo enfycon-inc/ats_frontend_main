@@ -1067,53 +1067,7 @@ export function JobAssignModal({
                         <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
                           {u.fullName || u.name}
                         </span>
-                        {(() => {
-                          const labelMap = new Map<string, string>();
-                          
-                          const addRole = (name: string) => {
-                            if (!name) return;
-                            const key = name.toLowerCase();
-                            // Store the title-cased or actual name. If we already have an ALL-CAPS version, overwrite it with Title Case.
-                            if (!labelMap.has(key) || (name !== name.toUpperCase() && labelMap.get(key) === labelMap.get(key)?.toUpperCase())) {
-                              labelMap.set(key, name);
-                            }
-                          };
 
-                          if (u.customRoleName) addRole(u.customRoleName);
-                          
-                          if (u.roleName) {
-                            const match = rolesList.find((cr: any) => cr.id === u.roleName || cr.name === u.roleName);
-                            if (match?.name) addRole(match.name);
-                          }
-
-                          if (Array.isArray(u.roles)) {
-                            u.roles.forEach((r: string) => {
-                              const match = rolesList.find((cr: any) => cr.id === r || cr.name === r);
-                              if (match?.name) addRole(match.name);
-                              else if (!r.includes("-")) addRole(r);
-                            });
-                          }
-
-                          if (labelMap.size === 0 && u.systemRole) {
-                            addRole(u.systemRole.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()));
-                          }
-
-                          if (labelMap.size === 0) addRole(roleLabel);
-
-                          return Array.from(labelMap.values()).map((lbl, i) => (
-                            <span
-                              key={i}
-                              className={cn(
-                                "text-[9.5px] font-mono px-1.5 py-0.2 rounded font-semibold border",
-                                lbl.toUpperCase().includes("RECRUITER") || lbl.toUpperCase().includes("POD LEAD")
-                                  ? "bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200/80 dark:border-purple-800"
-                                  : "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200/80 dark:border-blue-800"
-                              )}
-                            >
-                              {lbl}
-                            </span>
-                          ));
-                        })()}
                         {isPodMember && (
                           <span
                             className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800 flex items-center gap-0.5"
