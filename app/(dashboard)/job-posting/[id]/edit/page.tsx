@@ -539,35 +539,7 @@ export default function EditJobPostingPage() {
     }
   }, [market, watchTaxTerms, commissionType, customCommission, setValue]);
 
-  useEffect(() => {
-    if (selectedCountry === "India") {
-      setMarket("IN");
-      setBillCurrency("INR");
-      setBillUnit("LPA");
-      setBillTerm("Permanent");
-
-      setPayCurrency("INR");
-      setPayUnit("LPA");
-      setPayTerm("Permanent");
-      
-      setValue("taxTerms", "Permanent");
-      setValue("workAuthorization", "Indian Citizen");
-      const commVal = commissionType === "custom" ? customCommission : commissionType;
-      setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: true });
-    } else if (selectedCountry === "United States") {
-      setMarket("US");
-      setBillCurrency("USD");
-      setBillUnit("Hourly");
-      setBillTerm("C2C");
-
-      setPayCurrency("USD");
-      setPayUnit("Hourly");
-      setPayTerm("C2C");
-      
-      setValue("taxTerms", "C2C");
-      setValue("workAuthorization", "US Authorized");
-    }
-  }, [selectedCountry, setValue, commissionType, customCommission]);
+  
 
   const fetchClients = useCallback(async () => {
     try {
@@ -1117,6 +1089,15 @@ export default function EditJobPostingPage() {
       </div>
     );
   };
+
+    if (isJobLoading) {
+    return (
+      <div className="flex h-[calc(100vh-100px)] w-full items-center justify-center flex-col gap-3 font-sans bg-neutral-50/50 dark:bg-slate-900/10">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="text-sm font-bold text-neutral-600 dark:text-neutral-400">Loading Job Requisition Data...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-neutral-50/50 dark:bg-slate-900/10 font-sans">

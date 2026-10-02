@@ -114,6 +114,12 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
       if (child.href === "/applicants/pipeline") return has("submission:view");
       if (child.href === "/job-posting/drafts") return has("job:create");
       if (child.href === "/job-posting/boards") return has("job:publish_direct");
+      if (child.href === "/job-posting/all?tab=shared") {
+        const role = resolveActiveSystemRole(input, roles, profile);
+        if (!["TENANT_ADMIN", "BRANCH_ADMIN", "UNIT_ADMIN", "DELIVERY_HEAD"].includes(role)) {
+          return false;
+        }
+      }
       if (child.href === "/management/branch") return has("tenant:settings", "tenant:manage", "branch:create");
       if (child.href === "/management/markets") return profile?.roles?.includes("SUPER_ADMIN") || has("platform:manage");
       if (child.href === "/management/units") return has("tenant:settings", "tenant:manage", "branch_admin:manage", "unit_admin:manage", "unit:view");

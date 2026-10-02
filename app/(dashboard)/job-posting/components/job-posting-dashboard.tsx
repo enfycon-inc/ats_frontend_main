@@ -157,15 +157,10 @@ export default function JobPostingDashboard({
   }, [currentUser, userPermissions, userRoles, systemRole]);
 
   const showBranchTabs = useMemo(() => {
-    if (!canManageBranchJobs) return false;
-    const isGlobalAdmin = 
-      systemRole === "SUPER_ADMIN" || 
-      systemRole === "TENANT_ADMIN" ||
-      userRoles.includes("SUPERADMIN") ||
-      userRoles.includes("TENANT_ADMIN") ||
-      userRoles.includes("TENANTADMIN");
-    return !isGlobalAdmin;
-  }, [canManageBranchJobs, systemRole, userRoles]);
+    // Show tabs (Branch Jobs, Shared/Co-sourced Jobs) ONLY for Managers / Delivery Heads
+    const allowedRoles = ["TENANT_ADMIN", "BRANCH_ADMIN", "UNIT_ADMIN", "DELIVERY_HEAD"];
+    return allowedRoles.includes(systemRole);
+  }, [systemRole]);
 
   // Load and verify active branch's pod system capability
   useEffect(() => {
