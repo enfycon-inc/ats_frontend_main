@@ -564,9 +564,12 @@ export function JobTableRow({
                   }
 
                   return (
+                    <JobPodHoverCard 
+                      podIds={assignInfo.pods?.ids || []}
+                      recruiterNames={assignInfo.recruiters?.names || []}
+                    >
                     <div className="flex flex-col gap-1 min-w-0 flex-1">
                       {assignInfo.pods && (
-                        <JobPodHoverCard podIds={assignInfo.pods.ids || []}>
                         <div className="flex items-center gap-1 min-w-0">
                           <span
                             className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800 shrink-0 max-w-[155px]"
@@ -583,7 +586,6 @@ export function JobTableRow({
                             )}
                           </span>
                         </div>
-                        </JobPodHoverCard>
                       )}
 
                       {assignInfo.recruiters && (
@@ -610,6 +612,7 @@ export function JobTableRow({
                         </div>
                       )}
                     </div>
+                    </JobPodHoverCard>
                   );
                 })()}
                 {hasEditPermission && (

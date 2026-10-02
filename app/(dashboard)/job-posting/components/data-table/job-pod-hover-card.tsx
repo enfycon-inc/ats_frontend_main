@@ -1,39 +1,63 @@
 import React, { useState, useEffect } from 'react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Users, Crown, Mail, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Users, Crown, Mail, ChevronDown, ChevronUp, User } from 'lucide-react';
 import { atsApi } from '@/lib/ats-api';
 import { cn } from '@/lib/utils';
 
 export function JobPodHoverCard({
   podIds,
+  recruiterNames = [],
   children
 }: {
   podIds: string[];
+  recruiterNames?: string[];
   children: React.ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [pods, setPods] = useState<any[]>([]);
+  const [recruiters, setRecruiters] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [expandedPodId, setExpandedPodId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen && pods.length === 0 && podIds.length > 0) {
-      setIsLoading(true);
-      // Fetch all pods since there is no endpoint to fetch specific pods by IDs yet, 
-      // but in a real app you'd fetch only what you need.
-      atsApi.pods.list()
-        .then((allPods) => {
-          const matched = allPods.filter((p: any) => podIds.includes(p.id));
-          setPods(matched);
-          if (matched.length === 1) {
-            setExpandedPodId(matched[0].id);
-          }
-        })
-        .catch(console.error)
-        .finally(() => setIsLoading(false));
+    if (isOpen) {
+      const needsPods = pods.length === 0 && podIds.length > 0;
+      const needsRecruiters = recruiters.length === 0 && recruiterNames.length > 0;
+
+      if (needsPods || needsRecruiters) {
+        setIsLoading(true);
+        Promise.all([
+          needsPods ? atsApi.pods.list().catch(() => []) : Promise.resolve([]),
+          needsRecruiters ? atsApi.auth.listUsers().catch(() => []) : Promise.resolve([])
+        ])
+          .then(([allPods, allUsers]) => {
+            if (needsPods) {
+              const matchedPods = allPods.filter((p: any) => podIds.includes(p.id));
+              setPods(matchedPods);
+              if (matchedPods.length === 1) {
+                setExpandedPodId(matchedPods[0].id);
+              }
+            }
+            if (needsRecruiters) {
+              const matchedRecruiters = allUsers.filter((u: any) => 
+                recruiterNames.some(n => n.toLowerCase() === (u.fullName || u.name || '').toLowerCase())
+              );
+              // if not found in db, just use the names
+              const mappedRecruiters = recruiterNames.map(name => {
+                const found = matchedRecruiters.find((u: any) => (u.fullName || u.name || '').toLowerCase() === name.toLowerCase());
+                return found || { fullName: name };
+              });
+              setRecruiters(mappedRecruiters);
+            }
+          })
+          .catch(console.error)
+          .finally(() => setIsLoading(false));
+      }
     }
-  }, [isOpen, podIds, pods.length]);
+  }, [isOpen, podIds, pods.length, recruiters.length, recruiterNames]);
+
+  const totalAssigned = podIds.length + recruiterNames.length;
 
   return (
     <HoverCard openDelay={200} closeDelay={300} onOpenChange={setIsOpen}>
@@ -52,10 +76,10 @@ export function JobPodHoverCard({
             </div>
             <div>
               <h4 className="text-sm font-semibold text-slate-900 dark:text-white leading-none mb-1">
-                Assigned Pods
+                Assigned Team
               </h4>
               <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
-                {podIds.length} Pod{podIds.length > 1 ? 's' : ''} Selected
+                {totalAssigned} Entity{totalAssigned > 1 ? 's' : ''} Assigned
               </p>
             </div>
           </div>
@@ -66,11 +90,9 @@ export function JobPodHoverCard({
             <div className="flex items-center justify-center py-6 text-slate-400">
               <Loader2 className="h-5 w-5 animate-spin" />
             </div>
-          ) : pods.length === 0 ? (
-            <div className="py-6 text-center text-xs text-slate-500">No pod details found.</div>
           ) : (
             <div className="flex flex-col gap-2">
-              {pods.map((pod) => {
+              {pods.length > 0 && pods.map((pod) => {
                 const isExpanded = expandedPodId === pod.id;
                 const members = Array.isArray(pod.users) ? pod.users : Array.isArray(pod.members) ? pod.members : [];
                 return (
@@ -109,7 +131,7 @@ export function JobPodHoverCard({
                               <div key={idx} className="flex items-center gap-2.5 p-1.5 rounded-md hover:bg-white dark:hover:bg-slate-800 transition-colors">
                                 <Avatar className="h-7 w-7 border border-slate-200 dark:border-slate-700">
                                   <AvatarImage src={mAvatar} />
-                                  <AvatarFallback className="bg-blue-50 text-blue-600 text-[10px] font-bold dark:bg-blue-900/40 dark:text-blue-300">
+                                  <AvatarFallback className="bg-purple-50 text-purple-600 text-[10px] font-bold dark:bg-purple-900/40 dark:text-purple-300">
                                     {mName.substring(0, 2).toUpperCase()}
                                   </AvatarFallback>
                                 </Avatar>
@@ -133,6 +155,43 @@ export function JobPodHoverCard({
                   </div>
                 );
               })}
+
+              {recruiters.length > 0 && (
+                <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden mt-1">
+                  <div className="flex items-center gap-1.5 p-2 bg-blue-50 dark:bg-blue-950/20 border-b border-slate-100 dark:border-slate-800">
+                    <User className="h-3.5 w-3.5 text-blue-500" />
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Independent Recruiters</span>
+                  </div>
+                  <div className="p-2 flex flex-col gap-1.5">
+                    {recruiters.map((u: any, idx: number) => {
+                      const mName = u.fullName || u.name || 'Member';
+                      const mEmail = u.email;
+                      const mAvatar = u.avatar;
+                      return (
+                        <div key={idx} className="flex items-center gap-2.5 p-1.5 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <Avatar className="h-7 w-7 border border-slate-200 dark:border-slate-700">
+                            <AvatarImage src={mAvatar} />
+                            <AvatarFallback className="bg-blue-50 text-blue-600 text-[10px] font-bold dark:bg-blue-900/40 dark:text-blue-300">
+                              {mName.substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-200 truncate">
+                              {mName}
+                            </span>
+                            {mEmail && (
+                              <span className="text-[9px] text-slate-500 flex items-center gap-1 truncate">
+                                <Mail className="h-2.5 w-2.5" />
+                                {mEmail}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
