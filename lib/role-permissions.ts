@@ -84,8 +84,9 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
       
       // Specific Removals for Managers (Unit Admin, Branch Admin, Tenant Admin)
       const isManagerRole = resolveActiveSystemRole(input, roles, profile) === "TENANT_ADMIN" || 
-                            resolveActiveSystemRole(input, roles, profile) === "BRANCH_ADMIN" || 
-                            resolveActiveSystemRole(input, roles, profile) === "UNIT_ADMIN";
+                              resolveActiveSystemRole(input, roles, profile) === "BRANCH_ADMIN" || 
+                              resolveActiveSystemRole(input, roles, profile) === "DELIVERY_HEAD" || 
+                              resolveActiveSystemRole(input, roles, profile) === "UNIT_ADMIN";
       
       if (isManagerRole) {
         if (child.href === "/job-posting/my-jobs") return false;
