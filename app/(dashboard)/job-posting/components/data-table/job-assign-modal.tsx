@@ -472,12 +472,22 @@ export function JobAssignModal({
     if (selectedPodIds.length > 0 && recruiterFilterMode === "podMembers") {
       list = list.filter((u: any) => isUserInSelectedPods(u.id, u.podId || u.pod_id));
     }
-    if (!q) return list;
-    return list.filter((u: any) => {
-      const name = (u.fullName || u.name || "").toLowerCase();
-      const email = (u.email || "").toLowerCase();
-      const role = getUserRoleLabel(u, targetBranch?.id).toLowerCase();
-      return name.includes(q) || email.includes(q) || role.includes(q);
+    let result = list;
+    if (q) {
+      result = list.filter((u: any) => {
+        const name = (u.fullName || u.name || "").toLowerCase();
+        const email = (u.email || "").toLowerCase();
+        const role = getUserRoleLabel(u, targetBranch?.id).toLowerCase();
+        return name.includes(q) || email.includes(q) || role.includes(q);
+      });
+    }
+    
+    // Sort: Available (not in selected pods) first, then Disabled (in selected pods)
+    return [...result].sort((a: any, b: any) => {
+      const aIsPodMember = isUserInSelectedPods(a.id, a.podId || a.pod_id);
+      const bIsPodMember = isUserInSelectedPods(b.id, b.podId || b.pod_id);
+      if (aIsPodMember === bIsPodMember) return 0;
+      return aIsPodMember ? 1 : -1;
     });
   }, [
     branchRecruiterUsers,
