@@ -1467,6 +1467,7 @@ export default function UserManagementPage() {
 
     const userBranchId = profile?.branchId || currentUser?.branchId;
     const defaultBranchId = (isBranchAdmin && userBranchId) ? userBranchId : (branches[0]?.id || "");
+    const defaultBusinessUnitId = isUnitAdmin ? (currentUser?.businessUnitId || "") : "";
     setAddForm({
       firstName: "",
       lastName: "",
@@ -1475,7 +1476,7 @@ export default function UserManagementPage() {
       confirmPassword: "",
       roles: [],
         branchId: defaultBranchId,
-        businessUnitId: "",
+        businessUnitId: defaultBusinessUnitId,
         sendEmailInvite: false,
     });
     setShowPassword(false);
@@ -1594,13 +1595,15 @@ export default function UserManagementPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="px-3 py-1.5 rounded-lg border border-default-200 bg-default-50 text-xs">
-            <span className="text-default-500 font-medium">License Usage: </span>
-            <span className="font-bold text-indigo-600">
-              {loading && users.length === 0 ? <span className="animate-pulse">...</span> : activeSeats}
-            </span>
-            <span className="text-default-600 font-semibold"> / {userLimit} Seats</span>
-          </div>
+          {isTenantAdmin && (
+            <div className="px-3 py-1.5 rounded-lg border border-default-200 bg-default-50 text-xs">
+              <span className="text-default-500 font-medium">License Usage: </span>
+              <span className="font-bold text-indigo-600">
+                {loading && users.length === 0 ? <span className="animate-pulse">...</span> : activeSeats}
+              </span>
+              <span className="text-default-600 font-semibold"> / {userLimit} Seats</span>
+            </div>
+          )}
 
           <Button
             onClick={() => {
@@ -2390,14 +2393,20 @@ export default function UserManagementPage() {
         <div className="flex-1">
           <label className="block text-[10px] font-bold text-neutral-700 dark:text-neutral-300 mb-1">Office Branch *</label>
           {isBranchAdmin || isUnitAdmin ? (
-             <div className="flex items-center gap-2 h-9 px-3 rounded-xl border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+             <div className="flex items-center gap-2 min-h-9 px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                 <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
-                <span>
-                   {(() => {
-                      const b = branches.find((b) => b.id === reviewForm.branchId);
-                      return b ? b.name : "Assigned Branch";
-                   })()}
-                </span>
+                {(() => {
+                   const b = branches.find((b) => b.id === reviewForm.branchId);
+                   if (!b) return <span>Assigned Branch</span>;
+                   return (
+                     <span className="flex flex-col leading-tight">
+                       <span className="font-semibold">{b.name}</span>
+                       {(b.city || b.state) && (
+                         <span className="text-[9px] font-normal text-neutral-400">{b.city}{b.city && b.state ? ", " : ""}{b.state}</span>
+                       )}
+                     </span>
+                   );
+                })()}
              </div>
           ) : (
           <Select
@@ -2411,7 +2420,16 @@ export default function UserManagementPage() {
             </SelectTrigger>
             <SelectContent>
               {branches.map(b => (
-                <SelectItem key={b.id} value={b.id} className="text-xs">{b.name}{b.city ? ` - ${b.city}` : ""}{b.state ? `, ${b.state}` : ""}</SelectItem>
+                <SelectItem key={b.id} value={b.id} className="text-xs">
+                  <div className="flex flex-col text-left py-0.5">
+                    <span className="font-semibold text-neutral-900 dark:text-white">{b.name}</span>
+                    {(b.city || b.state) && (
+                      <span className="text-[9.5px] font-normal text-neutral-500 dark:text-neutral-400 -mt-0.5">
+                        {b.city}{b.city && b.state ? ", " : ""}{b.state}
+                      </span>
+                    )}
+                  </div>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -2746,7 +2764,14 @@ export default function UserManagementPage() {
                                         {(() => {
                                           const b = assignedBranches.find((b) => b.id === addForm.branchId) || branches.find((b) => b.id === addForm.branchId);
                                           if (!b) return "Assigned Branch";
-                                          return `${b.name}${b.city ? ` - ${b.city}` : ""}${b.state ? `, ${b.state}` : ""}`;
+                                          return (
+                                            <span className="flex flex-col leading-tight">
+                                              <span className="font-semibold">{b.name}</span>
+                                              {(b.city || b.state) && (
+                                                <span className="text-[9px] font-normal text-neutral-400">{b.city}{b.city && b.state ? ", " : ""}{b.state}</span>
+                                              )}
+                                            </span>
+                                          );
                                         })()}
                                       </span>
                                     </div>
@@ -2807,7 +2832,14 @@ export default function UserManagementPage() {
                                         {(() => {
                                           const b = assignedBranches.find((b) => b.id === addForm.branchId) || branches.find((b) => b.id === addForm.branchId);
                                           if (!b) return "Assigned Branch";
-                                          return `${b.name}${b.city ? ` - ${b.city}` : ""}${b.state ? `, ${b.state}` : ""}`;
+                                          return (
+                                            <span className="flex flex-col leading-tight">
+                                              <span className="font-semibold">{b.name}</span>
+                                              {(b.city || b.state) && (
+                                                <span className="text-[9px] font-normal text-neutral-400">{b.city}{b.city && b.state ? ", " : ""}{b.state}</span>
+                                              )}
+                                            </span>
+                                          );
                                         })()}
                                       </span>
                                 </div>
@@ -3125,7 +3157,14 @@ export default function UserManagementPage() {
                                         {(() => {
                                           const b = assignedBranches.find((b) => b.id === editForm.branchId) || branches.find((b) => b.id === editForm.branchId);
                                           if (!b) return "Assigned Branch";
-                                          return `${b.name}${b.city ? ` - ${b.city}` : ""}${b.state ? `, ${b.state}` : ""}`;
+                                          return (
+                                            <span className="flex flex-col leading-tight">
+                                              <span className="font-semibold">{b.name}</span>
+                                              {(b.city || b.state) && (
+                                                <span className="text-[9px] font-normal text-neutral-400">{b.city}{b.city && b.state ? ", " : ""}{b.state}</span>
+                                              )}
+                                            </span>
+                                          );
                                         })()}
                                       </span>
                                     </div>
@@ -3186,7 +3225,14 @@ export default function UserManagementPage() {
                                         {(() => {
                                           const b = assignedBranches.find((b) => b.id === editForm.branchId) || branches.find((b) => b.id === editForm.branchId);
                                           if (!b) return "Assigned Branch";
-                                          return `${b.name}${b.city ? ` - ${b.city}` : ""}${b.state ? `, ${b.state}` : ""}`;
+                                          return (
+                                            <span className="flex flex-col leading-tight">
+                                              <span className="font-semibold">{b.name}</span>
+                                              {(b.city || b.state) && (
+                                                <span className="text-[9px] font-normal text-neutral-400">{b.city}{b.city && b.state ? ", " : ""}{b.state}</span>
+                                              )}
+                                            </span>
+                                          );
                                         })()}
                                       </span>
                                 </div>
