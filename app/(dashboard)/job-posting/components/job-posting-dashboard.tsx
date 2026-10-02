@@ -27,6 +27,7 @@ import { getUserColumnPreferences, saveUserColumnPreferences } from "@/utils/use
 const getBaseJobColumns = (usesPods: boolean) => [
   "jobCode",
   "jobTitle",
+  "assignedTo",
   "businessUnit",
   "jobStatus",
   "createdBy",
@@ -192,7 +193,7 @@ export default function JobPostingDashboard({
   // Sanitize user columns: remove legacy recruiter / recruitmentManager,
   // and remove podName only if the current branch does not use pods.
   const sanitizeColumns = useCallback((cols: string[], usesPods: boolean) => {
-    let clean = cols.filter((c) => c !== "recruiter" && c !== "recruitmentManager");
+    let clean = cols.filter((c) => c !== "recruitmentManager");
     if (!usesPods) {
       clean = clean.filter((c) => c !== "podName");
     }
@@ -373,7 +374,9 @@ export default function JobPostingDashboard({
   const allColumns = useMemo(() => {
     const cols = [
       { id: "jobCode", label: "Job Code" },
-      { id: "jobTitle", label: "Job Title" },
+      { id: "jobTitle",
+  "assignedTo", label: "Job Title" },
+      { id: "assignedTo", label: "Assigned To" },
       { id: "businessUnit", label: "Business Unit" },
       { id: "jobStatus", label: "Job Status" },
       { id: "createdBy", label: "Job Created By" },
