@@ -517,16 +517,7 @@ export function JobAssignModal({
     );
   };
 
-  const handleSelectAllFilteredPods = () => {
-    const filteredIds = filteredPods.map((p: any) => p.id);
-    const allSelected =
-      filteredIds.length > 0 && filteredIds.every((id: string) => selectedPodIds.includes(id));
-    if (allSelected) {
-      setSelectedPodIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
-    } else {
-      setSelectedPodIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
-    }
-  };
+
 
   const handleToggleUserSelection = (userId: string) => {
     setSelectedUserIds((prev) =>
@@ -534,16 +525,7 @@ export function JobAssignModal({
     );
   };
 
-  const handleSelectAllFiltered = () => {
-    const filteredIds = filteredUsers.filter((u: any) => !isUserInSelectedPods(u.id, u.podId || u.pod_id)).map((u: any) => u.id);
-    const allSelected =
-      filteredIds.length > 0 && filteredIds.every((id: string) => selectedUserIds.includes(id));
-    if (allSelected) {
-      setSelectedUserIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
-    } else {
-      setSelectedUserIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
-    }
-  };
+
 
   const handleSaveCombinedAssignment = async (override?: { unassignAll?: boolean }) => {
     if (!job) return;
@@ -828,81 +810,7 @@ export function JobAssignModal({
             </div>
           )}
 
-          {/* Multi-select bar for PODS */}
-          {assignTab === "pods" && (
-            <div className="flex items-center justify-between text-xs py-1 px-0.5 border-b border-dashed border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={handleSelectAllFilteredPods}
-                  className="text-[11.5px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1.5"
-                >
-                  <CheckSquare className="h-3.5 w-3.5" />
-                  {filteredPods.length > 0 &&
-                  filteredPods.every((p: any) => selectedPodIds.includes(p.id))
-                    ? "Deselect All Filtered"
-                    : `Select All (${filteredPods.length})`}
-                </button>
 
-                {selectedPodIds.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPodIds([])}
-                    className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer underline"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-[11.5px] text-slate-500 dark:text-slate-400">
-                  <strong className="text-purple-600 dark:text-purple-400 font-bold">
-                    {selectedPodIds.length}
-                  </strong>{" "}
-                  selected
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Multi-select bar for RECRUITERS */}
-          {assignTab === "users" && (
-            <div className="flex items-center justify-between text-xs py-1 px-0.5 border-b border-dashed border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={handleSelectAllFiltered}
-                  className="text-[11.5px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1.5"
-                >
-                  <CheckSquare className="h-3.5 w-3.5" />
-                  {filteredUsers.length > 0 &&
-                  filteredUsers.every((u: any) => selectedUserIds.includes(u.id))
-                    ? "Deselect All Filtered"
-                    : `Select All (${filteredUsers.length})`}
-                </button>
-
-                {selectedUserIds.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedUserIds([])}
-                    className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer underline"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-[11.5px] text-slate-500 dark:text-slate-400">
-                  <strong className="text-blue-600 dark:text-blue-400 font-bold">
-                    {selectedUserIds.length}
-                  </strong>{" "}
-                  selected
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Selection List */}
