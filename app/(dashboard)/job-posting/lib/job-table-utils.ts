@@ -15,6 +15,7 @@ export interface AssignedPersonDisplay {
   } | null;
   recruiters?: {
     names: string[];
+    ids?: string[];
     count: number;
     label: string;
   } | null;
