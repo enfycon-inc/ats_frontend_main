@@ -163,8 +163,7 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
   const [isCloningLoading, setIsCloningLoading] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      return !!(params.get("cloneFrom") || params.get("duplicateFrom") || params.get("copyFrom"));
-    }
+      return !!(params.get("cloneFrom") || params.get("duplicateFrom") || params.get("copyFrom"
     return false;
   });
 
@@ -451,8 +450,7 @@ const getInitialActiveBranchContext = () => {
 
     // 4. System role
     if (u.systemRole) {
-      return u.systemRole.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-    }
+      return u.systemRole.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase(
 
     // 5. Roles array
     if (Array.isArray(u.roles) && u.roles.length > 0) {
@@ -708,8 +706,7 @@ const getInitialActiveBranchContext = () => {
             activeBranchObj = branchesList.find((b: any) => b.id === activeBranchId);
           }
           if (!activeBranchObj && activeBranchName) {
-            activeBranchObj = branchesList.find((b: any) => b.name?.toLowerCase() === activeBranchName.toLowerCase());
-          }
+            activeBranchObj = branchesList.find((b: any) => b.name?.toLowerCase() === activeBranchName.toLowerCase(
           setActiveBranch(activeBranchObj || null);
           
 
@@ -845,8 +842,7 @@ const getInitialActiveBranchContext = () => {
           const shiftTimingMatch = sourceJob.description.match(/<p>\s*<strong>Shift Timing:<\/strong>\s*([^<]+)<\/p>/i)
             || sourceJob.description.match(/Shift Timing:\s*([^\n<]+)/i);
           if (shiftTimingMatch) {
-            setValue("shiftTiming", shiftTimingMatch[1].trim());
-          }
+            setValue("shiftTiming", shiftTimingMatch[1].trim(
         }
         if (Array.isArray(sourceJob.skillsRequired) && sourceJob.skillsRequired.length > 0) {
           setPrimarySkills(sourceJob.skillsRequired);
@@ -928,8 +924,7 @@ const getInitialActiveBranchContext = () => {
       setValue("city", jobData.city || "");
       setValue("jobStatus", jobData.jobStatus || "Active");
       setValue("workAuthorization", jobData.visaType || "Indian Citizen");
-));
-      }
+
 
       // Parse Bill Rate
       const rawBillRate = jobData.clientBillRate || "";
@@ -992,8 +987,7 @@ const getInitialActiveBranchContext = () => {
       }
 
     }).catch(err => { console.error("Error populating edit job data:", err); toast.error("Failed to load job details"); })
-      .finally(() => setIsJobLoading(false));
-  }, [editJobId, setValue]);
+      .finally(() => setIsJobLoading(false, [editJobId, setValue]);
 
 
   
@@ -1008,8 +1002,7 @@ const getInitialActiveBranchContext = () => {
   };
 
   const removePrimarySkill = (tag: string) => {
-    setPrimarySkills(primarySkills.filter((t) => t !== tag));
-  };
+    setPrimarySkills(primarySkills.filter((t) => t !== tag;
 
   const addSecondarySkill = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && newSecondarySkill.trim()) {
@@ -1022,8 +1015,7 @@ const getInitialActiveBranchContext = () => {
   };
 
   const removeSecondarySkill = (tag: string) => {
-    setSecondarySkills(secondarySkills.filter((t) => t !== tag));
-  };
+    setSecondarySkills(secondarySkills.filter((t) => t !== tag;
 
   // Document Upload Sim
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1082,11 +1074,9 @@ const getInitialActiveBranchContext = () => {
 
         // Pre-fill experience ranges
         if (res.experienceMin !== undefined && res.experienceMin !== null) {
-          setValue("expMin", Number(res.experienceMin));
-        }
+          setValue("expMin", Number(res.experienceMin
         if (res.experienceMax !== undefined && res.experienceMax !== null) {
-          setValue("expMax", Number(res.experienceMax));
-        }
+          setValue("expMax", Number(res.experienceMax
 
         // Pre-fill pay rate / Candidate CTC
         const extractedPay = res.payRate || res.ctc || res.salary;
@@ -1179,11 +1169,9 @@ const getInitialActiveBranchContext = () => {
         const currentMax = getValues("expMax");
 
         if ((currentMin === undefined || currentMin === null || isNaN(currentMin)) && res.experienceMin !== undefined && res.experienceMin !== null) {
-          setValue("expMin", Number(res.experienceMin));
-        }
+          setValue("expMin", Number(res.experienceMin
         if ((currentMax === undefined || currentMax === null || isNaN(currentMax)) && res.experienceMax !== undefined && res.experienceMax !== null) {
-          setValue("expMax", Number(res.experienceMax));
-        }
+          setValue("expMax", Number(res.experienceMax
 
         // Pre-fill CTC / Pay Rate & Budget Range (Min / Max)
         const resAny = res as any;
