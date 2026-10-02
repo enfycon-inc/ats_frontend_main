@@ -519,7 +519,7 @@ export default function JobPostingDashboard({
     }
   };
 
-  const handleUpdateJob = useCallback(async (jobId: string, updatedFields: Partial<Job>) => {
+  const handleUpdateJob = useCallback(async (jobId: string, updatedFields: Partial<Job> & { _alreadySaved?: boolean }) => {
     // 1. Instantly update local state for optimistic UI responsiveness
     setAllJobs((prev) =>
       prev.map((job) => (job.id === jobId ? { ...job, ...updatedFields } : job))
@@ -527,6 +527,8 @@ export default function JobPostingDashboard({
     setJobsData((prev) =>
       prev.map((job) => (job.id === jobId ? { ...job, ...updatedFields } : job))
     );
+
+    if (updatedFields._alreadySaved) return;
 
     // 2. Prepare payload and persist to database
     try {
@@ -540,6 +542,7 @@ export default function JobPostingDashboard({
       if (updatedFields.assignedTo !== undefined) apiPayload.assignedTo = updatedFields.assignedTo;
 
       if (updatedFields.podId !== undefined) apiPayload.podId = updatedFields.podId;
+      if ((updatedFields as any).podIds !== undefined) apiPayload.podIds = (updatedFields as any).podIds;
 
       if (updatedFields.recruiterId !== undefined) {
         apiPayload.recruiterId = updatedFields.recruiterId;

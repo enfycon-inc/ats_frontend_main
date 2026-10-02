@@ -577,10 +577,12 @@ export function JobAssignModal({
 
       onSuccess({
         podId: payload.podId,
+        podIds: payload.podIds,
         podName: payload.podName,
         assignedTo: payload.assignedTo,
         recruiter: payload.recruiter,
         recruiterId: payload.recruiterId,
+        _alreadySaved: true,
       } as any);
 
       const summaryParts: string[] = [];
