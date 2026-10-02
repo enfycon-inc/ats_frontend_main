@@ -374,8 +374,7 @@ export default function JobPostingDashboard({
   const allColumns = useMemo(() => {
     const cols = [
       { id: "jobCode", label: "Job Code" },
-      { id: "jobTitle",
-  "assignedTo", label: "Job Title" },
+      { id: "jobTitle", label: "Job Title" },
       { id: "assignedTo", label: "Assigned To" },
       { id: "businessUnit", label: "Business Unit" },
       { id: "jobStatus", label: "Job Status" },
@@ -748,3 +747,4 @@ export default function JobPostingDashboard({
     </div>
   );
 }
+
