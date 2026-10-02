@@ -582,9 +582,8 @@ export function JobAssignModal({
           const recruiterNames = selectedUsers.map((u) => u.fullName || u.name || u.email);
           payload.assignedTo = recruiterNames.join(", ");
           payload.recruiterId = selectedUserIds[0];
-            payload.recruiterIds = selectedUserIds;
-          payload.recruiter =
-            selectedUsers[0]?.fullName || selectedUsers[0]?.name || recruiterNames[0];
+          payload.recruiterIds = selectedUserIds;
+          payload.recruiter = recruiterNames.join(", ");
         } else {
           payload.assignedTo = "Unassigned";
           payload.recruiter = "N/A";
@@ -601,7 +600,7 @@ export function JobAssignModal({
         assignedTo: payload.assignedTo,
         recruiter: payload.recruiter,
         recruiterId: payload.recruiterId,
-          recruiterIds: payload.recruiterIds,
+        recruiterIds: payload.recruiterIds,
         _alreadySaved: true,
       } as any);
 
@@ -634,7 +633,7 @@ export function JobAssignModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg md:max-w-[540px] w-full p-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+      <DialogContent className="sm:max-w-lg md:max-w-2xl w-full p-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xl">
         <DialogHeader className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850/70">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-lg shrink-0 border border-blue-100 dark:border-blue-900/50">
@@ -1017,20 +1016,6 @@ export function JobAssignModal({
                   </strong>{" "}
                   selected
                 </span>
-                <Button
-                  size="sm"
-                  disabled={
-                    isAssigning || (selectedPodIds.length === 0 && selectedUserIds.length === 0)
-                  }
-                  onClick={() => handleSaveCombinedAssignment()}
-                  className="h-6.5 px-2.5 text-[11px] font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed rounded-md"
-                >
-                  {isAssigning
-                    ? "Saving..."
-                    : selectedUserIds.length > 0
-                    ? `Save (${selectedPodIds.length} Pods + ${selectedUserIds.length} Recruiters)`
-                    : `Assign Pods (${selectedPodIds.length})`}
-                </Button>
               </div>
             </div>
           )}
@@ -1069,20 +1054,6 @@ export function JobAssignModal({
                   </strong>{" "}
                   selected
                 </span>
-                <Button
-                  size="sm"
-                  disabled={
-                    isAssigning || (selectedPodIds.length === 0 && selectedUserIds.length === 0)
-                  }
-                  onClick={() => handleSaveCombinedAssignment()}
-                  className="h-6.5 px-2.5 text-[11px] font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed rounded-md"
-                >
-                  {isAssigning
-                    ? "Saving..."
-                    : selectedPodIds.length > 0
-                    ? `Save (${selectedPodIds.length} Pods + ${selectedUserIds.length} Recruiters)`
-                    : `Assign Recruiters (${selectedUserIds.length})`}
-                </Button>
               </div>
             </div>
           )}
@@ -1250,9 +1221,32 @@ export function JobAssignModal({
                         <span className="font-semibold text-slate-900 dark:text-white text-xs truncate">
                           {u.fullName || u.name}
                         </span>
-                        <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200/80 dark:border-blue-800">
-                          {roleLabel}
-                        </span>
+                        {(() => {
+                          const labels = new Set<string>();
+                          if (u.customRoleName) labels.add(u.customRoleName);
+                          if (u.systemRole) labels.add(u.systemRole.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()));
+                          if (Array.isArray(u.roles)) {
+                            u.roles.forEach((r: string) => {
+                              const match = rolesList.find((cr: any) => cr.id === r || cr.name === r);
+                              if (match?.name) labels.add(match.name);
+                              else if (!r.includes("-")) labels.add(r);
+                            });
+                          }
+                          if (labels.size === 0) labels.add(roleLabel);
+                          return Array.from(labels).map((lbl, i) => (
+                            <span
+                              key={i}
+                              className={cn(
+                                "text-[9.5px] font-mono px-1.5 py-0.2 rounded font-semibold border",
+                                lbl.toUpperCase().includes("RECRUITER") || lbl.toUpperCase().includes("POD LEAD")
+                                  ? "bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200/80 dark:border-purple-800"
+                                  : "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200/80 dark:border-blue-800"
+                              )}
+                            >
+                              {lbl}
+                            </span>
+                          ));
+                        })()}
                         {isPodMember && (
                           <span
                             className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800 flex items-center gap-0.5"
