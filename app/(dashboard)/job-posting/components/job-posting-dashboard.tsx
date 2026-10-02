@@ -263,7 +263,8 @@ export default function JobPostingDashboard({
   }, [isRecruiter, filterParam, initialStatusFilter]);
 
   const [activeView, setActiveView] = useState(initialActiveView);
-  const [dashboardTab, setDashboardTab] = useState<"all" | "branch" | "shared">("all");
+  const urlTab = searchParams.get("tab") as "all" | "branch" | "shared" | null;
+  const [dashboardTab, setDashboardTab] = useState<"all" | "branch" | "shared">(urlTab || "all");
 
   // Track active branch ID as state so tab filters reactively update
   const [currentBranchId, setCurrentBranchId] = useState<string | null>(null);

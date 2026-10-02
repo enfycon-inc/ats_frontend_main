@@ -114,7 +114,13 @@ export default function DataTable({
     if (!currentUser) return false;
     const { active } = getDashboardRoleSelection(currentUser, currentUser.assignedRoles || []);
     const sysRole = resolveActiveSystemRole(active.id, currentUser.assignedRoles || [], currentUser);
-    const isAdmin = sysRole === "TENANT_ADMIN" || sysRole === "SUPER_ADMIN";
+    
+    // Per user request: Managers should not have the option to create jobs
+    if (["TENANT_ADMIN", "BRANCH_ADMIN", "UNIT_ADMIN"].includes(sysRole)) {
+      return false;
+    }
+    
+    const isAdmin = sysRole === "SUPER_ADMIN";
     const perms = getActiveRolePermissions(active.id, currentUser.assignedRoles || [], currentUser);
     return isAdmin || perms.includes("job:create");
   }, [currentUser]);

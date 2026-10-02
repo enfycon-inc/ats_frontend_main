@@ -82,6 +82,7 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
       { label: "My Jobs", href: "/job-posting/my-jobs" },
       { label: "Pod Jobs", href: "/job-posting/pod-jobs" },
       { label: "Draft Jobs", href: "/job-posting/drafts" },
+      { label: "Co-sourced Jobs", href: "/job-posting/all?tab=shared" },
       { label: "Job Boards", href: "/job-posting/boards" },
     ],
   },

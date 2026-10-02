@@ -81,7 +81,20 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
         has("job:create")
       );
 
-      // ── Specific Removals for Account Manager ──
+      
+      // Specific Removals for Managers (Unit Admin, Branch Admin, Tenant Admin)
+      const isManagerRole = resolveActiveSystemRole(input, roles, profile) === "TENANT_ADMIN" || 
+                            resolveActiveSystemRole(input, roles, profile) === "BRANCH_ADMIN" || 
+                            resolveActiveSystemRole(input, roles, profile) === "UNIT_ADMIN";
+      
+      if (isManagerRole) {
+        if (child.href === "/job-posting/my-jobs") return false;
+        if (child.href === "/job-posting/pod-jobs") return false;
+        if (child.href === "/job-posting/drafts") return false;
+        if (child.href === "/job-posting/boards") return false;
+      }
+
+        // ── Specific Removals for Account Manager ──
       if (isAccountManager) {
         if (child.href === "/job-posting/pod-jobs") return false;
         if (child.href === "/job-posting/boards") return false;
