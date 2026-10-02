@@ -150,6 +150,7 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
 // Workflow active screen state: 'landing' | 'manual' | 'parse'
   // Detect cloneFrom query parameter immediately to smoothly transition directly to manual edit page
   const [activeWorkflow, setActiveWorkflow] = useState<"landing" | "manual" | "parse">(() => {
+    if (editJobId) return "manual";
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("cloneFrom") || params.get("duplicateFrom") || params.get("copyFrom")) {
@@ -927,9 +928,7 @@ const getInitialActiveBranchContext = () => {
       setValue("city", jobData.city || "");
       setValue("jobStatus", jobData.jobStatus || "Active");
       setValue("workAuthorization", jobData.visaType || "Indian Citizen");
-
-      if (jobData.jobTimezone) {
-        setJobTiming(prev => ({ ...prev, jobTimezone: jobData.jobTimezone! }));
+));
       }
 
       // Parse Bill Rate
@@ -992,7 +991,7 @@ const getInitialActiveBranchContext = () => {
         setRespondByType("Unlimited");
       }
 
-    }).catch(err => toast.error("Failed to load job details"))
+    }).catch(err => { console.error("Error populating edit job data:", err); toast.error("Failed to load job details"); })
       .finally(() => setIsJobLoading(false));
   }, [editJobId, setValue]);
 
