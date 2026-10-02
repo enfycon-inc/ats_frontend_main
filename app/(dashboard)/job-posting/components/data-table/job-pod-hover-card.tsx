@@ -42,10 +42,12 @@ const fetchUsersCached = async () => {
 export function JobPodHoverCard({
   podIds,
   recruiterNames = [],
+  recruiterIds = [],
   children
 }: {
   podIds: string[];
   recruiterNames?: string[];
+  recruiterIds?: string[];
   children: React.ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -57,7 +59,7 @@ export function JobPodHoverCard({
   useEffect(() => {
     if (isOpen) {
       const needsPods = pods.length === 0 && podIds.length > 0;
-      const needsRecruiters = recruiters.length === 0 && recruiterNames.length > 0;
+      const needsRecruiters = recruiters.length === 0 && (recruiterNames.length > 0 || recruiterIds.length > 0);
 
       if (needsPods || needsRecruiters) {
         setIsLoading(true);
@@ -75,13 +77,19 @@ export function JobPodHoverCard({
             }
             if (needsRecruiters) {
               const matchedRecruiters = allUsers.filter((u: any) => 
-                recruiterNames.some(n => n.toLowerCase() === (u.fullName || u.name || '').toLowerCase())
+                recruiterIds.includes(u.id) || recruiterNames.some(n => n.toLowerCase() === (u.fullName || u.name || '').toLowerCase())
               );
               // if not found in db, just use the names
-              const mappedRecruiters = recruiterNames.map(name => {
+              // if not found in db, just use the names, or if we have ids use matched
+              let mappedRecruiters = [];
+              if (recruiterIds.length > 0) {
+                mappedRecruiters = recruiterIds.map(id => matchedRecruiters.find(u => u.id === id) || { fullName: 'Unknown User' });
+              } else {
+                mappedRecruiters = recruiterNames.map(name => {
                 const found = matchedRecruiters.find((u: any) => (u.fullName || u.name || '').toLowerCase() === name.toLowerCase());
                 return found || { fullName: name };
-              });
+                });
+              }
               setRecruiters(mappedRecruiters);
             }
           })
@@ -91,7 +99,7 @@ export function JobPodHoverCard({
     }
   }, [isOpen, podIds, pods.length, recruiters.length, recruiterNames]);
 
-  const totalAssigned = podIds.length + recruiterNames.length;
+  const totalAssigned = podIds.length + Math.max(recruiterNames.length, recruiterIds.length);
 
   return (
     <HoverCard openDelay={200} closeDelay={300} onOpenChange={setIsOpen}>

@@ -541,6 +541,7 @@ export function JobAssignModal({
         payload.assignedTo = "Unassigned";
         payload.recruiter = "N/A";
         payload.recruiterId = null;
+          payload.recruiterIds = [];
       } else {
         // 1. Pods assignment:
         if (selectedPodIds.length > 0) {
@@ -564,6 +565,7 @@ export function JobAssignModal({
           const recruiterNames = selectedUsers.map((u) => u.fullName || u.name || u.email);
           payload.assignedTo = recruiterNames.join(", ");
           payload.recruiterId = selectedUserIds[0];
+            payload.recruiterIds = selectedUserIds;
           payload.recruiter =
             selectedUsers[0]?.fullName || selectedUsers[0]?.name || recruiterNames[0];
         } else {
@@ -582,6 +584,7 @@ export function JobAssignModal({
         assignedTo: payload.assignedTo,
         recruiter: payload.recruiter,
         recruiterId: payload.recruiterId,
+          recruiterIds: payload.recruiterIds,
         _alreadySaved: true,
       } as any);
 

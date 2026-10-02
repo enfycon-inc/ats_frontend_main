@@ -60,7 +60,7 @@ export function getAssignedPersonDisplay(job: Job): AssignedPersonDisplay {
   }
 
   // 3. Extract Recruiters info
-  let recruitersInfo: { names: string[]; count: number; label: string } | null = null;
+  let recruitersInfo: { names: string[]; ids?: string[]; count: number; label: string } | null = null;
   const podNamesLower = podsInfo ? podsInfo.names.map((n) => n.toLowerCase()) : [];
 
   if (rawAssigned && rawUpper !== "N/A" && rawUpper !== "UNASSIGNED" && rawUpper !== "NONE") {
@@ -72,6 +72,7 @@ export function getAssignedPersonDisplay(job: Job): AssignedPersonDisplay {
     if (nonPodRecruiterNames.length > 0) {
       recruitersInfo = {
         names: nonPodRecruiterNames,
+          ids: (job as any).recruiterIds || [],
         count: nonPodRecruiterNames.length,
         label:
           nonPodRecruiterNames.length > 1
@@ -90,6 +91,7 @@ export function getAssignedPersonDisplay(job: Job): AssignedPersonDisplay {
     if (!podNamesLower.includes(job.recruiter.toLowerCase())) {
       recruitersInfo = {
         names: [job.recruiter],
+          ids: (job as any).recruiterIds || [],
         count: 1,
         label: job.recruiter,
       };

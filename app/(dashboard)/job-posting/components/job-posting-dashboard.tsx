@@ -544,7 +544,10 @@ export default function JobPostingDashboard({
       if (updatedFields.podId !== undefined) apiPayload.podId = updatedFields.podId;
       if ((updatedFields as any).podIds !== undefined) apiPayload.podIds = (updatedFields as any).podIds;
 
-      if (updatedFields.recruiterId !== undefined) {
+      if ((updatedFields as any).recruiterIds !== undefined) {
+          apiPayload.recruiterIds = (updatedFields as any).recruiterIds;
+        }
+        if (updatedFields.recruiterId !== undefined) {
         apiPayload.recruiterId = updatedFields.recruiterId;
       } else if (updatedFields.recruiter !== undefined) {
         const recruiterName = updatedFields.recruiter;
