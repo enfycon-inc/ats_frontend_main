@@ -145,103 +145,9 @@ type FormValues = zod.infer<typeof formSchema>;
 export function UsStaffingForm({ editJobId }: { editJobId?: string }) {
   const router = useRouter();
   const { data: session, status } = useSession();
-
   const [isJobLoading, setIsJobLoading] = useState(!!editJobId);
 
-  useEffect(() => {
-    if (!editJobId) return;
-    setIsJobLoading(true);
-    atsApi.jobs.get(editJobId).then(jobData => {
-      if (!jobData) return;
-      setValue("jobCode", jobData.jobCode || "");
-      setValue("jobTitle", jobData.jobTitle || "");
-      setValue("client", jobData.client || "");
-      setValue("endClientName", jobData.endClientName || "");
-      setValue("locationAutocomplete", jobData.location || "");
-      
-      const shiftTimingMatch = jobData.description?.match(/<p>\s*<strong>Shift Timing:<\/strong>\s*([^<]+)<\/p>/i)
-        || jobData.description?.match(/Shift Timing:\s*([^\n<]+)/i);
-      const extractedShiftTiming = jobData.shiftTiming || (shiftTimingMatch ? shiftTimingMatch[1].trim() : "General Shift");
-      let cleanDescription = (jobData.description || "")
-        .replace(/<p>\s*<strong>Shift Timing:<\/strong>[^<]*<\/p>/gi, "")
-        .replace(/<p>\s*Shift Timing:[^<]*<\/p>/gi, "")
-        .replace(/^Shift Timing:[^\n]*\n*/gim, "")
-        .trim();
-
-      setValue("jobType", jobData.type || "Contract");
-      setValue("jobDescription", cleanDescription);
-      setValue("shiftTiming", extractedShiftTiming);
-      setPrimarySkills(jobData.skillsRequired || []);
-      setSecondarySkills(jobData.secondarySkills || []);
-      setValue("businessUnit", jobData.businessUnit || "enfycon Inc");
-      setValue("country", jobData.country || "United States");
-      setValue("states", jobData.state || "");
-      setValue("city", jobData.city || "");
-      setValue("jobStatus", jobData.jobStatus || "Active");
-      setValue("workAuthorization", jobData.visaType || "");
-
-      if (jobData.jobTimezone) {
-        setJobTiming(prev => ({ ...prev, jobTimezone: jobData.jobTimezone! }));
-      }
-
-      // Parse Bill Rate
-      const rawBillRate = jobData.clientBillRate || "";
-      if (rawBillRate.includes("% Placement Commission")) {
-        setValue("clientBillRate", "8.33% Placement Commission"); // fallback logic could be complex
-      } else {
-        const matchesBill = rawBillRate.match(/([\d.]+)/);
-        setValue("clientBillRate", matchesBill ? matchesBill[1] : (rawBillRate || ""));
-      }
-
-      // Parse Pay Rate
-      const matchesPay = (jobData.payRate || "").match(/([\d.]+)/);
-      setValue("payRate", matchesPay ? matchesPay[1] : (jobData.payRate || ""));
-
-      setValue("numPositions", jobData.noOfPositions || 1);
-      setValue("maxSubmissions", jobData.submissionRequired || 5);
-      setValue("priority", (jobData.priority || "Warm") as any);
-      setValue("taxTerms", jobData.taxTerms || "C2C");
-      
-      const rLower = (jobData.remoteJob || "").toLowerCase();
-      setValue("remoteJob", (rLower.includes("remote") || rLower === "yes") ? "Remote" : rLower.includes("hybrid") ? "Hybrid" : "In Office");
-      
-      setValue("startDate", jobData.startDate ? jobData.startDate.split("T")[0] : "");
-      setValue("endDate", jobData.endDate ? jobData.endDate.split("T")[0] : "");
-      setValue("hoursPerWeek", jobData.hoursPerWeek || 40);
-      setValue("duration", jobData.duration || "");
-      setValue("recruitmentManager", jobData.recruitmentManagerId || "");
-      setValue("recruiter", jobData.recruiterId || "");
-      setValue("assignedTo", jobData.assignedTo || "");
-      setValue("accountManager", jobData.accountManagerId || "");
-      setValue("industry", jobData.industry || "");
-      setValue("degree", jobData.degree || "");
-      setValue("expMin", jobData.expMin);
-      setValue("expMax", jobData.expMax);
-      setValue("noticePeriod", jobData.noticePeriod || "Select Notice Period");
-
-      if (jobData.podId) {
-        setSelectedPodId(`pod:${jobData.podId}`);
-      } else if (jobData.recruiterId) {
-        setSelectedPodId(`rec:${jobData.recruiterId}`);
-      } else if (jobData.assignedTo === "ALL" || jobData.assignedTo === "All Branch Recruiters") {
-        setSelectedPodId("all");
-      } else if (jobData.assignedTo === "Unassigned") {
-        setSelectedPodId("none");
-      }
-
-      if (jobData.respondBy) {
-        setRespondByType("Date Option");
-        setValue("respondBy", jobData.respondBy.split("T")[0]);
-      } else {
-        setRespondByType("Unlimited");
-      }
-
-    }).catch(err => toast.error("Failed to load job details"))
-      .finally(() => setIsJobLoading(false));
-  }, [editJobId, setValue]);
-
-
-  // Workflow active screen state: 'landing' | 'manual' | 'parse'
+// Workflow active screen state: 'landing' | 'manual' | 'parse'
   // Detect cloneFrom query parameter immediately to smoothly transition directly to manual edit page
   const [activeWorkflow, setActiveWorkflow] = useState<"landing" | "manual" | "parse">(() => {
     if (typeof window !== "undefined") {
@@ -989,6 +895,101 @@ const getInitialActiveBranchContext = () => {
   }, [isDirty, activeWorkflow]);
 
   // Skill tags handlers
+
+  useEffect(() => {
+    if (!editJobId) return;
+    setIsJobLoading(true);
+    atsApi.jobs.get(editJobId).then(jobData => {
+      if (!jobData) return;
+      setValue("jobCode", jobData.jobCode || "");
+      setValue("jobTitle", jobData.jobTitle || "");
+      setValue("client", jobData.client || "");
+      setValue("endClientName", jobData.endClientName || "");
+      setValue("locationAutocomplete", jobData.location || "");
+      
+      const shiftTimingMatch = jobData.description?.match(/<p>\s*<strong>Shift Timing:<\/strong>\s*([^<]+)<\/p>/i)
+        || jobData.description?.match(/Shift Timing:\s*([^\n<]+)/i);
+      const extractedShiftTiming = jobData.shiftTiming || (shiftTimingMatch ? shiftTimingMatch[1].trim() : "General Shift");
+      let cleanDescription = (jobData.description || "")
+        .replace(/<p>\s*<strong>Shift Timing:<\/strong>[^<]*<\/p>/gi, "")
+        .replace(/<p>\s*Shift Timing:[^<]*<\/p>/gi, "")
+        .replace(/^Shift Timing:[^\n]*\n*/gim, "")
+        .trim();
+
+      setValue("jobType", jobData.type || "Contract");
+      setValue("jobDescription", cleanDescription);
+      setValue("shiftTiming", extractedShiftTiming);
+      setPrimarySkills(jobData.skillsRequired || []);
+      setSecondarySkills(jobData.secondarySkills || []);
+      setValue("businessUnit", jobData.businessUnit || "enfycon Inc");
+      setValue("country", jobData.country || "United States");
+      setValue("states", jobData.state || "");
+      setValue("city", jobData.city || "");
+      setValue("jobStatus", jobData.jobStatus || "Active");
+      setValue("workAuthorization", jobData.visaType || "");
+
+      if (jobData.jobTimezone) {
+        setJobTiming(prev => ({ ...prev, jobTimezone: jobData.jobTimezone! }));
+      }
+
+      // Parse Bill Rate
+      const rawBillRate = jobData.clientBillRate || "";
+      if (rawBillRate.includes("% Placement Commission")) {
+        setValue("clientBillRate", "8.33% Placement Commission"); // fallback logic could be complex
+      } else {
+        const matchesBill = rawBillRate.match(/([\d.]+)/);
+        setValue("clientBillRate", matchesBill ? matchesBill[1] : (rawBillRate || ""));
+      }
+
+      // Parse Pay Rate
+      const matchesPay = (jobData.payRate || "").match(/([\d.]+)/);
+      setValue("payRate", matchesPay ? matchesPay[1] : (jobData.payRate || ""));
+
+      setValue("numPositions", jobData.noOfPositions || 1);
+      setValue("maxSubmissions", jobData.submissionRequired || 5);
+      setValue("priority", (jobData.priority || "Warm") as any);
+      setValue("taxTerms", jobData.taxTerms || "C2C");
+      
+      const rLower = (jobData.remoteJob || "").toLowerCase();
+      setValue("remoteJob", (rLower.includes("remote") || rLower === "yes") ? "Remote" : rLower.includes("hybrid") ? "Hybrid" : "In Office");
+      
+      setValue("startDate", jobData.startDate ? jobData.startDate.split("T")[0] : "");
+      setValue("endDate", jobData.endDate ? jobData.endDate.split("T")[0] : "");
+      setValue("hoursPerWeek", jobData.hoursPerWeek || 40);
+      setValue("duration", jobData.duration || "");
+      setValue("recruitmentManager", jobData.recruitmentManagerId || "");
+      setValue("recruiter", jobData.recruiterId || "");
+      setValue("assignedTo", jobData.assignedTo || "");
+      setValue("accountManager", jobData.accountManagerId || "");
+      setValue("industry", jobData.industry || "");
+      setValue("degree", jobData.degree || "");
+      setValue("expMin", jobData.expMin);
+      setValue("expMax", jobData.expMax);
+      setValue("noticePeriod", jobData.noticePeriod || "Select Notice Period");
+
+      if (jobData.podId) {
+        setSelectedPodId(`pod:${jobData.podId}`);
+      } else if (jobData.recruiterId) {
+        setSelectedPodId(`rec:${jobData.recruiterId}`);
+      } else if (jobData.assignedTo === "ALL" || jobData.assignedTo === "All Branch Recruiters") {
+        setSelectedPodId("all");
+      } else if (jobData.assignedTo === "Unassigned") {
+        setSelectedPodId("none");
+      }
+
+      if (jobData.respondBy) {
+        setRespondByType("Date Option");
+        setValue("respondBy", jobData.respondBy.split("T")[0]);
+      } else {
+        setRespondByType("Unlimited");
+      }
+
+    }).catch(err => toast.error("Failed to load job details"))
+      .finally(() => setIsJobLoading(false));
+  }, [editJobId, setValue]);
+
+
+  
   const addPrimarySkill = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && newPrimarySkill.trim()) {
       e.preventDefault();
