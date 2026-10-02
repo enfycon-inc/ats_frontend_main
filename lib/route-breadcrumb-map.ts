@@ -174,11 +174,11 @@ export function getRouteBreadcrumbInfo(
 
     if (sub === "edit") {
       return {
-        pageTitle: `Edit Job ${id}`,
+        pageTitle: "Edit Job",
         breadcrumbs: [
           { label: "ATS", href: "/dashboard" },
           { label: "Job Posting", href: "/job-posting" },
-          { label: id, href: `/job-posting/${id}` },
+          { label: "Job Details", href: `/job-posting/${id}` },
           { label: "Edit", isCurrent: true },
         ],
         showBackButton: true,
@@ -188,11 +188,11 @@ export function getRouteBreadcrumbInfo(
 
     if (sub === "matches") {
       return {
-        pageTitle: `Candidate Matches • ${id}`,
+        pageTitle: "Candidate Matches",
         breadcrumbs: [
           { label: "ATS", href: "/dashboard" },
           { label: "Job Posting", href: "/job-posting" },
-          { label: id, href: `/job-posting/${id}` },
+          { label: "Job Details", href: `/job-posting/${id}` },
           { label: "Matches", isCurrent: true },
         ],
         showBackButton: true,
@@ -201,11 +201,11 @@ export function getRouteBreadcrumbInfo(
     }
 
     return {
-      pageTitle: `Job Details • ${id}`,
+      pageTitle: "Job Details",
       breadcrumbs: [
         { label: "ATS", href: "/dashboard" },
         { label: "Job Posting", href: "/job-posting" },
-        { label: id, isCurrent: true },
+        { label: "Job Details", isCurrent: true },
       ],
       showBackButton: true,
       backHref: "/job-posting",
