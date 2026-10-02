@@ -633,7 +633,7 @@ export function JobAssignModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg md:max-w-2xl w-full p-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+      <DialogContent className="sm:max-w-lg md:max-w-xl w-full p-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xl">
         <DialogHeader className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850/70">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-lg shrink-0 border border-blue-100 dark:border-blue-900/50">
@@ -670,58 +670,6 @@ export function JobAssignModal({
                 </span>
                 {targetBranch?.name ? ` • Branch: ${targetBranch.name}` : ""}
               </p>
-            </div>
-            <div className="text-right shrink-0">
-              <span className="text-[9.5px] uppercase font-semibold tracking-wider text-slate-400 block mb-0.5">
-                Currently Assigned
-              </span>
-              {(() => {
-                const curInfo = getAssignedPersonDisplay(job);
-                if (curInfo.isUnassigned || curInfo.type === "unassigned") {
-                  return (
-                    <Badge
-                      variant="outline"
-                      className="text-[10.5px] font-normal px-2 py-0.5 text-neutral-400 dark:text-neutral-500 italic border-slate-200 dark:border-slate-700"
-                    >
-                      Unassigned
-                    </Badge>
-                  );
-                }
-                return (
-                  <div className="flex flex-col items-end gap-1">
-                    {curInfo.pods && (
-                      <span
-                        className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/70 max-w-[140px] truncate"
-                        title={`Assigned Pods: ${curInfo.pods.names.join(", ")}`}
-                      >
-                        <Icon
-                          icon="heroicons:squares-plus"
-                          className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400 shrink-0"
-                        />
-                        {curInfo.pods.label}
-                      </span>
-                    )}
-                    {curInfo.recruiters && (
-                      <span
-                        className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/70 max-w-[140px] truncate"
-                        title={`Assigned Recruiters: ${curInfo.recruiters.names.join(", ")}`}
-                      >
-                        <Icon
-                          icon="heroicons:user"
-                          className="h-2.5 w-2.5 text-blue-600 dark:text-blue-400 shrink-0"
-                        />
-                        {curInfo.recruiters.label}
-                      </span>
-                    )}
-                    {curInfo.type === "all" && (
-                      <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200">
-                        All recruiters
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
           </div>
         </DialogHeader>
 
@@ -825,109 +773,6 @@ export function JobAssignModal({
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            {selectedPodIds.length > 0 && (
-              <span className="text-[11px] text-purple-700 dark:text-purple-300 font-semibold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/60 border border-purple-200/70 inline-flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-                {selectedPodIds.length} Pod{selectedPodIds.length !== 1 ? "s" : ""}
-              </span>
-            )}
-            {selectedUserIds.length > 0 && (
-              <span className="text-[11px] text-blue-700 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/70 inline-flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                {selectedUserIds.length} Recruiters
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Staged Assignment Ribbon */}
-        <div className="mx-5 my-2 p-2 rounded-lg bg-slate-50/80 dark:bg-slate-850/50 border border-slate-200/70 dark:border-slate-800">
-          <div className="flex items-center justify-between text-[11px] mb-1">
-            <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <Sparkles className="h-3 w-3 text-indigo-500" />
-              <span>Staged Assignment</span>
-              {(selectedPodIds.length > 0 || selectedUserIds.length > 0) && (
-                <span className="text-[10.5px] text-slate-400 font-normal">
-                  ({selectedPodIds.length} pod{selectedPodIds.length !== 1 ? "s" : ""},{" "}
-                  {selectedUserIds.length} recruiter{selectedUserIds.length !== 1 ? "s" : ""})
-                </span>
-              )}
-            </span>
-            {(selectedPodIds.length > 0 || selectedUserIds.length > 0) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedPodIds([]);
-                  setSelectedUserIds([]);
-                }}
-                className="text-[10px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer font-medium"
-              >
-                Clear all
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 min-h-[24px] max-h-[85px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
-            {selectedPodIds.length === 0 && selectedUserIds.length === 0 ? (
-              <span className="text-[11px] text-slate-400 italic">
-                No pods or recruiters selected. Pick from Pods and/or Recruiters tabs below.
-              </span>
-            ) : (
-              <>
-                {selectedPodIds.map((pId) => {
-                  const pod = [...podsList, ...targetBranchPods].find((p: any) => p.id === pId);
-                  const name = pod?.name || "Pod";
-                  return (
-                    <span
-                      key={pId}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800 animate-in fade-in"
-                    >
-                      <Icon
-                        icon="heroicons:squares-plus"
-                        className="h-3 w-3 text-purple-600 dark:text-purple-400"
-                      />
-                      <span className="max-w-[130px] truncate">{name}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleTogglePodSelection(pId);
-                        }}
-                        className="hover:text-purple-900 dark:hover:text-white rounded-full ml-0.5 p-0.5 cursor-pointer"
-                        title="Remove pod"
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </button>
-                    </span>
-                  );
-                })}
-                {selectedUserIds.map((uId) => {
-                  const u = usersList.find((usr: any) => usr.id === uId);
-                  const name = u?.fullName || u?.name || u?.email || "Recruiter";
-                  return (
-                    <span
-                      key={uId}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800 animate-in fade-in"
-                    >
-                      <Icon icon="heroicons:user" className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                      <span className="max-w-[120px] truncate">{name}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleUserSelection(uId);
-                        }}
-                        className="hover:text-blue-900 dark:hover:text-white rounded-full ml-0.5 p-0.5 cursor-pointer"
-                        title="Remove recruiter"
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </button>
-                    </span>
-                  );
-                })}
-              </>
-            )}
-          </div>
         </div>
 
         {/* Search Box & Multi-Select Toolbar */}
@@ -1343,22 +1188,7 @@ export function JobAssignModal({
                   Saving...
                 </span>
               ) : (
-                <span>
-                  Save Assignment
-                  {(selectedPodIds.length > 0 || selectedUserIds.length > 0) && (
-                    <span className="ml-1 opacity-90 font-normal">
-                      (
-                      {selectedPodIds.length > 0
-                        ? `${selectedPodIds.length} Pod${selectedPodIds.length > 1 ? "s" : ""}`
-                        : ""}
-                      {selectedPodIds.length > 0 && selectedUserIds.length > 0 ? " + " : ""}
-                      {selectedUserIds.length > 0
-                        ? `${selectedUserIds.length} Recruiters`
-                        : ""}
-                      )
-                    </span>
-                  )}
-                </span>
+                <span>Save Assignment</span>
               )}
             </Button>
           </div>
