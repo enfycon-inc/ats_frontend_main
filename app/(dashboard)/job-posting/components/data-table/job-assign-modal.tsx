@@ -1201,6 +1201,8 @@ export function JobAssignModal({
                 ((job as any).assignedTo || "N/A")?.toLowerCase().includes((u.email || "").toLowerCase());
               const roleLabel = getUserRoleLabel(u, targetBranch?.id);
               const isPodMember = isUserInSelectedPods(u.id, u.podId || u.pod_id);
+              const userPod = [...podsList, ...targetBranchPods].find(p => p.id === (u.podId || u.pod_id));
+              const userPodName = userPod?.name || "Pod Member";
 
               return (
                 <div
@@ -1249,9 +1251,7 @@ export function JobAssignModal({
                             <Icon
                               icon="heroicons:squares-plus"
                               className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400"
-                            />
-                            Pod Member
-                          </span>
+                            />{userPodName}</span>
                         )}
                         {isCurrent && (
                           <Badge
