@@ -519,6 +519,28 @@ export function JobAssignModal({
 
 
 
+  const handleSelectAllFilteredPods = () => {
+    const filteredIds = filteredPods.map((p: any) => p.id);
+    const allSelected =
+      filteredIds.length > 0 && filteredIds.every((id: string) => selectedPodIds.includes(id));
+    if (allSelected) {
+      setSelectedPodIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
+    } else {
+      setSelectedPodIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+    }
+  };
+
+  const handleSelectAllFiltered = () => {
+    const filteredIds = filteredUsers.filter((u: any) => !isUserInSelectedPods(u.id, u.podId || u.pod_id)).map((u: any) => u.id);
+    const allSelected =
+      filteredIds.length > 0 && filteredIds.every((id: string) => selectedUserIds.includes(id));
+    if (allSelected) {
+      setSelectedUserIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
+    } else {
+      setSelectedUserIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+    }
+  };
+
   const handleToggleUserSelection = (userId: string) => {
     setSelectedUserIds((prev) =>
       prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
@@ -811,6 +833,39 @@ export function JobAssignModal({
           )}
 
 
+        </div>
+
+        {/* Minimal Select All Bar */}
+        <div className="px-6 py-1.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={assignTab === "pods" ? handleSelectAllFilteredPods : handleSelectAllFiltered}
+              className="h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors border cursor-pointer border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:border-blue-400"
+              title="Toggle Select All"
+            >
+              {(() => {
+                const isAllSelected = assignTab === "pods" 
+                  ? (filteredPods.length > 0 && filteredPods.every((p: any) => selectedPodIds.includes(p.id)))
+                  : (filteredUsers.length > 0 && filteredUsers.every((u: any) => selectedUserIds.includes(u.id)));
+                
+                return isAllSelected ? (
+                  <Check className="h-3 w-3 stroke-[3] text-blue-600" />
+                ) : (
+                  <CheckSquare className="h-3.5 w-3.5 text-transparent" />
+                );
+              })()}
+            </button>
+            <span className="text-[10.5px] font-medium text-slate-500">
+              Select All
+            </span>
+          </div>
+          
+          {(selectedPodIds.length > 0 || selectedUserIds.length > 0) && (
+            <span className="text-[10.5px] text-slate-400 font-medium">
+              {assignTab === "pods" ? selectedPodIds.length : selectedUserIds.length} selected
+            </span>
+          )}
         </div>
 
         {/* Selection List */}
