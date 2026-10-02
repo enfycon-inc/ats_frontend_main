@@ -110,7 +110,6 @@ export function JobPodHoverCard({
         className="w-80 p-0 overflow-hidden border-slate-200/80 dark:border-slate-800 shadow-xl rounded-xl bg-white dark:bg-slate-900"
         align="start"
         sideOffset={8}
-        asChild
       >
         <article>
           <header className="bg-slate-50 dark:bg-slate-900 px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
