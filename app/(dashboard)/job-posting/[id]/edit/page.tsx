@@ -48,7 +48,7 @@ export default function EditJobPostingPage() {
         const units = await atsApi.businessUnits.list().catch(() => []);
         const matchedUnit = units.find((u: any) => 
           u.name?.toLowerCase() === jobData.businessUnit?.toLowerCase() || 
-          u.id === jobData.businessUnitId
+          u.id === (jobData as any).businessUnitId
         );
 
         if (matchedUnit) {
