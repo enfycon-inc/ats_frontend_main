@@ -9,6 +9,7 @@ export interface AssignedPersonDisplay {
   isUnassigned?: boolean;
   pods?: {
     names: string[];
+    ids?: string[];
     count: number;
     label: string;
   } | null;
@@ -44,6 +45,7 @@ export function getAssignedPersonDisplay(job: Job): AssignedPersonDisplay {
       if (names.length > 0) {
         podsInfo = {
           names,
+          ids: (job.podId && job.podId !== "none" && job.podId !== "off") ? String(job.podId).split(",").map(id => id.trim()) : [],
           count: names.length,
           label: names.length > 1 ? `${names[0]} +${names.length - 1}` : names[0],
         };
