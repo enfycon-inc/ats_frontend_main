@@ -95,6 +95,21 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
         if (child.href === "/job-posting/boards") return false;
       }
 
+      // ── Submission access gating for DH / UA / BA (granular permission) ──
+      const isSubmissionGatedRole =
+        resolveActiveSystemRole(input, roles, profile) === "DELIVERY_HEAD" ||
+        resolveActiveSystemRole(input, roles, profile) === "UNIT_ADMIN" ||
+        resolveActiveSystemRole(input, roles, profile) === "BRANCH_ADMIN";
+
+      if (isSubmissionGatedRole) {
+        // Pod Submissions: always hidden — not relevant for these roles
+        if (child.href === "/utility/submissions?view=pod") return false;
+        // My Submissions: only if they have submission:view or submission:create
+        if (child.href === "/utility/submissions?view=my") return has("submission:view", "submission:create");
+        // All Submissions: only if they have submission:view
+        if (child.href === "/utility/submissions?view=all") return has("submission:view");
+      }
+
         // ── Specific Removals for Account Manager ──
       if (isAccountManager) {
         if (child.href === "/job-posting/pod-jobs") return false;

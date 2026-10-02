@@ -101,11 +101,24 @@ const SYSTEM_ARCHETYPES = [
     label: "Delivery Head Template",
     badge: "Delivery Governance",
     desc: "Branch delivery orchestration, client approvals & rejections, recruiter & pod allocation, requisition activation, and audit gates.",
+    // perms = full ceiling (all permissions visible/grantable in the matrix)
     perms: [
       "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:view", "candidate:create",
       "submission:view", "submission:create", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+      "client:view", "client:create", "client:direct_add", "client:edit", "client:approve", "client:reject",
+      "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
+      "unit_admin:manage", "branch:assign_user",
+      "user:manage",
+      "candidate:search_all_branches", "job:view_all_branches", "candidate:search_all_markets",
+      "placement:view", "report:view"
+    ],
+    // defaultPerms = pre-selected when creating a new role (submission disabled by default)
+    defaultPerms: [
+      "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
+      "candidate:view", "candidate:create",
       "client:view", "client:create", "client:direct_add", "client:edit", "client:approve", "client:reject",
       "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
       "unit_admin:manage", "branch:assign_user",
@@ -119,11 +132,23 @@ const SYSTEM_ARCHETYPES = [
     label: "Unit Admin Template",
     badge: "Unit Governance",
     desc: "Branch unit administrative authority, staff assignment, and unit-level recruitment oversight.",
+    // perms = full ceiling (submission perms visible/grantable for Branch Admin to enable)
     perms: [
       "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
       "submission:create", "submission:view", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+      "client:view", "client:create", "client:direct_add", "client:edit",
+      "unit_admin:manage", "branch:assign_user",
+      "user:manage",
+      "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
+      "placement:view", "report:view"
+    ],
+    // defaultPerms = pre-selected when creating a new role (submission disabled by default)
+    defaultPerms: [
+      "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
+      "candidate:create", "candidate:view",
       "client:view", "client:create", "client:direct_add", "client:edit",
       "unit_admin:manage", "branch:assign_user",
       "user:manage",
@@ -136,11 +161,22 @@ const SYSTEM_ARCHETYPES = [
     label: "Branch Admin Template",
     badge: "Branch Governance",
     desc: "Branch administrative authority, client approval & management, staff role configuration, and branch recruitment oversight.",
+    // perms = full ceiling (submission perms visible/grantable for Tenant Admin to enable)
     perms: [
       "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
       "submission:create", "submission:view", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+      "client:view", "client:create", "client:direct_add", "client:edit", "client:approve", "client:reject",
+      "branch_admin:manage", "user:manage",
+      "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
+      "placement:view", "placement:create", "report:view"
+    ],
+    // defaultPerms = pre-selected when creating a new role (submission disabled by default)
+    defaultPerms: [
+      "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
+      "candidate:create", "candidate:view",
       "client:view", "client:create", "client:direct_add", "client:edit", "client:approve", "client:reject",
       "branch_admin:manage", "user:manage",
       "pod:create", "pod:edit", "pod:delete", "pod:view", "pod:reset_cycle", "pod:overlap",
@@ -578,7 +614,7 @@ export default function RolesPermissionsPage() {
     const defaultBranch = rawBranch === "all" ? (branches[0]?.id || "") : rawBranch;
     setNewRoleBranchId(defaultBranch);
     setNewRoleSystemRole("RECRUITER");
-    setNewRolePermissions(SYSTEM_ARCHETYPES[0].perms);
+    setNewRolePermissions(SYSTEM_ARCHETYPES[0].defaultPerms ?? SYSTEM_ARCHETYPES[0].perms);
     setShowCreateMatrix(false);
     setExpandedCreateGroups({});
     setShowAddRole(true);
@@ -588,7 +624,7 @@ export default function RolesPermissionsPage() {
     setNewRoleSystemRole(archetypeKey);
     const archetype = SYSTEM_ARCHETYPES.find((a) => a.key === archetypeKey);
     if (archetype) {
-      setNewRolePermissions(archetype.perms);
+      setNewRolePermissions(archetype.defaultPerms ?? archetype.perms);
     }
   };
 
@@ -676,8 +712,9 @@ export default function RolesPermissionsPage() {
     setEditRoleSystemRole(archKey);
     const archetype = SYSTEM_ARCHETYPES.find((a) => a.key === archKey);
     if (archetype) {
-      setEditRolePermissions(archetype.perms);
-      toast.success(`Applied ${archetype.label} defaults (${archetype.perms.length} permissions)`);
+      const defaults = archetype.defaultPerms ?? archetype.perms;
+      setEditRolePermissions(defaults);
+      toast.success(`Applied ${archetype.label} defaults (${defaults.length} permissions)`);
     }
   };
 
