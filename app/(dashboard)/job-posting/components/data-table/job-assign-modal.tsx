@@ -495,6 +495,13 @@ export function JobAssignModal({
   }, [branchRecruiterUsers, isUserInSelectedPods]);
 
   const handleTogglePodSelection = (podId: string) => {
+    // If we are selecting a pod, we should auto-remove any independent recruiters who are in this pod
+    const isSelecting = !selectedPodIds.includes(podId);
+    if (isSelecting) {
+      const podUsers = (podsList.find(p => p.id === podId) || targetBranchPods.find(p => p.id === podId))?.users || [];
+      const podUserIds = podUsers.map(u => u.id);
+      setSelectedUserIds(prev => prev.filter(id => !podUserIds.includes(id)));
+    }
     setSelectedPodIds((prev) =>
       prev.includes(podId) ? prev.filter((id) => id !== podId) : [...prev, podId]
     );
@@ -518,7 +525,7 @@ export function JobAssignModal({
   };
 
   const handleSelectAllFiltered = () => {
-    const filteredIds = filteredUsers.map((u: any) => u.id);
+    const filteredIds = filteredUsers.filter((u: any) => !isUserInSelectedPods(u.id, u.podId || u.pod_id)).map((u: any) => u.id);
     const allSelected =
       filteredIds.length > 0 && filteredIds.every((id: string) => selectedUserIds.includes(id));
     if (allSelected) {
@@ -1198,10 +1205,10 @@ export function JobAssignModal({
               return (
                 <div
                   key={u.id}
-                  onClick={() => handleToggleUserSelection(u.id)}
+                  onClick={() => { if (!isPodMember) handleToggleUserSelection(u.id); }}
                   className={cn(
                     "p-2.5 sm:px-3 sm:py-2 rounded-lg border flex items-center justify-between gap-3 text-xs transition-all cursor-pointer select-none",
-                    isSelected
+                    isPodMember ? "opacity-50 cursor-not-allowed border-slate-200 bg-slate-50 dark:bg-slate-900 dark:border-slate-800" : isSelected
                       ? "border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 dark:border-blue-600 shadow-2xs ring-1 ring-blue-400/40"
                       : isCurrent
                       ? "border-slate-300 bg-slate-50/70 dark:bg-slate-800/40 dark:border-slate-700 hover:bg-slate-100/70 dark:hover:bg-slate-850"
