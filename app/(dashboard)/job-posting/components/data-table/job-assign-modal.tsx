@@ -670,6 +670,7 @@ export function JobAssignModal({
                 </span>
                 {targetBranch?.name ? ` • Branch: ${targetBranch.name}` : ""}
               </p>
+            </div>
           </div>
         </DialogHeader>
 
