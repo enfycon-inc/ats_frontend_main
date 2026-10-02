@@ -385,16 +385,32 @@ export default function UserManagementPage() {
 
   const isUnitAdmin = useMemo(() => {
     if (overrideRole) return false;
-    return !sessionPerms.includes('tenant:settings') && !sessionPerms.includes('branch_admin:manage') && !!currentUser?.businessUnitId;
-  }, [overrideRole, sessionPerms, currentUser]);
+    // Check profile (async me() response) first, then localStorage currentUser as fallback
+    const resolvedBusinessUnitId = profile?.businessUnitId || currentUser?.businessUnitId;
+    return !sessionPerms.includes('tenant:settings')
+      && !sessionPerms.includes('branch_admin:manage')
+      && !!resolvedBusinessUnitId;
+  }, [overrideRole, sessionPerms, currentUser, profile]);
 
   // Can the current user manage (edit/delete/status) a given target user?
   const canManageUser = (targetUser: any): boolean => {
-    const isTenantAdmin = sessionPerms.includes('tenant:settings');
-    if (isTenantAdmin) return true;
+    const isTenantAdminLocal = sessionPerms.includes('tenant:settings');
+    if (isTenantAdminLocal) return true;
 
     const targetBranchId = targetUser?.branchId || targetUser?.branch_id;
     const targetBusinessUnitId = targetUser?.businessUnitId || targetUser?.business_unit_id;
+    const targetPerms: string[] = Array.isArray(targetUser?.permissions) ? targetUser.permissions : [];
+
+    // Delivery Head: branch-level management (cannot manage Tenant Admin or Branch Admin peers)
+    const isDeliveryHead = sessionPerms.includes('job:approve')
+      && !sessionPerms.includes('tenant:settings')
+      && !sessionPerms.includes('branch_admin:manage');
+
+    if (isDeliveryHead) {
+      if (!targetBranchId) return false;
+      if (targetPerms.includes('tenant:settings') || targetPerms.includes('branch_admin:manage')) return false;
+      return assignedBranches.some((b) => b.id === targetBranchId);
+    }
 
     if (isBranchAdmin) {
       if (!targetBranchId) return false;
@@ -403,10 +419,11 @@ export default function UserManagementPage() {
 
     if (isUnitAdmin) {
       if (!targetBusinessUnitId) return false;
-      return targetBusinessUnitId === currentUser?.businessUnitId;
+      const resolvedBusinessUnitId = profile?.businessUnitId || currentUser?.businessUnitId;
+      return targetBusinessUnitId === resolvedBusinessUnitId;
     }
 
-    return false; // Default to false if no administrative role
+    return false; // Default: no administrative role
   };
 
   const getDomainSuffix = () => {

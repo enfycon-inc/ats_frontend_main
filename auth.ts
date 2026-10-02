@@ -84,6 +84,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   podId: u.podId || u.pod_id || null,
                   branchId: u.branchId || u.branch_id || null,
                   branchName: u.branchName || u.branch_name || null,
+                  businessUnitId: u.businessUnitId || u.business_unit_id || null,
+                  assignedBranchIds: u.assignedBranchIds || u.assigned_branch_ids || [],
                   tenantId: u.tenantId || u.tenant_id || DEFAULT_TENANT_ID,
                   defaultMarket: u.defaultMarket || u.default_market || "US",
                   isApproved: u.isApproved !== undefined ? u.isApproved : (u.is_approved !== undefined ? u.is_approved : true),
@@ -116,6 +118,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 podId: u.podId || u.pod_id || null,
                 branchId: u.branchId || u.branch_id || null,
                 branchName: u.branchName || u.branch_name || null,
+                businessUnitId: u.businessUnitId || u.business_unit_id || null,
+                assignedBranchIds: u.assignedBranchIds || u.assigned_branch_ids || [],
                 tenantId: u.tenantId || u.tenant_id || DEFAULT_TENANT_ID,
                 defaultMarket: u.defaultMarket || u.default_market || "US",
               };
@@ -168,6 +172,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 podId: u.podId || u.pod_id || null,
                 branchId: u.branchId || u.branch_id || null,
                 branchName: u.branchName || u.branch_name || null,
+                businessUnitId: u.businessUnitId || u.business_unit_id || null,
+                assignedBranchIds: u.assignedBranchIds || u.assigned_branch_ids || [],
                 tenantId: u.tenantId || u.tenant_id || DEFAULT_TENANT_ID,
                 defaultMarket: u.defaultMarket || u.default_market || "US",
               };
@@ -253,6 +259,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               (user as any).podId = data.user.podId || null;
               (user as any).branchId = data.user.branchId || null;
               (user as any).branchName = data.user.branchName || null;
+              (user as any).businessUnitId = data.user.businessUnitId || data.user.business_unit_id || null;
+              (user as any).assignedBranchIds = data.user.assignedBranchIds || data.user.assigned_branch_ids || [];
               (user as any).tenantId = data.user.tenantId || DEFAULT_TENANT_ID;
               (user as any).defaultMarket = data.user.defaultMarket || "US";
               (user as any).isApproved = data.user.isApproved !== undefined ? data.user.isApproved : (data.user.is_approved !== undefined ? data.user.is_approved : true);
@@ -286,6 +294,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.podId = (user as any).podId
         token.branchId = (user as any).branchId
         token.branchName = (user as any).branchName
+        token.businessUnitId = (user as any).businessUnitId || null
+        token.assignedBranchIds = (user as any).assignedBranchIds || []
         token.tenantId = (user as any).tenantId
         token.defaultMarket = (user as any).defaultMarket
         token.isApproved = (user as any).isApproved !== undefined ? (user as any).isApproved : true
@@ -348,6 +358,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as any).podId = token.podId;
         (session.user as any).branchId = token.branchId;
         (session.user as any).branchName = token.branchName;
+        (session.user as any).businessUnitId = (token as any).businessUnitId || null;
+        (session.user as any).assignedBranchIds = (token as any).assignedBranchIds || [];
         (session.user as any).tenantId = token.tenantId;
         (session.user as any).defaultMarket = token.defaultMarket;
         (session.user as any).isApproved = token.isApproved !== undefined ? token.isApproved : true;
