@@ -5,6 +5,40 @@ import { Loader2, Users, Crown, Mail, ChevronDown, ChevronUp, User } from 'lucid
 import { atsApi } from '@/lib/ats-api';
 import { cn } from '@/lib/utils';
 
+// Global cache to prevent redundant API calls across multiple hover cards
+let globalPodsCache: any[] | null = null;
+let globalUsersCache: any[] | null = null;
+let isFetchingPods = false;
+let isFetchingUsers = false;
+let podsPromise: Promise<any[]> | null = null;
+let usersPromise: Promise<any[]> | null = null;
+
+const fetchPodsCached = async () => {
+  if (globalPodsCache) return globalPodsCache;
+  if (podsPromise) return podsPromise;
+  podsPromise = atsApi.pods.list().then(res => {
+    globalPodsCache = res;
+    return res;
+  }).catch(() => {
+    podsPromise = null;
+    return [];
+  });
+  return podsPromise;
+};
+
+const fetchUsersCached = async () => {
+  if (globalUsersCache) return globalUsersCache;
+  if (usersPromise) return usersPromise;
+  usersPromise = atsApi.auth.listUsers().then(res => {
+    globalUsersCache = res;
+    return res;
+  }).catch(() => {
+    usersPromise = null;
+    return [];
+  });
+  return usersPromise;
+};
+
 export function JobPodHoverCard({
   podIds,
   recruiterNames = [],
@@ -28,8 +62,8 @@ export function JobPodHoverCard({
       if (needsPods || needsRecruiters) {
         setIsLoading(true);
         Promise.all([
-          needsPods ? atsApi.pods.list().catch(() => []) : Promise.resolve([]),
-          needsRecruiters ? atsApi.auth.listUsers().catch(() => []) : Promise.resolve([])
+          needsPods ? fetchPodsCached() : Promise.resolve([]),
+          needsRecruiters ? fetchUsersCached() : Promise.resolve([])
         ])
           .then(([allPods, allUsers]) => {
             if (needsPods) {
