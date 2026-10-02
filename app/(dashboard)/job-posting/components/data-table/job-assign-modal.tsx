@@ -1222,18 +1222,39 @@ export function JobAssignModal({
                           {u.fullName || u.name}
                         </span>
                         {(() => {
-                          const labels = new Set<string>();
-                          if (u.customRoleName) labels.add(u.customRoleName);
-                          if (u.systemRole) labels.add(u.systemRole.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()));
+                          const labelMap = new Map<string, string>();
+                          
+                          const addRole = (name: string) => {
+                            if (!name) return;
+                            const key = name.toLowerCase();
+                            // Store the title-cased or actual name. If we already have an ALL-CAPS version, overwrite it with Title Case.
+                            if (!labelMap.has(key) || (name !== name.toUpperCase() && labelMap.get(key) === labelMap.get(key)?.toUpperCase())) {
+                              labelMap.set(key, name);
+                            }
+                          };
+
+                          if (u.customRoleName) addRole(u.customRoleName);
+                          
+                          if (u.roleName) {
+                            const match = rolesList.find((cr: any) => cr.id === u.roleName || cr.name === u.roleName);
+                            if (match?.name) addRole(match.name);
+                          }
+
                           if (Array.isArray(u.roles)) {
                             u.roles.forEach((r: string) => {
                               const match = rolesList.find((cr: any) => cr.id === r || cr.name === r);
-                              if (match?.name) labels.add(match.name);
-                              else if (!r.includes("-")) labels.add(r);
+                              if (match?.name) addRole(match.name);
+                              else if (!r.includes("-")) addRole(r);
                             });
                           }
-                          if (labels.size === 0) labels.add(roleLabel);
-                          return Array.from(labels).map((lbl, i) => (
+
+                          if (labelMap.size === 0 && u.systemRole) {
+                            addRole(u.systemRole.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()));
+                          }
+
+                          if (labelMap.size === 0) addRole(roleLabel);
+
+                          return Array.from(labelMap.values()).map((lbl, i) => (
                             <span
                               key={i}
                               className={cn(
