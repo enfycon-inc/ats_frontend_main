@@ -89,12 +89,15 @@ export function getAssignedPersonDisplay(job: Job): AssignedPersonDisplay {
     job.recruiter !== "N/A" &&
     job.recruiter.toLowerCase() !== "unassigned"
   ) {
-    if (!podNamesLower.includes(job.recruiter.toLowerCase())) {
+    const recruiterNames = job.recruiter.split(",").map((s) => s.trim()).filter(Boolean);
+    const nonPodNames = recruiterNames.filter((t) => !podNamesLower.includes(t.toLowerCase()));
+
+    if (nonPodNames.length > 0) {
       recruitersInfo = {
-        names: [job.recruiter],
-          ids: (job as any).recruiterIds || [],
-        count: 1,
-        label: job.recruiter,
+        names: nonPodNames,
+        ids: (job as any).recruiterIds || [],
+        count: nonPodNames.length,
+        label: nonPodNames.length > 1 ? `${nonPodNames[0]} +${nonPodNames.length - 1}` : nonPodNames[0],
       };
     }
   }
