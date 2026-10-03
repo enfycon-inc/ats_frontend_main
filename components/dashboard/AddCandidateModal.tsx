@@ -207,7 +207,7 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
       }
       
       await atsApi.submissions.create({
-        candidateId: candidate.id,
+        candidateId: candidate.dbId || candidate.id,
         jobId: job?.id,
         recruiterId: currentUser.id,
         finalStatus: "PENDING_APPROVAL",
@@ -249,15 +249,6 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
               Submitting profile for <span className="font-semibold text-slate-800 dark:text-slate-200">{job?.jobCode} - {job?.jobTitle}</span>
             </DialogDescription>
           </div>
-          {autoFilled && (
-            <div className="bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              Auto-Extracted Data Active
-            </div>
-          )}
         </div>
 
         {/* Body Container */}
