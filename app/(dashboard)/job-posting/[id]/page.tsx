@@ -71,6 +71,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
+import { CandidateSubmissionModal } from "@/components/job-posting/CandidateSubmissionModal";
 import { mapApiJobToJob, type Job } from "../data/mock-jobs";
 import toast from "react-hot-toast";
 import { ScheduleInterviewModal } from "@/components/interviews/schedule-interview-modal";
@@ -2245,105 +2246,7 @@ export default function JobDetailPage() {
         onSuccess={loadData}
       />
 
-      {/* DIRECT UPLOAD & SUBMIT CV DIALOG (Dice / LinkedIn / Portal Sourcing) */}
-      <Dialog open={uploadSubmitOpen} onOpenChange={setUploadSubmitOpen}>
-        <DialogContent className="sm:max-w-[480px] bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl p-0 overflow-hidden font-sans">
-          <div className="p-5 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850/40">
-            <div className="flex items-center gap-2">
-              <Badge className="bg-emerald-100 text-emerald-800 font-extrabold text-[10px] uppercase border-0 px-2 py-0.5">
-                1-Click Sourcing
-              </Badge>
-              <span className="text-[10px] font-mono text-neutral-500 font-bold">{job.jobCode}</span>
-            </div>
-            <DialogTitle className="text-lg font-black text-neutral-900 dark:text-white mt-1.5">
-              Upload CV & Submit Candidate
-            </DialogTitle>
-            <DialogDescription className="text-xs text-neutral-500 mt-0.5">
-              Upload a CV downloaded from Dice, LinkedIn, or Indeed to automatically parse & submit directly into this requisition pipeline.
-            </DialogDescription>
-          </div>
-
-          <form onSubmit={handleUploadAndSubmitCandidate} className="p-5 space-y-4 text-xs">
-            {/* File Dropzone */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-450">
-                Select Candidate Resume File (PDF / DOCX)
-              </label>
-              <div className="border-2 border-dashed border-neutral-300 dark:border-slate-700 hover:border-emerald-500 rounded-xl p-4 text-center bg-neutral-50/50 dark:bg-slate-850/50 transition-all">
-                <input
-                  type="file"
-                  accept=".pdf,.docx,.doc"
-                  id="cv-upload-input"
-                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                  className="hidden"
-                />
-                <label htmlFor="cv-upload-input" className="cursor-pointer flex flex-col items-center gap-1.5">
-                  <Upload className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-                  <span className="font-bold text-neutral-700 dark:text-neutral-200">
-                    {uploadFile ? uploadFile.name : "Click to select or drop CV file"}
-                  </span>
-                  <span className="text-[10px] text-neutral-400">PDF, DOCX up to 15MB</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Sourcing Channel & Rate */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-450">Sourcing Source</label>
-                <select
-                  value={uploadSource}
-                  onChange={(e) => setUploadSource(e.target.value)}
-                  className="w-full h-9 border border-neutral-300 dark:border-slate-700 rounded-lg px-2.5 bg-transparent text-xs font-semibold focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="Dice Sourcing">Dice Sourcing</option>
-                  <option value="LinkedIn Recruiter">LinkedIn Recruiter</option>
-                  <option value="Monster / Indeed">Monster / Indeed</option>
-                  <option value="CareerBuilder">CareerBuilder</option>
-                  <option value="Referral / Direct">Referral / Direct</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-450">Submitted / Expected Rate</label>
-                <Input
-                  placeholder="e.g. $70/hr or 14 LPA"
-                  value={uploadRate}
-                  onChange={(e) => setUploadRate(e.target.value)}
-                  className="h-9 text-xs"
-                />
-              </div>
-            </div>
-
-            {/* Screening Comment */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-450">Screening Comment / Notes</label>
-              <textarea
-                rows={2}
-                placeholder="Initial screening remarks (e.g. Available immediately, 10+ yrs Java exp)..."
-                value={uploadComment}
-                onChange={(e) => setUploadComment(e.target.value)}
-                className="w-full p-2.5 border border-neutral-300 dark:border-slate-700 rounded-lg bg-transparent text-xs focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            <DialogFooter className="pt-2 border-t border-neutral-100 dark:border-slate-800 gap-2">
-              <Button type="button" variant="outline" onClick={() => setUploadSubmitOpen(false)} className="text-xs h-9">
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={uploadingCv || !uploadFile}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs h-9 shadow-sm cursor-pointer"
-              >
-                {uploadingCv ? "Parsing & Submitting..." : "Upload & Submit to Pipeline"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* APPROVE JOB CONFIRMATION MODAL */}
+      <CandidateSubmissionModal open={uploadSubmitOpen} onOpenChange={setUploadSubmitOpen} job={job} currentUser={currentUser} onSuccess={loadData} />\n\n        {/* APPROVE JOB CONFIRMATION MODAL */}
       <Dialog open={approveModalOpen} onOpenChange={setApproveModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
