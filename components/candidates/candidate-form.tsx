@@ -25,8 +25,8 @@ export function CandidateForm({
   job,
   isContractual,
 }: CandidateFormProps) {
-  // Determine if it's strictly Indian market (default to true for now as per instructions)
-  const isIndianMarket = job?.market === "IN" || !job?.market || job?.market?.toUpperCase() === "INDIA";
+  const marketVal = job?.market?.toUpperCase() || "";
+  const isIndianMarket = marketVal === "IN" || marketVal === "INDIA" || marketVal === "DOMESTIC" || !marketVal;
   const currencyPrefix = isIndianMarket ? "₹ " : "$ ";
   const defaultPhoneCountry = isIndianMarket ? "IN" : "US";
 
