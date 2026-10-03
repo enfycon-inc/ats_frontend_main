@@ -29,6 +29,7 @@ const addClientSchema = zod.object({
   state: zod.string().optional(),
   city: zod.string().optional(),
   aboutCompany: zod.string().optional(),
+  commissionPercentage: zod.union([zod.number().min(0).max(100), zod.nan().transform(() => undefined)]).optional(),
 });
 
 type AddClientFormValues = zod.infer<typeof addClientSchema>;
@@ -48,6 +49,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
       clientName: initialClientName || "",
       status: "Active",
       country: market === "IN" ? "IN" : "US",
+      commissionPercentage: undefined,
     }
   });
 
@@ -233,7 +235,25 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
               {errors.ownership && <p className="text-[10px] text-red-500 font-bold">{errors.ownership.message}</p>}
             </div>
 
-            {/* About Company */}
+            
+            {/* Placement Commission */}
+            <div className="space-y-1">
+              <Label className="font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                Placement Commission (%)
+                <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Standard permanent placement fee % of Annual CTC (e.g. 8.33)">?</span>
+              </Label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                {...register("commissionPercentage", { valueAsNumber: true })}
+                placeholder="e.g. 8.33"
+                className="w-full h-8 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 font-semibold"
+              />
+            </div>
+
+{/* About Company */}
             <div className="md:col-span-2 space-y-1">
               <Label className="font-bold text-neutral-700 dark:text-neutral-300">About Company</Label>
               <Textarea 

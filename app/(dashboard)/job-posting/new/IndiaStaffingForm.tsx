@@ -170,6 +170,7 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
   // Collapse/Expand state for each form section
   const [collapsedSections, setCollapsedSections] = useState({
     businessInfo: false,
+    location: false,
     skills: false,
     orgInfo: false,
     jobDescription: false,
@@ -217,6 +218,16 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
   const [countryOpen, setCountryOpen] = useState(false);
   const [stateOpen, setStateOpen] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [pocList, setPocList] = useState<{ myContacts: any[]; otherContacts: any[] }>({ myContacts: [], otherContacts: [] });
+  const [pocOpen, setPocOpen] = useState(false);
+  const [pocSearch, setPocSearch] = useState('');
+  const [selectedPocId, setSelectedPocId] = useState<string | null>(null);
+  const [addPocOpen, setAddPocOpen] = useState(false);
+  const [newPocName, setNewPocName] = useState('');
+  const [newPocDesignation, setNewPocDesignation] = useState('');
+  const [newPocEmail, setNewPocEmail] = useState('');
+  const [newPocPhone, setNewPocPhone] = useState('');
 
   const countryListRef = useRef<HTMLDivElement>(null);
   const stateListRef = useRef<HTMLDivElement>(null);
@@ -2412,9 +2423,8 @@ const getInitialActiveBranchContext = () => {
                     {/* Job Status (Hidden, Defaults to Active) */}
                     <input type="hidden" {...register("jobStatus")} value="Active" />
 
-                    
-                    {/* Location Block */}
-                    <div className="space-y-1 col-span-1 md:col-span-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* OLD LOCATION BLOCK - moved to Geographic Location section */}
+                    <div style={{display:'none'}}>
                       {/* Country */}
                       <div className="space-y-1">
                         <Label className="font-bold text-neutral-700 dark:text-neutral-300">Country</Label>
@@ -2639,6 +2649,20 @@ const getInitialActiveBranchContext = () => {
                                             setValue("client", clientNameStr, { shouldValidate: true });
                                             setClientDropdownOpen(false);
                                             setClientSearchText("");
+                                            // Auto-fill commission & load POCs
+                                            const found = clientList.find((c: any) => (c.client_name || c.clientName || c.name || '') === clientNameStr);
+                                            if (found) {
+                                              setSelectedClientId(found.id);
+                                              if (found.commissionPercentage || found.commission_percentage) {
+                                                const pct = found.commissionPercentage || found.commission_percentage;
+                                                setCommissionType(String(pct));
+                                              }
+                                              // Load POCs for this client
+                                              atsApi.clients?.getContacts
+                                                ? atsApi.clients.getContacts(found.id).then((data: any) => setPocList(data)).catch(() => {})
+                                                : fetch(`/api/ats/clients/${found.id}/contacts`, { credentials: 'include' })
+                                                    .then(r => r.json()).then(data => setPocList(data)).catch(() => {});
+                                            }
                                           }}
                                           className="text-xs cursor-pointer"
                                         >
@@ -2924,7 +2948,110 @@ const getInitialActiveBranchContext = () => {
                 )}
               </div>
 
-              {/* -------------------- REQUIRED SKILLS SECTION -------------------- */}
+              
+              {/* -------------------- GEOGRAPHIC LOCATION SECTION -------------------- */}
+              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
+                <SectionHeader title="Geographic Location" sectionKey="location" />
+                {!collapsedSections.location && (
+                  <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    {/* Country */}
+                    <div className="space-y-1">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Country</label>
+                      <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" role="combobox" className="w-full h-8 px-2 text-xs font-semibold justify-between border-neutral-300 bg-white dark:bg-slate-800 dark:border-slate-700">
+                            {watch("country") ? (
+                              <div className="flex items-center gap-2">
+                                <ReactCountryFlag countryCode={Country.getAllCountries().find((c: any) => c.name === watch("country"))?.isoCode || ""} svg style={{ width: "1.2em", height: "1.2em" }} />
+                                <span className="truncate">{watch("country")}</span>
+                              </div>
+                            ) : "Select Country..."}
+                            <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search country..." className="text-xs h-8" value={countrySearchText} onValueChange={setCountrySearchText} />
+                            <CommandList className="max-h-[200px]">
+                              <CommandEmpty>No country found.</CommandEmpty>
+                              <CommandGroup>
+                                {Country.getAllCountries().filter((c: any) => c.name.toLowerCase().includes(countrySearchText.toLowerCase())).map((c: any) => (
+                                  <CommandItem key={c.isoCode} value={c.name} onSelect={() => { setValue("country", c.name, { shouldValidate: true, shouldDirty: true }); setValue("states", ""); setValue("city", ""); setCountryOpen(false); }} className="text-xs font-medium cursor-pointer">
+                                    <ReactCountryFlag countryCode={c.isoCode} svg className="mr-2 h-4 w-4" />
+                                    {c.name}
+                                    <Check className={cn("ml-auto h-3 w-3", watch("country") === c.name ? "opacity-100" : "opacity-0")} />
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    {/* State */}
+                    <div className="space-y-1">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">State</label>
+                      <Popover open={stateOpen} onOpenChange={setStateOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" role="combobox" disabled={!watch("country")} className="w-full h-8 px-2 text-xs font-semibold justify-between border-neutral-300 bg-white dark:bg-slate-800 dark:border-slate-700">
+                            <span className="truncate">{watch("states") || "Select State..."}</span>
+                            <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search state..." className="text-xs h-8" value={stateSearchText} onValueChange={setStateSearchText} />
+                            <CommandList className="max-h-[200px]">
+                              <CommandEmpty>No state found.</CommandEmpty>
+                              <CommandGroup>
+                                {State.getStatesOfCountry(Country.getAllCountries().find((c: any) => c.name === watch("country"))?.isoCode || "").filter((s: any) => s.name.toLowerCase().includes(stateSearchText.toLowerCase())).map((s: any) => (
+                                  <CommandItem key={s.isoCode} value={s.name} onSelect={() => { setValue("states", s.name, { shouldValidate: true, shouldDirty: true }); setValue("city", ""); setStateOpen(false); }} className="text-xs font-medium cursor-pointer">
+                                    {s.name}
+                                    <Check className={cn("ml-auto h-3 w-3", watch("states") === s.name ? "opacity-100" : "opacity-0")} />
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    {/* City */}
+                    <div className="space-y-1">
+                      <label className="font-bold text-neutral-700 dark:text-neutral-300">City</label>
+                      <Popover open={cityOpen} onOpenChange={setCityOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" role="combobox" disabled={!watch("states")} className="w-full h-8 px-2 text-xs font-semibold justify-between border-neutral-300 bg-white dark:bg-slate-800 dark:border-slate-700">
+                            <span className="truncate">{watch("city") || "Select City..."}</span>
+                            <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search city..." className="text-xs h-8" value={citySearchText} onValueChange={setCitySearchText} />
+                            <CommandList className="max-h-[200px]">
+                              <CommandEmpty>No city found.</CommandEmpty>
+                              <CommandGroup>
+                                {City.getCitiesOfState(
+                                  Country.getAllCountries().find((c: any) => c.name === watch("country"))?.isoCode || "",
+                                  State.getStatesOfCountry(Country.getAllCountries().find((c: any) => c.name === watch("country"))?.isoCode || "").find((s: any) => s.name === watch("states"))?.isoCode || ""
+                                ).filter((c: any) => c.name.toLowerCase().includes(citySearchText.toLowerCase())).map((c: any) => (
+                                  <CommandItem key={c.name} value={c.name} onSelect={() => { setValue("city", c.name, { shouldValidate: true, shouldDirty: true }); setCityOpen(false); }} className="text-xs font-medium cursor-pointer">
+                                    {c.name}
+                                    <Check className={cn("ml-auto h-3 w-3", watch("city") === c.name ? "opacity-100" : "opacity-0")} />
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+{/* -------------------- REQUIRED SKILLS SECTION -------------------- */}
               <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
                 <SectionHeader title="Required Skills" sectionKey="skills" />
                 {!collapsedSections.skills && (
@@ -3616,3 +3743,4 @@ const getInitialActiveBranchContext = () => {
       </div>
   );
 }
+
