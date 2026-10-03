@@ -132,9 +132,9 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
             phone: data.pocPhone || null,
             isPrimary: true
           };
-          await fetch(/api/ats/clients//contacts, {
+          await fetch(`/api/ats/clients/${newClientId}/contacts`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: Bearer  },
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(window as any).__ats_token || ''}` },
             body: JSON.stringify(pocPayload)
           });
         } catch (e) {
