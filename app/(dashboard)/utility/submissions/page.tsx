@@ -141,6 +141,11 @@ interface Submission {
   candidateCurrentCtc?: string | null;
   candidateExpectedCtc?: string | null;
   candidateNoticePeriod?: number | null;
+  candidateRelevantExperience?: number | null;
+  candidatePreferredLocations?: string[] | null;
+  candidateSkills?: string[] | null;
+  jobSkillsRequired?: string[] | null;
+  jobSecondarySkills?: string[] | null;
   jobCode?: string;
   jobTitle?: string;
   clientName?: string;
@@ -829,6 +834,25 @@ let cachedSubmissionsState: {
   availableRoles: CustomRoleDefinition[];
   timestamp: number;
 } | null = null;
+
+function calculateMatchScore(candidateSkills?: string[] | null, jobRequiredSkills?: string[] | null, jobSecondarySkills?: string[] | null): number {
+  if (!candidateSkills || candidateSkills.length === 0) return 0;
+  
+  const allJobSkills = [
+    ...(jobRequiredSkills || []),
+    ...(jobSecondarySkills || [])
+  ].map(s => s.toLowerCase().trim()).filter(Boolean);
+  
+  if (allJobSkills.length === 0) return 100; // No skills required means 100% match
+
+  const candSkillsNormalized = candidateSkills.map(s => s.toLowerCase().trim());
+  
+  // Calculate how many job skills are present in candidate skills
+  const matchedSkills = allJobSkills.filter(jobSkill => candSkillsNormalized.includes(jobSkill));
+  
+  const score = Math.round((matchedSkills.length / allJobSkills.length) * 100);
+  return Math.min(score, 100);
+}
 
 export default function SubmissionsPage() {
   const searchParams = useSearchParams();
@@ -2596,41 +2620,100 @@ export default function SubmissionsPage() {
                           <span className="font-medium text-foreground block">{selectedSubmission.candidatePhone || "—"}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground block text-[11px]">Location</span>
+                          <span className="text-muted-foreground block text-[11px]">Current Location</span>
                           <span className="font-medium text-foreground block truncate">{selectedSubmission.candidateCurrentLocation || "—"}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground block text-[11px]">Experience</span>
-                          <span className="font-medium text-foreground block">
-                            {selectedSubmission.candidateExperience != null ? `${selectedSubmission.candidateExperience} Years` : "—"}
+                          <span className="text-muted-foreground block text-[11px]">Preferred Location</span>
+                          <span className="font-medium text-foreground block truncate">
+                            {selectedSubmission.candidatePreferredLocations && selectedSubmission.candidatePreferredLocations.length > 0
+                              ? selectedSubmission.candidatePreferredLocations.join(", ")
+                              : "—"}
                           </span>
                         </div>
-                        {(selectedSubmission.market === "IN" || selectedSubmission.jobCode?.includes("-IN-") || selectedSubmission.jobTitle?.toLowerCase().includes("india") || selectedSubmission.jobCode?.toLowerCase().includes("in")) ? (
-                          <>
-                            <div>
-                              <span className="text-muted-foreground block text-[11px]">Current CTC</span>
-                              <span className="font-medium text-foreground block">
-                                {selectedSubmission.candidateCurrentCtc ? `${selectedSubmission.candidateCurrentCtc} Lakhs` : "—"}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground block text-[11px]">Notice Period</span>
-                              <span className="font-medium text-foreground block">
-                                {selectedSubmission.candidateNoticePeriod != null ? `${selectedSubmission.candidateNoticePeriod} Days` : "—"}
-                              </span>
-                            </div>
-                          </>
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Relevant Experience</span>
+                          <span className="font-medium text-foreground block">
+                            {selectedSubmission.candidateRelevantExperience != null
+                              ? `${selectedSubmission.candidateRelevantExperience} Years`
+                              : selectedSubmission.candidateExperience != null
+                                ? `${selectedSubmission.candidateExperience} Years (Total)`
+                                : "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Notice Period</span>
+                          <span className="font-medium text-foreground block">
+                            {selectedSubmission.candidateNoticePeriod != null ? `${selectedSubmission.candidateNoticePeriod} Days` : "—"}
+                          </span>
+                        </div>
+                        
+                        {/* Dynamic CTC Formatting based on Market */}
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Current CTC</span>
+                          <span className="font-medium text-foreground block">
+                            {selectedSubmission.candidateCurrentCtc 
+                              ? (selectedSubmission.market === "IN" || selectedSubmission.jobCode?.includes("-IN-") ? `₹${selectedSubmission.candidateCurrentCtc} Lakhs` : `$${selectedSubmission.candidateCurrentCtc}`)
+                              : "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Expected CTC</span>
+                          <span className="font-medium text-foreground block">
+                            {selectedSubmission.candidateExpectedCtc 
+                              ? (selectedSubmission.market === "IN" || selectedSubmission.jobCode?.includes("-IN-") ? `₹${selectedSubmission.candidateExpectedCtc} Lakhs` : `$${selectedSubmission.candidateExpectedCtc}`)
+                              : "—"}
+                          </span>
+                        </div>
+                      </div>
+                    </Card>
+
+                    {/* Skill Match & Analysis Card */}
+                    <Card className="p-4 border border-border shadow-none space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                          Skills & Match Analysis
+                        </Label>
+                        <Badge variant={calculateMatchScore(selectedSubmission.candidateSkills, selectedSubmission.jobSkillsRequired, selectedSubmission.jobSecondarySkills) >= 70 ? "default" : "secondary"} className="text-[10px] font-bold">
+                          Match: {calculateMatchScore(selectedSubmission.candidateSkills, selectedSubmission.jobSkillsRequired, selectedSubmission.jobSecondarySkills)}%
+                        </Badge>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {selectedSubmission.candidateSkills && selectedSubmission.candidateSkills.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {selectedSubmission.candidateSkills.map((skill, idx) => {
+                              const jobSkillsLower = [
+                                ...(selectedSubmission.jobSkillsRequired || []),
+                                ...(selectedSubmission.jobSecondarySkills || [])
+                              ].map(s => s.toLowerCase().trim());
+                              
+                              const isMatch = jobSkillsLower.includes(skill.toLowerCase().trim());
+                              
+                              return (
+                                <Badge 
+                                  key={idx} 
+                                  variant="outline" 
+                                  className={cn(
+                                    "text-[10px] py-0 px-2 font-medium border", 
+                                    isMatch 
+                                      ? "bg-amber-100/50 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800/50" 
+                                      : "bg-muted text-muted-foreground"
+                                  )}
+                                >
+                                  {skill} {isMatch && <Check className="h-3 w-3 ml-1 opacity-70" />}
+                                </Badge>
+                              );
+                            })}
+                          </div>
                         ) : (
-                          <>
-                            <div>
-                              <span className="text-muted-foreground block text-[11px]">Work Authorization</span>
-                              <span className="font-medium text-foreground block truncate">{selectedSubmission.candidateWorkAuth || "—"}</span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground block text-[11px]">Source Channel</span>
-                              <span className="font-medium text-foreground block truncate">{selectedSubmission.candidateSource || "—"}</span>
-                            </div>
-                          </>
+                          <span className="text-xs text-muted-foreground italic block">No skills documented for candidate.</span>
+                        )}
+                        
+                        {(!selectedSubmission.candidateSkills || selectedSubmission.candidateSkills.length === 0) && (
+                           <div className="text-[10px] text-muted-foreground mt-1">
+                             Job Required Skills: {(selectedSubmission.jobSkillsRequired || []).join(", ") || "None"}
+                           </div>
                         )}
                       </div>
                     </Card>
