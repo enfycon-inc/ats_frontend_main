@@ -3732,7 +3732,8 @@ const getInitialActiveBranchContext = () => {
             <Button variant="outline" onClick={() => setAddPocOpen(false)} className="h-8 text-xs">Cancel</Button>
             <Button onClick={async () => {
               if (!newPocName || !selectedClientId) return;
-                const res = await atsApi.clients?.createContact 
+              try {
+                const res = await atsApi.clients?.createContact  
                   ? atsApi.clients.createContact(selectedClientId, { name: newPocName, designation: newPocDesignation, email: newPocEmail, phone: newPocPhone })
                   : fetch(`/api/ats/clients/${selectedClientId}/contacts`, {
                   method: 'POST',
