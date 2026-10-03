@@ -2329,7 +2329,10 @@ const getInitialActiveBranchContext = () => {
                         <>
                           <div className="flex items-center gap-1">
                             <label className="font-bold text-neutral-700 dark:text-neutral-300">
-                              Budget Range (LPA) <span className="text-red-500">*</span>
+                              {["Contract", "C2H", "Freelance"].includes(watch("jobType"))
+                                ? <span>Budget Range <span className="text-green-600">(Per Month ₹)</span> <span className="text-red-500">*</span></span>
+                                : <span>Budget Range <span className="text-blue-600">(LPA)</span> <span className="text-red-500">*</span></span>
+                              }
                             </label>
                             <span
                               className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help"
@@ -2893,7 +2896,107 @@ const getInitialActiveBranchContext = () => {
                       )}
                     </div>
 
-                    {/* Row 4, Col 3: Client Job ID */}
+                    
+                    {/* Point of Contact (POC) */}
+                    <div className="space-y-1">
+                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Point of Contact</Label>
+                      <Popover open={pocOpen} onOpenChange={setPocOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            disabled={!selectedClientId}
+                            className="w-full h-8 px-2 text-xs font-semibold justify-between border-neutral-300 bg-white dark:bg-slate-800 dark:border-slate-700"
+                          >
+                            <span className="truncate">
+                              {selectedPocId
+                                ? pocList.myContacts.concat(pocList.otherContacts).find(p => p.id === selectedPocId)?.name || "Unknown POC"
+                                : "Select POC..."}
+                            </span>
+                            <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0" align="start">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search POC..."
+                              className="text-xs h-8"
+                              value={pocSearch}
+                              onValueChange={setPocSearch}
+                            />
+                            <CommandList className="max-h-[200px]">
+                              <CommandEmpty>No POC found.</CommandEmpty>
+
+                              {pocList.myContacts.length > 0 && (
+                                <CommandGroup heading="? My Contacts">
+                                  {pocList.myContacts
+                                    .filter(p => p.name.toLowerCase().includes(pocSearch.toLowerCase()))
+                                    .map(p => (
+                                      <CommandItem
+                                        key={p.id}
+                                        value={p.name}
+                                        onSelect={() => {
+                                          setSelectedPocId(p.id);
+                                          setPocOpen(false);
+                                        }}
+                                        className="text-xs cursor-pointer"
+                                      >
+                                        <div className="flex flex-col">
+                                          <span className="font-medium">{p.name}</span>
+                                          {p.designation && <span className="text-[10px] text-neutral-500">{p.designation}</span>}
+                                        </div>
+                                        <Check
+                                          className={ml-auto h-3 w-3 }
+                                        />
+                                      </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                              )}
+
+                              {pocList.otherContacts.length > 0 && (
+                                <CommandGroup heading="?? Other Contacts">
+                                  {pocList.otherContacts
+                                    .filter(p => p.name.toLowerCase().includes(pocSearch.toLowerCase()))
+                                    .map(p => (
+                                      <CommandItem
+                                        key={p.id}
+                                        value={p.name}
+                                        onSelect={() => {
+                                          setSelectedPocId(p.id);
+                                          setPocOpen(false);
+                                        }}
+                                        className="text-xs cursor-pointer"
+                                      >
+                                        <div className="flex flex-col">
+                                          <span className="font-medium">{p.name}</span>
+                                          <span className="text-[10px] text-neutral-500">Added by {p.addedBy?.name || 'Unknown'}</span>
+                                        </div>
+                                        <Check
+                                          className={ml-auto h-3 w-3 }
+                                        />
+                                      </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                              )}
+                            </CommandList>
+                            <div className="p-2 border-t">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                className="w-full text-xs font-semibold text-blue-600 justify-start h-8"
+                                onClick={() => {
+                                  setPocOpen(false);
+                                  setAddPocOpen(true);
+                                }}
+                              >
+                                + Add New Contact
+                              </Button>
+                            </div>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+\n                    {/* Row 4, Col 3: Client Job ID */}
                     <div className="space-y-1">
                       <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Job ID</Label>
                       <input
