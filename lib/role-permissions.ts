@@ -104,8 +104,8 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
       if (isSubmissionGatedRole) {
         // Pod Submissions: always hidden — not relevant for these roles
         if (child.href === "/utility/submissions?view=pod") return false;
-        // My Submissions: always visible for management roles (they oversee their team's submissions)
-        if (child.href === "/utility/submissions?view=my") return true;
+        // My Submissions: hidden — managers oversee, they don't personally submit
+        if (child.href === "/utility/submissions?view=my") return false;
         // All Submissions: always visible for management roles (core oversight function)
         if (child.href === "/utility/submissions?view=all") return true;
       }

@@ -499,7 +499,7 @@ function renderPipelineProgress(sub: Submission) {
   );
 }
 
-function renderInternalReviewStatus(sub: Submission) {
+function renderInternalReviewStatus(sub: Submission, canInternalScreen: boolean) {
   const isPending = sub.finalStatus === "PENDING_APPROVAL";
 
   // Candidate has interview progression if any round has been scheduled/updated
@@ -513,7 +513,9 @@ function renderInternalReviewStatus(sub: Submission) {
 
   const isRejectedInternally = sub.finalStatus === "REJECTED" && !hasInterviewProgress;
 
-  const statusLabel = isPending ? "Pending Review" : isRejectedInternally ? "Rejected Internally" : "Approved";
+  const statusLabel = isPending
+    ? (canInternalScreen ? "⚡ Awaiting Your Approval" : "Pending Review")
+    : isRejectedInternally ? "Rejected Internally" : "Approved";
   const statusColor = isPending ? "text-amber-600 dark:text-amber-400" : isRejectedInternally ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400";
   const badgeStyle = isPending
     ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300"
@@ -1443,7 +1445,7 @@ export default function SubmissionsPage() {
         return (
           <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
             <div className="flex items-center gap-1.5">
-              {renderInternalReviewStatus(sub)}
+              {renderInternalReviewStatus(sub, canInternalScreen)}
               {sub.finalStatus === "PENDING_APPROVAL" && canInternalScreen && (
                 <div className="flex items-center gap-1 ml-1" onClick={(e) => e.stopPropagation()}>
                   <button
