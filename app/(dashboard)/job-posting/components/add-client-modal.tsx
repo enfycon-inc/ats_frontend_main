@@ -58,6 +58,9 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
       status: "Active",
       country: market === "IN" ? "IN" : "US",
       commissionPercentage: undefined,
+      msaSigned: false,
+      sowExecuted: false,
+      addPoc: false,
     }
   });
 
