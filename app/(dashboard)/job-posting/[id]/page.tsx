@@ -1937,6 +1937,68 @@ export default function JobDetailPage() {
               )}
 
               {/* UNIFIED SINGLE-THEME INTERVIEW STAGES (3-Column Grid) */}
+              
+              {/* Extended Logistics & Skills Analysis */}
+              {selectedSub && (
+                <div className="p-3 bg-neutral-50 dark:bg-slate-850 border border-neutral-200 dark:border-slate-800 rounded-lg space-y-3 mt-3 mb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Current CTC</span>
+                      <span className="font-semibold text-neutral-700 dark:text-neutral-200 block">{selectedSub.candidateCurrentCtc ? `₹${selectedSub.candidateCurrentCtc}` : "N/A"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Expected CTC</span>
+                      <span className="font-semibold text-neutral-700 dark:text-neutral-200 block">{selectedSub.candidateExpectedCtc ? `₹${selectedSub.candidateExpectedCtc}` : "N/A"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Notice Period</span>
+                      <span className="font-semibold text-neutral-700 dark:text-neutral-200 block">{selectedSub.candidateNoticePeriod ? `${selectedSub.candidateNoticePeriod} Days` : "N/A"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Rel. Experience</span>
+                      <span className="font-semibold text-neutral-700 dark:text-neutral-200 block">{selectedSub.candidateRelevantExperience ? `${selectedSub.candidateRelevantExperience} Yrs` : "N/A"}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Current Location</span>
+                      <span className="font-semibold text-neutral-700 dark:text-neutral-200 block truncate">{selectedSub.candidateCurrentLocation || "N/A"}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Preferred Locations</span>
+                      <span className="font-semibold text-neutral-700 dark:text-neutral-200 block truncate">{(selectedSub.candidatePreferredLocations || []).join(", ") || "N/A"}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Skill Matching & Highlighting */}
+                  {selectedSub.candidateSkills && selectedSub.jobSkillsRequired && (
+                    <div className="pt-2 border-t border-neutral-200 dark:border-slate-700">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Skill Match Analysis</span>
+                        {(() => {
+                           const cSkills = (selectedSub.candidateSkills || []).map((s: any) => String(s).toLowerCase());
+                           const reqSkills = (selectedSub.jobSkillsRequired || []);
+                           const matched = reqSkills.filter((rs: any) => cSkills.some((cs: any) => cs.includes(String(rs).toLowerCase()) || String(rs).toLowerCase().includes(cs)));
+                           const score = reqSkills.length > 0 ? Math.round((matched.length / reqSkills.length) * 100) : 0;
+                           return (
+                             <span className={`text-xs font-bold px-2 py-0.5 rounded ${score >= 75 ? 'bg-green-100 text-green-800' : score >= 40 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>
+                               Match Score: {score}%
+                             </span>
+                           );
+                        })()}
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {(selectedSub.jobSkillsRequired || []).map((skill: any, idx: number) => {
+                          const isMatched = (selectedSub.candidateSkills || []).some((cs: any) => String(cs).toLowerCase().includes(String(skill).toLowerCase()) || String(skill).toLowerCase().includes(String(cs).toLowerCase()));
+                          return (
+                            <span key={idx} className={`px-2 py-0.5 rounded text-[10px] font-semibold ${isMatched ? 'bg-yellow-200 text-yellow-900 border border-yellow-300' : 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-slate-800 dark:text-slate-400'}`}>
+                              {String(skill)}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <div>
                 <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1.5">
                   Interview Progression Stages
