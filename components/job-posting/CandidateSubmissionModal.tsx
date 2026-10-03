@@ -234,7 +234,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
 
   const handleClose = () => {
     resetForm();
-    onClose();
+    onClose(false);
     if (typeof document !== "undefined") {
       setTimeout(() => {
         document.body.style.pointerEvents = "";
