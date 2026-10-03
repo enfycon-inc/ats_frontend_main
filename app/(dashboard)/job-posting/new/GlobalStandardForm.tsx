@@ -225,8 +225,8 @@ export function GlobalStandardForm({ editJobId }: { editJobId?: string }) {
   const sortedCountries = useMemo(() => {
     const popularNames = ["India", "United States", "United Kingdom", "Canada", "Australia", "United Arab Emirates", "Singapore"];
     const countries = Country.getAllCountries();
-    const popular = countries.filter(c => popularNames.includes(c.name));
-    const others = countries.filter(c => !popularNames.includes(c.name)).sort((a, b) => a.name.localeCompare(b.name));
+    const popular = Country.getAllCountries().filter(c => popularNames.includes(c.name));
+    const others = Country.getAllCountries().filter(c => !popularNames.includes(c.name)).sort((a, b) => a.name.localeCompare(b.name));
     return [...popular, ...others];
   }, []);
 
@@ -2466,7 +2466,7 @@ const getInitialActiveBranchContext = () => {
                             <Button variant="outline" role="combobox" aria-expanded={countryOpen} className="w-full h-8 px-2 text-xs font-semibold justify-between border-neutral-300 bg-white dark:bg-slate-800 dark:border-slate-700">
                               {watch("country") ? (
                                 <div className="flex items-center gap-2">
-                                  <ReactCountryFlag countryCode={countries.find(c => c.name === watch("country"))?.isoCode || ""} svg style={{ width: '1.2em', height: '1.2em' }} />
+                                  <ReactCountryFlag countryCode={Country.getAllCountries().find(c => c.name === watch("country"))?.isoCode || ""} svg style={{ width: '1.2em', height: '1.2em' }} />
                                   <span className="truncate">{watch("country")}</span>
                                 </div>
                               ) : "Select Country..."}
@@ -2479,7 +2479,7 @@ const getInitialActiveBranchContext = () => {
                               <CommandList className="max-h-[200px]">
                                 <CommandEmpty>No country found.</CommandEmpty>
                                 <CommandGroup>
-                                  {countries.filter(c => c.name.toLowerCase().includes(countrySearchText.toLowerCase())).map((c) => (
+                                  {Country.getAllCountries().filter(c => c.name.toLowerCase().includes(countrySearchText.toLowerCase())).map((c) => (
                                     <CommandItem
                                       key={c.isoCode}
                                       value={c.name}
@@ -2519,7 +2519,7 @@ const getInitialActiveBranchContext = () => {
                               <CommandList className="max-h-[200px]">
                                 <CommandEmpty>No state found.</CommandEmpty>
                                 <CommandGroup>
-                                  {State.getStatesOfCountry(countries.find(c => c.name === watch("country"))?.isoCode || "").filter(s => s.name.toLowerCase().includes(stateSearchText.toLowerCase())).map((s) => (
+                                  {State.getStatesOfCountry(Country.getAllCountries().find(c => c.name === watch("country"))?.isoCode || "").filter(s => s.name.toLowerCase().includes(stateSearchText.toLowerCase())).map((s) => (
                                     <CommandItem
                                       key={s.isoCode}
                                       value={s.name}
@@ -2558,8 +2558,8 @@ const getInitialActiveBranchContext = () => {
                                 <CommandEmpty>No city found.</CommandEmpty>
                                 <CommandGroup>
                                   {City.getCitiesOfState(
-                                    countries.find(c => c.name === watch("country"))?.isoCode || "",
-                                    State.getStatesOfCountry(countries.find(c => c.name === watch("country"))?.isoCode || "").find(s => s.name === watch("states"))?.isoCode || ""
+                                    Country.getAllCountries().find(c => c.name === watch("country"))?.isoCode || "",
+                                    State.getStatesOfCountry(Country.getAllCountries().find(c => c.name === watch("country"))?.isoCode || "").find(s => s.name === watch("states"))?.isoCode || ""
                                   ).filter(c => c.name.toLowerCase().includes(citySearchText.toLowerCase())).map((c) => (
                                     <CommandItem
                                       key={c.name}
