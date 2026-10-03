@@ -2946,7 +2946,7 @@ const getInitialActiveBranchContext = () => {
                                           {p.designation && <span className="text-[10px] text-neutral-500">{p.designation}</span>}
                                         </div>
                                         <Check
-                                          className={ml-auto h-3 w-3 }
+                                          className={`ml-auto h-3 w-3 ${selectedPocId === p.id ? "opacity-100" : "opacity-0"}`}
                                         />
                                       </CommandItem>
                                     ))}
@@ -2972,7 +2972,7 @@ const getInitialActiveBranchContext = () => {
                                           <span className="text-[10px] text-neutral-500">Added by {p.addedBy?.name || 'Unknown'}</span>
                                         </div>
                                         <Check
-                                          className={ml-auto h-3 w-3 }
+                                          className={`ml-auto h-3 w-3 ${selectedPocId === p.id ? "opacity-100" : "opacity-0"}`}
                                         />
                                       </CommandItem>
                                     ))}
