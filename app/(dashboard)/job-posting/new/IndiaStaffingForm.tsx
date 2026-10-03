@@ -3732,10 +3732,11 @@ const getInitialActiveBranchContext = () => {
             <Button variant="outline" onClick={() => setAddPocOpen(false)} className="h-8 text-xs">Cancel</Button>
             <Button onClick={async () => {
               if (!newPocName || !selectedClientId) return;
-              try {
-                const res = await fetch(/api/ats/clients//contacts, {
+                const res = await atsApi.clients?.createContact 
+                  ? atsApi.clients.createContact(selectedClientId, { name: newPocName, designation: newPocDesignation, email: newPocEmail, phone: newPocPhone })
+                  : fetch(`/api/ats/clients/${selectedClientId}/contacts`, {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: Bearer  },
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(window as any).__ats_token || ''}` },
                   body: JSON.stringify({
                     name: newPocName, designation: newPocDesignation, email: newPocEmail, phone: newPocPhone
                   })
