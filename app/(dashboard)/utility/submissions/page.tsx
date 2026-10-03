@@ -112,6 +112,7 @@ interface Submission {
   jobId: string;
   candidateId: number;
   recruiterId: string;
+  recruiterJobReviewerId?: string | null;
   l1Status: "PENDING" | "SCHEDULED" | "CLEARED" | "REJECTED" | null;
   l1Date: string | null;
   l1Remarks?: string | null;
@@ -1173,6 +1174,7 @@ export default function SubmissionsPage() {
 
   const isAdmin = activeSystemRole === "TENANT_ADMIN" || activeSystemRole === "SUPER_ADMIN";
   const isDeliveryHead = activeSystemRole === "DELIVERY_HEAD";
+  const isUnitAdmin = activeSystemRole === "UNIT_ADMIN";
   const isAm = activeSystemRole === "ACCOUNT_MANAGER";
   const isPodLead = activeSystemRole === "POD_LEAD";
 
@@ -1180,11 +1182,17 @@ export default function SubmissionsPage() {
   const canAuditL1 = canAuditRounds || isPodLead || effectivePerms.includes("submission:audit_l1");
   const canAuditL2 = canAuditRounds || effectivePerms.includes("submission:audit_l2");
   const canAuditL3 = canAuditRounds || effectivePerms.includes("submission:audit_l3");
-  const canInternalScreen = isAdmin || isDeliveryHead || isPodLead || effectivePerms.includes("submission:internal_screening");
-  const canFinalStatus = isAdmin || isDeliveryHead || isAm || effectivePerms.includes("submission:final_status");
-  const canApproveClient = canInternalScreen || canFinalStatus;
+  
+  const getCanInternalScreen = (sub?: Submission | null) => {
+    const isReportingManager = sub && currentUser?.id === sub.recruiterJobReviewerId;
+    return isAdmin || isDeliveryHead || isUnitAdmin || isPodLead || isReportingManager || effectivePerms.includes("submission:internal_screening");
+  };
+  const canInternalScreenGlobal = getCanInternalScreen();
+  
+  const canFinalStatus = isAdmin || isDeliveryHead || isUnitAdmin || isAm || effectivePerms.includes("submission:final_status");
+  const canApproveClientGlobal = canInternalScreenGlobal || canFinalStatus;
   const canEditRate = isAdmin || isDeliveryHead || effectivePerms.includes("submission:edit_rate");
-  const isRecruiterOnly = activeSystemRole === "RECRUITER" && !canAuditL1 && !canAuditL2 && !canAuditL3 && !canInternalScreen && !canFinalStatus && !canAuditRounds;
+  const isRecruiterOnly = activeSystemRole === "RECRUITER" && !canAuditL1 && !canAuditL2 && !canAuditL3 && !canInternalScreenGlobal && !canFinalStatus && !canAuditRounds;
 
   const canEditRecruiterComment = useMemo(() => {
     if (isAdmin) return true;
@@ -1253,7 +1261,7 @@ export default function SubmissionsPage() {
         payload.l3Date = l3Date ? new Date(l3Date).toISOString() : null;
         payload.l3Remarks = l3Remarks.trim() || null;
       }
-      if (canApproveClient) {
+      if (canApproveClientGlobal) {
         payload.finalStatus = finalStatus;
         payload.remarks = remarks.trim() || null;
         payload.reviewFeedback = reviewFeedback.trim() || null;
@@ -1445,8 +1453,8 @@ export default function SubmissionsPage() {
         return (
           <td key={colId} className="h-[56px] py-3.5 px-4 border-r border-neutral-200 dark:border-slate-800 whitespace-nowrap align-middle">
             <div className="flex items-center gap-1.5">
-              {renderInternalReviewStatus(sub, canInternalScreen)}
-              {sub.finalStatus === "PENDING_APPROVAL" && canInternalScreen && (
+              {renderInternalReviewStatus(sub, getCanInternalScreen(sub))}
+              {sub.finalStatus === "PENDING_APPROVAL" && getCanInternalScreen(sub) && (
                 <div className="flex items-center gap-1 ml-1" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={(e) => {
@@ -2423,7 +2431,7 @@ export default function SubmissionsPage() {
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
                           <Label className="text-[11px] text-muted-foreground font-normal">Reviewer Feedback &amp; Notes</Label>
-                          {canInternalScreen && (
+                          {getCanInternalScreen(selectedSubmission) && (
                             <div className="flex items-center gap-1.5">
                               <select
                                 defaultValue=""
@@ -2454,7 +2462,7 @@ export default function SubmissionsPage() {
                             </div>
                           )}
                         </div>
-                        {canInternalScreen ? (
+                        {getCanInternalScreen(selectedSubmission) ? (
                           <RemarkSuggestTextarea
                             placeholder="Type to search or write review evaluation notes..."
                             value={reviewFeedback}
@@ -2473,7 +2481,7 @@ export default function SubmissionsPage() {
                       </div>
 
                       {/* Quick Approve / Reject Buttons (when pending decision) */}
-                      {selectedSubmission.finalStatus === "PENDING_APPROVAL" && canInternalScreen && (
+                      {selectedSubmission.finalStatus === "PENDING_APPROVAL" && getCanInternalScreen(selectedSubmission) && (
                         <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
                           <Button
                             type="button"
