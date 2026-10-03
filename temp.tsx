@@ -2176,22 +2176,154 @@ const getInitialActiveBranchContext = () => {
                       )}
                     </div>
 
-                    {/* Row 4, Col 4: Priority */}
-                    <div className="space-y-1">
-                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Priority <span className="text-red-500">*</span></Label>
-                      <select
-                        {...register("priority")}
-                        className="w-full h-8 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 cursor-pointer font-semibold"
-                      >
-                        <option value="Hot">Hot</option>
-                        <option value="Warm">Warm</option>
-                        <option value="Cold">Cold</option>
-                      </select>
-                      {errors.priority && (
-                        <p className="text-[10px] text-red-655 font-bold">{errors.priority.message}</p>
-                      )}
-                    </div>
-                    {renderWorkAuthBlock()}
+                    {true ? (
+                      <>
+                        {/* Row 3, Col 1: Client Commission (%) (India Permanent) or Client Bill Rate (India Contract) */}
+                        <div className="space-y-1">
+                          {watch("taxTerms") === "Permanent" ? (
+                            <>
+                              <div className="flex items-center gap-1">
+                                <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Commission (%) <span className="text-red-500">*</span></Label>
+                                <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Permanent placement agency commission percentage">?</span>
+                              </div>
+                              <div className="flex gap-2 items-center w-full">
+                                <select
+                                  value={commissionType}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCommissionType(val);
+                                    const commVal = val === "custom" ? customCommission : val;
+                                    if (commVal) {
+                                      setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: true });
+                                    }
+                                  }}
+                                  className={cn(
+                                    "h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold",
+                                    commissionType === "custom" ? "w-2/3" : "w-full"
+                                  )}
+                                >
+                                  <option value="8.33">8.33% (1 Month Salary)</option>
+                                  <option value="10">10.0%</option>
+                                  <option value="12.5">12.5%</option>
+                                  <option value="15">15.0%</option>
+                                  <option value="custom">Custom Percentage...</option>
+                                </select>
+                                {commissionType === "custom" && (
+                                  <div className="flex items-center gap-1 shrink-0 w-1/3">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      max="100"
+                                      value={customCommission}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setCustomCommission(val);
+                                        if (val) {
+                                          setValue("clientBillRate", `${val}% Placement Commission`, { shouldValidate: true });
+                                        }
+                                      }}
+                                      placeholder="e.g. 10.5"
+                                      className="h-8 w-full text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 rounded font-semibold"
+                                    />
+                                    <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">%</span>
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-1">
+                                <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Bill Rate <span className="text-red-500">*</span></Label>
+                                <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Bill rate information">?</span>
+                              </div>
+                              <div className="flex gap-1.5 items-center w-full">
+                                <select
+                                  value={billCurrency}
+                                  onChange={(e) => setBillCurrency(e.target.value)}
+                                  className="w-16 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                                >
+                                  <option value="INR">INR</option>
+                                  <option value="USD">USD</option>
+                                </select>
+                                <Input
+                                  type="text"
+                                  {...register("clientBillRate")}
+                                  className="h-8 flex-1 min-w-[70px] text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 font-semibold"
+                                  placeholder="Rate"
+                                />
+                                <select
+                                  value={billUnit}
+                                  onChange={(e) => setBillUnit(e.target.value)}
+                                  className="w-24 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                                >
+                                  <option value="LPA">LPA</option>
+                                  <option value="Monthly">Monthly</option>
+                                  <option value="Hourly">Hourly</option>
+                                </select>
+                              </div>
+                            </>
+                          )}
+                          {errors.clientBillRate && (
+                            <p className="text-[10px] text-red-655 font-bold">{errors.clientBillRate.message}</p>
+                          )}
+                        </div>
+
+                        {/* Row 3, Col 2: Work Authorization (Fits into red-marked space next to Client Commission) */}
+                        {renderWorkAuthBlock()}
+                      </>
+                    ) : (
+                      /* For US Market: Client Bill Rate spans 2 cols */
+                      <div className="space-y-1 md:col-span-2">
+                        <div className="flex items-center gap-1">
+                          <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Bill Rate / Salary <span className="text-red-500">*</span></Label>
+                          <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Bill rate information">?</span>
+                        </div>
+                        <div className="flex gap-1.5 items-center w-full">
+                          <select
+                            value={billCurrency}
+                            onChange={(e) => setBillCurrency(e.target.value)}
+                            className="w-16 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                          >
+                            <option value="USD">USD</option>
+                            <option value="CAD">CAD</option>
+                          </select>
+                          <Input
+                            type="text"
+                            {...register("clientBillRate")}
+                            className="h-8 flex-1 min-w-[70px] text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 font-semibold"
+                            placeholder="Rate"
+                          />
+                          <select
+                            value={billUnit}
+                            onChange={(e) => setBillUnit(e.target.value)}
+                            className="w-24 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                          >
+                            <option value="Hourly">Hourly</option>
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Bi-Weekly">Bi-Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Yearly">Yearly</option>
+                          </select>
+                          <select
+                            value={billTerm}
+                            onChange={(e) => setBillTerm(e.target.value)}
+                            className="w-36 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
+                          >
+                            <option value="W-2">W-2</option>
+                            <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
+                            <option value="C2C">C2C</option>
+                            <option value="1099">1099</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        {errors.clientBillRate && (
+                          <p className="text-[10px] text-red-655 font-bold">{errors.clientBillRate.message}</p>
+                        )}
+                      </div>
+                    )}
+
                     {/* Pay Rate / Budget Min & Max (Row 3, Right Span 2 -> Same Row as Client Bill Rate!) */}
                     <div className="space-y-1 md:col-span-2">
                       {true ? (
@@ -2292,621 +2424,134 @@ const getInitialActiveBranchContext = () => {
                       )}
                     </div>
 
-                                      </div>
-                )}
-              </div>
-
-              {/* -------------------- CLIENT INFORMATION SECTION -------------------- */}
-              <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
-                <SectionHeader title="CLIENT INFORMATION" sectionKey="clientInfo" />
-                {!collapsedSections.clientInfo && (
-                  <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                    {/* Client */}
-                    <div className="space-y-1 flex flex-col">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">Client <span className="text-red-500">*</span></label>
-                      <Popover open={clientDropdownOpen} onOpenChange={(open) => {
-                        setClientDropdownOpen(open);
-                        if (!open) {
-                          setClientSearchText("");
-                        }
-                      }}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            role="combobox"
-                            aria-expanded={clientDropdownOpen}
-                            className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800 text-neutral-900 dark:text-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100"
-                          >
-                            <span className={cn("truncate", watch("client") ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-400 dark:text-slate-400 font-medium")}>
-                              {watch("client") ? watch("client") : "Search for a Client..."}
-                            </span>
-                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-neutral-500" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0" align="start">
-                          <Command shouldFilter={false}>
-                            <CommandInput
-                              placeholder="Search for a Client..."
-                              className="h-9 text-xs"
-                              value={clientSearchText}
-                              onValueChange={setClientSearchText}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  const query = clientSearchText.trim();
-                                  if (query) {
-                                    const exactMatch = clientList.find((cl: any) => {
-                                      const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
-                                      return cName === query.toLowerCase();
-                                    });
-                                    if (exactMatch) {
-                                      const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
-                                      setValue("client", clientNameStr, { shouldValidate: true });
-                                      setClientDropdownOpen(false);
-                                      setClientSearchText("");
-                                    } else {
-                                      setClientModalTarget("client");
-                                      setPrefilledClientName(query);
-                                      setClientDropdownOpen(false);
-                                      setAddClientModalOpen(true);
-                                    }
-                                    e.preventDefault();
-                                  }
-                                }
-                              }}
-                            />
-                            <CommandList className="max-h-[240px] overflow-y-auto">
-                              {(() => {
-                                const query = clientSearchText.trim().toLowerCase();
-                                const filtered = clientList.filter((cl: any) => {
-                                  const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
-                                  return !query || cName.includes(query);
-                                });
-
-                                if (filtered.length === 0) {
-                                  return (
-                                    <div className="py-4 px-3 text-center text-xs text-neutral-500">
-                                      {query ? (
-                                        <div className="space-y-2">
-                                          <p>No client matching "{clientSearchText.trim()}"</p>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setClientModalTarget("client");
-                                              setPrefilledClientName(clientSearchText.trim());
-                                              setClientDropdownOpen(false);
-                                              setAddClientModalOpen(true);
-                                            }}
-                                            className="px-3 py-1 bg-primary text-white text-xs font-semibold rounded hover:bg-primary/90 transition-colors cursor-pointer"
-                                          >
-                                            Use "{clientSearchText.trim()}" as Client
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        "No clients available in database."
-                                      )}
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <CommandGroup heading="Existing Clients">
-                                    {filtered.map((cl: any) => {
-                                      const clientNameStr = cl.client_name || cl.clientName || cl.name || "";
-                                      return (
-                                        <CommandItem
-                                          key={cl.id || clientNameStr}
-                                          value={clientNameStr}
-                                          onSelect={() => {
-                                            setValue("client", clientNameStr, { shouldValidate: true });
-                                            setClientDropdownOpen(false);
-                                            setClientSearchText("");
-                                            // Auto-fill commission & load POCs
-                                            const found = clientList.find((c: any) => (c.client_name || c.clientName || c.name || '') === clientNameStr);
-                                            if (found) {
-                                              setSelectedClientId(found.id);
-                                              if (found.commissionPercentage || found.commission_percentage) {
-                                                const pct = found.commissionPercentage || found.commission_percentage;
-                                                setCommissionType(String(pct));
-                                              }
-                                              // Load POCs for this client
-                                              atsApi.clients?.getContacts
-                                                ? atsApi.clients.getContacts(found.id).then((data: any) => setPocList(data)).catch(() => {})
-                                                : fetch(`/api/ats/clients/${found.id}/contacts`, { credentials: 'include' })
-                                                    .then(r => r.json()).then(data => setPocList(data)).catch(() => {});
-                                            }
-                                          }}
-                                          className="text-xs cursor-pointer"
-                                        >
-                                          <Check
-                                            className={cn(
-                                              "mr-2 h-4 w-4",
-                                              watch("client") === clientNameStr ? "opacity-100" : "opacity-0"
-                                            )}
-                                          />
-                                          {clientNameStr}
-                                        </CommandItem>
-                                      );
-                                    })}
-                                  </CommandGroup>
-                                );
-                              })()}
-                            </CommandList>
-                            <div className="p-2 border-t flex items-center justify-between gap-2">
-                              {clientSearchText.trim() !== "" && (
-                                <button
-                                  type="button"
-                                  className="text-primary font-bold text-xs hover:underline bg-transparent border-0 cursor-pointer"
-                                  onClick={() => {
-                                    const query = clientSearchText.trim();
-                                    const exactMatch = clientList.find((cl: any) => {
-                                      const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
-                                      return cName === query.toLowerCase();
-                                    });
-                                    if (exactMatch) {
-                                      const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
-                                      setValue("client", clientNameStr, { shouldValidate: true });
-                                      setClientDropdownOpen(false);
-                                      setClientSearchText("");
-                                    } else {
-                                      setClientModalTarget("client");
-                                      setPrefilledClientName(query);
-                                      setClientDropdownOpen(false);
-                                      setAddClientModalOpen(true);
-                                    }
-                                  }}
-                                >
-                                  Γ£ö Select "{clientSearchText.trim()}"
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer text-xs ml-auto"
-                                onClick={() => {
-                                  setClientModalTarget("client");
-                                  setPrefilledClientName(clientSearchText.trim());
-                                  setClientDropdownOpen(false);
-                                  setAddClientModalOpen(true);
-                                }}
-                              >
-                                + Add Client
-                              </button>
-                            </div>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      {errors.client && (
-                        <p className="text-[10px] text-red-655 font-bold">{errors.client.message}</p>
-                      )}
-                    </div>
-
-                    {true ? (
-                      <>
-                        {/* Row 3, Col 1: Client Commission (%) (India Permanent) or Client Bill Rate (India Contract) */}
-                        <div className="space-y-1">
-                          {watch("taxTerms") === "Permanent" ? (
-                            <>
-                              <div className="flex items-center gap-1">
-                                <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Commission (%) <span className="text-red-500">*</span></Label>
-                                <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Permanent placement agency commission percentage">?</span>
-                              </div>
-                              <div className="flex gap-2 items-center w-full">
-                                <select
-                                  value={commissionType}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setCommissionType(val);
-                                    const commVal = val === "custom" ? customCommission : val;
-                                    if (commVal) {
-                                      setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: true });
-                                    }
-                                  }}
-                                  className={cn(
-                                    "h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold",
-                                    commissionType === "custom" ? "w-2/3" : "w-full"
-                                  )}
-                                >
-                                  <option value="8.33">8.33% (1 Month Salary)</option>
-                                  <option value="10">10.0%</option>
-                                  <option value="12.5">12.5%</option>
-                                  <option value="15">15.0%</option>
-                                  <option value="custom">Custom Percentage...</option>
-                                </select>
-                                {commissionType === "custom" && (
-                                  <div className="flex items-center gap-1 shrink-0 w-1/3">
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      max="100"
-                                      value={customCommission}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        setCustomCommission(val);
-                                        if (val) {
-                                          setValue("clientBillRate", `${val}% Placement Commission`, { shouldValidate: true });
-                                        }
-                                      }}
-                                      placeholder="e.g. 10.5"
-                                      className="h-8 w-full text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 rounded font-semibold"
-                                    />
-                                    <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">%</span>
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex items-center gap-1">
-                                <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Bill Rate <span className="text-red-500">*</span></Label>
-                                <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Bill rate information">?</span>
-                              </div>
-                              <div className="flex gap-1.5 items-center w-full">
-                                <select
-                                  value={billCurrency}
-                                  onChange={(e) => setBillCurrency(e.target.value)}
-                                  className="w-16 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
-                                >
-                                  <option value="INR">INR</option>
-                                  <option value="USD">USD</option>
-                                </select>
-                                <Input
-                                  type="text"
-                                  {...register("clientBillRate")}
-                                  className="h-8 flex-1 min-w-[70px] text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 font-semibold"
-                                  placeholder="Rate"
-                                />
-                                <select
-                                  value={billUnit}
-                                  onChange={(e) => setBillUnit(e.target.value)}
-                                  className="w-24 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
-                                >
-                                  <option value="LPA">LPA</option>
-                                  <option value="Monthly">Monthly</option>
-                                  <option value="Hourly">Hourly</option>
-                                </select>
-                              </div>
-                            </>
-                          )}
-                          {errors.clientBillRate && (
-                            <p className="text-[10px] text-red-655 font-bold">{errors.clientBillRate.message}</p>
-                          )}
-                        </div>
-
-                        
-                        
-                      </>
-                    ) : (
-                      /* For US Market: Client Bill Rate spans 2 cols */
-                      <div className="space-y-1 md:col-span-2">
-                        <div className="flex items-center gap-1">
-                          <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Bill Rate / Salary <span className="text-red-500">*</span></Label>
-                          <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Bill rate information">?</span>
-                        </div>
-                        <div className="flex gap-1.5 items-center w-full">
-                          <select
-                            value={billCurrency}
-                            onChange={(e) => setBillCurrency(e.target.value)}
-                            className="w-16 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
-                          >
-                            <option value="USD">USD</option>
-                            <option value="CAD">CAD</option>
-                          </select>
-                          <Input
-                            type="text"
-                            {...register("clientBillRate")}
-                            className="h-8 flex-1 min-w-[70px] text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 font-semibold"
-                            placeholder="Rate"
-                          />
-                          <select
-                            value={billUnit}
-                            onChange={(e) => setBillUnit(e.target.value)}
-                            className="w-24 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
-                          >
-                            <option value="Hourly">Hourly</option>
-                            <option value="Daily">Daily</option>
-                            <option value="Weekly">Weekly</option>
-                            <option value="Bi-Weekly">Bi-Weekly</option>
-                            <option value="Monthly">Monthly</option>
-                            <option value="Yearly">Yearly</option>
-                          </select>
-                          <select
-                            value={billTerm}
-                            onChange={(e) => setBillTerm(e.target.value)}
-                            className="w-36 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
-                          >
-                            <option value="W-2">W-2</option>
-                            <option value="W2 - Profit Sharing">W2 - Profit Sharing</option>
-                            <option value="C2C">C2C</option>
-                            <option value="1099">1099</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-                        {errors.clientBillRate && (
-                          <p className="text-[10px] text-red-655 font-bold">{errors.clientBillRate.message}</p>
-                        )}
-                      </div>
-                    )}
-{/* Point of Contact (POC) */}
-                    <div className="space-y-1">
-                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Point of Contact</Label>
-                      <Popover open={pocOpen} onOpenChange={setPocOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            disabled={!selectedClientId}
-                            className="w-full h-8 px-2 text-xs font-semibold justify-between border-neutral-300 bg-white dark:bg-slate-800 dark:border-slate-700"
-                          >
-                            <span className="truncate">
-                              {selectedPocId
-                                ? pocList.myContacts.concat(pocList.otherContacts).find(p => p.id === selectedPocId)?.name || "Unknown POC"
-                                : "Select POC..."}
-                            </span>
-                            <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[300px] p-0" align="start">
-                          <Command>
-                            <CommandInput
-                              placeholder="Search POC..."
-                              className="text-xs h-8"
-                              value={pocSearch}
-                              onValueChange={setPocSearch}
-                            />
-                            <CommandList className="max-h-[200px]">
-                              <CommandEmpty>No POC found.</CommandEmpty>
-
-                              {pocList.myContacts.length > 0 && (
-                                <CommandGroup heading="? My Contacts">
-                                  {pocList.myContacts
-                                    .filter(p => p.name.toLowerCase().includes(pocSearch.toLowerCase()))
-                                    .map(p => (
-                                      <CommandItem
-                                        key={p.id}
-                                        value={p.name}
-                                        onSelect={() => {
-                                          setSelectedPocId(p.id);
-                                          setPocOpen(false);
-                                        }}
-                                        className="text-xs cursor-pointer"
-                                      >
-                                        <div className="flex flex-col">
-                                          <span className="font-medium">{p.name}</span>
-                                          {p.designation && <span className="text-[10px] text-neutral-500">{p.designation}</span>}
-                                        </div>
-                                        <Check
-                                          className={`ml-auto h-3 w-3 ${selectedPocId === p.id ? "opacity-100" : "opacity-0"}`}
-                                        />
-                                      </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                              )}
-
-                              {pocList.otherContacts.length > 0 && (
-                                <CommandGroup heading="?? Other Contacts">
-                                  {pocList.otherContacts
-                                    .filter(p => p.name.toLowerCase().includes(pocSearch.toLowerCase()))
-                                    .map(p => (
-                                      <CommandItem
-                                        key={p.id}
-                                        value={p.name}
-                                        onSelect={() => {
-                                          setSelectedPocId(p.id);
-                                          setPocOpen(false);
-                                        }}
-                                        className="text-xs cursor-pointer"
-                                      >
-                                        <div className="flex flex-col">
-                                          <span className="font-medium">{p.name}</span>
-                                          <span className="text-[10px] text-neutral-500">Added by {p.addedBy?.name || 'Unknown'}</span>
-                                        </div>
-                                        <Check
-                                          className={`ml-auto h-3 w-3 ${selectedPocId === p.id ? "opacity-100" : "opacity-0"}`}
-                                        />
-                                      </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                              )}
-                            </CommandList>
-                            <div className="p-2 border-t">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                className="w-full text-xs font-semibold text-blue-600 justify-start h-8"
-                                onClick={() => {
-                                  setPocOpen(false);
-                                  setAddPocOpen(true);
-                                }}
-                              >
-                                + Add New Contact
-                              </Button>
-                            </div>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    {/* End Client */}
-                    <div className="space-y-1 flex flex-col">
-                      <label className="font-bold text-neutral-700 dark:text-neutral-300">End Client</label>
-                      <Popover open={endClientDropdownOpen} onOpenChange={(open) => {
-                        setEndClientDropdownOpen(open);
-                        if (!open) {
-                          setEndClientSearchText("");
-                        }
-                      }}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            role="combobox"
-                            aria-expanded={endClientDropdownOpen}
-                            className="w-full justify-between h-8 text-xs font-normal bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 hover:bg-neutral-50 dark:hover:bg-slate-800 text-neutral-900 dark:text-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100"
-                          >
-                            <span className={cn("truncate", watch("endClientName") ? "text-neutral-900 dark:text-neutral-100 font-semibold" : "text-neutral-400 dark:text-slate-400 font-medium")}>
-                              {watch("endClientName") ? watch("endClientName") : "Search or enter End Client..."}
-                            </span>
-                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-neutral-500" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0" align="start">
-                          <Command shouldFilter={false}>
-                            <CommandInput
-                              placeholder="Search for an End Client..."
-                              className="h-9 text-xs"
-                              value={endClientSearchText}
-                              onValueChange={setEndClientSearchText}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  const query = endClientSearchText.trim();
-                                  if (query) {
-                                    const exactMatch = clientList.find((cl: any) => {
-                                      const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
-                                      return cName === query.toLowerCase();
-                                    });
-                                    if (exactMatch) {
-                                      const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
-                                      setValue("endClientName", clientNameStr, { shouldValidate: true });
-                                      setEndClientDropdownOpen(false);
-                                      setEndClientSearchText("");
-                                    } else {
-                                      setClientModalTarget("endClientName");
-                                      setPrefilledClientName(query);
-                                      setEndClientDropdownOpen(false);
-                                      setAddClientModalOpen(true);
-                                    }
-                                    e.preventDefault();
-                                  }
-                                }
-                              }}
-                            />
-                            <CommandList className="max-h-[240px] overflow-y-auto">
-                              {(() => {
-                                const query = endClientSearchText.trim().toLowerCase();
-                                const filtered = clientList.filter((cl: any) => {
-                                  const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
-                                  return !query || cName.includes(query);
-                                });
-
-                                if (filtered.length === 0) {
-                                  return (
-                                    <div className="py-4 px-3 text-center text-xs text-neutral-500">
-                                      {query ? (
-                                        <div className="space-y-2">
-                                          <p>No client matching "{endClientSearchText.trim()}"</p>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setClientModalTarget("endClientName");
-                                              setPrefilledClientName(endClientSearchText.trim());
-                                              setEndClientDropdownOpen(false);
-                                              setAddClientModalOpen(true);
-                                            }}
-                                            className="px-3 py-1 bg-primary text-white text-xs font-semibold rounded hover:bg-primary/90 transition-colors cursor-pointer"
-                                          >
-                                            Use "{endClientSearchText.trim()}" as End Client
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        "No clients available in database."
-                                      )}
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <CommandGroup heading="Existing Clients">
-                                    {filtered.map((cl: any) => {
-                                      const clientNameStr = cl.client_name || cl.clientName || cl.name || "";
-                                      return (
-                                        <CommandItem
-                                          key={cl.id || clientNameStr}
-                                          value={clientNameStr}
-                                          onSelect={() => {
-                                            setValue("endClientName", clientNameStr, { shouldValidate: true });
-                                            setEndClientDropdownOpen(false);
-                                            setEndClientSearchText("");
-                                          }}
-                                          className="text-xs cursor-pointer"
-                                        >
-                                          <Check
-                                            className={cn(
-                                              "mr-2 h-4 w-4",
-                                              watch("endClientName") === clientNameStr ? "opacity-100" : "opacity-0"
-                                            )}
-                                          />
-                                          {clientNameStr}
-                                        </CommandItem>
-                                      );
-                                    })}
-                                  </CommandGroup>
-                                );
-                              })()}
-                            </CommandList>
-                            <div className="p-2 border-t flex items-center justify-between gap-2">
-                              {endClientSearchText.trim() !== "" && (
-                                <button
-                                  type="button"
-                                  className="text-primary font-bold text-xs hover:underline bg-transparent border-0 cursor-pointer"
-                                  onClick={() => {
-                                    const query = endClientSearchText.trim();
-                                    const exactMatch = clientList.find((cl: any) => {
-                                      const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
-                                      return cName === query.toLowerCase();
-                                    });
-                                    if (exactMatch) {
-                                      const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
-                                      setValue("endClientName", clientNameStr, { shouldValidate: true });
-                                      setEndClientDropdownOpen(false);
-                                      setEndClientSearchText("");
-                                    } else {
-                                      setClientModalTarget("endClientName");
-                                      setPrefilledClientName(query);
-                                      setEndClientDropdownOpen(false);
-                                      setAddClientModalOpen(true);
-                                    }
-                                  }}
-                                >
-                                  Γ£ö Select "{endClientSearchText.trim()}"
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer text-xs ml-auto"
-                                onClick={() => {
-                                  setClientModalTarget("endClientName");
-                                  setPrefilledClientName(endClientSearchText.trim());
-                                  setEndClientDropdownOpen(false);
-                                  setAddClientModalOpen(true);
-                                }}
-                              >
-                                + Add Client
-                              </button>
-                            </div>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      {errors.endClientName && (
-                        <p className="text-[10px] text-red-655 font-bold">{errors.endClientName.message}</p>
-                      )}
-                    </div>
-
-                    
-                    {/* Row 4, Col 3: Client Job ID */}
-                    <div className="space-y-1">
-                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Job ID</Label>
-                      <input
-                        type="text"
-                        {...register("clientJobId")}
-                        className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200"
-                        placeholder="e.g. REQ-9941"
-                      />
-                    </div>
-
                     {/* Job Status (Hidden, Defaults to Active) */}
                     <input type="hidden" {...register("jobStatus")} value="Active" />
 
-                    
+                    {/* OLD LOCATION BLOCK - moved to Geographic Location section */}
+                    <div style={{display:'none'}}>
+                      {/* Country */}
+                      <div className="space-y-1">
+                        <Label className="font-bold text-neutral-700 dark:text-neutral-300">Country</Label>
+                        <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" role="combobox" aria-expanded={countryOpen} className="w-full h-8 px-2 text-xs font-semibold justify-between border-neutral-300 bg-white dark:bg-slate-800 dark:border-slate-700">
+                              {watch("country") ? (
+                                <div className="flex items-center gap-2">
+                                  <ReactCountryFlag countryCode={Country.getAllCountries().find(c => c.name === watch("country"))?.isoCode || ""} svg style={{ width: '1.2em', height: '1.2em' }} />
+                                  <span className="truncate">{watch("country")}</span>
+                                </div>
+                              ) : "Select Country..."}
+                              <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search country..." className="text-xs h-8" value={countrySearchText} onValueChange={setCountrySearchText} />
+                              <CommandList className="max-h-[200px]">
+                                <CommandEmpty>No country found.</CommandEmpty>
+                                <CommandGroup>
+                                  {Country.getAllCountries().filter(c => c.name.toLowerCase().includes(countrySearchText.toLowerCase())).map((c) => (
+                                    <CommandItem
+                                      key={c.isoCode}
+                                      value={c.name}
+                                      onSelect={() => {
+                                        setValue("country", c.name, { shouldValidate: true, shouldDirty: true });
+                                        setValue("states", "");
+                                        setValue("city", "");
+                                        setCountryOpen(false);
+                                      }}
+                                      className="text-xs font-medium cursor-pointer"
+                                    >
+                                      <ReactCountryFlag countryCode={c.isoCode} svg className="mr-2 h-4 w-4" />
+                                      {c.name}
+                                      <Check className={cn("ml-auto h-3 w-3", watch("country") === c.name ? "opacity-100" : "opacity-0")} />
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      {/* State */}
+                      <div className="space-y-1">
+                        <Label className="font-bold text-neutral-700 dark:text-neutral-300">State</Label>
+                        <Popover open={stateOpen} onOpenChange={setStateOpen}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" role="combobox" aria-expanded={stateOpen} disabled={!watch("country")} className="w-full h-8 px-2 text-xs font-semibold justify-between border-neutral-300 bg-white dark:bg-slate-800 dark:border-slate-700">
+                              <span className="truncate">{watch("states") || "Select State..."}</span>
+                              <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search state..." className="text-xs h-8" value={stateSearchText} onValueChange={setStateSearchText} />
+                              <CommandList className="max-h-[200px]">
+                                <CommandEmpty>No state found.</CommandEmpty>
+                                <CommandGroup>
+                                  {State.getStatesOfCountry(Country.getAllCountries().find(c => c.name === watch("country"))?.isoCode || "").filter(s => s.name.toLowerCase().includes(stateSearchText.toLowerCase())).map((s) => (
+                                    <CommandItem
+                                      key={s.isoCode}
+                                      value={s.name}
+                                      onSelect={() => {
+                                        setValue("states", s.name, { shouldValidate: true, shouldDirty: true });
+                                        setValue("city", "");
+                                        setStateOpen(false);
+                                      }}
+                                      className="text-xs font-medium cursor-pointer"
+                                    >
+                                      {s.name}
+                                      <Check className={cn("ml-auto h-3 w-3", watch("states") === s.name ? "opacity-100" : "opacity-0")} />
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      {/* City */}
+                      <div className="space-y-1">
+                        <Label className="font-bold text-neutral-700 dark:text-neutral-300">City</Label>
+                        <Popover open={cityOpen} onOpenChange={setCityOpen}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" role="combobox" aria-expanded={cityOpen} disabled={!watch("states")} className="w-full h-8 px-2 text-xs font-semibold justify-between border-neutral-300 bg-white dark:bg-slate-800 dark:border-slate-700">
+                              <span className="truncate">{watch("city") || "Select City..."}</span>
+                              <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search city..." className="text-xs h-8" value={citySearchText} onValueChange={setCitySearchText} />
+                              <CommandList className="max-h-[200px]">
+                                <CommandEmpty>No city found.</CommandEmpty>
+                                <CommandGroup>
+                                  {City.getCitiesOfState(
+                                    Country.getAllCountries().find(c => c.name === watch("country"))?.isoCode || "",
+                                    State.getStatesOfCountry(Country.getAllCountries().find(c => c.name === watch("country"))?.isoCode || "").find(s => s.name === watch("states"))?.isoCode || ""
+                                  ).filter(c => c.name.toLowerCase().includes(citySearchText.toLowerCase())).map((c) => (
+                                    <CommandItem
+                                      key={c.name}
+                                      value={c.name}
+                                      onSelect={() => {
+                                        setValue("city", c.name, { shouldValidate: true, shouldDirty: true });
+                                        setCityOpen(false);
+                                      }}
+                                      className="text-xs font-medium cursor-pointer"
+                                    >
+                                      {c.name}
+                                      <Check className={cn("ml-auto h-3 w-3", watch("city") === c.name ? "opacity-100" : "opacity-0")} />
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
 
                     {/* Client */}
                     <div className="space-y-1 flex flex-col">
@@ -3352,7 +2997,7 @@ const getInitialActiveBranchContext = () => {
                         </PopoverContent>
                       </Popover>
                     </div>
-                    {/* Row 4, Col 3: Client Job ID */}
+\n                    {/* Row 4, Col 3: Client Job ID */}
                     <div className="space-y-1">
                       <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Job ID</Label>
                       <input
@@ -3408,9 +3053,9 @@ const getInitialActiveBranchContext = () => {
               </div>
 
               
-              {/* -------------------- JOB LOCATION SECTION -------------------- */}
+              {/* -------------------- GEOGRAPHIC LOCATION SECTION -------------------- */}
               <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
-                <SectionHeader title="JOB LOCATION" sectionKey="location" />
+                <SectionHeader title="Geographic Location" sectionKey="location" />
                 {!collapsedSections.location && (
                   <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                     {/* Country */}
@@ -4110,7 +3755,7 @@ const getInitialActiveBranchContext = () => {
           </div>
         </DialogContent>
       </Dialog>
-\n      <AddClientModal
+\n\n      <AddClientModal
         open={addClientModalOpen}
         onOpenChange={(open) => {
           setAddClientModalOpen(open);
