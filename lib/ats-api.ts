@@ -1234,7 +1234,7 @@ const candidates = {
   async uploadCv(
     file: File, 
     source = 'CV Upload',
-    overrides?: { fullName?: string; email?: string; phone?: string; relevantExperienceYears?: string; currentCompany?: string; availabilityToStart?: string; currentCtc?: string; expectedCtc?: string; noticePeriodDays?: string }
+    overrides?: { fullName?: string; email?: string; phone?: string; relevantExperienceYears?: string; currentCompany?: string; availabilityToStart?: string; currentCtc?: string; expectedCtc?: string; noticePeriodDays?: string; skills?: string; currentLocation?: string; preferredLocations?: string }
   ): Promise<{ candidate: any; duplicate: boolean; parsed: boolean; updated?: boolean }> {
     const formData = new FormData();
     formData.append('file', file);
