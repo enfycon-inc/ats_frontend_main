@@ -65,7 +65,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
   const allowed: Record<string, boolean> = {
     dashboard: true,
     "job-posting": has("job:view"), "applicants": has("candidate:view", "candidate:create"),
-    "submissions-tracker": has("submission:view"), placements: has("placement:view"),
+    "submissions-tracker": has("submission:view") || ["DELIVERY_HEAD", "UNIT_ADMIN", "BRANCH_ADMIN", "TENANT_ADMIN"].includes(resolveActiveSystemRole(input, roles, profile)), placements: has("placement:view"),
     clients: has("client:view"), "talent-bench": has("candidate:view"),
     vendors: has("vendor:view"), onboarding: has("onboarding:view"), reports: has("report:view"),
     "branch-units": has("tenant:settings", "tenant:manage", "branch:create", "unit_admin:manage", "branch_admin:manage", "unit:view"),
@@ -104,10 +104,10 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
       if (isSubmissionGatedRole) {
         // Pod Submissions: always hidden — not relevant for these roles
         if (child.href === "/utility/submissions?view=pod") return false;
-        // My Submissions: only if they have submission:view or submission:create
-        if (child.href === "/utility/submissions?view=my") return has("submission:view", "submission:create");
-        // All Submissions: only if they have submission:view
-        if (child.href === "/utility/submissions?view=all") return has("submission:view");
+        // My Submissions: always visible for management roles (they oversee their team's submissions)
+        if (child.href === "/utility/submissions?view=my") return true;
+        // All Submissions: always visible for management roles (core oversight function)
+        if (child.href === "/utility/submissions?view=all") return true;
       }
 
         // ── Specific Removals for Account Manager ──
