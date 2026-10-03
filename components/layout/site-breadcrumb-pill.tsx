@@ -59,11 +59,10 @@ export function SiteBreadcrumbPill({
       {/* Unified Root Link: Home Icon + ATS (EnfySync Reference) */}
       <Link
         href="/dashboard"
-        className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors shrink-0 group"
+        className="flex items-center text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors shrink-0 group"
         title="Go to ATS Dashboard"
       >
         <Home className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300 transition-colors" />
-        <span className="font-normal text-xs md:text-[13px]">ATS</span>
       </Link>
 
       {/* Subsequent Breadcrumb Segments */}
