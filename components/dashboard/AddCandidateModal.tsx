@@ -192,7 +192,7 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
         expectedCtc: formData.expectedCtc,
         noticePeriodDays: formData.noticePeriodDays,
         skills: formData.skills,
-        location: formData.currentLocation,
+        currentLocation: formData.currentLocation,
         preferredLocations: formData.preferredLocations,
       });
 

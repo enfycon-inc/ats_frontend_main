@@ -192,7 +192,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
         expectedCtc: formData.expectedCtc,
         noticePeriodDays: formData.noticePeriodDays,
         skills: formData.skills,
-        location: formData.currentLocation,
+        currentLocation: formData.currentLocation,
         preferredLocations: formData.preferredLocations,
       });
 
