@@ -1141,10 +1141,6 @@ export default function JobDetailPage() {
             <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850 gap-3">
                 <div className="flex items-center gap-3">
-          {/* DEBUG INFO */}
-          <div className="text-[10px] text-red-500 font-bold">
-            isAdmin: {String(isAdmin)} | canSubmit: {String(canSubmitCandidate)} | roleName: {activeRoleName} | perms: {effectivePerms.includes("submission:create") ? "yes" : "no"} | total perms: {effectivePerms.length} | currentUser.perms: {currentUser?.permissions?.length}
-          </div>
                   <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-650 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/60">
                     <Users className="h-4.5 w-4.5" />
                   </div>
