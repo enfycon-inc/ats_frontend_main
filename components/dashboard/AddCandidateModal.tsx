@@ -103,6 +103,11 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
       if (!phone && parsed.contact?.phones?.length > 0) {
         phone = parsed.contact.phones[0];
       }
+      
+      // Ensure phone number has no spaces to satisfy E.164
+      if (phone) {
+        phone = phone.replace(/\s+/g, '');
+      }
 
       if (phone && !phone.startsWith("+")) {
         const digits = phone.replace(/\D/g, "");
@@ -196,24 +201,13 @@ export default function AddCandidateModal({ isOpen, onClose, job }: { isOpen: bo
 
       const candidate = uploadResponse.candidate;
 
-      let parsedCandidateId = candidate.id;
-      if (typeof parsedCandidateId === "string") {
-        const parts = parsedCandidateId.split("-");
-        const rawNum = parts[parts.length - 1];
-        parsedCandidateId = rawNum;
-      } else if (candidate.applicantId && typeof candidate.applicantId === "string") {
-        const parts = candidate.applicantId.split("-");
-        const rawNum = parts[parts.length - 1];
-        parsedCandidateId = rawNum;
-      }
-
       const currentUser = atsApi.auth.getCurrentUser();
       if (!currentUser?.id) {
         throw new Error("You must be logged in to submit a candidate.");
       }
       
       await atsApi.submissions.create({
-        candidateId: parsedCandidateId || candidate.id || 1,
+        candidateId: candidate.id,
         jobId: job?.id,
         recruiterId: currentUser.id,
         finalStatus: "PENDING_APPROVAL",
