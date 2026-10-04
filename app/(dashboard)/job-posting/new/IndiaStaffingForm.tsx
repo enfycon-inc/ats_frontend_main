@@ -224,6 +224,9 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
   const [pocOpen, setPocOpen] = useState(false);
   const [pocSearch, setPocSearch] = useState('');
   const [selectedPocId, setSelectedPocId] = useState<string | null>(null);
+  const [endPocOpen, setEndPocOpen] = useState(false);
+  const [endPocSearch, setEndPocSearch] = useState("");
+  const [selectedEndPocId, setSelectedEndPocId] = useState<string | null>(null);
   const [addPocOpen, setAddPocOpen] = useState(false);
   const [newPocName, setNewPocName] = useState('');
   const [newPocDesignation, setNewPocDesignation] = useState('');
@@ -562,6 +565,17 @@ const getInitialActiveBranchContext = () => {
 
   const selectedCountry = watch("country");
   const watchTaxTerms = watch("taxTerms");
+
+  // Clear clientBillRate if it switches from Permanent to something else and contains %
+  useEffect(() => {
+    const currentRate = watch("clientBillRate");
+    if (watch("taxTerms") !== "Permanent" && currentRate && currentRate.includes("Placement")) {
+      setValue("clientBillRate", "");
+    } else if (watch("taxTerms") === "Permanent" && !currentRate) {
+      setValue("clientBillRate", "8.33% Placement Commission");
+    }
+  }, [watch("taxTerms")]);
+
 
   // Keep clientBillRate synced when market is IN and taxTerms is Permanent
   useEffect(() => {
@@ -1348,6 +1362,8 @@ const getInitialActiveBranchContext = () => {
         title: data.jobTitle,
         client: data.client || data.endClientName || "Direct Client",
         endClientName: data.endClientName || undefined,
+        pocId: selectedPocId || undefined,
+        endClientPocId: selectedEndPocId || undefined,
         location: data.locationAutocomplete || data.city || data.states || "Remote",
         type: data.jobType || "Contract",
         description: finalDescription,
@@ -2222,7 +2238,7 @@ const getInitialActiveBranchContext = () => {
                                   setPayRateMin(e.target.value);
                                   setValue("payRate", e.target.value, { shouldValidate: true });
                                 }}
-                                placeholder="e.g. 10.0"
+                                placeholder={["Contract", "C2H", "Freelance"].includes(watch("jobType")) ? "e.g. 50000" : "e.g. 10.0"}
                                 className="w-full h-8 pl-10 pr-10 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold"
                               />
                               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">{["Contract", "C2H", "Freelance"].includes(watch("jobType")) ? "/mo" : "LPA"}</span>
@@ -2234,7 +2250,7 @@ const getInitialActiveBranchContext = () => {
                                 type="text"
                                 value={payRateMax}
                                 onChange={(e) => setPayRateMax(e.target.value)}
-                                placeholder="e.g. 15.0"
+                                placeholder={["Contract", "C2H", "Freelance"].includes(watch("jobType")) ? "e.g. 80000" : "e.g. 15.0"}
                                 className="w-full h-8 pl-10 pr-10 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold"
                               />
                               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">{["Contract", "C2H", "Freelance"].includes(watch("jobType")) ? "/mo" : "LPA"}</span>
@@ -2894,7 +2910,94 @@ const getInitialActiveBranchContext = () => {
                     </div>
 
                     
-                    {/* Row 4, Col 3: Client Job ID */}
+                    
+                    {/* End Client POC */}
+                    <div className="space-y-1">
+                      <Label className="font-bold text-neutral-700 dark:text-neutral-300">End Client POC</Label>
+                      <Popover open={endPocOpen} onOpenChange={setEndPocOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            disabled={!watch("endClientName")}
+                            className="w-full h-8 px-2 text-xs font-semibold justify-between border-neutral-300 bg-white dark:bg-slate-800 dark:border-slate-700"
+                          >
+                            <span className="truncate">
+                              {selectedEndPocId
+                                ? pocList.myContacts.concat(pocList.otherContacts).find(p => p.id === selectedEndPocId)?.name || "Unknown POC"
+                                : "Select End POC..."}
+                            </span>
+                            <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0" align="start">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search POC..."
+                              className="text-xs h-8"
+                              value={endPocSearch}
+                              onValueChange={setEndPocSearch}
+                            />
+                            <CommandList className="max-h-[200px]">
+                              <CommandEmpty>No POC found.</CommandEmpty>
+
+                              {pocList.myContacts.length > 0 && (
+                                <CommandGroup heading="?? My Contacts">
+                                  {pocList.myContacts
+                                    .filter(p => p.name.toLowerCase().includes(endPocSearch.toLowerCase()))
+                                    .map(p => (
+                                      <CommandItem
+                                        key={p.id}
+                                        value={p.name}
+                                        onSelect={() => {
+                                          setSelectedEndPocId(p.id);
+                                          setEndPocOpen(false);
+                                        }}
+                                        className="text-xs cursor-pointer py-1.5"
+                                      >
+                                        <div className="flex flex-col">
+                                          <span className="font-medium text-neutral-900 dark:text-neutral-100">{p.name}</span>
+                                          {p.email && <span className="text-[10px] text-neutral-500">{p.email}</span>}
+                                        </div>
+                                        <Check
+                                          className={`ml-auto h-3 w-3 ${selectedEndPocId === p.id ? "opacity-100" : "opacity-0"}`}
+                                        />
+                                      </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                              )}
+
+                              {pocList.otherContacts.length > 0 && (
+                                <CommandGroup heading="?? Company Contacts">
+                                  {pocList.otherContacts
+                                    .filter(p => p.name.toLowerCase().includes(endPocSearch.toLowerCase()))
+                                    .map(p => (
+                                      <CommandItem
+                                        key={p.id}
+                                        value={p.name}
+                                        onSelect={() => {
+                                          setSelectedEndPocId(p.id);
+                                          setEndPocOpen(false);
+                                        }}
+                                        className="text-xs cursor-pointer py-1.5"
+                                      >
+                                        <div className="flex flex-col">
+                                          <span className="font-medium text-neutral-900 dark:text-neutral-100">{p.name}</span>
+                                          {p.email && <span className="text-[10px] text-neutral-500">{p.email}</span>}
+                                        </div>
+                                        <Check
+                                          className={`ml-auto h-3 w-3 ${selectedEndPocId === p.id ? "opacity-100" : "opacity-0"}`}
+                                        />
+                                      </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                              )}
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+\n                    {/* Row 4, Col 3: Client Job ID */}
                     <div className="space-y-1">
                       <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Job ID</Label>
                       <input
