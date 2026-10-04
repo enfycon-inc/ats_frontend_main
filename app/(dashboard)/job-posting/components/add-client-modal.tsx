@@ -4,7 +4,7 @@ import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import * as zod from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Country, State } from "country-state-city";
+import { Country, State, City } from "country-state-city";
 import { toast } from "react-hot-toast";
 
 import {
@@ -34,7 +34,10 @@ const addClientSchema = zod.object({
   sowExecuted: zod.boolean().optional(),
   paymentTerms: zod.string().optional(),
   addPoc: zod.boolean().optional(),
-  pocName: zod.string().optional(),
+  pocFirstName: zod.string().optional(),
+  pocLastName: zod.string().optional(),
+  pocPhoneCode: zod.string().optional(),
+  pocDesignationCustom: zod.string().optional(),
   pocDesignation: zod.string().optional(),
   pocEmail: zod.string().email("Invalid email").optional().or(zod.literal("")),
   pocPhone: zod.string().optional(),
@@ -67,6 +70,8 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
   const countryIso = watch("country");
   const countries = Country.getAllCountries();
   const states = countryIso ? State.getStatesOfCountry(countryIso) : [];
+  const watchState = watch("state");
+  const cities = countryIso && watchState ? City.getCitiesOfState(countryIso, watchState) : [];
 
   const [hasDirectAddClearance, setHasDirectAddClearance] = React.useState<boolean>(true);
 
@@ -106,36 +111,38 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
     try {
       const activeBranch = (typeof window !== "undefined" ? localStorage.getItem("active_branch_name") : null) || "bbsr-domestic";
       
+      
       const payload = {
-        clientName: data.clientName,
-        email: data.emailId,
+        client_name: data.clientName,
+        email_id: data.emailId,
         website: data.website || null,
         status: data.status,
         country: data.country,
         state: data.state || null,
         city: data.city || null,
         ownership: data.ownership,
-        aboutCompany: data.aboutCompany || null,
-        commissionPercentage: data.commissionPercentage || null,
-        msaSigned: data.msaSigned,
-        sowExecuted: data.sowExecuted,
-        paymentTerms: data.paymentTerms || null
+        about_company: data.aboutCompany || null,
+        commission_percentage: data.commissionPercentage || null,
+        msa_signed: data.msaSigned,
+        sow_executed: data.sowExecuted,
+        payment_terms: data.paymentTerms || null
       };
 
       const res = await atsApi.clients.create(payload);
       const newClientId = res?.id || res?.data?.id;
-      
+
       // If POC was added and we have the new client ID, create the contact
-      if (newClientId && data.addPoc && data.pocName) {
+      if (newClientId && data.addPoc && (data.pocFirstName || data.pocLastName)) {
         try {
+          const pocPhoneFull = data.pocPhoneCode && data.pocPhone ? `${data.pocPhoneCode}${data.pocPhone}` : data.pocPhone || null;
           const pocPayload = {
-            name: data.pocName,
-            designation: data.pocDesignation || null,
+            name: [data.pocFirstName, data.pocLastName].filter(Boolean).join(" "),
+            designation: data.pocDesignation === "Other" ? data.pocDesignationCustom || null : data.pocDesignation || null,
             email: data.pocEmail || null,
-            phone: data.pocPhone || null,
+            phone: pocPhoneFull,
             isPrimary: true
           };
-          await fetch(`/api/ats/clients/${newClientId}/contacts`, {
+await fetch(`/api/ats/clients/${newClientId}/contacts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(window as any).__ats_token || ''}` },
             body: JSON.stringify(pocPayload)
@@ -323,20 +330,57 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
             {watch("addPoc") && (
               <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-neutral-50 dark:bg-slate-900 p-3 rounded-md border border-neutral-200 dark:border-slate-800">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400">POC Name *</Label>
-                  <Input {...register("pocName")} className="h-7 text-xs bg-white dark:bg-slate-950" placeholder="e.g. Suresh Kumar" />
+                  <Label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400">First Name *</Label>
+                  <Input {...register("pocFirstName")} className="h-7 text-xs bg-white dark:bg-slate-950" placeholder="First Name" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400">Last Name</Label>
+                  <Input {...register("pocLastName")} className="h-7 text-xs bg-white dark:bg-slate-950" placeholder="Last Name" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400">Designation</Label>
-                  <Input {...register("pocDesignation")} className="h-7 text-xs bg-white dark:bg-slate-950" placeholder="e.g. HR Head" />
+                  <div className="flex gap-1">
+                    <select
+                      {...register("pocDesignation")}
+                      className="h-7 px-1 flex-1 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded text-[10px] text-neutral-800 dark:text-neutral-200 outline-hidden focus:border-primary"
+                    >
+                      <option value="">Select</option>
+                      <option value="HR Manager">HR Manager</option>
+                      <option value="Talent Acquisition">Talent Acquisition</option>
+                      <option value="Recruiter">Recruiter</option>
+                      <option value="CEO">CEO</option>
+                      <option value="CTO">CTO</option>
+                      <option value="Director">Director</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    {watch("pocDesignation") === "Other" && (
+                      <Input
+                        {...register("pocDesignationCustom")}
+                        className="h-7 text-xs flex-1 bg-white dark:bg-slate-950"
+                        placeholder="Custom"
+                      />
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400">Email</Label>
-                  <Input {...register("pocEmail")} type="email" className="h-7 text-xs bg-white dark:bg-slate-950" placeholder="suresh@company.com" />
+                  <Input {...register("pocEmail")} type="email" className="h-7 text-xs bg-white dark:bg-slate-950" placeholder="email@company.com" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400">Phone</Label>
-                  <Input {...register("pocPhone")} className="h-7 text-xs bg-white dark:bg-slate-950" placeholder="+91-9876543210" />
+                  <div className="flex gap-1">
+                    <select
+                      {...register("pocPhoneCode")}
+                      className="h-7 px-1 w-16 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded text-[10px] text-neutral-800 dark:text-neutral-200 outline-hidden focus:border-primary shrink-0"
+                    >
+                      <option value="+91">+91 (IN)</option>
+                      <option value="+1">+1 (US)</option>
+                      <option value="+44">+44 (UK)</option>
+                      <option value="+61">+61 (AU)</option>
+                      <option value="+971">+971 (AE)</option>
+                    </select>
+                    <Input {...register("pocPhone")} className="h-7 text-xs flex-1 bg-white dark:bg-slate-950" placeholder="9876543210" />
+                  </div>
                 </div>
               </div>
             )}
