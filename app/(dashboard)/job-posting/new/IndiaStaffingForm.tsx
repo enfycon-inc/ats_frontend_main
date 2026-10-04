@@ -1250,7 +1250,8 @@ const getInitialActiveBranchContext = () => {
       const cleanVal = val.replace(/[^0-9.]/g, "");
       if (!cleanVal) return "N/A";
       if (cur === "INR") {
-        return `INR - ${cleanVal} LPA`;
+        const suffix = ["Contract", "C2H", "Freelance"].includes(data.jobType) ? "/mo" : "LPA";
+        return `INR - ${cleanVal} ${suffix}`;
       } else {
         const unitLabel = unit === "Hourly" ? "hr" : unit === "Yearly" ? "yr" : "hr";
         return `USD - $${cleanVal}/${unitLabel}`;
@@ -1269,10 +1270,11 @@ const getInitialActiveBranchContext = () => {
     if (true) {
       const minVal = payRateMin || data.payRate || "";
       const maxVal = payRateMax || minVal;
+      const suffix = ["Contract", "C2H", "Freelance"].includes(data.jobType) ? "/mo" : "LPA";
       assembledPayRate = minVal && maxVal && minVal !== maxVal 
-        ? `INR - ${minVal} to ${maxVal} LPA` 
+        ? `INR - ${minVal} to ${maxVal} ${suffix}` 
         : minVal 
-          ? `INR - ${minVal} LPA` 
+          ? `INR - ${minVal} ${suffix}` 
           : "N/A";
     } else {
       assembledPayRate = formatRatePayload(data.payRate, payCurrency, payUnit, payTerm);
