@@ -227,6 +227,40 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
   const [endPocOpen, setEndPocOpen] = useState(false);
   const [endPocSearch, setEndPocSearch] = useState("");
   const [selectedEndPocId, setSelectedEndPocId] = useState<string | null>(null);
+
+  const [selectedEndClientId, setSelectedEndClientId] = useState<string | null>(null);
+  const [endPocList, setEndPocList] = useState<{myContacts: any[], otherContacts: any[]}>({ myContacts: [], otherContacts: [] });
+  const [addEndPocOpen, setAddEndPocOpen] = useState(false);
+  const [newEndPocName, setNewEndPocName] = useState("");
+  const [newEndPocDesignation, setNewEndPocDesignation] = useState("");
+  const [newEndPocEmail, setNewEndPocEmail] = useState("");
+  const [newEndPocPhone, setNewEndPocPhone] = useState("");
+
+  useEffect(() => {
+    if (!selectedEndClientId) {
+      setEndPocList({ myContacts: [], otherContacts: [] });
+      setSelectedEndPocId(null);
+      return;
+    }
+    const fetchEndPocs = async () => {
+      try {
+        const res = await fetch(`/api/ats/clients/${selectedEndClientId}/contacts`, {
+          headers: { Authorization: `Bearer ${(window as any).__ats_token || ""}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const me = session?.user?.email || "me";
+          const mine = data.filter((p: any) => p.created_by_email === me || p.createdByEmail === me);
+          const others = data.filter((p: any) => p.created_by_email !== me && p.createdByEmail !== me);
+          setEndPocList({ myContacts: mine, otherContacts: others });
+        }
+      } catch (err) {
+        console.error("Failed to fetch end POCs", err);
+      }
+    };
+    fetchEndPocs();
+  }, [selectedEndClientId, session?.user?.email]);
+
   const [addPocOpen, setAddPocOpen] = useState(false);
   const [newPocName, setNewPocName] = useState('');
   const [newPocDesignation, setNewPocDesignation] = useState('');
@@ -311,6 +345,8 @@ const getInitialActiveBranchContext = () => {
       setValue("shiftTiming", unit.shiftTiming || "General Shift (Day)");
       setValue("workAuthorization", "Indian Citizen");
       setValue("taxTerms", "Permanent");
+                                    setBillUnit("LPA");
+                                    setPayUnit("LPA");
       setBillCurrency("INR");
       setBillUnit("LPA");
       setBillTerm("Permanent");
@@ -599,6 +635,8 @@ const getInitialActiveBranchContext = () => {
       setPayTerm("Permanent");
       
       setValue("taxTerms", "Permanent");
+                                    setBillUnit("LPA");
+                                    setPayUnit("LPA");
       setValue("workAuthorization", "Indian Citizen");
       const commVal = commissionType === "custom" ? customCommission : commissionType;
       setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: false });
@@ -774,6 +812,8 @@ const getInitialActiveBranchContext = () => {
             setValue("shiftTiming", "General Shift (Day)");
             setValue("workAuthorization", "Indian Citizen");
             setValue("taxTerms", "Permanent");
+                                    setBillUnit("LPA");
+                                    setPayUnit("LPA");
             setValue("accountManager", posterName);
             setBillCurrency("INR");
             setBillUnit("LPA");
@@ -2062,8 +2102,12 @@ const getInitialActiveBranchContext = () => {
                                   const val = e.target.value;
                                   if (val === "Full Time") {
                                     setValue("taxTerms", "Permanent");
+                                    setBillUnit("LPA");
+                                    setPayUnit("LPA");
                                   } else if (val === "Contract") {
                                     setValue("taxTerms", true ? "Contract (3rd Party)" : "C2C");
+                                    setBillUnit("Monthly");
+                                    setPayUnit("Monthly");
                                   }
                                 }
                               })}
@@ -2096,8 +2140,12 @@ const getInitialActiveBranchContext = () => {
                                 const val = e.target.value;
                                 if (val === "Full Time") {
                                   setValue("taxTerms", "Permanent");
+                                    setBillUnit("LPA");
+                                    setPayUnit("LPA");
                                 } else if (val === "Contract") {
                                   setValue("taxTerms", true ? "Contract (3rd Party)" : "C2C");
+                                    setBillUnit("Monthly");
+                                    setPayUnit("Monthly");
                                 }
                               }
                             })}
@@ -2785,6 +2833,7 @@ const getInitialActiveBranchContext = () => {
                                     if (exactMatch) {
                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
                                       setValue("endClientName", clientNameStr, { shouldValidate: true });
+                                      if (exactMatch.id) setSelectedEndClientId(exactMatch.id); else if (cl?.id) setSelectedEndClientId(cl.id);
                                       setEndClientDropdownOpen(false);
                                       setEndClientSearchText("");
                                     } else {
@@ -2842,6 +2891,7 @@ const getInitialActiveBranchContext = () => {
                                           value={clientNameStr}
                                           onSelect={() => {
                                             setValue("endClientName", clientNameStr, { shouldValidate: true });
+                                      if (exactMatch.id) setSelectedEndClientId(exactMatch.id); else if (cl?.id) setSelectedEndClientId(cl.id);
                                             setEndClientDropdownOpen(false);
                                             setEndClientSearchText("");
                                           }}
@@ -2875,6 +2925,7 @@ const getInitialActiveBranchContext = () => {
                                     if (exactMatch) {
                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
                                       setValue("endClientName", clientNameStr, { shouldValidate: true });
+                                      if (exactMatch.id) setSelectedEndClientId(exactMatch.id); else if (cl?.id) setSelectedEndClientId(cl.id);
                                       setEndClientDropdownOpen(false);
                                       setEndClientSearchText("");
                                     } else {
@@ -2924,7 +2975,7 @@ const getInitialActiveBranchContext = () => {
                           >
                             <span className="truncate">
                               {selectedEndPocId
-                                ? pocList.myContacts.concat(pocList.otherContacts).find(p => p.id === selectedEndPocId)?.name || "Unknown POC"
+                                ? endPocList.myContacts.concat(endPocList.otherContacts).find(p => p.id === selectedEndPocId)?.name || "Unknown POC"
                                 : "Select End POC..."}
                             </span>
                             <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
@@ -2941,9 +2992,9 @@ const getInitialActiveBranchContext = () => {
                             <CommandList className="max-h-[200px]">
                               <CommandEmpty>No POC found.</CommandEmpty>
 
-                              {pocList.myContacts.length > 0 && (
+                              {endPocList.myContacts.length > 0 && (
                                 <CommandGroup heading="?? My Contacts">
-                                  {pocList.myContacts
+                                  {endPocList.myContacts
                                     .filter(p => p.name.toLowerCase().includes(endPocSearch.toLowerCase()))
                                     .map(p => (
                                       <CommandItem
@@ -2967,9 +3018,9 @@ const getInitialActiveBranchContext = () => {
                                 </CommandGroup>
                               )}
 
-                              {pocList.otherContacts.length > 0 && (
+                              {endPocList.otherContacts.length > 0 && (
                                 <CommandGroup heading="?? Company Contacts">
-                                  {pocList.otherContacts
+                                  {endPocList.otherContacts
                                     .filter(p => p.name.toLowerCase().includes(endPocSearch.toLowerCase()))
                                     .map(p => (
                                       <CommandItem
@@ -2992,12 +3043,25 @@ const getInitialActiveBranchContext = () => {
                                     ))}
                                 </CommandGroup>
                               )}
+                              <div className="p-1 mt-1 border-t border-neutral-200 dark:border-slate-800">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  className="w-full text-xs font-semibold text-blue-600 justify-start h-8"
+                                  onClick={() => {
+                                    setEndPocOpen(false);
+                                    setAddEndPocOpen(true);
+                                  }}
+                                >
+                                  + Add New Contact
+                                </Button>
+                              </div>
                             </CommandList>
                           </Command>
                         </PopoverContent>
                       </Popover>
                     </div>
-\n                    {/* Row 4, Col 3: Client Job ID */}
+                    {/* Row 4, Col 3: Client Job ID */}
                     <div className="space-y-1">
                       <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Job ID</Label>
                       <input
@@ -3667,6 +3731,59 @@ const getInitialActiveBranchContext = () => {
       )}
 
       
+
+      {/* Add End POC Dialog */}
+      <Dialog open={addEndPocOpen} onOpenChange={setAddEndPocOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-lg">Add New End Client Contact</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-1">
+              <Label htmlFor="end-poc-name" className="text-xs font-bold text-neutral-700">Name <span className="text-red-500">*</span></Label>
+              <Input id="end-poc-name" value={newEndPocName} onChange={e => setNewEndPocName(e.target.value)} className="h-8 text-xs" placeholder="e.g. Suresh Kumar" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="end-poc-desig" className="text-xs font-bold text-neutral-700">Designation</Label>
+              <Input id="end-poc-desig" value={newEndPocDesignation} onChange={e => setNewEndPocDesignation(e.target.value)} className="h-8 text-xs" placeholder="e.g. HR Manager" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="end-poc-email" className="text-xs font-bold text-neutral-700">Email</Label>
+              <Input id="end-poc-email" type="email" value={newEndPocEmail} onChange={e => setNewEndPocEmail(e.target.value)} className="h-8 text-xs" placeholder="suresh@company.com" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="end-poc-phone" className="text-xs font-bold text-neutral-700">Phone</Label>
+              <Input id="end-poc-phone" value={newEndPocPhone} onChange={e => setNewEndPocPhone(e.target.value)} className="h-8 text-xs" placeholder="+91-9876543210" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setAddEndPocOpen(false)} className="h-8 text-xs">Cancel</Button>
+            <Button onClick={async () => {
+              if (!newEndPocName || !selectedEndClientId) return;
+              try {
+                const res = await fetch(`/api/ats/clients/${selectedEndClientId}/contacts`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(window as any).__ats_token || ''}` },
+                  body: JSON.stringify({
+                    name: newEndPocName, designation: newEndPocDesignation, email: newEndPocEmail, phone: newEndPocPhone
+                  })
+                });
+                if (res.ok) {
+                  const newContact = await res.json();
+                  setEndPocList(prev => ({ ...prev, myContacts: [newContact, ...prev.myContacts] }));
+                  setSelectedEndPocId(newContact.id);
+                  setAddEndPocOpen(false);
+                  setNewEndPocName(''); setNewEndPocDesignation(''); setNewEndPocEmail(''); setNewEndPocPhone('');
+                }
+              } catch (err) {
+                console.error("Failed to add end POC", err);
+              }
+            }} className="h-8 text-xs" disabled={!newEndPocName}>
+              Save Contact
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Add POC Dialog */}
       <Dialog open={addPocOpen} onOpenChange={setAddPocOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -3717,7 +3834,7 @@ const getInitialActiveBranchContext = () => {
           </div>
         </DialogContent>
       </Dialog>
-\n      <AddClientModal
+      <AddClientModal
         open={addClientModalOpen}
         onOpenChange={(open) => {
           setAddClientModalOpen(open);

@@ -1,39 +1,43 @@
-import re
-
 with open('app/(dashboard)/job-posting/new/IndiaStaffingForm.tsx', 'r', encoding='utf-8') as f:
-    code = f.read()
+    lines = f.read().split('\n')
 
-# 1. Fix placeholders for Per Month (min/max)
-# It's currently placeholder="e.g. 10.0" and placeholder="e.g. 15.0"
-code = code.replace(
-    'placeholder="e.g. 10.0"',
-    'placeholder={["Contract", "C2H", "Freelance"].includes(watch("jobType")) ? "e.g. 50000" : "e.g. 10.0"}'
-)
-code = code.replace(
-    'placeholder="e.g. 15.0"',
-    'placeholder={["Contract", "C2H", "Freelance"].includes(watch("jobType")) ? "e.g. 80000" : "e.g. 15.0"}'
-)
+start = -1
+for i, line in enumerate(lines):
+    if '{/* End Client POC */}' in line:
+        start = i
+        break
 
-# 2. Clear clientBillRate when taxTerms changes from Permanent
-# Let's find the useEffect for watchTaxTerms or jobType
-# We will inject a useEffect.
-injection = '''  // Clear clientBillRate if it switches from Permanent to something else and contains %
-  useEffect(() => {
-    const currentRate = watch("clientBillRate");
-    if (watch("taxTerms") !== "Permanent" && currentRate && currentRate.includes("Placement")) {
-      setValue("clientBillRate", "");
-    } else if (watch("taxTerms") === "Permanent" && !currentRate) {
-      setValue("clientBillRate", "8.33% Placement Commission");
-    }
-  }, [watch("taxTerms")]);
-'''
-
-# Find a good place to inject. After const watchTaxTerms = watch("taxTerms");
-s_watch = code.find('const watchTaxTerms = watch("taxTerms");')
-if s_watch != -1:
-    e_line = code.find('\\n', s_watch)
-    code = code[:e_line] + '\\n' + injection + code[e_line:]
+if start != -1:
+    end = -1
+    for i in range(start, start + 100):
+        if '</Popover>' in lines[i]:
+            end = i + 1
+            break
+    
+    if end != -1:
+        chunk = '\n'.join(lines[start:end])
+        chunk = chunk.replace('pocList', 'endPocList')
+        
+        # Add the + Add POC button at the end of the CommandList
+        chunk = chunk.replace(
+            '                            </CommandList>',
+            '''                              <div className="p-1 mt-1 border-t border-neutral-200 dark:border-slate-800">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  className="w-full text-xs font-semibold text-blue-600 justify-start h-8"
+                                  onClick={() => {
+                                    setEndPocOpen(false);
+                                    setAddEndPocOpen(true);
+                                  }}
+                                >
+                                  + Add New Contact
+                                </Button>
+                              </div>
+                            </CommandList>'''
+        )
+        lines[start:end] = chunk.split('\n')
 
 with open('app/(dashboard)/job-posting/new/IndiaStaffingForm.tsx', 'w', encoding='utf-8') as f:
-    f.write(code)
-print('Fixed 1 and 2')
+    f.write('\n'.join(lines))
+print("Fixed End POC UI")
