@@ -16,6 +16,8 @@ const MAIN_DOMAINS = [
   "www.enfyjobs.com",
   "enfycon.com",
   "www.enfycon.com",
+  "admin.enfyjobs.com",
+  "admin.enfycon.com",
 ];
 
 function checkIsSubdomain(hostname: string): boolean {
