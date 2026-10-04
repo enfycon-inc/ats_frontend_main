@@ -807,7 +807,8 @@ const getInitialActiveBranchContext = () => {
           const posterName = (session as any)?.user?.name || prof?.name || prof?.email || "Account Manager";
 
           
-          if (targetMarket === "IN") {
+          const tMarket = (activeBranchObj?.market || "US").toUpperCase();
+          if (tMarket === "IN") {
             setValue("jobType", "Full Time");
             setValue("shiftTiming", "General Shift (Day)");
             setValue("workAuthorization", "Indian Citizen");

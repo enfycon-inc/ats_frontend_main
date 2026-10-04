@@ -12,6 +12,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -113,7 +114,9 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
       
       
       const payload = {
+        clientName: data.clientName,
         client_name: data.clientName,
+        emailId: data.emailId,
         email_id: data.emailId,
         website: data.website || null,
         status: data.status,
@@ -121,10 +124,15 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
         state: data.state || null,
         city: data.city || null,
         ownership: data.ownership,
+        aboutCompany: data.aboutCompany || null,
         about_company: data.aboutCompany || null,
+        commissionPercentage: data.commissionPercentage || null,
         commission_percentage: data.commissionPercentage || null,
+        msaSigned: data.msaSigned,
         msa_signed: data.msaSigned,
+        sowExecuted: data.sowExecuted,
         sow_executed: data.sowExecuted,
+        paymentTerms: data.paymentTerms || null,
         payment_terms: data.paymentTerms || null
       };
 
@@ -170,6 +178,7 @@ await fetch(`/api/ats/clients/${newClientId}/contacts`, {
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">Add Client</DialogTitle>
+          <DialogDescription className="sr-only">Form to add a new client</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
