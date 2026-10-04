@@ -2338,6 +2338,7 @@ const getInitialActiveBranchContext = () => {
                               <option value="Bi-Weekly">Bi-Weekly</option>
                               <option value="Monthly">Monthly</option>
                               <option value="Yearly">Yearly</option>
+                                  <option value="LPA">LPA</option>
                             </select>
                             <select
                               value={payTerm}
@@ -2627,7 +2628,7 @@ const getInitialActiveBranchContext = () => {
                                   onChange={(e) => setBillUnit(e.target.value)}
                                   className="w-24 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
                                 >
-                                  <option value="LPA">LPA</option>
+                                  
                                   <option value="Monthly">Monthly</option>
                                   <option value="Hourly">Hourly</option>
                                 </select>
@@ -2675,6 +2676,7 @@ const getInitialActiveBranchContext = () => {
                             <option value="Bi-Weekly">Bi-Weekly</option>
                             <option value="Monthly">Monthly</option>
                             <option value="Yearly">Yearly</option>
+                                  <option value="LPA">LPA</option>
                           </select>
                           <select
                             value={billTerm}
