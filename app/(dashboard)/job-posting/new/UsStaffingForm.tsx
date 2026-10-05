@@ -294,7 +294,6 @@ const getInitialActiveBranchContext = () => {
       setValue("country", "India");
       setValue("jobType", "Full Time");
       setValue("shiftTiming", unit.shiftTiming || "General Shift (Day)");
-      setValue("workAuthorization", "Indian Citizen");
       setValue("taxTerms", "Permanent");
       setBillCurrency("INR");
       setBillUnit("LPA");
@@ -306,7 +305,6 @@ const getInitialActiveBranchContext = () => {
       setValue("country", "United States");
       setValue("jobType", "Full Time");
       setValue("shiftTiming", unit.shiftTiming || "US Shift (Night)");
-      setValue("workAuthorization", "US Authorized");
       setValue("taxTerms", "C2C");
       setBillCurrency("USD");
       setBillUnit("Hourly");
@@ -532,7 +530,7 @@ const getInitialActiveBranchContext = () => {
       hoursPerWeek: undefined,
       jobStatus: "Active",
       priority: "Warm",
-      workAuthorization: "US Authorized",
+      workAuthorization: "",
       jobType: "Full Time",
       taxTerms: "C2C",
       expMin: undefined,
@@ -573,7 +571,6 @@ const getInitialActiveBranchContext = () => {
       setPayTerm("Permanent");
       
       setValue("taxTerms", "Permanent");
-      setValue("workAuthorization", "Indian Citizen");
       const commVal = commissionType === "custom" ? customCommission : commissionType;
       setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: false });
     } else if (selectedCountry === "United States") {
@@ -587,7 +584,6 @@ const getInitialActiveBranchContext = () => {
       setPayTerm("C2C");
       
       setValue("taxTerms", "C2C");
-      setValue("workAuthorization", "US Authorized");
     }
   }, [selectedCountry, setValue, commissionType, customCommission]);
 
@@ -746,7 +742,6 @@ const getInitialActiveBranchContext = () => {
           if (targetMarket === "IN") {
             setValue("jobType", "Full Time");
             setValue("shiftTiming", "General Shift (Day)");
-            setValue("workAuthorization", "Indian Citizen");
             setValue("taxTerms", "Permanent");
             setValue("accountManager", posterName);
             setBillCurrency("INR");
@@ -758,7 +753,6 @@ const getInitialActiveBranchContext = () => {
           } else {
             setValue("jobType", "Full Time");
             setValue("shiftTiming", "US Shift (Night)");
-            setValue("workAuthorization", "US Authorized");
             setValue("taxTerms", "C2C");
             setBillCurrency("USD");
             setBillUnit("Hourly");
@@ -1050,7 +1044,6 @@ const getInitialActiveBranchContext = () => {
         if (res.workAuthorization) {
           setValue("workAuthorization", res.workAuthorization);
         } else {
-          setValue("workAuthorization", false ? "Indian Citizen" : "US Authorized");
         }
 
         // Pre-fill location fields if returned (preserving active branch market)
