@@ -221,6 +221,12 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
   const [cityOpen, setCityOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [pocList, setPocList] = useState<{ myContacts: any[]; otherContacts: any[] }>({ myContacts: [], otherContacts: [] });
+  useEffect(() => {
+    if (!selectedClientId) { setPocList({ myContacts: [], otherContacts: [] }); return; }
+    let active = true;
+    atsApi.clients.getContacts(selectedClientId).then(data => { if (active) setPocList(data); }).catch(() => { if (active) setPocList({ myContacts: [], otherContacts: [] }); });
+    return () => { active = false; };
+  }, [selectedClientId]);
   const [pocOpen, setPocOpen] = useState(false);
   const [pocSearch, setPocSearch] = useState('');
   const [selectedPocId, setSelectedPocId] = useState<string | null>(null);
@@ -343,7 +349,7 @@ const getInitialActiveBranchContext = () => {
       setValue("country", "India");
       setValue("jobType", "Full Time");
       setValue("shiftTiming", unit.shiftTiming || "General Shift (Day)");
-      setValue("workAuthorization", "Indian Citizen");
+      setValue("workAuthorization", "US Authorized");
       setValue("taxTerms", "Permanent");
                                     setBillUnit("LPA");
                                     setPayUnit("LPA");
@@ -355,7 +361,7 @@ const getInitialActiveBranchContext = () => {
       setPayTerm("Permanent");
     } else {
       setValue("country", "United States");
-      setValue("jobType", "Contract");
+      setValue("jobType", "Full Time");
       setValue("shiftTiming", unit.shiftTiming || "US Shift (Night)");
       setValue("workAuthorization", "US Authorized");
       setValue("taxTerms", "C2C");
@@ -583,7 +589,7 @@ const getInitialActiveBranchContext = () => {
       hoursPerWeek: undefined,
       jobStatus: "Active",
       priority: "Warm",
-      workAuthorization: "Indian Citizen",
+      workAuthorization: "US Authorized",
       jobType: "Full Time",
       taxTerms: "Permanent",
       expMin: undefined,
@@ -637,7 +643,7 @@ const getInitialActiveBranchContext = () => {
       setValue("taxTerms", "Permanent");
                                     setBillUnit("LPA");
                                     setPayUnit("LPA");
-      setValue("workAuthorization", "Indian Citizen");
+      setValue("workAuthorization", "US Authorized");
       const commVal = commissionType === "custom" ? customCommission : commissionType;
       setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: false });
     } else if (selectedCountry === "United States") {
@@ -807,11 +813,11 @@ const getInitialActiveBranchContext = () => {
           const posterName = (session as any)?.user?.name || prof?.name || prof?.email || "Account Manager";
 
           
-          const tMarket = (activeBranchObj?.market || "US").toUpperCase();
+          const tMarket = "IN";
           if (tMarket === "IN") {
             setValue("jobType", "Full Time");
             setValue("shiftTiming", "General Shift (Day)");
-            setValue("workAuthorization", "Indian Citizen");
+            setValue("workAuthorization", "US Authorized");
             setValue("taxTerms", "Permanent");
                                     setBillUnit("LPA");
                                     setPayUnit("LPA");
@@ -823,7 +829,7 @@ const getInitialActiveBranchContext = () => {
             setPayUnit("LPA");
             setPayTerm("Permanent");
           } else {
-            setValue("jobType", "Contract");
+            setValue("jobType", "Full Time");
             setValue("shiftTiming", "US Shift (Night)");
             setValue("workAuthorization", "US Authorized");
             setValue("taxTerms", "C2C");
@@ -983,7 +989,7 @@ const getInitialActiveBranchContext = () => {
         .replace(/^Shift Timing:[^\n]*\n*/gim, "")
         .trim();
 
-      setValue("jobType", jobData.type || "Contract");
+      setValue("jobType", jobData.type || "Full Time");
       setValue("jobDescription", cleanDescription);
       setValue("shiftTiming", extractedShiftTiming);
       setPrimarySkills(jobData.skillsRequired || []);
@@ -1125,7 +1131,7 @@ const getInitialActiveBranchContext = () => {
         if (res.workAuthorization) {
           setValue("workAuthorization", res.workAuthorization);
         } else {
-          setValue("workAuthorization", true ? "Indian Citizen" : "US Authorized");
+          setValue("workAuthorization", "US Authorized");
         }
 
         // Pre-fill location fields if returned (preserving active branch market)
@@ -1406,7 +1412,7 @@ const getInitialActiveBranchContext = () => {
         pocId: selectedPocId || undefined,
         endClientPocId: selectedEndPocId || undefined,
         location: data.locationAutocomplete || data.city || data.states || "Remote",
-        type: data.jobType || "Contract",
+        type: data.jobType || "Full Time",
         description: finalDescription,
         skillsRequired: primarySkills,
         secondarySkills: secondarySkills,
@@ -3838,6 +3844,7 @@ const getInitialActiveBranchContext = () => {
         </DialogContent>
       </Dialog>
       <AddClientModal
+        market="IN"
         open={addClientModalOpen}
         onOpenChange={(open) => {
           setAddClientModalOpen(open);
@@ -3846,7 +3853,10 @@ const getInitialActiveBranchContext = () => {
           }
         }}
         initialClientName={prefilledClientName}
-        onClientAdded={(clientName) => {
+        onClientAdded={async (clientName) => {
+          const latestClients = await atsApi.clients.list();
+          const addedClient = latestClients.find((c: any) => (c.client_name || c.clientName) === clientName);
+          if (addedClient && clientModalTarget === "client") setSelectedClientId(addedClient.id);
           fetchClients();
           if (clientModalTarget === "client") {
             setValue("client", clientName, { shouldValidate: true });

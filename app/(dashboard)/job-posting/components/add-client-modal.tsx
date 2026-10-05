@@ -79,6 +79,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
   // Pre-fill ownership with current logged-in user details, initial client name and business unit
   useEffect(() => {
     if (open) {
+      setValue("country", market === "IN" ? "IN" : "US");
       if (initialClientName) {
         setValue("clientName", initialClientName);
       }
@@ -150,13 +151,9 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
             phone: pocPhoneFull,
             isPrimary: true
           };
-await fetch(`/api/ats/clients/${newClientId}/contacts`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(window as any).__ats_token || ''}` },
-            body: JSON.stringify(pocPayload)
-          });
+await atsApi.clients.createContact(newClientId, pocPayload);
         } catch (e) {
-          console.error("Failed to add POC", e);
+          toast.error("Client was created, but its contact could not be saved. Add the contact from the client record.");
         }
       }
 

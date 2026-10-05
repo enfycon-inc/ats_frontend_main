@@ -304,7 +304,7 @@ const getInitialActiveBranchContext = () => {
       setPayTerm("Permanent");
     } else {
       setValue("country", "United States");
-      setValue("jobType", "Contract");
+      setValue("jobType", "Full Time");
       setValue("shiftTiming", unit.shiftTiming || "US Shift (Night)");
       setValue("workAuthorization", "US Authorized");
       setValue("taxTerms", "C2C");
@@ -756,7 +756,7 @@ const getInitialActiveBranchContext = () => {
             setPayUnit("LPA");
             setPayTerm("Permanent");
           } else {
-            setValue("jobType", "Contract");
+            setValue("jobType", "Full Time");
             setValue("shiftTiming", "US Shift (Night)");
             setValue("workAuthorization", "US Authorized");
             setValue("taxTerms", "C2C");
@@ -916,7 +916,7 @@ const getInitialActiveBranchContext = () => {
         .replace(/^Shift Timing:[^\n]*\n*/gim, "")
         .trim();
 
-      setValue("jobType", jobData.type || "Contract");
+      setValue("jobType", jobData.type || "Full Time");
       setValue("jobDescription", cleanDescription);
       setValue("shiftTiming", extractedShiftTiming);
       setPrimarySkills(jobData.skillsRequired || []);
@@ -1327,7 +1327,7 @@ const getInitialActiveBranchContext = () => {
         client: data.client || data.endClientName || "Direct Client",
         endClientName: data.endClientName || undefined,
         location: data.locationAutocomplete || data.city || data.states || "Remote",
-        type: data.jobType || "Contract",
+        type: data.jobType || "Full Time",
         description: finalDescription,
         skillsRequired: primarySkills,
         secondarySkills: secondarySkills,

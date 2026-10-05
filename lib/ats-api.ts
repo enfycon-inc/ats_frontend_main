@@ -1330,6 +1330,16 @@ const candidates = {
 };
 
 const clients = {
+  async getContacts(id: string): Promise<any> {
+    return apiFetch(`/api/clients/${id}/contacts`);
+  },
+
+  async createContact(id: string, data: Record<string, any>): Promise<Response> {
+    const contact = await apiFetch(`/api/clients/${id}/contacts`, {
+      method: 'POST', body: JSON.stringify(data),
+    });
+    return Response.json(contact);
+  },
   async list(includeDeleted?: string): Promise<any[]> {
     const query = includeDeleted === 'true' ? '?includeDeleted=true' : '';
     return apiFetch<any[]>(`/api/clients${query}`);
