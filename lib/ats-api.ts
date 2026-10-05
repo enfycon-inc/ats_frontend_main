@@ -454,7 +454,8 @@ const auth = {
   async createManualTenant(data: {
     companyName: string;
     subdomain: string;
-    adminFullName: string;
+    adminFirstName: string;
+      adminLastName: string;
     adminEmail: string;
     adminPassword?: string;
     userLimit?: number;
@@ -1775,5 +1776,6 @@ export const atsApi = {
   email,
   fetch: apiFetch,
 };
+
 
 

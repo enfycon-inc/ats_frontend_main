@@ -15,7 +15,7 @@ import { useSearchParams } from "next/navigation";
 import { getBaseDomain } from "@/utils/subdomain-helper";
 import { CrossBranchApprovalsView } from "./cross-branch-approvals";
 import DataTable from "@/components/shared/data-table";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Eye, EyeOff } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 interface PendingUser {
@@ -112,12 +112,15 @@ export default function ApprovalsPage() {
   const [showCreateTenantModal, setShowCreateTenantModal] = useState(false);
   const [manualCompanyName, setManualCompanyName] = useState("");
   const [manualSubdomain, setManualSubdomain] = useState("");
-  const [manualAdminFullName, setManualAdminFullName] = useState("");
+  const [manualAdminFirstName, setManualAdminFirstName] = useState("");
+  const [manualAdminLastName, setManualAdminLastName] = useState("");
+  const [manualAdminVerifyPassword, setManualAdminVerifyPassword] = useState("");
+  const [showManualPassword, setShowManualPassword] = useState(false);
   const [manualAdminEmail, setManualAdminEmail] = useState("");
   const [manualAdminPassword, setManualAdminPassword] = useState("");
   const [manualUserLimit, setManualUserLimit] = useState(20);
   const [manualMaxBranches, setManualMaxBranches] = useState(5);
-  const [manualMarket, setManualMarket] = useState<"US" | "IN">("US");
+  
   const [creatingManualTenant, setCreatingManualTenant] = useState(false);
 
   // SaaS Tenant Details Modal state
@@ -242,7 +245,8 @@ export default function ApprovalsPage() {
     e.preventDefault();
     if (!manualCompanyName.trim()) return toast.error("Company Name is required.");
     if (!manualSubdomain.trim()) return toast.error("Subdomain is required.");
-    if (!manualAdminFullName.trim()) return toast.error("Tenant Admin Name is required.");
+    if (!manualAdminFirstName.trim() || !manualAdminLastName.trim()) return toast.error("Admin First and Last Name are required.");
+    if (manualAdminPassword !== manualAdminVerifyPassword) return toast.error("Passwords do not match.");
     if (!manualAdminEmail.trim()) return toast.error("Tenant Admin Email is required.");
 
     try {
@@ -250,12 +254,13 @@ export default function ApprovalsPage() {
       const res = await atsApi.auth.createManualTenant({
         companyName: manualCompanyName.trim(),
         subdomain: manualSubdomain.trim().toLowerCase(),
-        adminFullName: manualAdminFullName.trim(),
+        adminFirstName: manualAdminFirstName.trim(),
+        adminLastName: manualAdminLastName.trim(),
         adminEmail: manualAdminEmail.trim().toLowerCase(),
         adminPassword: manualAdminPassword,
         userLimit: manualUserLimit,
         maxBranches: manualMaxBranches,
-        defaultMarket: manualMarket,
+        
       });
 
       toast.success(`Tenant "${manualCompanyName}" created and activated! Workspace: ${manualSubdomain}.${baseDomain}`);
@@ -263,12 +268,15 @@ export default function ApprovalsPage() {
       // Reset form & close modal
       setManualCompanyName("");
       setManualSubdomain("");
-      setManualAdminFullName("");
+      setManualAdminFirstName("");
+      setManualAdminLastName("");
+      setManualAdminVerifyPassword("");
+      setShowManualPassword(false);
       setManualAdminEmail("");
       setManualAdminPassword("");
       setManualUserLimit(20);
       setManualMaxBranches(5);
-      setManualMarket("US");
+      
       setShowCreateTenantModal(false);
 
       await loadData();
@@ -996,37 +1004,35 @@ export default function ApprovalsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-default-800">Admin Full Name *</label>
-                  <Input
-                    placeholder="John Doe"
-                    value={manualAdminFullName}
-                    onChange={(e) => setManualAdminFullName(e.target.value)}
-                    required
-                  />
+                              <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-default-800">Admin First Name *</label>
+                    <Input placeholder="John" value={manualAdminFirstName} onChange={(e) => setManualAdminFirstName(e.target.value)} required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-default-800">Admin Last Name *</label>
+                    <Input placeholder="Doe" value={manualAdminLastName} onChange={(e) => setManualAdminLastName(e.target.value)} required />
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-default-800">Admin Work Email *</label>
-                  <Input
-                    type="email"
-                    placeholder="admin@acmestaffing.com"
-                    value={manualAdminEmail}
-                    onChange={(e) => setManualAdminEmail(e.target.value)}
-                    required
-                  />
+                  <Input type="email" placeholder="admin@acmestaffing.com" value={manualAdminEmail} onChange={(e) => setManualAdminEmail(e.target.value)} required />
                 </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-default-800">Temporary Password</label>
-                <Input
-                  type="text"
-                  placeholder="Enter initial admin password"
-                  value={manualAdminPassword}
-                  onChange={(e) => setManualAdminPassword(e.target.value)}
-                />
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-default-800">Temporary Password</label>
+                    <div className="relative">
+                      <Input type={showManualPassword ? "text" : "password"} placeholder="Enter initial password" value={manualAdminPassword} onChange={(e) => setManualAdminPassword(e.target.value)} required className="pr-10" />
+                      <button type="button" onClick={() => setShowManualPassword(!showManualPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                        {showManualPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-default-800">Verify Password</label>
+                    <Input type={showManualPassword ? "text" : "password"} placeholder="Re-enter password" value={manualAdminVerifyPassword} onChange={(e) => setManualAdminVerifyPassword(e.target.value)} required />
+                  </div>
+                </div>
 
               {/* Plan Limits */}
               <div className="grid grid-cols-2 gap-3 p-3 bg-indigo-50/40 dark:bg-slate-900/40 border border-indigo-100 dark:border-slate-800 rounded-xl">
@@ -1112,3 +1118,5 @@ export default function ApprovalsPage() {
     </div>
   );
 }
+
+

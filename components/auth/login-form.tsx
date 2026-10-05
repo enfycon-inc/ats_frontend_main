@@ -184,13 +184,7 @@ const LoginForm = () => {
             const base = getBaseDomain();
             const protocol = window.location.protocol;
 
-            if (isSuperAdmin) {
-              if (currentSub) {
-                window.location.replace(`${protocol}//${base}/dashboard`);
-              } else {
-                window.location.replace("/dashboard");
-              }
-            } else if (userSub && !isMasterTenant) {
+            if (userSub && !isMasterTenant) {
               if (currentSub === userSub) {
                 // User is already on their respective tenant subdomain (e.g. deb.localhost:3000)
                 window.location.replace("/dashboard");
@@ -274,26 +268,6 @@ const LoginForm = () => {
         const base = getBaseDomain();
         const protocol = window.location.protocol;
         const isMasterTenant = !userTenantDomain || userTenantDomain === "enfy" || userTenantDomain === "www" || userTenantDomain === "localhost";
-
-        if (isSuperAdmin) {
-          // Super Admin always operates on root domain
-          const signInRes = await signIn("token-handoff", {
-            redirect: false,
-            token: syncRes.accessToken,
-            userJson: JSON.stringify(syncRes.user),
-            callbackUrl: "/dashboard",
-          });
-
-          if (signInRes?.error) {
-            toast.error("Sign in failed. Please check credentials.");
-            return;
-          }
-
-          toast.success("Successfully logged in");
-          const dest = currentSubdomain ? `${protocol}//${base}/dashboard` : "/dashboard";
-          await navigateAfterLogin(dest);
-          return;
-        }
 
         if (userTenantDomain && !isMasterTenant && currentSubdomain !== userTenantDomain) {
           // Tenant member logging in from root domain or different subdomain:
