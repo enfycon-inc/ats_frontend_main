@@ -779,6 +779,10 @@ export default function UserManagementPage() {
         }
       } catch (syncErr) {
         console.warn("Follow-up user details sync warning:", syncErr);
+        toast.error('Member was created, but assignment synchronization failed. Review their roles and branch before continuing.');
+        loadData();
+        setIsAddModalOpen(false);
+        return;
       }
 
       toast.success(`Successfully added ${trimmedName} (${fullEmail})!`);
