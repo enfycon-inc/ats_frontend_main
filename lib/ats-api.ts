@@ -1,6 +1,6 @@
 
 /**
- * ats-api.ts â€” Typed API client for the NestJS ATS backend
+ * ats-api.ts — Typed API client for the NestJS ATS backend
  *
  * All API calls go through this file. It handles:
  * - Token storage in localStorage
@@ -49,7 +49,7 @@ export function getApiBase(): string {
   return 'http://127.0.0.1:5000';
 }
 
-// â”€â”€â”€ Token Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Token Management ──────────────────────────────────────────────
 const TOKEN_KEY = 'ats_access_token';
 const REFRESH_TOKEN_KEY = 'ats_refresh_token';
 const USER_KEY = 'ats_current_user';
@@ -166,7 +166,7 @@ async function getOrFetchToken(): Promise<string | null> {
   let token = getToken();
   if (token) return token;
 
-  // No valid stored token â€” attempt to recover via refresh token
+  // No valid stored token — attempt to recover via refresh token
   if (getRefreshToken()) {
     const refreshed = await tryAutoRefresh();
     if (refreshed) return refreshed;
@@ -229,7 +229,7 @@ async function refreshStoredToken(): Promise<string | null> {
   return null;
 }
 
-// â”€â”€â”€ HTTP Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── HTTP Helper ────────────────────────────────────────────────────
 async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {},
@@ -342,7 +342,7 @@ async function apiFetch<T = any>(
   return res.json();
 }
 
-// â”€â”€â”€ Auth API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Auth API ───────────────────────────────────────────────────────
 const auth = {
   async login(email: string, password: string) {
     const subdomain = getTenantIdentifier();
@@ -390,7 +390,7 @@ const auth = {
 
   async getProfile(userId?: string): Promise<any> {
     // /api/auth/me returns the authenticated user's profile.
-    // The old /api/auth/profile/:id route does not exist â€” use /me instead.
+    // The old /api/auth/profile/:id route does not exist — use /me instead.
     return apiFetch<any>('/api/auth/me').catch(() => null);
   },
 
@@ -796,7 +796,7 @@ const auth = {
   },
 };
 
-// â”€â”€â”€ Email API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Email API ───────────────────────────────────────────────────────
 const email = {
   async getAccounts(): Promise<any[]> {
     return apiFetch<any[]>('/email/accounts');
@@ -905,7 +905,7 @@ const email = {
 };
 
 
-// â”€â”€â”€ Jobs API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Jobs API ───────────────────────────────────────────────────────
 export interface JobPayload {
   id: string;
   jobCode: string;
@@ -1322,11 +1322,11 @@ const candidates = {
 
 const clients = {
   async getContacts(id: string): Promise<any> {
-    return apiFetch(`/api/clients/${id}/contacts`);
+    return apiFetch(`/clients/${id}/contacts`);
   },
 
   async createContact(id: string, data: Record<string, any>): Promise<Response> {
-    const contact = await apiFetch(`/api/clients/${id}/contacts`, {
+    const contact = await apiFetch(`/clients/${id}/contacts`, {
       method: 'POST', body: JSON.stringify(data),
     });
     return Response.json(contact);
@@ -1721,7 +1721,7 @@ const integrations = {
   },
 };
 
-// â”€â”€â”€ Market Segments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Market Segments ────────────────────────────────────────────────
 const marketSegments = {
   async list(): Promise<any[]> {
     return apiFetch<any[]>('/api/market-segments');
@@ -1768,7 +1768,7 @@ const marketSegments = {
   },
 };
 
-// â”€â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Export ─────────────────────────────────────────────────────────
 export const atsApi = {
   auth,
   jobs,

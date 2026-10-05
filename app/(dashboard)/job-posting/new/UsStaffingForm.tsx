@@ -1,3 +1,4 @@
+import { ContactDialog } from "../components/contact-dialog";
 // @ts-nocheck
 "use client";
 
@@ -880,7 +881,7 @@ const getInitialActiveBranchContext = () => {
     const timer = setInterval(() => {
       if (isDirty && activeWorkflow === "manual") {
         toast("Draft auto-saved successfully", {
-          icon: "💾",
+          icon: undefined,
           duration: 2000,
         });
       }
@@ -1201,7 +1202,7 @@ const getInitialActiveBranchContext = () => {
         if (pSkills.length > 0 || sSkills.length > 0 || res.experienceMin !== undefined || extractedTitle) {
           toast.success(`AI extracted Job Title (${extractedTitle || 'Role'}), Skills & Experience (${res.experienceMin ?? 0}-${res.experienceMax ?? 5} yrs)!`);
         } else {
-          toast("No skills found in description.", { icon: "⚠️" });
+          toast("No skills found in description.", { icon: undefined });
         }
       } else {
         toast.error("Failed to parse Job Description.");
@@ -1670,7 +1671,7 @@ const getInitialActiveBranchContext = () => {
             {/* Card 2: Requisition */}
             <div
               onClick={() => {
-                toast("Coming Soon!", { icon: "🚧" });
+                toast("Coming Soon!", { icon: undefined });
               }}
               className="flex flex-col items-center text-center p-6 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg cursor-pointer shadow-xs hover:shadow-md hover:border-primary/50 group transition-all duration-300"
             >
@@ -1688,7 +1689,7 @@ const getInitialActiveBranchContext = () => {
             {/* Card 3: Job Template */}
             <div
               onClick={() => {
-                toast("Coming Soon!", { icon: "🚧" });
+                toast("Coming Soon!", { icon: undefined });
               }}
               className="flex flex-col items-center text-center p-6 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg cursor-pointer shadow-xs hover:shadow-md hover:border-primary/50 group transition-all duration-300"
             >

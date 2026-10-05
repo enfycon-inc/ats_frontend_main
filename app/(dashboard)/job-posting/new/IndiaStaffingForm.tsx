@@ -1,3 +1,4 @@
+import { ContactDialog } from "../components/contact-dialog";
 // @ts-nocheck
 "use client";
 
@@ -250,11 +251,8 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
     }
     const fetchEndPocs = async () => {
       try {
-        const res = await fetch(`/api/ats/clients/${selectedEndClientId}/contacts`, {
-          headers: { Authorization: `Bearer ${(window as any).__ats_token || ""}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
+        const data = await atsApi.clients.getContacts(selectedEndClientId);
+        {
           const me = session?.user?.email || "me";
           const mine = data.filter((p: any) => p.created_by_email === me || p.createdByEmail === me);
           const others = data.filter((p: any) => p.created_by_email !== me && p.createdByEmail !== me);
@@ -953,7 +951,7 @@ const getInitialActiveBranchContext = () => {
     const timer = setInterval(() => {
       if (isDirty && activeWorkflow === "manual") {
         toast("Draft auto-saved successfully", {
-          icon: "≡ƒÆ╛",
+          icon: undefined,
           duration: 2000,
         });
       }
@@ -1282,7 +1280,7 @@ const getInitialActiveBranchContext = () => {
         if (pSkills.length > 0 || sSkills.length > 0 || res.experienceMin !== undefined || extractedTitle) {
           toast.success(`AI extracted Job Title (${extractedTitle || 'Role'}), Skills & Experience (${res.experienceMin ?? 0}-${res.experienceMax ?? 5} yrs)!`);
         } else {
-          toast("No skills found in description.", { icon: "ΓÜá∩╕Å" });
+          toast("No skills found in description.", { icon: undefined });
         }
       } else {
         toast.error("Failed to parse Job Description.");
@@ -1755,7 +1753,7 @@ const getInitialActiveBranchContext = () => {
             {/* Card 2: Requisition */}
             <div
               onClick={() => {
-                toast("Coming Soon!", { icon: "≡ƒÜº" });
+                toast("Coming Soon!", { icon: undefined });
               }}
               className="flex flex-col items-center text-center p-6 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg cursor-pointer shadow-xs hover:shadow-md hover:border-primary/50 group transition-all duration-300"
             >
@@ -1773,7 +1771,7 @@ const getInitialActiveBranchContext = () => {
             {/* Card 3: Job Template */}
             <div
               onClick={() => {
-                toast("Coming Soon!", { icon: "≡ƒÜº" });
+                toast("Coming Soon!", { icon: undefined });
               }}
               className="flex flex-col items-center text-center p-6 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg cursor-pointer shadow-xs hover:shadow-md hover:border-primary/50 group transition-all duration-300"
             >
@@ -3735,107 +3733,15 @@ const getInitialActiveBranchContext = () => {
       
 
       {/* Add End POC Dialog */}
-      <Dialog open={addEndPocOpen} onOpenChange={setAddEndPocOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="text-lg">Add New End Client Contact</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-1">
-              <Label htmlFor="end-poc-name" className="text-xs font-bold text-neutral-700">Name <span className="text-red-500">*</span></Label>
-              <Input id="end-poc-name" value={newEndPocName} onChange={e => setNewEndPocName(e.target.value)} className="h-8 text-xs" placeholder="e.g. Suresh Kumar" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="end-poc-desig" className="text-xs font-bold text-neutral-700">Designation</Label>
-              <Input id="end-poc-desig" value={newEndPocDesignation} onChange={e => setNewEndPocDesignation(e.target.value)} className="h-8 text-xs" placeholder="e.g. HR Manager" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="end-poc-email" className="text-xs font-bold text-neutral-700">Email</Label>
-              <Input id="end-poc-email" type="email" value={newEndPocEmail} onChange={e => setNewEndPocEmail(e.target.value)} className="h-8 text-xs" placeholder="suresh@company.com" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="end-poc-phone" className="text-xs font-bold text-neutral-700">Phone</Label>
-              <Input id="end-poc-phone" value={newEndPocPhone} onChange={e => setNewEndPocPhone(e.target.value)} className="h-8 text-xs" placeholder="+91-9876543210" />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setAddEndPocOpen(false)} className="h-8 text-xs">Cancel</Button>
-            <Button onClick={async () => {
-              if (!newEndPocName || !selectedEndClientId) return;
-              try {
-                const res = await fetch(`/api/ats/clients/${selectedEndClientId}/contacts`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(window as any).__ats_token || ''}` },
-                  body: JSON.stringify({
-                    name: newEndPocName, designation: newEndPocDesignation, email: newEndPocEmail, phone: newEndPocPhone
-                  })
-                });
-                if (res.ok) {
-                  const newContact = await res.json();
-                  setEndPocList(prev => ({ ...prev, myContacts: [newContact, ...prev.myContacts] }));
-                  setSelectedEndPocId(newContact.id);
-                  setAddEndPocOpen(false);
-                  setNewEndPocName(''); setNewEndPocDesignation(''); setNewEndPocEmail(''); setNewEndPocPhone('');
-                }
-              } catch (err) {
-                console.error("Failed to add end POC", err);
-              }
-            }} className="h-8 text-xs" disabled={!newEndPocName}>
-              Save Contact
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ContactDialog open={addEndPocOpen} onOpenChange={setAddEndPocOpen} clientId={selectedEndClientId} market="IN" endClient onSaved={contact => {
+        setEndPocList(prev => ({ ...prev, myContacts: [contact, ...prev.myContacts] }));
+        setSelectedEndPocId(contact.id);
+      }} />
       {/* Add POC Dialog */}
-      <Dialog open={addPocOpen} onOpenChange={setAddPocOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="text-lg">Add New Point of Contact</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-1">
-              <Label htmlFor="poc-name" className="text-xs font-bold text-neutral-700">Name <span className="text-red-500">*</span></Label>
-              <Input id="poc-name" value={newPocName} onChange={e => setNewPocName(e.target.value)} className="h-8 text-xs" placeholder="e.g. Suresh Kumar" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="poc-desig" className="text-xs font-bold text-neutral-700">Designation</Label>
-              <Input id="poc-desig" value={newPocDesignation} onChange={e => setNewPocDesignation(e.target.value)} className="h-8 text-xs" placeholder="e.g. HR Manager" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="poc-email" className="text-xs font-bold text-neutral-700">Email</Label>
-              <Input id="poc-email" type="email" value={newPocEmail} onChange={e => setNewPocEmail(e.target.value)} className="h-8 text-xs" placeholder="suresh@company.com" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="poc-phone" className="text-xs font-bold text-neutral-700">Phone</Label>
-              <Input id="poc-phone" value={newPocPhone} onChange={e => setNewPocPhone(e.target.value)} className="h-8 text-xs" placeholder="+91-9876543210" />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setAddPocOpen(false)} className="h-8 text-xs">Cancel</Button>
-            <Button onClick={async () => {
-              if (!newPocName || !selectedClientId) return;
-              try {
-                const res = await atsApi.clients?.createContact  
-                  ? atsApi.clients.createContact(selectedClientId, { name: newPocName, designation: newPocDesignation, email: newPocEmail, phone: newPocPhone })
-                  : fetch(`/api/ats/clients/${selectedClientId}/contacts`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(window as any).__ats_token || ''}` },
-                  body: JSON.stringify({
-                    name: newPocName, designation: newPocDesignation, email: newPocEmail, phone: newPocPhone
-                  })
-                });
-                if (res.ok) {
-                  const newContact = await res.json();
-                  setPocList(prev => ({ ...prev, myContacts: [newContact, ...prev.myContacts] }));
-                  setSelectedPocId(newContact.id);
-                  setAddPocOpen(false);
-                  setNewPocName(''); setNewPocDesignation(''); setNewPocEmail(''); setNewPocPhone('');
-                }
-              } catch (err) {}
-            }} className="h-8 text-xs" disabled={!newPocName}>Save Contact</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ContactDialog open={addPocOpen} onOpenChange={setAddPocOpen} clientId={selectedClientId} market="IN"  onSaved={contact => {
+        setPocList(prev => ({ ...prev, myContacts: [contact, ...prev.myContacts] }));
+        setSelectedPocId(contact.id);
+      }} />
       <AddClientModal
         market="IN"
         open={addClientModalOpen}
