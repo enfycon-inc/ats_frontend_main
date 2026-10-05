@@ -41,7 +41,7 @@ export function getActiveRolePermissions(input: any, roles: CustomRoleDefinition
       if (role) foundRole = true;
       return Array.isArray(role?.permissions) ? role.permissions : [];
     });
-    if (foundRole) return [...new Set(resolvedPerms)];
+    if (foundRole) return [...new Set(resolvedPerms)]; if (inputs.includes(profile?.systemRole)) return Array.isArray(profile?.permissions) ? profile.permissions : [];
     // If an explicit role was requested but not found, do not fall back to the union.
     return [];
   }
@@ -55,12 +55,12 @@ export function getActiveRolePermissions(input: any, roles: CustomRoleDefinition
 }
 
 export function isRoleAdmin(input: any, roles: CustomRoleDefinition[] = [], profile?: any): boolean {
-  return getActiveRolePermissions(input, roles, profile).some(p => ["tenant:settings", "tenant:manage", "platform:manage"].includes(p));
+  const perms = getActiveRolePermissions(input, roles, profile); return perms.includes('*') || perms.some(p => ['tenant:settings', 'tenant:manage', 'platform:manage'].includes(p));
 }
 
 export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] = [], profile?: any): NavItem[] {
   const perms = getActiveRolePermissions(input, roles, profile);
-  const has = (...keys: string[]) => keys.some(k => perms.includes(k));
+  const has = (...keys: string[]) => perms.includes('*') || keys.some(k => perms.includes(k));
   if (has("platform:manage")) return GLOBAL_ADMIN_NAV_ITEMS;
   const allowed: Record<string, boolean> = {
     dashboard: true,
@@ -149,7 +149,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
 
 export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [], profile?: any): NavItem[] {
   const perms = getActiveRolePermissions(input, roles, profile);
-  const has = (...keys: string[]) => keys.some(k => perms.includes(k));
+  const has = (...keys: string[]) => perms.includes('*') || keys.some(k => perms.includes(k));
   if (has("platform:manage")) return GLOBAL_ADMIN_MORE_ITEMS;
   const company = has("tenant:settings", "tenant:manage");
   const allowed: Record<string, boolean> = {
