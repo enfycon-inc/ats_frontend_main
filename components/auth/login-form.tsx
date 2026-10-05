@@ -185,13 +185,10 @@ const LoginForm = () => {
             const protocol = window.location.protocol;
 
             if (userSub && !isMasterTenant) {
-              if (currentSub === userSub) {
-                // User is already on their respective tenant subdomain (e.g. deb.localhost:3000)
+              const isPlatformOwnerOnRoot = (userSub === "enfycon" || userSub === "enfy") && currentSub === "";
+              if (currentSub === userSub || isPlatformOwnerOnRoot) {
                 window.location.replace("/dashboard");
               } else if (!currentSub) {
-                // User is on root domain (localhost:3000) with a residual tenant session.
-                // Purge the root session so they are not treated as logged in on the main domain.
-                // Do NOT redirect to another subdomain — stay on localhost!
                 signOut({ redirect: false });
               }
             } else if (isMasterTenant && !currentSub) {
@@ -269,7 +266,8 @@ const LoginForm = () => {
         const protocol = window.location.protocol;
         const isMasterTenant = !userTenantDomain || userTenantDomain === "enfy" || userTenantDomain === "www" || userTenantDomain === "localhost";
 
-        if (userTenantDomain && !isMasterTenant && currentSubdomain !== userTenantDomain) {
+        const isPlatformOwnerOnRoot = (userTenantDomain === "enfycon" || userTenantDomain === "enfy") && currentSubdomain === "";
+        if (userTenantDomain && !isMasterTenant && currentSubdomain !== userTenantDomain && !isPlatformOwnerOnRoot) {
           // Tenant member logging in from root domain or different subdomain:
           // Do NOT establish a NextAuth session on root domain (avoids ghost root sessions).
           // Immediately redirect to tenant subdomain with SSO handoff token and user payload!
