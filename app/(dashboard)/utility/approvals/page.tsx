@@ -1058,33 +1058,7 @@ export default function ApprovalsPage() {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-default-800">Default Staffing Market</label>
-                <div className="flex bg-default-100 dark:bg-slate-800 p-1 rounded-lg border border-default-250">
-                  <button
-                    type="button"
-                    onClick={() => setManualMarket("US")}
-                    className={`flex-1 py-1.5 text-xs font-semibold rounded transition cursor-pointer ${
-                      manualMarket === "US"
-                        ? "bg-white dark:bg-slate-700 text-indigo-600 shadow-sm"
-                        : "text-default-500"
-                    }`}
-                  >
-                    US IT Staffing
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setManualMarket("IN")}
-                    className={`flex-1 py-1.5 text-xs font-semibold rounded transition cursor-pointer ${
-                      manualMarket === "IN"
-                        ? "bg-white dark:bg-slate-700 text-emerald-600 shadow-sm"
-                        : "text-default-500"
-                    }`}
-                  >
-                    Indian Staffing
-                  </button>
-                </div>
-              </div>
+              
 
               <div className="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
                 <Button
