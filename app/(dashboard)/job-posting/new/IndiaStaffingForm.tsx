@@ -1900,7 +1900,7 @@ const getInitialActiveBranchContext = () => {
                   New Job Requirement Form
                 </h2>
                 <p className="text-[10px] text-neutral-500 font-semibold mt-0.5">
-                  {true ? `${tenantName} India IT Recruitment Workspace` : `${tenantName} US IT Recruitment Workspace`}
+                  {true ? `${tenantName} India Staffing Workspace` : `${tenantName} US IT Recruitment Workspace`}
                 </p>
               </div>
             </div>
