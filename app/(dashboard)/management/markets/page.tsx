@@ -9,7 +9,7 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
-import { isRoleAdmin, resolveActiveSystemRole } from "@/lib/role-permissions";
+import { getActiveRolePermissions } from "@/lib/role-permissions";
 import { useRouter } from "next/navigation";
 
 interface MarketSegment {
@@ -41,7 +41,8 @@ export default function MarketsManagementPage() {
     try {
       const user = atsApi.auth.getCurrentUser();
       const active = localStorage.getItem("active_role_id") || user?.roles?.[0] || "";
-      const isSuper = user?.roles?.includes("SUPER_ADMIN") || (isRoleAdmin(resolveActiveSystemRole(active, [], user)) && active === "SUPER_ADMIN");
+      const permissions = getActiveRolePermissions(active, [], user);
+      const isSuper = permissions.includes("platform:manage") || permissions.includes("*");
       setIsSuperAdmin(isSuper);
     } catch (e) {
       console.error(e);
@@ -53,7 +54,8 @@ export default function MarketsManagementPage() {
   const fetchMarkets = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await atsApi.marketSegments.list(); console.log("RAW MARKET DATA FETCHED:", data);
+      setError('');
+      const data = await atsApi.marketSegments.list();
       setMarkets(data.sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0)));
     } catch (err: any) {
       setError(err.message || 'Failed to fetch market segments');
@@ -93,10 +95,10 @@ export default function MarketsManagementPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-            <Globe className="h-6 w-6 text-indigo-600" /> Market Segments
+          <h1 className="text-lg font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+            <Globe className="h-5 w-5 text-indigo-600" /> Market Segments
           </h1>
-          <p className="text-sm text-neutral-500 mt-1">
+          <p className="text-xs text-neutral-500 mt-1">
             Standard platform market segments. Enable or disable markets globally to control which markets are available for Tenant Admins when creating Business Units.
           </p>
         </div>
@@ -105,6 +107,13 @@ export default function MarketsManagementPage() {
       {error && (
         <div className="bg-red-50 text-red-700 p-4 rounded-lg text-sm border border-red-100 font-medium">
           {error}
+        </div>
+      )}
+
+      {!permsLoading && !loading && !error && markets.length === 0 && (
+        <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl p-5 text-xs text-neutral-600 dark:text-neutral-300">
+          No platform markets are available. Restart the backend to initialize the standard markets.
+          <button className="ml-2 text-indigo-600 font-semibold" onClick={fetchMarkets}>Retry</button>
         </div>
       )}
 
@@ -157,6 +166,7 @@ export default function MarketsManagementPage() {
                       <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />
                     ) : (
                       <Switch 
+                        aria-label={`Enable ${segment.name}`}
                         checked={segment.isActive} 
                         onCheckedChange={() => toggleStatus(segment)} 
                       />
