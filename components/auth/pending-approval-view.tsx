@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { signOut } from "next-auth/react";
+import { useSocket } from "@/contexts/SocketContext";
 
 interface PendingApprovalViewProps {
   initialRequestedRole?: string | null;
@@ -93,25 +94,57 @@ export default function PendingApprovalView({
   const [isLoadingLocations, setIsLoadingLocations] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [approvedRoles, setApprovedRoles] = useState<string[] | null>(null);
+  const { socket } = useSocket();
+  const showApproval = React.useCallback((profile: any) => {
+    if (profile?.isApproved !== true || profile.requestedRole || profile.isActive === false) return false;
+    const roles = Array.isArray(profile.assignedRoles) && profile.assignedRoles.length
+      ? profile.assignedRoles.map((role: any) => role.name)
+      : Array.isArray(profile.roles) ? profile.roles : [profile.roleName];
+    setApprovedRoles(current => current || roles.filter((role: unknown): role is string => typeof role === "string" && Boolean(role)));
+    return true;
+  }, []);
 
   React.useEffect(() => {
-    let pollInterval: NodeJS.Timeout;
-    if (requestedRole) {
-      pollInterval = setInterval(async () => {
-        try {
-          const res = await fetch("/api/auth/me");
-          if (res.ok) {
-            const data = await res.json();
-            // If the user's role has been granted, requested_role will be null and isApproved will be true
-            if (data?.user?.is_approved && data?.user?.requested_role === null) {
-              window.location.reload();
-            }
-          }
-        } catch (e) {}
-      }, 1000 * 60 * 3); // 3 minutes
-    }
-    return () => clearInterval(pollInterval);
-  }, [requestedRole]);
+    if (!approvedRoles) return;
+    const timeout = setTimeout(() => window.location.replace("/dashboard"), 5000);
+    return () => clearTimeout(timeout);
+  }, [approvedRoles]);
+
+  React.useEffect(() => {
+    let disposed = false;
+    let checking = false;
+    let recheckRequested = false;
+    const checkApproval = async () => {
+      if (disposed || document.visibilityState === "hidden") return;
+      if (checking) { recheckRequested = true; return; }
+      checking = true;
+      try {
+        const profile = await atsApi.auth.me();
+        if (!disposed) showApproval(profile);
+      } catch {
+        // Keep the waiting page open during temporary connection failures.
+      } finally {
+        checking = false;
+        if (recheckRequested && !disposed) {
+          recheckRequested = false;
+          void checkApproval();
+        }
+      }
+    };
+    void checkApproval();
+    socket?.on("account_approved", checkApproval);
+    socket?.on("connect", checkApproval);
+    window.addEventListener("focus", checkApproval);
+    document.addEventListener("visibilitychange", checkApproval);
+    return () => {
+      disposed = true;
+      socket?.off("account_approved", checkApproval);
+      socket?.off("connect", checkApproval);
+      window.removeEventListener("focus", checkApproval);
+      document.removeEventListener("visibilitychange", checkApproval);
+    };
+  }, [socket, showApproval]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -215,9 +248,7 @@ export default function PendingApprovalView({
     setIsRefreshing(true);
     try {
       const res = await atsApi.auth.me();
-      if (res?.isApproved) {
-        toast.success("Your account has been approved! Redirecting...");
-        window.location.href = "/dashboard";
+      if (showApproval(res)) {
         return;
       }
       toast("Account still pending approval. Please check again shortly.", { icon: "⏳" });
@@ -239,6 +270,19 @@ export default function PendingApprovalView({
     });
     await signOut({ callbackUrl: "/auth/login" });
   };
+
+  if (approvedRoles) {
+    return (
+      <div className="w-full max-w-lg mx-auto p-8 bg-white dark:bg-slate-900 rounded-xl border border-neutral-200 dark:border-slate-800 text-center" role="status" aria-live="polite">
+        <CheckCircle2 className="w-12 h-12 mx-auto mb-4 text-green-600" />
+        <h1 className="text-2xl font-semibold text-neutral-900 dark:text-white mb-3">Your account is approved</h1>
+        {requestedRole && <p className="text-neutral-500 mb-2">Requested role: {requestedRole.replace(/_/g, " ")}</p>}
+        <p className="text-neutral-700 dark:text-neutral-200 mb-4">Assigned {approvedRoles.length > 1 ? "roles" : "role"}: <strong>{approvedRoles.length ? approvedRoles.map(role => role.replace(/_/g, " ")).join(", ") : "No role assigned"}</strong></p>
+        <p className="text-sm text-neutral-500 mb-6">Your dashboard will open automatically in a few seconds with the access your administrator assigned.</p>
+        <Button onClick={() => window.location.replace("/dashboard")}>Open Dashboard <ArrowRight className="w-4 h-4 ml-2" /></Button>
+      </div>
+    );
+  }
 
   // ─── STATE 1: Already Requested Role (Hang Tight Screen) ───────────────────
   if (requestedRole) {

@@ -3,6 +3,7 @@
 import React from "react";
 import PendingApprovalView from "@/components/auth/pending-approval-view";
 import type { NavigationBootstrap } from "@/lib/navigation-bootstrap";
+import { SocketProvider } from "@/contexts/SocketContext";
 
 interface OnboardingNewUserClientProps {
   session: any;
@@ -26,15 +27,17 @@ export default function OnboardingNewUserClient({
 
   return (
     // Full-height scrollable container — the key fix for scroll being blocked
-    <div className="flex-1 w-full overflow-y-auto">
-      <div className="w-full py-8 md:py-16 px-4">
-        <PendingApprovalView
-          initialRequestedRole={requestedRole}
-          userEmail={userEmail}
-          userName={userName}
-          tenantName={tenantName}
-        />
+    <SocketProvider>
+      <div className="flex-1 w-full overflow-y-auto">
+        <div className="w-full py-8 md:py-16 px-4">
+          <PendingApprovalView
+            initialRequestedRole={requestedRole}
+            userEmail={userEmail}
+            userName={userName}
+            tenantName={tenantName}
+          />
+        </div>
       </div>
-    </div>
+    </SocketProvider>
   );
 }
