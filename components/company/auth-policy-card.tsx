@@ -153,6 +153,10 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
       toast.error("Enter the Microsoft application (Client) ID before enabling Microsoft sign-in.");
       return;
     }
+    if (allowMicrosoftSso && microsoftClientId.includes("@")) {
+      toast.error("Use the Microsoft Application (client) ID from Entra App registrations, not an email address.");
+      return;
+    }
 
     try {
       setSavingSection(section);
