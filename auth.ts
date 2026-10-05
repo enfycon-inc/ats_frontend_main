@@ -6,6 +6,7 @@ import Keycloak from "next-auth/providers/keycloak"
 import { ZodError } from "zod"
 import { loginSchema } from "./lib/zod"
 import { headers } from "next/headers"
+import { classifySsoError } from "./lib/sso-error"
 import { getTenantIdentifier } from "./utils/subdomain-helper"
 
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || "d3b07384-d113-49c3-a555-9ee75c13ca33";
@@ -271,10 +272,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           // SSO backend rejected — redirect to login with error message
           const errData = res ? await res.json().catch(() => ({})) : {};
           console.warn(`SSO authentication rejected: ${errData.message || res?.statusText}`);
-          return `/auth/login?error=AccessDenied`;
+          return `/auth/login?error=${classifySsoError(res?.status, typeof errData.message === 'string' ? errData.message : '')}`;
         } catch (err) {
           console.error("SSO signIn callback error:", err);
-          return `/auth/login?error=AccessDenied`;
+          return `/auth/login?error=SSOServiceUnavailable`;
         }
       }
       return true;

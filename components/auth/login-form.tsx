@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { Loader2, Eye, EyeOff, Mail, Lock, ArrowRight, ShieldCheck } from "lucide-react";
 import { signIn, signOut } from "next-auth/react";
 import { atsApi } from "@/lib/ats-api";
+import { ssoErrorMessage } from "@/lib/sso-error";
 import toast from "react-hot-toast";
 import { getCurrentSubdomain, getBaseDomain, getTenantIdentifier } from "@/utils/subdomain-helper";
 import Social from "./social";
@@ -101,12 +102,8 @@ const LoginForm = () => {
     }
 
     const errorParam = searchParams.get("error");
-    if (errorParam === "AccessDenied" || errorParam === "Callback") {
-      toast.error(
-        "Access Denied: You have not been invited to this workspace. Please contact your administrator for an invite.",
-        { duration: 6000 }
-      );
-    }
+    const errorMessage = errorParam ? ssoErrorMessage(errorParam) : null;
+    if (errorMessage) toast.error(errorMessage, { duration: 6000 });
 
     const emailParam = searchParams.get("email");
     
