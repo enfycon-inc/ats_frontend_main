@@ -12,19 +12,12 @@ import { getBaseDomain, getCurrentSubdomain } from "@/utils/subdomain-helper";
 
 // Share one session read between metadata and layout within this server request.
 const getSessionSafe = cache(async () => {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    const session = await Promise.race([
-      auth(),
-      new Promise<null>((resolve) => {
-        timeout = setTimeout(() => resolve(null), 8000);
-      }),
-    ]);
-    return session;
+    // Renewal transport can take longer than eight seconds during an outage.
+    // A local timeout must not turn an existing session into a login redirect.
+    return await auth();
   } catch {
     return null;
-  } finally {
-    if (timeout !== undefined) clearTimeout(timeout);
   }
 });
 
@@ -91,7 +84,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <SessionProvider session={session}>
+    <SessionProvider session={session} refetchInterval={120} refetchOnWindowFocus={true}>
       <ClientRoot initialNavigation={initialNavigation} defaultOpen={cookieStore.get("sidebar_state")?.value !== "false"}>{children}</ClientRoot>
     </SessionProvider>
   );

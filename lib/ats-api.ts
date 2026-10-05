@@ -1,6 +1,6 @@
 
 /**
- * ats-api.ts — Typed API client for the NestJS ATS backend
+ * ats-api.ts â€” Typed API client for the NestJS ATS backend
  *
  * All API calls go through this file. It handles:
  * - Token storage in localStorage
@@ -49,7 +49,7 @@ export function getApiBase(): string {
   return 'http://127.0.0.1:5000';
 }
 
-// ─── Token Management ──────────────────────────────────────────────
+// â”€â”€â”€ Token Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TOKEN_KEY = 'ats_access_token';
 const REFRESH_TOKEN_KEY = 'ats_refresh_token';
 const USER_KEY = 'ats_current_user';
@@ -128,8 +128,10 @@ async function fetchSessionToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
   try {
     const res = await fetch('/api/auth/session', { cache: 'no-store' });
+    if (!res.ok && res.status !== 401) throw new SessionRenewalUnavailable();
     if (res.ok) {
       const session = await res.json();
+      if (session?.error === 'SessionRenewalUnavailable') throw new SessionRenewalUnavailable();
       if (session?.user?.accessToken && (session as any)?.error !== 'RefreshAccessTokenError') {
         const token = session.user.accessToken;
         setToken(token);
@@ -153,7 +155,9 @@ async function fetchSessionToken(): Promise<string | null> {
       }
     }
   } catch (e) {
+    if (e instanceof SessionRenewalUnavailable) throw e;
     console.warn('Could not retrieve token from NextAuth session', e);
+    throw new SessionRenewalUnavailable();
   }
   return null;
 }
@@ -162,7 +166,7 @@ async function getOrFetchToken(): Promise<string | null> {
   let token = getToken();
   if (token) return token;
 
-  // No valid stored token — attempt to recover via refresh token
+  // No valid stored token â€” attempt to recover via refresh token
   if (getRefreshToken()) {
     const refreshed = await tryAutoRefresh();
     if (refreshed) return refreshed;
@@ -172,15 +176,30 @@ async function getOrFetchToken(): Promise<string | null> {
   return await fetchSessionToken();
 }
 
-let isRefreshing = false;
-let refreshSubscribers: Array<(token: string) => void> = [];
+let pendingRefresh: Promise<string | null> | null = null;
 
-function onRefreshed(token: string) {
-  refreshSubscribers.forEach((cb) => cb(token));
-  refreshSubscribers = [];
+class SessionRenewalUnavailable extends Error {
+  constructor() { super('Session renewal is temporarily unavailable. Please try again.'); }
 }
 
 async function tryAutoRefresh(): Promise<string | null> {
+  if (pendingRefresh) return pendingRefresh;
+  const run = async () => {
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+      const previous = getToken();
+      return navigator.locks.request('ats_token_refresh', async () => {
+        const current = getToken();
+        if (current && current !== previous) return current;
+        return refreshStoredToken();
+      });
+    }
+    return refreshStoredToken();
+  };
+  pendingRefresh = run();
+  try { return await pendingRefresh; } finally { pendingRefresh = null; }
+}
+
+async function refreshStoredToken(): Promise<string | null> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
 
@@ -192,6 +211,7 @@ async function tryAutoRefresh(): Promise<string | null> {
       body: JSON.stringify({ refreshToken }),
     });
 
+    if (res.status !== 401 && !res.ok) throw new SessionRenewalUnavailable();
     if (res.ok) {
       const data = await res.json();
       if (data?.accessToken) {
@@ -202,13 +222,14 @@ async function tryAutoRefresh(): Promise<string | null> {
     }
   } catch (e) {
     console.error('Auto token refresh failed:', e);
+    throw new SessionRenewalUnavailable();
   }
 
   clearToken();
   return null;
 }
 
-// ─── HTTP Helper ────────────────────────────────────────────────────
+// â”€â”€â”€ HTTP Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {},
@@ -282,38 +303,8 @@ async function apiFetch<T = any>(
     // Attempt automatic token refresh / session recovery if token expired and retry once
     if (isExpired && !isRetry && !isPublicAuthPolicy) {
       if (getRefreshToken()) {
-        const executeRefresh = async () => {
-          if (!isRefreshing) {
-            isRefreshing = true;
-            const newToken = await tryAutoRefresh();
-            isRefreshing = false;
-            if (newToken) {
-              onRefreshed(newToken);
-              return apiFetch<T>(path, options, true);
-            }
-          } else {
-            return new Promise<T>((resolve, reject) => {
-              refreshSubscribers.push((newToken: string) => {
-                apiFetch<T>(path, options, true).then(resolve).catch(reject);
-              });
-            });
-          }
-          return null;
-        };
-
-        let retryResult;
-        if (typeof navigator !== 'undefined' && navigator.locks) {
-          retryResult = await navigator.locks.request('ats_token_refresh', async () => {
-            const currentToken = getToken();
-            if (currentToken && currentToken !== token) {
-              return apiFetch<T>(path, options, true);
-            }
-            return await executeRefresh();
-          });
-        } else {
-          retryResult = await executeRefresh();
-        }
-        if (retryResult) return retryResult;
+        const refreshed = await tryAutoRefresh();
+        if (refreshed) return apiFetch<T>(path, options, true);
       }
 
       // If no refresh token or refresh failed, fetch a fresh session token from NextAuth
@@ -351,7 +342,7 @@ async function apiFetch<T = any>(
   return res.json();
 }
 
-// ─── Auth API ───────────────────────────────────────────────────────
+// â”€â”€â”€ Auth API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const auth = {
   async login(email: string, password: string) {
     const subdomain = getTenantIdentifier();
@@ -399,7 +390,7 @@ const auth = {
 
   async getProfile(userId?: string): Promise<any> {
     // /api/auth/me returns the authenticated user's profile.
-    // The old /api/auth/profile/:id route does not exist — use /me instead.
+    // The old /api/auth/profile/:id route does not exist â€” use /me instead.
     return apiFetch<any>('/api/auth/me').catch(() => null);
   },
 
@@ -805,7 +796,7 @@ const auth = {
   },
 };
 
-// ─── Email API ───────────────────────────────────────────────────────
+// â”€â”€â”€ Email API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const email = {
   async getAccounts(): Promise<any[]> {
     return apiFetch<any[]>('/email/accounts');
@@ -914,7 +905,7 @@ const email = {
 };
 
 
-// ─── Jobs API ───────────────────────────────────────────────────────
+// â”€â”€â”€ Jobs API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export interface JobPayload {
   id: string;
   jobCode: string;
@@ -1730,7 +1721,7 @@ const integrations = {
   },
 };
 
-// ─── Market Segments ────────────────────────────────────────────────
+// â”€â”€â”€ Market Segments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const marketSegments = {
   async list(): Promise<any[]> {
     return apiFetch<any[]>('/api/market-segments');
@@ -1777,7 +1768,7 @@ const marketSegments = {
   },
 };
 
-// ─── Export ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const atsApi = {
   auth,
   jobs,

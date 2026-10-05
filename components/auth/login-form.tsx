@@ -31,6 +31,7 @@ const LoginForm = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [passwordType, setPasswordType] = useState("password");
   const formRef = useRef<HTMLFormElement>(null);
+  const handoffStarted = useRef(false);
 
   const [isAuthorizingSso, setIsAuthorizingSso] = useState(false);
   const [authPolicyStatus, setAuthPolicyStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -124,28 +125,36 @@ const LoginForm = () => {
       window.history.replaceState({}, "", cleanUrl);
     }
 
-    let ssoToken = searchParams.get("token");
-    let userJsonParam = null;
-    
-    // Read secure handoff cookie if it exists
-    const match = document.cookie.match(new RegExp('(^| )ats_sso_handoff=([^;]+)'));
-    if (match) {
-      try {
-        const payload = JSON.parse(decodeURIComponent(match[2]));
-        ssoToken = payload.token || ssoToken;
-        userJsonParam = payload.user ? JSON.stringify(payload.user) : null;
-        // Clean up the cookie
-        document.cookie = "ats_sso_handoff=; Max-Age=0; Path=/; Domain=" + window.location.hostname.split('.').slice(-2).join('.');
-      } catch (e) {}
+    if (searchParams.get("handoff") === "true") {
+      if (handoffStarted.current) return;
+      handoffStarted.current = true;
+      setIsAuthorizingSso(true);
+      void (async () => {
+        try {
+          const response = await fetch('/api/auth/handoff', { cache: 'no-store' });
+          if (!response.ok) throw new Error('Workspace sign-in could not be completed. Please sign in again.');
+          const data = await response.json();
+          const result = await signIn('token-handoff', {
+            token: data.accessToken, refreshToken: data.refreshToken,
+            expiresIn: data.expiresIn, userJson: JSON.stringify(data.user), redirect: false,
+          });
+          if (!result?.ok) throw new Error('Workspace sign-in failed.');
+          localStorage.removeItem('ats_refresh_token');
+          localStorage.setItem('ats_access_token', data.accessToken);
+          localStorage.setItem('ats_current_user', JSON.stringify(data.user));
+          await navigateAfterLogin(searchParams.get('callbackUrl') || '/dashboard');
+        } catch (error: any) {
+          setIsAuthorizingSso(false);
+          toast.error(error.message);
+        }
+      })();
+      return;
     }
+    const ssoToken = searchParams.get("token");
+
     if (ssoToken) {
       setIsAuthorizingSso(true);
-      if (userJsonParam && typeof window !== "undefined") {
-        try {
-          localStorage.setItem("ats_current_user", userJsonParam);
-        } catch {}
-      }
-      const cachedUser = userJsonParam || (typeof window !== "undefined" ? localStorage.getItem("ats_current_user") : null);
+      const cachedUser = (typeof window !== "undefined" ? localStorage.getItem("ats_current_user") : null);
       signIn("token-handoff", {
         token: ssoToken,
         userJson: cachedUser || undefined,
@@ -267,18 +276,16 @@ const LoginForm = () => {
         if (userTenantDomain && !isMasterTenant && currentSubdomain !== userTenantDomain && !isPlatformOwnerOnRoot) {
           // Tenant member logging in from root domain or different subdomain:
           // Do NOT establish a NextAuth session on root domain (avoids ghost root sessions).
-          // Immediately redirect to tenant subdomain with SSO handoff token and user payload!
+          // Transfer renewal credentials to the tenant before navigating.
           toast.success("Redirecting to your workspace...");
           const callbackUrlParam = searchParams.get("callbackUrl");
-            const cbParam = callbackUrlParam ? `?callbackUrl=${encodeURIComponent(callbackUrlParam)}` : "";
-            
-            // Secure cross-subdomain handoff via temporary cookie
-            if (syncRes?.accessToken) {
-              const handoffPayload = JSON.stringify({ token: syncRes.accessToken, user: syncRes.user });
-              document.cookie = `ats_sso_handoff=${encodeURIComponent(handoffPayload)}; Domain=.${base}; Path=/; Max-Age=30; SameSite=Lax`;
-            }
-            
-            navigateToDashboard(`${protocol}//${userTenantDomain}.${base}/auth/login${cbParam}`);
+          const handoff = await fetch('/api/auth/handoff', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accessToken: syncRes.accessToken, refreshToken: syncRes.refreshToken, destination: userTenantDomain }),
+          });
+          if (!handoff.ok) throw new Error('Unable to transfer your workspace session. Please try again.');
+          localStorage.removeItem('ats_refresh_token');
+          navigateToDashboard(`${protocol}//${userTenantDomain}.${base}/auth/login?handoff=true${callbackUrlParam ? `&callbackUrl=${encodeURIComponent(callbackUrlParam)}` : ''}`);
           return;
         }
 
@@ -286,6 +293,8 @@ const LoginForm = () => {
         const signInRes = await signIn("token-handoff", {
           redirect: false,
           token: syncRes.accessToken,
+          refreshToken: syncRes.refreshToken,
+          expiresIn: syncRes.expiresIn,
           userJson: JSON.stringify(syncRes.user),
           callbackUrl: "/dashboard",
         });
@@ -295,6 +304,8 @@ const LoginForm = () => {
           return;
         }
 
+        // NextAuth owns renewal; avoid independently rotating the same token in localStorage.
+        localStorage.removeItem("ats_refresh_token");
         toast.success("Successfully logged in");
 
         const dest = (currentSubdomain === "enfy" && isMasterTenant)

@@ -62,6 +62,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       name: "Token Handoff",
       credentials: {
         token: {},
+        refreshToken: {},
+        expiresIn: {},
         userJson: {},
       },
       authorize: async (credentials) => {
@@ -80,6 +82,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   permissions: u.permissions || [],
                   roles: u.roles || [],
                   accessToken: credentials.token as string,
+                  refreshToken: typeof credentials.refreshToken === "string" ? credentials.refreshToken : null,
+                  expiresIn: Number(credentials.expiresIn) || 300,
                   tenantDomain: u.tenantDomain || u.tenant_domain || (u.tenant && (u.tenant.domain || u.tenant.tenantDomain)) || "",
                   systemRole: u.systemRole || "",
                   podId: u.podId || u.pod_id || null,
@@ -114,6 +118,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 permissions: u.permissions || [],
                 roles: u.roles || [],
                 accessToken: credentials.token as string,
+                refreshToken: typeof credentials.refreshToken === "string" ? credentials.refreshToken : null,
+                expiresIn: Number(credentials.expiresIn) || 300,
                 tenantDomain: u.tenantDomain || u.tenant_domain || (u.tenant && (u.tenant.domain || u.tenant.tenantDomain)) || "",
                 systemRole: u.systemRole || "",
                 podId: u.podId || u.pod_id || null,
@@ -289,7 +295,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.accessToken = (user as any).accessToken
         token.refreshToken = (user as any).refreshToken || null
         // Use actual Keycloak expiresIn — do not apply a local default
-        token.accessTokenExpiry = Date.now() + (((user as any).expiresIn || 3600) * 1000)
+        token.accessTokenExpiry = Date.now() + (((user as any).expiresIn || 300) * 1000)
         token.tenantDomain = (user as any).tenantDomain
         token.systemRole = (user as any).systemRole
         token.podId = (user as any).podId
@@ -322,19 +328,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ refreshToken: token.refreshToken }),
+            signal: AbortSignal.timeout(25_000),
           }).catch(() => null)
 
+          if (!res || (!res.ok && res.status !== 401)) {
+            token.error = 'SessionRenewalUnavailable'
+            return token
+          }
+          if (res.status === 401) {
+            token.error = 'RefreshAccessTokenError'
+            return token
+          }
           if (res && res.ok) {
             const data = await res.json()
             token.accessToken = data.accessToken
             if (data.refreshToken) token.refreshToken = data.refreshToken
-            token.accessTokenExpiry = Date.now() + ((data.expiresIn || 36000) * 1000)
+            token.accessTokenExpiry = Date.now() + ((data.expiresIn || 300) * 1000)
             delete token.error
             console.log('[auth.ts jwt] Access token silently refreshed.')
             return token
           }
         } catch (e) {
           console.error('[auth.ts jwt] Silent token refresh failed:', e)
+          token.error = 'SessionRenewalUnavailable'
+          return token
         }
       }
 
