@@ -11,7 +11,7 @@ import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
 
 import { useSession } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { getBaseDomain } from "@/utils/subdomain-helper";
 import { CrossBranchApprovalsView } from "./cross-branch-approvals";
 import DataTable from "@/components/shared/data-table";
@@ -51,6 +51,7 @@ export default function ApprovalsPage() {
   }, []);
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const initialTab = searchParams.get("tab");
   const [isBranchAdmin, setIsBranchAdmin] = useState(false);
 
@@ -129,6 +130,9 @@ export default function ApprovalsPage() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false); 
   const [expandedBranches, setExpandedBranches] = useState<Record<string, boolean>>({});
+  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
+  const [tenantEdit, setTenantEdit] = useState({ name: '', subdomain: '', userLimit: 1, maxBranches: 1 });
+  const [savingTenant, setSavingTenant] = useState(false);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -207,6 +211,31 @@ export default function ApprovalsPage() {
       toast.error("Failed to load tenant users: " + err.message);
     } finally {
       setUsersLoading(false);
+    }
+  };
+
+  const openTenantEditor = (tenant: Tenant) => {
+    setEditingTenant(tenant);
+    setTenantEdit({ name: tenant.name || '', subdomain: tenant.domain || '', userLimit: tenant.userLimit || 1, maxBranches: tenant.maxBranches || 1 });
+  };
+
+  const manageTenant = (tenant: Tenant, path: string) => {
+    localStorage.setItem('tenant_id', tenant.id);
+    router.push(path);
+  };
+
+  const saveTenantEdit = async () => {
+    if (!editingTenant) return;
+    try {
+      setSavingTenant(true);
+      const updated = await atsApi.auth.updateTenant(editingTenant.id, tenantEdit);
+      setTenants(prev => prev.map(t => t.id === editingTenant.id ? { ...t, ...updated } : t));
+      setEditingTenant(null);
+      toast.success('Tenant updated successfully.');
+    } catch (err: any) {
+      toast.error(`Failed to update tenant: ${err.message}`);
+    } finally {
+      setSavingTenant(false);
     }
   };
 
@@ -757,6 +786,18 @@ export default function ApprovalsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openTenantEditor(row)} className="cursor-pointer font-medium text-xs">
+                          <Icon icon="heroicons:pencil-square" className="h-4 w-4 mr-2 text-indigo-500" />
+                          Edit Tenant
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => manageTenant(row, '/utility/users')} className="cursor-pointer font-medium text-xs">
+                          <Icon icon="heroicons:users" className="h-4 w-4 mr-2 text-indigo-500" />
+                          Manage Users
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => manageTenant(row, '/company')} className="cursor-pointer font-medium text-xs">
+                          <Icon icon="heroicons:cog-6-tooth" className="h-4 w-4 mr-2 text-indigo-500" />
+                          Manage Tenant Settings
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleViewTenantDetails(row)} className="cursor-pointer font-medium text-xs">
                           <Icon icon="heroicons:eye" className="h-4 w-4 mr-2 text-indigo-500" />
                           Details & Users
@@ -779,6 +820,27 @@ export default function ApprovalsPage() {
       </div>
 
       {/* Tenant Details & Users Modal */}
+      {editingTenant && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4" onClick={() => setEditingTenant(null)}>
+          <div className="bg-white dark:bg-slate-950 rounded-2xl max-w-xl w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="text-lg font-bold">Edit Tenant</h3>
+              <p className="text-xs text-slate-500 mt-1">Super Admin can update the same tenant-level settings available to Tenant Admins.</p>
+            </div>
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="text-xs font-semibold">Company name<Input value={tenantEdit.name} onChange={e => setTenantEdit(v => ({ ...v, name: e.target.value }))} className="mt-1" /></label>
+              <label className="text-xs font-semibold">Subdomain<Input value={tenantEdit.subdomain} onChange={e => setTenantEdit(v => ({ ...v, subdomain: e.target.value.toLowerCase() }))} className="mt-1" /></label>
+              <label className="text-xs font-semibold">Seat capacity<Input type="number" min={1} value={tenantEdit.userLimit} onChange={e => setTenantEdit(v => ({ ...v, userLimit: Number(e.target.value) }))} className="mt-1" /></label>
+              <label className="text-xs font-semibold">Branch capacity<Input type="number" min={1} value={tenantEdit.maxBranches} onChange={e => setTenantEdit(v => ({ ...v, maxBranches: Number(e.target.value) }))} className="mt-1" /></label>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditingTenant(null)}>Cancel</Button>
+              <Button onClick={saveTenantEdit} disabled={savingTenant}>{savingTenant ? 'Saving…' : 'Save changes'}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isModalOpen && selectedTenant && (
         <div 
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4"

@@ -479,6 +479,13 @@ const auth = {
     });
   },
 
+  async updateTenant(tenantId: string, data: { name?: string; subdomain?: string; userLimit?: number; maxBranches?: number }): Promise<any> {
+    return apiFetch<any>(`/api/auth/tenants/${tenantId}/management`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
   async updateTenantUserLimit(tenantId: string, limit: number): Promise<any> {
     return apiFetch<any>(`/api/auth/tenants/${tenantId}/user-limit`, {
       method: 'PATCH',
