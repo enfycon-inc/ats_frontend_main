@@ -912,6 +912,7 @@ export interface JobPayload {
   jobTitle: string;
   businessUnit: string;
   client: string;
+  endClientName?: string | null;
   clientJobId: string;
   location: string;
   state: string;
