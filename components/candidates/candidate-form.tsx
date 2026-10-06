@@ -4,7 +4,7 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { User, Briefcase, MapPin, DollarSign, FileText } from "lucide-react";
+import { User, Briefcase, MapPin, DollarSign, IndianRupee, FileText } from "lucide-react";
 import { TagInput } from "@/components/ui/tag-input";
 import { CityAutocomplete } from "@/components/city-autocomplete";
 
@@ -25,8 +25,8 @@ export function CandidateForm({
   job,
   isContractual,
 }: CandidateFormProps) {
-  const marketVal = job?.market?.toUpperCase() || "";
-  const isIndianMarket = marketVal === "IN" || marketVal === "INDIA" || marketVal === "DOMESTIC" || !marketVal;
+  const marketVal = job?.market?.trim().toUpperCase() || "";
+  const isIndianMarket = ["IND", "IN", "INDIA", "DOMESTIC", ""].includes(marketVal);
   const currencyPrefix = isIndianMarket ? "₹ " : "$ ";
   const defaultPhoneCountry = isIndianMarket ? "IN" : "US";
 
@@ -148,7 +148,7 @@ export function CandidateForm({
         {!isContractual && (
           <div className="space-y-4">
             <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-              <DollarSign className="h-4 w-4 text-blue-500" /> Compensation
+              {isIndianMarket ? <IndianRupee className="h-4 w-4 text-blue-500" /> : <DollarSign className="h-4 w-4 text-blue-500" />} Compensation
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div className="space-y-2 relative">

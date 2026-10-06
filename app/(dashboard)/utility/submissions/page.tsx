@@ -826,15 +826,6 @@ function formatSubmittedRate(rate: string | null | undefined, market?: string, j
   }
 }
 
-// In-memory Stale-While-Revalidate cache for instantaneous zero-delay page transitions
-let cachedSubmissionsState: {
-  submissions: Submission[];
-  stats: TrackerStats;
-  customRemarks: any[];
-  availableRoles: CustomRoleDefinition[];
-  timestamp: number;
-} | null = null;
-
 function calculateMatchScore(candidateSkills?: string[] | null, jobRequiredSkills?: string[] | null, jobSecondarySkills?: string[] | null): number {
   if (!candidateSkills || candidateSkills.length === 0) return 0;
   
@@ -858,10 +849,12 @@ export default function SubmissionsPage() {
   const searchParams = useSearchParams();
   const viewParam = searchParams.get('view') || 'all';
 
-  const [loading, setLoading] = useState(() => !cachedSubmissionsState);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadRequest = useRef(0);
   const [submitting, setSubmitting] = useState(false);
-  const [submissions, setSubmissions] = useState<Submission[]>(() => cachedSubmissionsState?.submissions || []);
-  const [stats, setStats] = useState<TrackerStats>(() => cachedSubmissionsState?.stats || { total: 0, l1Pending: 0, l2Pending: 0, l3Pending: 0 });
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [stats, setStats] = useState<TrackerStats>({ total: 0, l1Pending: 0, l2Pending: 0, l3Pending: 0 });
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
 
@@ -956,8 +949,8 @@ export default function SubmissionsPage() {
   const [reviewFeedback, setReviewFeedback] = useState(""); // AM/Pod feedback for recruiter
 
   // Custom Remarks Choices State (configured in Branch & Office Locations)
-  const [customRemarks, setCustomRemarks] = useState<any[]>(() => cachedSubmissionsState?.customRemarks || []);
-  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>(() => cachedSubmissionsState?.availableRoles || []);
+  const [customRemarks, setCustomRemarks] = useState<any[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
 
   // Quick Decision Modal state (for inline Table Approve / Reject)
   const [quickReviewModalOpen, setQuickReviewModalOpen] = useState(false);
@@ -968,7 +961,10 @@ export default function SubmissionsPage() {
   useEffect(() => {
     const user = atsApi.auth.getCurrentUser();
     setCurrentUser(user);
-    loadData(false);
+    setSubmissions([]);
+    setStats({ total: 0, l1Pending: 0, l2Pending: 0, l3Pending: 0 });
+    loadData(true);
+    return () => { loadRequest.current++; };
   }, [viewParam]);
 
   useEffect(() => {
@@ -979,68 +975,45 @@ export default function SubmissionsPage() {
     return () => window.removeEventListener("app:refresh", handleAppRefresh);
   }, [viewParam]);
 
-  const loadData = async (showLoading: boolean | any = true) => {
+  const loadData = async (_showLoading: boolean | any = true) => {
+    const requestId = ++loadRequest.current;
+    setLoading(true);
+    setLoadError(null);
     try {
-      const shouldShowLoading = typeof showLoading === "boolean" ? showLoading : true;
-      if (shouldShowLoading && !cachedSubmissionsState) {
-        setLoading(true);
-      }
       const user = atsApi.auth.getCurrentUser();
-      
-      const statsPromise = atsApi.submissions.getTrackerStats().then((data) => {
-        if (data) setStats(data);
-        return data;
-      }).catch(() => null);
-
-      const remarksPromise = atsApi.submissions.getCustomRemarks(user?.branchId || undefined).then((data) => {
-        if (data) setCustomRemarks(data);
-        return data;
-      }).catch(() => []);
-
-      const rolesPromise = atsApi.auth.listRoles().then((data) => {
-        if (data) setAvailableRoles(data);
-        return data;
-      }).catch(() => []);
-
-      const submissionsPromise = atsApi.submissions.list({
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        finalStatus: statusFilter || undefined,
-        view: viewParam,
-      }).then((data) => {
-        let list = data?.data || data || [];
-        if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase().trim();
-          list = list.filter((s: Submission) => 
-            s.candidateName?.toLowerCase().includes(q) ||
-            s.candidateEmail?.toLowerCase().includes(q) ||
-            s.jobCode?.toLowerCase().includes(q) ||
-            s.jobTitle?.toLowerCase().includes(q)
-          );
-        }
-        setSubmissions(list);
-        setLoading(false);
-        return list;
-      }).catch(() => []);
-
-      const [submissionsData, statsData, customRemarksData, rolesData] = await Promise.all([
-        submissionsPromise,
-        statsPromise,
-        remarksPromise,
-        rolesPromise,
+      const [data, customRemarksData, rolesData] = await Promise.all([
+        atsApi.submissions.list({
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+          finalStatus: statusFilter || undefined,
+          view: viewParam,
+        }),
+        atsApi.submissions.getCustomRemarks(user?.branchId || undefined).catch(() => []),
+        atsApi.auth.listRoles().catch(() => []),
       ]);
-
-      cachedSubmissionsState = {
-        submissions: submissionsData || [],
-        stats: statsData || { total: 0, l1Pending: 0, l2Pending: 0, l3Pending: 0 },
-        customRemarks: customRemarksData || [],
-        availableRoles: rolesData || [],
-        timestamp: Date.now(),
-      };
+      if (requestId !== loadRequest.current) return;
+      let list = data?.data || data || [];
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        list = list.filter((s: Submission) =>
+          s.candidateName?.toLowerCase().includes(q) ||
+          s.candidateEmail?.toLowerCase().includes(q) ||
+          s.jobCode?.toLowerCase().includes(q) ||
+          s.jobTitle?.toLowerCase().includes(q)
+        );
+      }
+      setSubmissions(list);
+      setStats(data.stats || { total: 0, l1Pending: 0, l2Pending: 0, l3Pending: 0 });
+      setCustomRemarks(customRemarksData);
+      setAvailableRoles(rolesData);
     } catch (err: any) {
+      if (requestId !== loadRequest.current) return;
+      setSubmissions([]);
+      setStats({ total: 0, l1Pending: 0, l2Pending: 0, l3Pending: 0 });
+      setLoadError("Unable to load submissions. Please retry.");
       toast.error("Failed to load submissions tracker: " + err.message);
     } finally {
-      setLoading(false);
+      if (requestId === loadRequest.current) setLoading(false);
     }
   };
 
@@ -1669,6 +1642,12 @@ export default function SubmissionsPage() {
           ))}
         </div>
 
+        {loadError && (
+          <div role="alert" className="mt-4 flex items-center justify-between rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+            <span>{loadError}</span>
+            <button type="button" onClick={() => loadData(true)} className="font-semibold underline">Retry</button>
+          </div>
+        )}
         {/* SUBMISSIONS LIST VS KANBAN PIPELINE */}
         {viewMode === "list" ? (
           <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none overflow-hidden relative font-sans mt-6">
@@ -1864,7 +1843,7 @@ export default function SubmissionsPage() {
                   ) : submissions.length === 0 ? (
                     <tr>
                       <td colSpan={selectedColumns.length + 1} className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900">
-                        No submissions found. Try adjusting your search queries or date filters.
+                        {loadError ? "Submissions could not be loaded." : "No submissions found. Try adjusting your search queries or date filters."}
                       </td>
                     </tr>
                   ) : (

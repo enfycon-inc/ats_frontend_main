@@ -346,8 +346,7 @@ const getInitialActiveBranchContext = () => {
     if (targetM === "IN") {
       setValue("country", "India");
       setValue("jobType", "Full Time");
-      setValue("shiftTiming", unit.shiftTiming || "General Shift (Day)");
-      setValue("taxTerms", "Permanent");
+      setValue("shiftTiming", unit.shiftTiming || "General Shift (Day)");      setValue("taxTerms", "Permanent");
                                     setBillUnit("LPA");
                                     setPayUnit("LPA");
       setBillCurrency("INR");
@@ -359,8 +358,7 @@ const getInitialActiveBranchContext = () => {
     } else {
       setValue("country", "United States");
       setValue("jobType", "Full Time");
-      setValue("shiftTiming", unit.shiftTiming || "US Shift (Night)");
-      setValue("taxTerms", "C2C");
+      setValue("shiftTiming", unit.shiftTiming || "US Shift (Night)");      setValue("taxTerms", "C2C");
       setBillCurrency("USD");
       setBillUnit("Hourly");
       setBillTerm("C2C");
@@ -638,8 +636,7 @@ const getInitialActiveBranchContext = () => {
       
       setValue("taxTerms", "Permanent");
                                     setBillUnit("LPA");
-                                    setPayUnit("LPA");
-      const commVal = commissionType === "custom" ? customCommission : commissionType;
+                                    setPayUnit("LPA");      const commVal = commissionType === "custom" ? customCommission : commissionType;
       setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: false });
     } else if (selectedCountry === "United States") {
       
@@ -651,8 +648,7 @@ const getInitialActiveBranchContext = () => {
       setPayUnit("Hourly");
       setPayTerm("C2C");
       
-      setValue("taxTerms", "C2C");
-    }
+      setValue("taxTerms", "C2C");    }
   }, [selectedCountry, setValue, commissionType, customCommission]);
 
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
@@ -810,8 +806,7 @@ const getInitialActiveBranchContext = () => {
           const tMarket = "IN";
           if (tMarket === "IN") {
             setValue("jobType", "Full Time");
-            setValue("shiftTiming", "General Shift (Day)");
-            setValue("taxTerms", "Permanent");
+            setValue("shiftTiming", "General Shift (Day)");            setValue("taxTerms", "Permanent");
                                     setBillUnit("LPA");
                                     setPayUnit("LPA");
             setValue("accountManager", posterName);
@@ -823,8 +818,7 @@ const getInitialActiveBranchContext = () => {
             setPayTerm("Permanent");
           } else {
             setValue("jobType", "Full Time");
-            setValue("shiftTiming", "US Shift (Night)");
-            setValue("taxTerms", "C2C");
+            setValue("shiftTiming", "US Shift (Night)");            setValue("taxTerms", "C2C");
             setBillCurrency("USD");
             setBillUnit("Hourly");
             setBillTerm("C2C");
@@ -1122,8 +1116,7 @@ const getInitialActiveBranchContext = () => {
         // Auto-assign work authorization if matched
         if (res.workAuthorization) {
           setValue("workAuthorization", res.workAuthorization);
-        } else {
-        }
+        } else {        }
 
         // Pre-fill location fields if returned (preserving active branch market)
         if (res.location) {
@@ -1257,7 +1250,7 @@ const getInitialActiveBranchContext = () => {
         let maxRate = resAny.payRateMax || resAny.budgetMax || resAny.ctcMax || "";
 
         if (!minRate && !maxRate && extractedPay) {
-          const match = String(extractedPay).match(/([\d\.]+)\s*[\ΓÇô\ΓÇö\-to\s]+\s*([\d\.]+)/);
+          const match = String(extractedPay).match(/([\d\.]+)\s*[\–\—\-to\s]+\s*([\d\.]+)/);
           if (match) {
             minRate = match[1];
             maxRate = match[2];
@@ -1392,7 +1385,7 @@ const getInitialActiveBranchContext = () => {
       const finalApproverId = hasDesignatedReviewer ? (currentUserProfile?.jobReviewerId || currentUserProfile?.job_reviewer_id || resolvedApproverId) : resolvedApproverId;
       const finalApproverRole = hasDesignatedReviewer ? "DESIGNATED_REVIEWER" : resolvedApproverRole;
 
-      // Map frontend form fields ΓåÆ backend CreateJobDto
+      // Map frontend form fields → backend CreateJobDto
       const payload = {
         jobCode: data.jobCode,
         branchId: selectedUnitObj?.branchId || (typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') || undefined : undefined),
@@ -1961,7 +1954,7 @@ const getInitialActiveBranchContext = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 font-bold text-xs">
                       <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0" />
-                      <span>Requisition Incomplete ΓÇö Please complete the {Object.keys(errors).length} mandatory field{Object.keys(errors).length > 1 ? "s" : ""} below before submitting:</span>
+                      <span>Requisition Incomplete — Please complete the {Object.keys(errors).length} mandatory field{Object.keys(errors).length > 1 ? "s" : ""} below before submitting:</span>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1.5 pt-0.5 pl-6">
@@ -2032,7 +2025,7 @@ const getInitialActiveBranchContext = () => {
                                 <optgroup key={b.id} label={`${b.name} (${b.city ? b.city + ', ' : ''}${b.country || ''})`}>
                                   {unitsInBranch.map((u) => (
                                     <option key={u.id} value={u.id}>
-                                      {u.name} ΓÇö {u.shiftTiming || 'General Shift'} ({u.currency || 'INR'})
+                                      {u.name} — {u.shiftTiming || 'General Shift'} ({u.currency || 'INR'})
                                     </option>
                                   ))}
                                 </optgroup>
@@ -2041,7 +2034,7 @@ const getInitialActiveBranchContext = () => {
                           ) : (
                             availableUnits.map((u) => (
                               <option key={u.id} value={u.id}>
-                                {u.name} ΓÇö {u.shiftTiming || 'General Shift'}
+                                {u.name} — {u.shiftTiming || 'General Shift'}
                               </option>
                             ))
                           )}
@@ -2521,7 +2514,7 @@ const getInitialActiveBranchContext = () => {
                                     }
                                   }}
                                 >
-                                  Γ£ö Select "{clientSearchText.trim()}"
+                                  ✔ Select "{clientSearchText.trim()}"
                                 </button>
                               )}
                               <button
@@ -2936,7 +2929,7 @@ const getInitialActiveBranchContext = () => {
                                     }
                                   }}
                                 >
-                                  Γ£ö Select "{endClientSearchText.trim()}"
+                                  ✔ Select "{endClientSearchText.trim()}"
                                 </button>
                               )}
                               <button
@@ -3830,11 +3823,11 @@ const getInitialActiveBranchContext = () => {
                 </div>
                 <div>
                   <span className="text-[10px] font-medium text-slate-400 block">Type & Location</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.jobType || "Full Time"} ΓÇó {publishingModalState.location || "Remote"}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.jobType || "Full Time"} • {publishingModalState.location || "Remote"}</span>
                 </div>
                 <div>
                   <span className="text-[10px] font-medium text-slate-400 block">Positions & Pay Rate</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.positions || 1} Pos ΓÇó {publishingModalState.payRate || "N/A"}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.positions || 1} Pos • {publishingModalState.payRate || "N/A"}</span>
                 </div>
               </div>
             </div>

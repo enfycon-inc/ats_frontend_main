@@ -668,7 +668,7 @@ export default function RolesPermissionsPage() {
     const handleCreateRole = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRoleName.trim()) return toast.error("Please provide a role name.");
-      // businessUnitId is optional � branch admins may not have a unit assigned
+      // businessUnitId is optional — branch admins may not have a unit assigned
     try {
       setSubmitting(true);
       const baseSystemRoleObj = roles.find(r => r.isSystem && r.name.toUpperCase() === newRoleSystemRole.toUpperCase());
@@ -722,7 +722,7 @@ export default function RolesPermissionsPage() {
     e.preventDefault();
     if (!editingRole) return;
     if (!editRoleName.trim()) return toast.error("Role name cannot be empty.");
-      // businessUnitId is optional � branch admins may not have a unit assigned
+      // businessUnitId is optional — branch admins may not have a unit assigned
 
     try {
       setSubmitting(true);
