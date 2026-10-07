@@ -558,8 +558,8 @@ const auth = {
     });
   },
 
-  async updateUserDetail(userId: string, data: { fullName?: string; email?: string; password?: string; branchId?: string;
-      businessUnitId?: string;
+  async updateUserDetail(userId: string, data: { fullName?: string; email?: string; password?: string; branchId?: string | null;
+      businessUnitId?: string | null;
       assignedBranchIds?: string[]; branchRoles?: Record<string, string[]>; roles?: string[]; assignedRoleIds?: string[]; jobReviewerId?: string | null }): Promise<any> {
     return apiFetch<any>(`/api/auth/users/${userId}`, {
       method: 'PATCH',

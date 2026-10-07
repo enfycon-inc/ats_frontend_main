@@ -822,10 +822,11 @@ export default function UserManagementPage() {
     try {
       setSubmitting(true);
       const finalRoles = getSelectedMemberRoleIds(editForm, editRolesCatalog);
+      const isTenantAdminAssignment = hasAdministrativeRole(editForm.roles, editRolesCatalog, "TENANT_ADMIN");
 
       await atsApi.auth.updateUserDetail(selectedUser.id, {
-        branchId: editForm.branchId || selectedUser.branchId || undefined,
-        businessUnitId: editForm.businessUnitId || selectedUser.businessUnitId || undefined,
+        branchId: isTenantAdminAssignment ? null : (editForm.branchId || selectedUser.branchId || undefined),
+        businessUnitId: isTenantAdminAssignment ? null : (editForm.businessUnitId || selectedUser.businessUnitId || undefined),
         assignedRoleIds: finalRoles,
       });
 
@@ -834,8 +835,8 @@ export default function UserManagementPage() {
           u.id === selectedUser.id
             ? {
                 ...u,
-                branchId: editForm.branchId || selectedUser.branchId || null,
-                businessUnitId: editForm.businessUnitId || selectedUser.businessUnitId || null,
+                branchId: isTenantAdminAssignment ? null : (editForm.branchId || selectedUser.branchId || null),
+                businessUnitId: isTenantAdminAssignment ? null : (editForm.businessUnitId || selectedUser.businessUnitId || null),
                 roles: finalRoles,
               }
             : u
@@ -3066,7 +3067,7 @@ export default function UserManagementPage() {
                         </div>
                         <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-2">Administrative roles grant system-wide permissions across the entire scope (Tenant, Branch, or Unit).</p>
                         
-                        {(editFormAdminRole === "TENANT_ADMIN" || editFormAdminRole === "BRANCH_ADMIN") && (
+                        {(editFormAdminRole === "BRANCH_ADMIN" || editFormAdminRole === "UNIT_ADMIN") && (
                            <div className="space-y-3 pt-3 mt-4 border-t border-neutral-100 dark:border-slate-800">
                              <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Assign Administrative Scope</label>
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -3110,7 +3111,7 @@ export default function UserManagementPage() {
                                     </Select>
                                   )}
                                 </div>
-                                {false && (
+                                {editFormAdminRole === "UNIT_ADMIN" && (
                                 <div className="space-y-1">
                                   <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Branch Unit *</label>
                                   {!editForm.branchId ? (
