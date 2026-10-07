@@ -3000,7 +3000,7 @@ export default function UserManagementPage() {
       {/* EDIT MEMBER MODAL (FIX EMAIL TYPOS / BRANCH) */}
       {isEditModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-4xl lg:max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[88vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95">
             <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
                 <Shield className="h-4 w-4 text-indigo-650" /> Assign Member Roles
@@ -3245,27 +3245,6 @@ export default function UserManagementPage() {
                   </div>
                 );
               })()}
-              {/* DESIGNATED MANAGER */}
-              <div className="space-y-2 pt-3 border-t border-neutral-100 dark:border-slate-800">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                    <UserCheck className="h-4 w-4 text-indigo-600" /> Designated Manager (Approvals & Reviews)
-                  </label>
-                  <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded">
-                    Reporting Manager
-                  </span>
-                </div>
-                <ReviewerSelect
-                  value={editForm.jobReviewerId || ""}
-                  onChange={(val) => setEditForm({ ...editForm, jobReviewerId: val })}
-                  eligibleUsers={eligibleReviewers}
-                  excludeUserId={selectedUser?.id}
-                  rolesList={rolesList}
-                />
-              </div>
-
-
-
               <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100 dark:border-slate-800 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
                 <Button type="button" variant="outline" size="sm" onClick={() => setIsEditModalOpen(false)} className="h-8 text-xs cursor-pointer">
                   Cancel
