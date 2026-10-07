@@ -28,7 +28,7 @@ import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
-import { getSelectedMemberRoleIds } from "@/lib/member-role-selection";
+import { getSelectedMemberRoleIds, hasAdministrativeRole, toggleAdministrativeRole } from "@/lib/member-role-selection";
 
 interface UserItem {
   id: string;
@@ -37,6 +37,8 @@ interface UserItem {
   roleId: string | null;
   roleName: string;
   roles?: string[];
+  assignedRoleIds?: string[];
+  assignedRoles?: any[];
   branchId: string | null;
   businessUnitId?: string | null;
   businessUnitName?: string | null;
@@ -806,6 +808,8 @@ export default function UserManagementPage() {
     }
   };
 
+  const editRolesCatalog = [...rolesList, ...(selectedUser?.assignedRoles || []).filter(role => !rolesList.some(available => available.id === role.id))];
+
   const handleUpdateMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
@@ -818,25 +822,15 @@ export default function UserManagementPage() {
       return toast.error("First Name, Last Name, and Work Email are required.");
     }
 
-    let editSysKey = "NONE";
-    for (const r of editForm.roles) {
-      const sr = rolesList.find(rl => rl.id === r || rl.name === r);
-      if (sr && sr.isSystem) {
-        const sysId = sr.systemRole || sr.system_role;
-        if (sysId === "TENANT_ADMIN" || sysId === "SUPER_ADMIN") editSysKey = "TENANT_ADMIN";
-        else if (sysId === "BRANCH_ADMIN") editSysKey = "BRANCH_ADMIN";
-        else if (sysId === "UNIT_ADMIN") editSysKey = "UNIT_ADMIN";
-      }
-    }
-    const isTenantOrBranchAdminEdit = editSysKey === 'TENANT_ADMIN' || editSysKey === 'BRANCH_ADMIN';
-    
+    const isTenantOrBranchAdminEdit = hasAdministrativeRole(editForm.roles, editRolesCatalog, 'TENANT_ADMIN') || hasAdministrativeRole(editForm.roles, editRolesCatalog, 'BRANCH_ADMIN');
+
     if (!isTenantOrBranchAdminEdit && !editForm.businessUnitId) {
       return toast.error('Branch Unit is mandatory for staffing roles.');
     }
 
     try {
       setSubmitting(true);
-      const finalRoles = getSelectedMemberRoleIds(editForm, rolesList);
+      const finalRoles = getSelectedMemberRoleIds(editForm, editRolesCatalog);
 
       await atsApi.auth.updateUserDetail(selectedUser.id, {
         fullName: trimmedName,
@@ -1521,7 +1515,7 @@ export default function UserManagementPage() {
     const nameParts = (user.fullName || "").trim().split(" ");
     const fName = nameParts[0] || "";
     const lName = nameParts.slice(1).join(" ") || "";
-    const rawRoles = getUserEffectiveRoles(user, "ALL");
+    const rawRoles = user.assignedRoleIds ?? (user.roleId ? [user.roleId] : getUserEffectiveRoles(user, "ALL"));
     setEditForm({
       firstName: fName,
       lastName: lName,
@@ -2721,7 +2715,8 @@ export default function UserManagementPage() {
                     if (newAdminRole) {
                       nextRoles.push(newAdminRole.id);
                     } else {
-                      alert("Error: Could not find system role ID for " + targetSysKey + ". Available: " + rolesList.filter(r => r.isSystem).map(r => r.name + ":" + (r.systemRoleId || r.system_role_id)).join(", "));
+                      toast.error("This administrative role is unavailable in your current access scope. Refresh the page or contact your administrator.");
+                      return;
                     }
                   }
                   
@@ -3081,50 +3076,15 @@ export default function UserManagementPage() {
 
               {/* ADMINISTRATIVE ACCESS & STAFF ROLES LOGIC */}
               {(() => {
-                const getAdminSysKey = (rolesArray: string[]) => {
-  for (const r of rolesArray) {
-    const sr = rolesList.find(rl => rl.id === r);
-    if (sr && sr.isSystem) {
-      const sysId = sr.systemRole || sr.system_role;
-      if (sysId === "TENANT_ADMIN" || sysId === "SUPER_ADMIN") return "TENANT_ADMIN";
-      if (sysId === "BRANCH_ADMIN") return "BRANCH_ADMIN";
-      if (sysId === "UNIT_ADMIN") return "UNIT_ADMIN";
-    }
-  }
-  return "NONE";
-};
-
-                const editFormAdminRole = getAdminSysKey(editForm.roles);
-
-                const handleEditAdminRoleChange = (targetSysKey: string) => {
-                  let nextRoles = editForm.roles.filter(r => {
-                    const sr = rolesList.find(rl => rl.id === r);
-                    return !(sr && sr.isSystem);
-                  });
-
-                  if (targetSysKey !== "NONE") {
-                    const newAdminRole = rolesList.find(rl => {
-                      if (!rl.isSystem) return false;
-                      const sysId = rl.systemRole || rl.system_role;
-                      if (targetSysKey === "TENANT_ADMIN") return sysId === "TENANT_ADMIN" || sysId === "SUPER_ADMIN";
-                      if (targetSysKey === "BRANCH_ADMIN") return sysId === "BRANCH_ADMIN";
-                      if (targetSysKey === "UNIT_ADMIN") return sysId === "UNIT_ADMIN";
-                      return false;
-                    });
-                    if (newAdminRole) {
-                      nextRoles.push(newAdminRole.id);
-                    } else {
-                      alert("Error: Could not find system role ID for " + targetSysKey + ". Available: " + rolesList.filter(r => r.isSystem).map(r => r.name + ":" + (r.systemRoleId || r.system_role_id)).join(", "));
-                    }
+                const selectedAdmin = (key: string) => hasAdministrativeRole(editForm.roles, editRolesCatalog, key);
+                const editFormAdminRole = selectedAdmin("UNIT_ADMIN") ? "UNIT_ADMIN" : selectedAdmin("BRANCH_ADMIN") ? "BRANCH_ADMIN" : selectedAdmin("TENANT_ADMIN") ? "TENANT_ADMIN" : "NONE";
+                const handleEditAdminRoleChange = (key: string) => {
+                  try {
+                    const nextRoles = toggleAdministrativeRole(editForm.roles, editRolesCatalog, rolesList, key);
+                    setEditForm(prev => ({ ...prev, roles: nextRoles }));
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "Unable to update this role selection.");
                   }
-                  
-                  // Retain business unit for Branch Admin so they can also have custom roles (like Recruiter)
-                  setEditForm(prev => ({
-                    ...prev, 
-                    roles: nextRoles,
-                    branchId: targetSysKey === "TENANT_ADMIN" ? "" : prev.branchId,
-                    businessUnitId: targetSysKey === "TENANT_ADMIN" ? "" : prev.businessUnitId
-                  }));
                 };
 
                 const branchRolesForEdit = (rolesList || []).filter((r) => {
@@ -3146,15 +3106,14 @@ export default function UserManagementPage() {
                             { key: "BRANCH_ADMIN", label: "Branch Admin", show: isTenantAdmin || isBranchAdmin },
                             { key: "UNIT_ADMIN", label: "Branch Unit Admin", show: isTenantAdmin || isBranchAdmin || isUnitAdmin }
                           ].filter(r => r.show).map((role) => {
-                            const isChecked = editFormAdminRole === role.key;
+                            const isChecked = selectedAdmin(role.key);
                             return (
                               <label key={role.key} className="flex items-center gap-1.5 cursor-pointer">
                                 <input 
                                   type="checkbox" 
                                   checked={isChecked} 
                                   onChange={() => {
-                                    if (isChecked) handleEditAdminRoleChange("NONE");
-                                    else handleEditAdminRoleChange(role.key);
+                                    handleEditAdminRoleChange(role.key);
                                   }} 
                                   className="h-4 w-4 accent-indigo-600 cursor-pointer rounded" 
                                 />

@@ -181,3 +181,12 @@ test('workspace handoff encrypts credentials, rejects other workspaces, and cons
     assert.equal((await routes.POST(request('example.test', { accessToken: 'access', refreshToken: 'private', destination: 'other' }))).status, 403);
   } finally { if (env === undefined) delete process.env.AUTH_SECRET; else process.env.AUTH_SECRET = env; }
 });
+
+test('full role catalog preserves explicit ALL scope over the active branch', async () => {
+  let sent;
+  const app = api(async (url, options) => { sent = options.headers; return new Response('[]'); });
+  app.storage.set('ats_token', 'valid-token');
+  app.storage.set('active_branch_id', 'branch-id');
+  await app.api.auth.listRoles('ALL', true);
+  assert.equal(sent['x-branch-id'], 'ALL');
+});

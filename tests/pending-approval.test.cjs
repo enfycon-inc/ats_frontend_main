@@ -20,7 +20,7 @@ function mount() {
   const imports = {
     react: { ...react, default: react }, 'react/jsx-runtime': { jsx, jsxs: jsx },
     '@/contexts/SocketContext': { useSocket: () => ({ socket }) },
-    '@/lib/ats-api': { atsApi: { auth: { me: async () => { calls++; return profile; }, listRoles: async () => [] }, branches: { list: async () => [] }, businessUnits: { list: async () => [] } } },
+    '@/lib/ats-api': { atsApi: { auth: { me: async () => { calls++; return profile; }, listRoles: async () => [] }, branches: { list: async () => [] }, businessUnits: { onboardingOptions: async () => [] } } },
   };
   const browser = { location: { replace: value => redirects.push(value) }, addEventListener: (name, fn) => windowListeners.set(name, fn), removeEventListener: name => windowListeners.delete(name) };
   const document = { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} };

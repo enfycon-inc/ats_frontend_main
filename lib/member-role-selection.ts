@@ -21,3 +21,24 @@ export function getSelectedMemberRoleIds(form: MemberRoleForm, availableRoles: A
     return matches[0].id;
   })));
 }
+
+export type MemberRole = AvailableMemberRole & { isSystem?: boolean; systemRole?: string; system_role?: string };
+
+export function getAdministrativeRoleKey(role?: MemberRole): string {
+  if (!role?.isSystem) return "NONE";
+  const key = role.systemRole || role.system_role;
+  return key === "SUPER_ADMIN" ? "TENANT_ADMIN" : key || "NONE";
+}
+
+export function hasAdministrativeRole(ids: string[], roles: MemberRole[], key: string): boolean {
+  return ids.some(id => getAdministrativeRoleKey(roles.find(role => role.id === id)) === key);
+}
+
+export function toggleAdministrativeRole(ids: string[], assignedRoles: MemberRole[], availableRoles: MemberRole[], key: string): string[] {
+  if (hasAdministrativeRole(ids, assignedRoles, key)) {
+    return ids.filter(id => getAdministrativeRoleKey(assignedRoles.find(role => role.id === id)) !== key);
+  }
+  const role = availableRoles.find(role => getAdministrativeRoleKey(role) === key);
+  if (!role) throw new Error("This administrative role is unavailable in your current access scope. Refresh the page or contact your administrator.");
+  return [...new Set([...ids, role.id])];
+}

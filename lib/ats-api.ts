@@ -280,7 +280,7 @@ async function apiFetch<T = any>(
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  if (activeBranchId) {
+  if (activeBranchId && !headers['x-branch-id']) {
     headers['x-branch-id'] = activeBranchId;
   }
   if (tenantDomain && tenantDomain !== 'www' && tenantDomain !== 'api') {
