@@ -107,12 +107,12 @@ function BranchAdminDashboardView({
         setLoading(true);
         const bId = activeBranchId && activeBranchId !== "all" ? activeBranchId : undefined;
         const [subsRes, usersRes, podsRes] = await Promise.all([
-          atsApi.submissions.list({ branchId: bId }).catch(() => []),
+          atsApi.submissions.list({ branchId: bId }).catch(() => null),
           atsApi.auth.listUsers().catch(() => []),
           atsApi.pods.list(bId).catch(() => []),
         ]);
         if (!isMounted) return;
-        const subList = subsRes?.data || subsRes || [];
+        const subList = subsRes?.data || [];
         setSubmissions(subList);
         setBranchUsers(usersRes || []);
 

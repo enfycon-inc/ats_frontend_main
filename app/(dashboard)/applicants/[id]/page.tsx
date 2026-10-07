@@ -147,8 +147,8 @@ export default function CandidateDetailPage() {
 
       // 2. Fetch submissions for this candidate
       try {
-        const subsList = await atsApi.submissions.list();
-        const candidateSubs = subsList.filter((s: any) => s.candidateId === candidateId);
+        const subsList = await atsApi.submissions.list({ candidateId });
+        const candidateSubs = subsList.data;
         setSubmissions(candidateSubs);
       } catch (subErr) {
         console.error("Failed to load submissions:", subErr);
@@ -236,8 +236,8 @@ export default function CandidateDetailPage() {
       setSubmitModalOpen(false);
 
       // Refresh submissions
-      const subsList = await atsApi.submissions.list();
-      const candidateSubs = subsList.filter((s: any) => s.candidateId === candidateId);
+      const subsList = await atsApi.submissions.list({ candidateId });
+      const candidateSubs = subsList.data;
       setSubmissions(candidateSubs);
     } catch (err: any) {
       toast.error("Failed to submit candidate: " + err.message);

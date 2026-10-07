@@ -14,6 +14,7 @@ import { useSession } from "next-auth/react";
 
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { NavbarLogo } from "@/components/layout/navbar-logo";
 import { TopNavbar } from "@/components/layout/top-navbar";
 import { SitePageHeader } from "@/components/layout/site-page-header";
 import { SocketProvider } from "@/contexts/SocketContext";
@@ -55,6 +56,8 @@ export function ClientRoot({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const isSubmissionTracker = pathname?.startsWith("/utility/submissions");
+  const [trackerNavigationOpen, setTrackerNavigationOpen] = useState(false);
   const { data: session } = useSession();
 
   useEffect(() => {
@@ -182,18 +185,19 @@ export function ClientRoot({
         <SocketProvider>
           <NotificationProvider>
             <NotificationListener />
-            <SidebarProvider defaultOpen={defaultOpen}>
+            <SidebarProvider defaultOpen={defaultOpen} open={isSubmissionTracker ? trackerNavigationOpen : undefined} onOpenChange={isSubmissionTracker ? setTrackerNavigationOpen : undefined}>
               <AppSidebar initialNavigation={initialNavigation} />
               <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-y-auto max-h-screen h-screen">
                 <header className="sticky top-0 z-40 flex h-[46px] min-h-[46px] shrink-0 items-center gap-2 border-b border-[#1a4fa0] dark:border-[#0f2d6b] bg-[#1a4fa0] dark:bg-[#0f2d6b] px-4 shadow-sm">
                   <SidebarTrigger className="-ml-1 text-white hover:bg-white/10 hover:text-white" />
+                  {isSubmissionTracker && <NavbarLogo className="!w-auto max-w-[240px]" />}
                   <div className="flex-1" />
                   <div className="flex items-center gap-2">
                     <NavbarRight />
                   </div>
                 </header>
                 <Suspense fallback={<div className="h-[50px] min-h-[50px] bg-white dark:bg-[#151c24] border-b border-slate-200/70 dark:border-slate-800/70 shrink-0" />}>
-                  <SitePageHeader />
+                  {!isSubmissionTracker && <SitePageHeader />}
                 </Suspense>
                 {MainContent}
               </SidebarInset>

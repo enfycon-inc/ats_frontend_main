@@ -1,3 +1,4 @@
+import type { TrackerResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
 
 /**
  * ats-api.ts — Typed API client for the NestJS ATS backend
@@ -1483,7 +1484,7 @@ const pods = {
 };
 
 const submissions = {
-  async list(filters?: Record<string, any>): Promise<any> {
+  async list(filters?: Record<string, any>): Promise<TrackerResponse> {
     const cleanFilters: Record<string, string> = {};
     if (filters) {
       Object.entries(filters).forEach(([key, val]) => {
@@ -1493,10 +1494,10 @@ const submissions = {
       });
     }
     const query = new URLSearchParams(cleanFilters).toString();
-    return apiFetch<any>(`/api/recruiter-submissions${query ? `?${query}` : ''}`);
+    return apiFetch<TrackerResponse>(`/api/recruiter-submissions${query ? `?${query}` : ''}`);
   },
-  async get(id: number): Promise<any> {
-    return apiFetch<any>(`/api/recruiter-submissions/${id}`);
+  async get(id: string | number): Promise<TrackerSubmission> {
+    return apiFetch<TrackerSubmission>(`/api/recruiter-submissions/${id}`);
   },
   async create(data: Record<string, any>): Promise<any> {
     return apiFetch<any>('/api/recruiter-submissions', {
@@ -1504,8 +1505,8 @@ const submissions = {
       body: JSON.stringify(data),
     });
   },
-  async update(id: number, data: Record<string, any>): Promise<any> {
-    return apiFetch<any>(`/api/recruiter-submissions/${id}`, {
+  async update(id: string | number, data: TrackerUpdate | Record<string, any>): Promise<TrackerSubmission> {
+    return apiFetch<TrackerSubmission>(`/api/recruiter-submissions/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
