@@ -25,7 +25,7 @@ export default function NewClientPage() {
     endClientName: "",
     market: "INDIA", // Automatically detected from branch
     status: "Active",
-    contactPerson: "",
+    contactFirstName: "", contactLastName: "",
     contactDesignation: "",
     emailId: "",
     contactNumber: "",
@@ -162,7 +162,7 @@ export default function NewClientPage() {
         is_same_as_primary: endClientSelectionMode === "__SAME__",
         market: formData.market,
         status: formData.status,
-        contact_person: formData.contactPerson.trim(),
+        contact_person: [formData.contactFirstName?.trim(), formData.contactLastName?.trim()].filter(Boolean).join(" "),
         contact_designation: formData.contactDesignation.trim(),
         email_id: formData.emailId.trim(),
         contact_number: formData.contactNumber.trim(),
@@ -303,12 +303,22 @@ export default function NewClientPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">POC Contact Name</label>
+                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">POC First Name</label>
                 <input
-                  name="contactPerson"
-                  value={formData.contactPerson}
+                  name="contactFirstName"
+                  value={formData.contactFirstName}
                   onChange={handleChange}
-                  placeholder="e.g. John Smith, Ramesh Kumar"
+                  placeholder="First Name"
+                  className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">POC Last Name</label>
+                <input
+                  name="contactLastName"
+                  value={formData.contactLastName}
+                  onChange={handleChange}
+                  placeholder="Last Name"
                   className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded-md outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>

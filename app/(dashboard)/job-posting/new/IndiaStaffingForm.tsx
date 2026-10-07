@@ -2741,7 +2741,7 @@ const getInitialActiveBranchContext = () => {
                               <CommandEmpty>No POC found.</CommandEmpty>
 
                               {pocList.myContacts.length > 0 && (
-                                <CommandGroup heading="? My Contacts">
+                                <CommandGroup heading="My Contacts">
                                   {pocList.myContacts
                                     .filter(p => p.name.toLowerCase().includes(pocSearch.toLowerCase()))
                                     .map(p => (
@@ -2756,7 +2756,7 @@ const getInitialActiveBranchContext = () => {
                                       >
                                         <div className="flex flex-col">
                                           <span className="font-medium">{p.name}</span>
-                                          {p.designation && <span className="text-[10px] text-neutral-500">{p.designation}</span>}
+                                          <span className="text-[10px] text-neutral-500">{[p.designation, p.email, p.phone].filter(Boolean).join(" | ")}</span>
                                         </div>
                                         <Check
                                           className={`ml-auto h-3 w-3 ${selectedPocId === p.id ? "opacity-100" : "opacity-0"}`}
@@ -2767,7 +2767,7 @@ const getInitialActiveBranchContext = () => {
                               )}
 
                               {pocList.otherContacts.length > 0 && (
-                                <CommandGroup heading="?? Other Contacts">
+                                <CommandGroup heading="Other Contacts">
                                   {pocList.otherContacts
                                     .filter(p => p.name.toLowerCase().includes(pocSearch.toLowerCase()))
                                     .map(p => (
@@ -2851,7 +2851,7 @@ const getInitialActiveBranchContext = () => {
                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
                                       setValue("endClientName", clientNameStr, { shouldValidate: true });
                                       // @ts-ignore
-                                      if (exactMatch.id) setSelectedEndClientId(exactMatch.id); else if (cl?.id) setSelectedEndClientId(cl.id);
+                                      if (cl?.id) setSelectedEndClientId(cl.id);
                                       setEndClientDropdownOpen(false);
                                       setEndClientSearchText("");
                                     } else {
@@ -2910,7 +2910,7 @@ const getInitialActiveBranchContext = () => {
                                           onSelect={() => {
                                             setValue("endClientName", clientNameStr, { shouldValidate: true });
                                       // @ts-ignore
-                                      if (exactMatch.id) setSelectedEndClientId(exactMatch.id); else if (cl?.id) setSelectedEndClientId(cl.id);
+                                      if (cl?.id) setSelectedEndClientId(cl.id);
                                             setEndClientDropdownOpen(false);
                                             setEndClientSearchText("");
                                           }}
@@ -2945,7 +2945,7 @@ const getInitialActiveBranchContext = () => {
                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
                                       setValue("endClientName", clientNameStr, { shouldValidate: true });
                                       // @ts-ignore
-                                      if (exactMatch.id) setSelectedEndClientId(exactMatch.id); else if (cl?.id) setSelectedEndClientId(cl.id);
+                                      if (cl?.id) setSelectedEndClientId(cl.id);
                                       setEndClientDropdownOpen(false);
                                       setEndClientSearchText("");
                                     } else {
@@ -3013,7 +3013,7 @@ const getInitialActiveBranchContext = () => {
                               <CommandEmpty>No POC found.</CommandEmpty>
 
                               {endPocList.myContacts.length > 0 && (
-                                <CommandGroup heading="?? My Contacts">
+                                <CommandGroup heading="My Contacts">
                                   {endPocList.myContacts
                                     .filter(p => p.name.toLowerCase().includes(endPocSearch.toLowerCase()))
                                     .map(p => (
@@ -3039,7 +3039,7 @@ const getInitialActiveBranchContext = () => {
                               )}
 
                               {endPocList.otherContacts.length > 0 && (
-                                <CommandGroup heading="?? Company Contacts">
+                                <CommandGroup heading="Company Contacts">
                                   {endPocList.otherContacts
                                     .filter(p => p.name.toLowerCase().includes(endPocSearch.toLowerCase()))
                                     .map(p => (

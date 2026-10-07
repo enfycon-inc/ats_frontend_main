@@ -62,7 +62,7 @@ export default function ClientDetailPage() {
     is_same_as_primary: true,
     market: "US",
     status: "Active",
-    contact_person: "",
+    contactFirstName: "", contactLastName: "",
     contact_designation: "",
     email_id: "",
     contact_number: "",
@@ -99,7 +99,7 @@ export default function ClientDetailPage() {
         is_same_as_primary: data?.is_same_as_primary !== false,
         market: data?.market || "US",
         status: data?.status || "Active",
-        contact_person: data?.contact_person || data?.client_lead || "",
+        contactFirstName: (data?.contact_person || data?.client_lead || "").split(" ")[0] || "", contactLastName: (data?.contact_person || data?.client_lead || "").split(" ").slice(1).join(" ") || "",
         contact_designation: data?.contact_designation || "",
         email_id: data?.email_id || "",
         contact_number: data?.contact_number || "",
@@ -154,7 +154,11 @@ export default function ClientDetailPage() {
 
     setIsSaving(true);
     try {
-      const updated = await atsApi.clients.update(clientId, formData);
+      const payload = {
+        ...formData,
+        contact_person: [formData.contactFirstName?.trim(), formData.contactLastName?.trim()].filter(Boolean).join(" ")
+    };
+    const updated = await atsApi.clients.update(clientId, payload);
       setClientData(updated);
       setIsEditing(false);
       toast.success("Client details updated successfully!");
