@@ -67,7 +67,6 @@ function CreateUnitContent() {
     // Job Assignment & Routing Policies (Unit Isolated)
     allowNone: true,
     allowPods: true,
-    allowAll: true,
     allowUnassigned: false,
     podDistributionStrategy: "AUTOMATIC",
   });
@@ -217,7 +216,6 @@ function CreateUnitContent() {
         jobCodePattern: formData.jobCodePattern || undefined,
         allowNone: formData.allowNone,
         allowPods: formData.allowPods,
-        allowAll: formData.allowAll,
         allowUnassigned: formData.allowUnassigned,
         podDistributionStrategy: formData.podDistributionStrategy,
       };
@@ -633,24 +631,6 @@ function CreateUnitContent() {
                   type="checkbox"
                   checked={formData.allowNone}
                   onChange={(e) => setFormData({ ...formData, allowNone: e.target.checked })}
-                  className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 cursor-pointer mt-0.5"
-                />
-              </div>
-
-              {/* Option 3: All Unit Recruiters (Pool) */}
-              <div className="pt-3 flex items-start justify-between gap-4">
-                <div className="space-y-0.5">
-                  <span className="text-xs font-bold text-neutral-900 dark:text-white block">
-                    3. All Unit Recruiters (Pool)
-                  </span>
-                  <p className="text-[11px] text-neutral-400">
-                    When assigned, the job requisition is pooled and broadcast strictly to active recruiters in this branch unit.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={formData.allowAll}
-                  onChange={(e) => setFormData({ ...formData, allowAll: e.target.checked })}
                   className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 cursor-pointer mt-0.5"
                 />
               </div>

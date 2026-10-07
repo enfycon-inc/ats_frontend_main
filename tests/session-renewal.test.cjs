@@ -216,3 +216,15 @@ test('job staffing uses the scoped jobs endpoint and exact active role without r
   await app.api.jobs.staffingOptions(scope);
   assert.equal(calls.length, 2, 'Completed staffing results are refreshed to respect changed assignments');
 });
+
+test('pod assignment lookup uses jobs permission context instead of pod administration', async () => {
+  let sent;
+  const role = '11111111-1111-4111-8111-111111111111';
+  const app = api(async (url, options) => { sent = { url: String(url), headers: options.headers }; return new Response('[]'); }, role);
+  app.storage.set('ats_access_token', `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')}.signature`);
+  await app.api.jobs.podOptions({ businessUnitId: 'unit-id', branchId: 'branch-id' });
+  const url = new URL(sent.url);
+  assert.equal(url.pathname, '/api/jobs/pod-options');
+  assert.equal(url.searchParams.get('businessUnitId'), 'unit-id');
+  assert.equal(sent.headers['x-active-role-id'], role);
+});

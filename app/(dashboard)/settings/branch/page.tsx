@@ -200,7 +200,6 @@ function BranchManagementPageContent() {
     breakDurationMinutes: 60,
     allowNone: false,
     allowPods: true,
-    allowAll: true,
     allowUnassigned: true,
     podDistributionStrategy: "AUTO" as "AUTO" | "MANUAL",
   });
@@ -219,7 +218,6 @@ function BranchManagementPageContent() {
     breakDurationMinutes: 60,
     allowNone: false,
     allowPods: true,
-    allowAll: true,
     allowUnassigned: true,
     podDistributionStrategy: "AUTO" as "AUTO" | "MANUAL",
   });
@@ -454,8 +452,7 @@ function BranchManagementPageContent() {
       breakDurationMinutes: 60,
       allowNone: false,
       allowPods: true,
-      allowAll: true,
-      allowUnassigned: true,
+        allowUnassigned: true,
       podDistributionStrategy: "AUTO",
     });
     setUnitFormError("");
@@ -489,7 +486,6 @@ function BranchManagementPageContent() {
         breakDurationMinutes: unitFormData.breakDurationMinutes,
         allowNone: unitFormData.allowNone,
         allowPods: unitFormData.allowPods,
-        allowAll: unitFormData.allowAll,
         allowUnassigned: unitFormData.allowUnassigned,
         podDistributionStrategy: unitFormData.podDistributionStrategy,
       });
@@ -556,9 +552,8 @@ function BranchManagementPageContent() {
       workingDays: Array.isArray(unit.workingDays) && unit.workingDays.length > 0 ? unit.workingDays : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
       breakDurationMinutes: unit.breakDurationMinutes ?? 60,
       allowNone: allowNone,
-      allowPods: allowNone ? false : (unit.allowPods !== false),
-      allowAll: allowNone ? false : (unit.allowAll !== false),
-      allowUnassigned: allowNone ? false : (unit.allowUnassigned !== false),
+      allowPods: unit.allowPods !== false,
+      allowUnassigned: unit.allowUnassigned !== false,
       podDistributionStrategy: (unit.podDistributionStrategy || "AUTO") as "AUTO" | "MANUAL",
     });
     setIsEditUnitOpen(true);
@@ -570,13 +565,9 @@ function BranchManagementPageContent() {
       const uPods = await atsApi.pods.list({ businessUnitId: unit.id, branchId: unit.branchId });
       const pods = Array.isArray(uPods) ? uPods : [];
       setUnitPods(pods);
-      if (pods.length === 0) {
-        setEditUnitFormData((prev) => ({ ...prev, allowPods: false }));
-      }
     } catch (err) {
       console.error("Failed to load unit pods:", err);
       setUnitPods([]);
-      setEditUnitFormData((prev) => ({ ...prev, allowPods: false }));
     } finally {
       setLoadingUnitPods(false);
     }
@@ -603,9 +594,8 @@ function BranchManagementPageContent() {
         workingDays: editUnitFormData.workingDays,
         breakDurationMinutes: editUnitFormData.breakDurationMinutes,
         allowNone: editUnitFormData.allowNone,
-        allowPods: (editUnitFormData.allowNone || unitPods.length === 0) ? false : editUnitFormData.allowPods,
-        allowAll: editUnitFormData.allowNone ? false : editUnitFormData.allowAll,
-        allowUnassigned: editUnitFormData.allowNone ? false : editUnitFormData.allowUnassigned,
+        allowPods: editUnitFormData.allowPods,
+        allowUnassigned: editUnitFormData.allowUnassigned,
         podDistributionStrategy: editUnitFormData.podDistributionStrategy,
       });
       toast.success(`Branch unit "${editUnitFormData.name}" updated successfully!`);
@@ -4485,348 +4475,30 @@ function BranchManagementPageContent() {
                   </span>
                 </div>
 
-                {/* Standard Assignment Modes 1 - 4 (Clean 2x2 Grid) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Option 1: None / Direct */}
-                  <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs cursor-pointer transition-all ${
-                    editUnitFormData.allowNone
-                      ? "bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-800"
-                      : "bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
-                  }`}>
-                    <input
-                      type="checkbox"
-                      checked={editUnitFormData.allowNone}
-                      onChange={(e) => {
-                        const isNone = e.target.checked;
-                        setEditUnitFormData({
-                          ...editUnitFormData,
-                          allowNone: isNone,
-                          ...(isNone
-                            ? { allowPods: false, allowAll: false, allowUnassigned: false }
-                            : { allowPods: unitPods.length > 0, allowAll: true, allowUnassigned: true }),
-                        });
-                      }}
-                      className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-neutral-900 dark:text-white">1. Direct Assignment Only</span>
-                        {editUnitFormData.allowNone && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-200 text-indigo-900 dark:bg-indigo-900 dark:text-indigo-200">
-                            Exclusive
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
-                        Direct individual recruiter assignment only. Pod and pooled routing options are disabled.
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Option 3: All Unit Recruiters */}
-                  <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs transition-all ${
-                    editUnitFormData.allowNone
-                      ? "opacity-40 cursor-not-allowed bg-neutral-100 dark:bg-slate-900"
-                      : "cursor-pointer bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
-                  }`}>
-                    <input
-                      type="checkbox"
-                      checked={editUnitFormData.allowAll}
-                      disabled={editUnitFormData.allowNone}
-                      onChange={(e) => setEditUnitFormData({ ...editUnitFormData, allowAll: e.target.checked })}
-                      className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
-                    />
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-neutral-900 dark:text-white">3. All Unit Recruiters (Pool)</span>
-                      </div>
-                      <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
-                        Allow broadcast to all active recruiters belonging to this branch unit.
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Option 2: Pod System (with sub-strategy & 0-pod gating) */}
-                  <div className={`space-y-2.5 p-3 rounded-xl border text-xs transition-all ${
-                    editUnitFormData.allowNone
-                      ? "opacity-40 pointer-events-none bg-neutral-100 dark:bg-slate-900 border-neutral-200"
-                      : unitPods.length === 0
-                      ? "bg-amber-50/25 dark:bg-amber-950/15 border-amber-200/80 dark:border-amber-900/40"
-                      : "bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750"
-                  }`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <label 
-                        className={`flex items-start gap-2.5 flex-1 ${
-                          editUnitFormData.allowNone 
-                            ? "cursor-not-allowed" 
-                            : unitPods.length === 0 
-                            ? "cursor-pointer" 
-                            : "cursor-pointer"
-                        }`}
-                        onClick={(e) => {
-                          if (unitPods.length === 0 && !editUnitFormData.allowNone) {
-                            e.preventDefault();
-                            toast.error("No pods created for this branch unit. Create a pod first!");
-                            openQuickCreatePod(editingUnit.id);
-                          }
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={Boolean(editUnitFormData.allowPods && unitPods.length > 0)}
-                          disabled={editUnitFormData.allowNone || unitPods.length === 0}
-                          onChange={(e) => {
-                            if (unitPods.length === 0) {
-                              toast.error("No pods created for this branch unit. Create a pod first!");
-                              openQuickCreatePod(editingUnit.id);
-                              return;
-                            }
-                            setEditUnitFormData({ ...editUnitFormData, allowPods: e.target.checked });
-                          }}
-                          className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-bold text-neutral-900 dark:text-white">2. Recruitment Pod System</span>
-                            {loadingUnitPods ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] text-neutral-400">
-                                <Loader2 className="h-3 w-3 animate-spin" /> Checking pods...
-                              </span>
-                            ) : unitPods.length === 0 ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800/80">
-                                0 Pods Available
-                              </span>
-                            ) : (
-                              <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                                <HoverCard openDelay={80} closeDelay={150}>
-                                  <HoverCardTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-800/80 hover:bg-emerald-200/90 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
-                                      title="Hover to view all available pods, leads, and members"
-                                    >
-                                      <Users className="h-2.5 w-2.5" />
-                                      <span>{unitPods.length} {unitPods.length === 1 ? "Pod" : "Pods"} Available</span>
-                                    </button>
-                                  </HoverCardTrigger>
-                                  <HoverCardContent
-                                    align="start"
-                                    side="bottom"
-                                    sideOffset={6}
-                                    className="w-84 sm:w-96 p-3 shadow-2xl z-60 font-sans bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl"
-                                  >
-                                    <div className="space-y-2.5">
-                                      {/* Pop-up Header */}
-                                      <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-2">
-                                        <div className="flex items-center gap-1.5">
-                                          <Layers className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                                          <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                                            Available Unit Pods
-                                          </span>
-                                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                                            {unitPods.length}
-                                          </span>
-                                        </div>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            openQuickCreatePod(editingUnit.id);
-                                          }}
-                                          className="text-[10.5px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 flex items-center gap-0.5 hover:underline cursor-pointer"
-                                        >
-                                          <Plus className="h-2.5 w-2.5" /> New Pod
-                                        </button>
-                                      </div>
-
-                                      {/* Pod List with Leads & Members */}
-                                      <div className="max-h-60 overflow-y-auto space-y-2 pr-1 select-text">
-                                        {unitPods.map((pod: any) => (
-                                          <div
-                                            key={pod.id}
-                                            className="p-2.5 rounded-lg border border-neutral-200/80 dark:border-slate-800 bg-neutral-50/60 dark:bg-slate-850/50 space-y-1.5 text-xs"
-                                          >
-                                            <div className="flex items-center justify-between gap-2">
-                                              <span className="font-bold text-xs text-neutral-900 dark:text-white truncate">
-                                                {pod.name}
-                                              </span>
-                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0">
-                                                <Check className="h-2 w-2" /> Active
-                                              </span>
-                                            </div>
-
-                                            <div className="flex items-center gap-1.5 text-[11px]">
-                                              <Crown className="h-3 w-3 text-amber-500 shrink-0" />
-                                              <span className="text-neutral-500 dark:text-neutral-400">Pod Lead:</span>
-                                              <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
-                                                {pod.podHeadName || "No Lead Assigned"}
-                                              </span>
-                                            </div>
-
-                                            <div className="space-y-1 text-[11px] pt-0.5">
-                                              <div className="flex items-center justify-between text-neutral-500 dark:text-neutral-400">
-                                                <span className="flex items-center gap-1">
-                                                  <Users className="h-3 w-3 text-indigo-500 shrink-0" />
-                                                  Members ({pod.members?.length || 0}):
-                                                </span>
-                                              </div>
-                                              {pod.members && pod.members.length > 0 ? (
-                                                <div className="flex flex-wrap gap-1">
-                                                  {pod.members.map((m: any) => (
-                                                    <span
-                                                      key={m.id}
-                                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 text-[10px] text-neutral-700 dark:text-neutral-300 font-medium"
-                                                      title={m.email || m.fullName}
-                                                    >
-                                                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />
-                                                      {m.fullName || m.email}
-                                                    </span>
-                                                  ))}
-                                                </div>
-                                              ) : (
-                                                <p className="text-[10px] text-neutral-400 dark:text-neutral-500 italic pl-4">
-                                                  No recruiters assigned to this pod yet.
-                                                </p>
-                                              )}
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </HoverCardContent>
-                                </HoverCard>
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                            Allow selecting and routing jobs to recruitment pods.
-                          </p>
-                        </div>
-                      </label>
-
-                      {/* Top-Right "Create New Pod" Button */}
-                      <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openQuickCreatePod(editingUnit.id);
-                          }}
-                          className="h-7 text-[11px] font-semibold border-indigo-200 dark:border-indigo-800/80 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
-                          title="Create a new recruitment pod for this branch unit"
-                        >
-                          <Plus className="h-3 w-3 text-indigo-600 dark:text-indigo-400" /> Create New Pod
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* When NO pods exist for this unit: Show "Create Pod First" banner and action */}
-                    {unitPods.length === 0 && !loadingUnitPods && (
-                      <div className="mt-1.5 p-3 rounded-lg bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/90 dark:border-amber-800/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-                        <div className="flex items-start gap-2">
-                          <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                          <div className="space-y-0.5">
-                            <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
-                              Create Pod First
-                            </p>
-                            <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-tight">
-                              This branch unit has no recruitment pods. Create a pod first to enable pod-based routing.
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openQuickCreatePod(editingUnit.id);
-                          }}
-                          className="h-7 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-md flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
-                        >
-                          <Plus className="h-3.5 w-3.5" /> Create Pod First
-                        </Button>
-                      </div>
-                    )}
-
-                    {editUnitFormData.allowPods && unitPods.length > 0 && !editUnitFormData.allowNone && (
-                      <div className="ml-5 pl-3 border-l-2 border-indigo-200 dark:border-indigo-800 space-y-1.5 pt-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 block">Pod Strategy:</span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openQuickCreatePod(editingUnit.id);
-                            }}
-                            className="text-[10.5px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center gap-0.5 hover:underline cursor-pointer"
-                          >
-                            <Plus className="h-2.5 w-2.5" /> Add Pod
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-[10.5px]">
-                          <label className={`flex items-center gap-1.5 p-1.5 rounded-lg border cursor-pointer ${
-                            editUnitFormData.podDistributionStrategy === "AUTO"
-                              ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-900 dark:text-indigo-200 font-bold"
-                              : "border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-neutral-600"
-                          }`}>
-                            <input
-                              type="radio"
-                              name="unitPodStrategy"
-                              value="AUTO"
-                              checked={editUnitFormData.podDistributionStrategy === "AUTO"}
-                              onChange={() => setEditUnitFormData({ ...editUnitFormData, podDistributionStrategy: "AUTO" })}
-                              className="sr-only"
-                            />
-                            <span>⚡ Auto (Sequential)</span>
-                          </label>
-                          <label className={`flex items-center gap-1.5 p-1.5 rounded-lg border cursor-pointer ${
-                            editUnitFormData.podDistributionStrategy === "MANUAL"
-                              ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-900 dark:text-indigo-200 font-bold"
-                              : "border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-neutral-600"
-                          }`}>
-                            <input
-                              type="radio"
-                              name="unitPodStrategy"
-                              value="MANUAL"
-                              checked={editUnitFormData.podDistributionStrategy === "MANUAL"}
-                              onChange={() => setEditUnitFormData({ ...editUnitFormData, podDistributionStrategy: "MANUAL" })}
-                              className="sr-only"
-                            />
-                            <span>👤 Manual</span>
-                          </label>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Option 4: Unassigned */}
-                  <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs transition-all ${
-                    editUnitFormData.allowNone
-                      ? "opacity-40 cursor-not-allowed bg-neutral-100 dark:bg-slate-900"
-                      : "cursor-pointer bg-neutral-50/50 dark:bg-slate-800/40 border-neutral-200 dark:border-slate-750 hover:bg-neutral-50"
-                  }`}>
-                    <input
-                      type="checkbox"
-                      checked={editUnitFormData.allowUnassigned}
-                      disabled={editUnitFormData.allowNone}
-                      onChange={(e) => setEditUnitFormData({ ...editUnitFormData, allowUnassigned: e.target.checked })}
-                      className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
-                    />
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-neutral-900 dark:text-white">4. Unassigned Allocation</span>
-                      </div>
-                      <p className="text-[10.5px] text-neutral-500 dark:text-neutral-400">
-                        Hold job in unassigned queue for Delivery Head or Pod Lead manual assignment.
-                      </p>
-                    </div>
-                  </label>
+                  {([
+                    ["allowNone", "Direct Recruiter Assignment"],
+                    ["allowPods", "Recruitment Pods"],
+                    ["allowUnassigned", "Allow Unassigned Requisitions"],
+                  ] as const).map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-2.5 p-3 rounded-xl border text-xs cursor-pointer border-neutral-200 dark:border-slate-750">
+                      <input type="checkbox" checked={editUnitFormData[key]}
+                        onChange={(e) => setEditUnitFormData({ ...editUnitFormData, [key]: e.target.checked })}
+                        className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500" />
+                      {label}
+                    </label>
+                  ))}
+                  {editUnitFormData.allowPods && (
+                    <label className="flex items-center gap-2 text-xs">
+                      Pod Distribution Strategy
+                      <select value={editUnitFormData.podDistributionStrategy}
+                        onChange={(e) => setEditUnitFormData({ ...editUnitFormData, podDistributionStrategy: e.target.value as "AUTO" | "MANUAL" })}
+                        className="rounded border p-2 bg-white dark:bg-slate-900">
+                        <option value="AUTO">Automatic Round-Robin</option>
+                        <option value="MANUAL">Manual Lead Selection</option>
+                      </select>
+                    </label>
+                  )}
                 </div>
               </div>
 

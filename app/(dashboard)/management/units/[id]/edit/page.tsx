@@ -72,7 +72,6 @@ export default function EditUnitPage() {
     // Job Assignment & Routing Policies
     allowNone: true,
     allowPods: true,
-    allowAll: true,
     allowUnassigned: false,
     podDistributionStrategy: "AUTOMATIC",
   });
@@ -124,7 +123,6 @@ export default function EditUnitPage() {
             jobCodePattern: unit.jobCodePattern || "",
             allowNone: unit.allowNone ?? true,
             allowPods: unit.allowPods ?? true,
-            allowAll: unit.allowAll ?? true,
             allowUnassigned: unit.allowUnassigned ?? false,
             podDistributionStrategy: unit.podDistributionStrategy || "AUTOMATIC",
           });
@@ -209,7 +207,6 @@ export default function EditUnitPage() {
         jobCodePattern: formData.jobCodePattern || null,
         allowNone: formData.allowNone,
         allowPods: formData.allowPods,
-        allowAll: formData.allowAll,
         allowUnassigned: formData.allowUnassigned,
         podDistributionStrategy: formData.podDistributionStrategy,
       };
@@ -658,24 +655,6 @@ export default function EditUnitPage() {
                   type="checkbox"
                   checked={formData.allowNone}
                   onChange={(e) => setFormData({ ...formData, allowNone: e.target.checked })}
-                  className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 cursor-pointer mt-0.5"
-                />
-              </div>
-
-              {/* Option 3: All Unit Recruiters (Pool) */}
-              <div className="pt-3 flex items-start justify-between gap-4">
-                <div className="space-y-0.5">
-                  <span className="text-xs font-bold text-neutral-900 dark:text-white block">
-                    3. All Unit Recruiters (Pool)
-                  </span>
-                  <p className="text-[11px] text-neutral-400">
-                    When assigned, the job requisition is pooled and broadcast strictly to active recruiters in this branch unit.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={formData.allowAll}
-                  onChange={(e) => setFormData({ ...formData, allowAll: e.target.checked })}
                   className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 cursor-pointer mt-0.5"
                 />
               </div>

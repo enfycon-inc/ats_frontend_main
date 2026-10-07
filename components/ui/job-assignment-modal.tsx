@@ -17,6 +17,8 @@ interface JobAssignmentModalProps {
   podsList: any[];
   recruitersList: any[];
   activeBranch?: any;
+  canAssignPods?: boolean;
+  canAssignRecruiters?: boolean;
 }
 
 export function JobAssignmentModal({
@@ -29,6 +31,8 @@ export function JobAssignmentModal({
   podsList,
   recruitersList,
   activeBranch,
+  canAssignPods = false,
+  canAssignRecruiters = false,
 }: JobAssignmentModalProps) {
   const [type, setType] = useState<AssignmentType>(initialType);
   const [podId, setPodId] = useState<string | null>(initialPodId);
@@ -63,24 +67,31 @@ export function JobAssignmentModal({
   }, [recruitersList, search]);
 
   const handleApply = () => {
-    onApply(type, podId, recruiterIds);
+    onApply(validSelection ? type : "unassigned", validSelection && type === "pod" ? podId : null, validSelection && type === "recruiters" ? recruiterIds : []);
     onClose();
   };
 
   const handleSelectAllRecruiters = () => {
-    if (recruiterIds.length === filteredRecruiters.length) {
-      setRecruiterIds([]);
+    if (allFilteredSelected) {
+      setRecruiterIds(ids => ids.filter(id => !recruitersList.some(r => r.id === id)));
     } else {
-      setRecruiterIds(filteredRecruiters.map(r => r.id));
+      setRecruiterIds(ids => [...new Set([...ids, ...recruitersList.map(r => r.id)])]);
     }
   };
 
-    const isPodsEnabled = !activeBranch || (activeBranch.allowPods !== false && activeBranch.allow_pods !== false);
-  const isRecruitersEnabled = !activeBranch || activeBranch.allowNone === true || activeBranch.allow_none === true;
+  const isPodsEnabled = canAssignPods && activeBranch?.allowPods === true;
+  const isRecruitersEnabled = canAssignRecruiters && activeBranch?.allowNone === true;
   const isAssignLaterEnabled = !activeBranch || activeBranch.allowUnassigned === true || activeBranch.allow_unassigned === true;
 
-  // For recruiters, determine if all filtered are selected
-  const allFilteredSelected = filteredRecruiters.length > 0 && filteredRecruiters.every(r => recruiterIds.includes(r.id));
+  // Select All includes every eligible recruiter in the selected unit.
+  const allFilteredSelected = recruitersList.length > 0 && recruitersList.every(r => recruiterIds.includes(r.id));
+  useEffect(() => {
+    if (!isOpen) return;
+    if ((type === "pod" && isPodsEnabled) || (type === "recruiters" && isRecruitersEnabled)) return;
+    setType(isPodsEnabled ? "pod" : isRecruitersEnabled ? "recruiters" : "unassigned");
+  }, [isOpen, type, isPodsEnabled, isRecruitersEnabled]);
+  const validSelection = (type === "pod" && isPodsEnabled && podsList.some(p => p.id === podId)) ||
+    (type === "recruiters" && isRecruitersEnabled && recruiterIds.length > 0 && recruiterIds.every(id => recruitersList.some(r => r.id === id)));
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -124,24 +135,13 @@ export function JobAssignmentModal({
             Individual Recruiters
           </button>
           )}
-          
-          {isAssignLaterEnabled && (
-            <button
-              onClick={() => { setType("unassigned"); setSearch(""); }}
-              className={cn(
-                "px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors",
-                type === "unassigned"
-                  ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
-                  : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              )}
-            >
-              Assign Later
-            </button>
-          )}
         </div>
 
         {/* Tab Content */}
         <div className="flex-1 overflow-hidden flex flex-col bg-white dark:bg-slate-900">
+          {!isPodsEnabled && !isRecruitersEnabled && (
+            <p className="p-6 text-sm text-slate-500">No assignment channels are enabled for this unit and your active role.</p>
+          )}
           
           {/* SEARCH BAR (For Pods & Recruiters) */}
           {type !== "unassigned" && (
@@ -165,7 +165,7 @@ export function JobAssignmentModal({
                 {filteredPods.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 text-slate-500">
                     <Building2 className="h-8 w-8 mb-2 opacity-20" />
-                    <p className="text-sm">No recruitment pods found.</p>
+                    <p className="text-sm">No pods available.</p>
                   </div>
                 ) : (
                   filteredPods.map(pod => (
@@ -207,14 +207,10 @@ export function JobAssignmentModal({
                     <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
                       {recruiterIds.length} recruiter{recruiterIds.length !== 1 ? 's' : ''} selected
                     </span>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={handleSelectAllRecruiters}
-                      className="h-7 text-xs px-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
-                    >
-                      {allFilteredSelected ? "Deselect All" : "Select All"}
-                    </Button>
+                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input type="checkbox" checked={allFilteredSelected} onChange={handleSelectAllRecruiters} />
+                      Select All
+                    </label>
                   </div>
                 )}
                 
@@ -264,21 +260,15 @@ export function JobAssignmentModal({
               </>
             )}
 
-            {/* --- ASSIGN LATER --- */}
-            {type === "unassigned" && (
-              <div className="flex flex-col items-center justify-center py-12 px-6 text-center h-full">
-                <div className="h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mb-4">
-                  <ShieldAlert className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-                </div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">Assign Later (Unassigned)</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm">
-                  This job will be created as Unassigned. It will remain invisible to recruiters until an authorized manager or administrator assigns it to a pod or individual recruiters.
-                </p>
-              </div>
-            )}
+
           </div>
         </div>
 
+        {isAssignLaterEnabled && (
+          <div className="px-6 py-2 flex justify-end">
+            <Button variant="ghost" onClick={() => { onApply("unassigned", null, []); onClose(); }}>Clear Assignment</Button>
+          </div>
+        )}
         {/* Footer */}
         <DialogFooter className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
           <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -309,6 +299,7 @@ export function JobAssignmentModal({
             </Button>
             <Button 
               onClick={handleApply} 
+              disabled={!validSelection && !isAssignLaterEnabled}
               className="h-9 font-semibold bg-indigo-600 hover:bg-indigo-700 text-white"
             >
               Apply Assignment

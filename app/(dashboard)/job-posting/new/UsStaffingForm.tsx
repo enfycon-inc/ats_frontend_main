@@ -369,11 +369,9 @@ const getInitialActiveBranchContext = () => {
   const getUserRoleLabel = useCallback((user: JobStaffOption): string =>
     user.canRecruit && user.canReview ? "Recruiter / Reviewer" : user.canRecruit ? "Recruiter" : "Reviewer", []);
 
-  const branchPods = useMemo(() => {
-    const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
-    if (!activeBranchId) return podsList;
-    return podsList.filter((p: any) => !p.branchId || !p.branch_id || p.branchId === activeBranchId || p.branch_id === activeBranchId);
-  }, [podsList]);
+  const branchPods = useMemo(() => podsList.filter((pod: any) =>
+    (pod.businessUnitId || pod.business_unit_id) === selectedUnitId), [podsList, selectedUnitId]);
+
 
   // Currency, Unit, and Term States for Bill Rate
   const [billCurrency, setBillCurrency] = useState(() => "USD");
@@ -495,6 +493,23 @@ const getInitialActiveBranchContext = () => {
   }, [selectedCountry, setValue, commissionType, customCommission]);
 
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
+  const assignmentPolicy = selectedUnitObj;
+  const canAssignRecruiters = !!currentUserProfile?.permissions?.includes("job:assign_recruiter");
+  const canAssignPods = !!currentUserProfile?.permissions?.includes("job:assign_pod");
+  const canAssignJob = canAssignRecruiters || canAssignPods;
+  const assignmentRequired = assignmentPolicy?.allowUnassigned !== true;
+  const assignmentValid = (assignmentType === "pod" && branchPods.some(p => p.id === selectedPodId) && canAssignPods && assignmentPolicy?.allowPods === true) ||
+    (assignmentType === "recruiters" && selectedRecruiterIds.length > 0 && selectedRecruiterIds.every(id => recruitersList.some(r => r.id === id)) && canAssignRecruiters && assignmentPolicy?.allowNone === true);
+  useEffect(() => {
+    let cancelled = false;
+    setPodsList([]);
+    if (!canAssignPods || !selectedUnitId) return;
+    const unit = availableUnits.find(unit => unit.id === selectedUnitId);
+    atsApi.jobs.podOptions({ branchId: unit?.branchId || currentUserProfile?.branchId, businessUnitId: selectedUnitId })
+      .then(pods => { if (!cancelled) { setPodsList(pods); setSelectedPodId(id => pods.some(p => p.id === id) ? id : null); } })
+      .catch(error => { if (!cancelled) toast.error(error.message || "Could not load pods."); });
+    return () => { cancelled = true; };
+  }, [selectedUnitId, canAssignPods, availableUnits, currentUserProfile]);
 
   useEffect(() => {
     let cancelled = false;
@@ -608,8 +623,8 @@ const getInitialActiveBranchContext = () => {
               setValue("businessUnit", matchedUnit.name);
             }
 
-            // Load heavier data in background without blocking job code generation
-            atsApi.pods.list().then(list => setPodsList(list || [])).catch(() => setPodsList([]));
+
+
           } catch (e) {
             console.warn("Failed to load units:", e);
           }
@@ -774,11 +789,9 @@ const getInitialActiveBranchContext = () => {
     }
   }
 
-    async function fetchPods() { try { const res = await atsApi.pods.list(); setPodsList(res || []); } catch(e) { console.warn("Could not load pods", e); } }
 
     fetchProfile();
     fetchClients();
-    fetchPods();
     checkAndLoadCloneData();
   }, [status, session, setValue, fetchClients]);
 
@@ -1139,8 +1152,8 @@ const getInitialActiveBranchContext = () => {
     }
   };
   const onSubmit = async (data: FormValues) => {
-    if ((assignmentType === "pod" && !selectedPodId) || (assignmentType === "recruiters" && selectedRecruiterIds.length === 0)) {
-      toast.error("Job Assignment is mandatory. Please select a Pod, Recruiters, or Assign Later.");
+    if (assignmentRequired && !assignmentValid) {
+      toast.error("Select a pod or at least one recruiter. Your active role must have assignment permission.");
       return;
     }
 
@@ -1196,22 +1209,22 @@ const getInitialActiveBranchContext = () => {
     try {
       let finalDescription = data.jobDescription;
 
-      let resolvedPodId: string | undefined = undefined;
+      let resolvedPodId: string | undefined = "none";
       let resolvedApproverId: string | undefined = selectedApproverId || undefined;
       let resolvedApproverRole: string = selectedApproverRole || "POD_LEAD";
-      let resolvedPrimaryRecruiterId: string | undefined = data.recruiter || undefined;
+      let resolvedPrimaryRecruiterId: string | undefined = undefined;
       // @ts-ignore
       let resolvedAssignedTo: string | undefined = data.assignedTo || undefined;
 
       let resolvedRecruiterIds: string[] = [];
 
-      if (assignmentType === "pod" && selectedPodId) {
+      if (assignmentValid && assignmentType === "pod" && selectedPodId) {
         resolvedPodId = selectedPodId;
         resolvedApproverRole = "POD_LEAD";
         const pod = podsList.find((p) => p.id === resolvedPodId);
         if (pod?.podHeadId) resolvedApproverId = pod.podHeadId;
         resolvedAssignedTo = pod?.name || "Recruitment Pod";
-      } else if (assignmentType === "recruiters" && selectedRecruiterIds.length > 0) {
+      } else if (assignmentValid && assignmentType === "recruiters" && selectedRecruiterIds.length > 0) {
         resolvedRecruiterIds = selectedRecruiterIds;
         resolvedPrimaryRecruiterId = selectedRecruiterIds[0];
         resolvedApproverRole = "PRIMARY_RECRUITER";
@@ -1271,8 +1284,8 @@ const getInitialActiveBranchContext = () => {
         hoursPerWeek: data.hoursPerWeek,
         duration: data.duration || undefined,
         recruitmentManagerId: data.recruitmentManager || undefined,
-        recruiterId: resolvedPrimaryRecruiterId,
-        recruiterIds: resolvedRecruiterIds,
+        recruiterId: canAssignRecruiters ? resolvedPrimaryRecruiterId : undefined,
+        recruiterIds: canAssignRecruiters ? resolvedRecruiterIds : undefined,
         
         accountManagerId: data.accountManager || undefined,
         industry: data.industry || undefined,
@@ -1281,7 +1294,7 @@ const getInitialActiveBranchContext = () => {
         expMax: data.expMax,
         respondBy: respondByType === "Date Option" ? (data.respondBy || undefined) : undefined,
         noticePeriod: data.noticePeriod || undefined,
-        podId: resolvedPodId,
+        podId: canAssignPods ? resolvedPodId : undefined,
         
         shiftTiming: data.shiftTiming || undefined,
       };
@@ -3007,20 +3020,20 @@ const getInitialActiveBranchContext = () => {
                       </div>
 
                       {/* Job Assignment Custom Dropdown */}
-                      <div className="space-y-1.5 relative">
+                      {canAssignJob && assignmentPolicy && <div className="space-y-1.5 relative">
                         <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center justify-between h-5">
                           <span className="flex items-center gap-1.5">
                             <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
                               <User className="h-2.5 w-2.5" />
                             </span>
-                            Job Assignment <span className="text-red-500 ml-0.5">*</span>
+                            Job Assignment {assignmentRequired && <span className="text-red-500 ml-0.5">*</span>}
                           </span>
                         </label>
                         <div 
                           onClick={() => setIsAssignmentModalOpen(true)}
                           className={cn(
                             "flex items-center justify-between w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors shadow-sm",
-                            ((assignmentType === "pod" && !selectedPodId) || (assignmentType === "recruiters" && selectedRecruiterIds.length === 0)) && isSubmitted ? "border-red-500 bg-red-50 dark:bg-red-900/20" : ""
+                            (assignmentRequired && !assignmentValid) && isSubmitted ? "border-red-500 bg-red-50 dark:bg-red-900/20" : ""
                           )}
                         >
                           <div className="flex items-center gap-3">
@@ -3031,7 +3044,7 @@ const getInitialActiveBranchContext = () => {
                               <span className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">
                                 {assignmentType === "pod" && selectedPodId ? podsList.find(p => p.id === selectedPodId)?.name || "Recruitment Pod" :
                                  assignmentType === "recruiters" && selectedRecruiterIds.length > 0 ? `${selectedRecruiterIds.length} Recruiter${selectedRecruiterIds.length > 1 ? 's' : ''} Selected` :
-                                 assignmentType === "unassigned" ? "Assign Later (Unassigned)" :
+                                 assignmentType === "unassigned" ? (assignmentRequired ? "Select Pods or Recruiters" : "No assignment (optional)") :
                                  "Select Assignment..."}
                               </span>
                               <span className="text-[11px] text-slate-500 font-medium">
@@ -3043,9 +3056,9 @@ const getInitialActiveBranchContext = () => {
                             Change
                           </Button>
                         </div>
-                        {isSubmitted && ((assignmentType === "pod" && !selectedPodId) || (assignmentType === "recruiters" && selectedRecruiterIds.length === 0)) && (
+                        {isSubmitted && (assignmentRequired && !assignmentValid) && (
                           <p className="text-[11px] text-red-500 font-medium mt-1">
-                            Job Assignment is required. Please select a Pod, Recruiters, or Assign Later.
+                            Select a pod or at least one recruiter.
                           </p>
                         )}
                         
@@ -3062,9 +3075,11 @@ const getInitialActiveBranchContext = () => {
                           }}
                           podsList={branchPods}
                           recruitersList={recruitersList}
-                          activeBranch={activeBranch}
+                          activeBranch={assignmentPolicy}
+                          canAssignPods={canAssignPods}
+                          canAssignRecruiters={canAssignRecruiters}
                         />
-                      </div>
+                      </div>}
                     </div>
                   </div>
                 )}

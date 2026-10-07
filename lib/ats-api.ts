@@ -1029,6 +1029,11 @@ export interface JobStaffOption {
 const staffingRequests = new Map<string, Promise<JobStaffOption[]>>();
 
 const jobs = {
+  async podOptions(scope: { branchId?: string; businessUnitId: string }): Promise<any[]> {
+    const query = new URLSearchParams({ businessUnitId: scope.businessUnitId });
+    if (scope.branchId) query.set('branchId', scope.branchId);
+    return apiFetch(`/api/jobs/pod-options?${query}`);
+  },
   async staffingOptions(scope?: { branchId?: string; businessUnitId?: string }): Promise<JobStaffOption[]> {
     const query = new URLSearchParams();
     if (scope?.branchId) query.set('branchId', scope.branchId);
@@ -1662,7 +1667,6 @@ const businessUnits = {
         breakDurationMinutes?: number;
     allowNone?: boolean;
     allowPods?: boolean;
-    allowAll?: boolean;
     allowUnassigned?: boolean;
     podDistributionStrategy?: string;
   }): Promise<any> {
@@ -1686,8 +1690,7 @@ const businessUnits = {
             breakDurationMinutes?: number;
       allowNone?: boolean;
       allowPods?: boolean;
-      allowAll?: boolean;
-      allowUnassigned?: boolean;
+        allowUnassigned?: boolean;
       podDistributionStrategy?: string;
     },
   ): Promise<any> {

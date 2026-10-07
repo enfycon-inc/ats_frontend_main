@@ -550,11 +550,6 @@ export function UnitsContent({
                               Pods ({u.podDistributionStrategy === "MANUAL" ? "Manual" : "Auto"})
                             </span>
                           )}
-                          {u.allowAll && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800">
-                              Unit Pool
-                            </span>
-                          )}
                           {u.allowNone && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/70 dark:border-amber-800">
                               Direct
@@ -565,7 +560,7 @@ export function UnitsContent({
                               Unassigned
                             </span>
                           )}
-                          {!u.allowPods && !u.allowAll && !u.allowNone && !u.allowUnassigned && (
+                          {!u.allowPods && !u.allowNone && !u.allowUnassigned && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-neutral-100 text-neutral-600 dark:bg-slate-800 dark:text-neutral-400 border border-neutral-200/80 dark:border-slate-700">
                               Standard Routing
                             </span>
