@@ -75,11 +75,16 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
   const cities = countryIso && watchState ? City.getCitiesOfState(countryIso, watchState) : [];
 
   const [hasDirectAddClearance, setHasDirectAddClearance] = React.useState<boolean>(true);
+  const [existingClients, setExistingClients] = React.useState<any[]>([]);
+  const [selectedExistingClient, setSelectedExistingClient] = React.useState<any | null>(null);
+  const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const clientNameValue = watch("clientName");
 
   // Pre-fill ownership with current logged-in user details, initial client name and business unit
   useEffect(() => {
     if (open) {
       setValue("country", market === "IN" ? "IN" : "US");
+      atsApi.clients.list().then((data: any) => setExistingClients(data || [])).catch(() => {});
       if (initialClientName) {
         setValue("clientName", initialClientName);
       }
@@ -111,10 +116,39 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
 
   const onSubmit = async (data: AddClientFormValues) => {
     try {
-      const activeBranchName = (typeof window !== "undefined" ? localStorage.getItem("active_branch_name") : null) || "bbsr-domestic"; const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+      if (selectedExistingClient) {
+        if (!data.addPoc || (!data.pocFirstName && !data.pocLastName)) {
+          toast.error("This client already exists! Please fill out the POC fields to add a new contact to it.");
+          return;
+        }
+        try {
+          const pocPhoneFull = data.pocPhoneCode && data.pocPhone ? `${data.pocPhoneCode}${data.pocPhone}` : data.pocPhone || null;
+          const pocPayload = {
+            name: [data.pocFirstName, data.pocLastName].filter(Boolean).join(" "),
+            designation: data.pocDesignation === "Other" ? data.pocDesignationCustom || null : data.pocDesignation || null,
+            email: data.pocEmail || null,
+            phone: pocPhoneFull,
+            isPrimary: false
+          };
+          await atsApi.clients.createContact(selectedExistingClient.id, pocPayload);
+          toast.success("New POC added to existing client successfully!");
+          onClientAdded(selectedExistingClient.clientName || selectedExistingClient.client_name);
+          reset();
+          setSelectedExistingClient(null);
+          onOpenChange(false);
+          return;
+        } catch (e: any) {
+          toast.error("Failed to add POC to existing client.");
+          return;
+        }
+      }
+
+      const activeBranchName = (typeof window !== "undefined" ? localStorage.getItem("active_branch_name") : null) || "bbsr-domestic"; 
+      const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
       
-      
-      const payload = { branch_id: activeBranchId, business_unit: activeBranchName,
+      const payload = { 
+        branch_id: activeBranchId, 
+        business_unit: activeBranchName,
         clientName: data.clientName,
         client_name: data.clientName,
         emailId: data.emailId,
@@ -151,7 +185,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
             phone: pocPhoneFull,
             isPrimary: true
           };
-await atsApi.clients.createContact(newClientId, pocPayload);
+          await atsApi.clients.createContact(newClientId, pocPayload);
         } catch (e) {
           toast.error("Client was created, but its contact could not be saved. Add the contact from the client record.");
         }
@@ -181,13 +215,38 @@ await atsApi.clients.createContact(newClientId, pocPayload);
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             
             {/* Client Name */}
-            <div className="space-y-1">
+            <div className="space-y-1 relative">
               <Label className="font-bold text-neutral-700 dark:text-neutral-300">Client Name <span className="text-red-500">*</span></Label>
               <Input 
-                className="h-8 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700" 
+                className={`h-8 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 ${selectedExistingClient ? "bg-neutral-100 text-neutral-500 cursor-not-allowed" : ""}`} 
                 placeholder="e.g. Acme Corp" 
-                {...register("clientName")} 
+                {...register("clientName", {
+                  onChange: (e) => {
+                    if (selectedExistingClient) setSelectedExistingClient(null);
+                  }
+                })} 
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                readOnly={!!selectedExistingClient}
               />
+              {showSuggestions && !selectedExistingClient && clientNameValue && existingClients.filter(c => (c.clientName || c.client_name).toLowerCase().includes(clientNameValue.toLowerCase())).length > 0 && (
+                <ul className="absolute z-50 top-[100%] left-0 w-full bg-white dark:bg-slate-900 border border-neutral-200 shadow-lg max-h-40 overflow-y-auto rounded-md">
+                  {existingClients.filter(c => (c.clientName || c.client_name).toLowerCase().includes(clientNameValue.toLowerCase())).map(c => (
+                    <li key={c.id} className="px-3 py-2 text-xs font-semibold cursor-pointer hover:bg-blue-50 text-slate-800 dark:text-slate-200 dark:hover:bg-slate-800" onClick={() => {
+                      setSelectedExistingClient(c);
+                      setValue("clientName", c.clientName || c.client_name);
+                      setValue("emailId", c.emailId || c.email_id || "N/A");
+                      setValue("website", c.website || "");
+                      setValue("country", c.country || "US");
+                      setValue("addPoc", true); 
+                      setShowSuggestions(false);
+                      toast("Existing client selected. Form is in read-only mode. You can now add a new POC.", { icon: "ℹ️" });
+                    }}>
+                      {c.clientName || c.client_name} <span className="font-normal text-[10px] text-neutral-400">({c.clientCode || c.client_code})</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {errors.clientName && <p className="text-[10px] text-red-500 font-bold">{errors.clientName.message}</p>}
             </div>
 
@@ -198,7 +257,7 @@ await atsApi.clients.createContact(newClientId, pocPayload);
                 type="email"
                 className="h-8 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700" 
                 placeholder="e.g. contact@acme.com" 
-                {...register("emailId")} 
+                {...register("emailId")} disabled={!!selectedExistingClient} 
               />
               {errors.emailId && <p className="text-[10px] text-red-500 font-bold">{errors.emailId.message}</p>}
             </div>
@@ -209,7 +268,7 @@ await atsApi.clients.createContact(newClientId, pocPayload);
               <Input 
                 className="h-8 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700" 
                 placeholder="e.g. www.acme.com" 
-                {...register("website")} 
+                {...register("website")} disabled={!!selectedExistingClient} 
               />
               {errors.website && <p className="text-[10px] text-red-500 font-bold">{errors.website.message}</p>}
             </div>
@@ -219,7 +278,7 @@ await atsApi.clients.createContact(newClientId, pocPayload);
               <Label className="font-bold text-neutral-700 dark:text-neutral-300">Status <span className="text-red-500">*</span></Label>
               <select 
                 className="w-full h-8 px-2 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded text-xs text-neutral-800 dark:text-neutral-200 focus:border-primary outline-hidden cursor-pointer"
-                {...register("status")}
+                {...register("status")} disabled={!!selectedExistingClient}
               >
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
@@ -232,7 +291,7 @@ await atsApi.clients.createContact(newClientId, pocPayload);
               <Label className="font-bold text-neutral-700 dark:text-neutral-300">Country <span className="text-red-500">*</span></Label>
               <select 
                 className="w-full h-8 px-2 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded text-xs text-neutral-800 dark:text-neutral-200 focus:border-primary outline-hidden cursor-pointer"
-                {...register("country")}
+                {...register("country")} disabled={!!selectedExistingClient}
               >
                 {countries.map((c: any) => (
                   <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
@@ -246,7 +305,7 @@ await atsApi.clients.createContact(newClientId, pocPayload);
               <Label className="font-bold text-neutral-700 dark:text-neutral-300">State</Label>
               <select 
                 className="w-full h-8 px-2 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded text-xs text-neutral-800 dark:text-neutral-200 focus:border-primary outline-hidden cursor-pointer"
-                {...register("state")}
+                {...register("state")} disabled={!!selectedExistingClient}
               >
                 <option value="">Select State</option>
                 {states.map((s: any) => (
@@ -261,7 +320,7 @@ await atsApi.clients.createContact(newClientId, pocPayload);
               <Input 
                 className="h-8 text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700" 
                 placeholder="City" 
-                {...register("city")} 
+                {...register("city")} disabled={!!selectedExistingClient} 
               />
             </div>
 
@@ -290,7 +349,7 @@ await atsApi.clients.createContact(newClientId, pocPayload);
                 step="0.01"
                 min="0"
                 max="100"
-                {...register("commissionPercentage", { valueAsNumber: true })}
+                {...register("commissionPercentage", { valueAsNumber: true })} disabled={!!selectedExistingClient}
                 placeholder="e.g. 8.33"
                 className="w-full h-8 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 font-semibold"
               />
@@ -301,7 +360,7 @@ await atsApi.clients.createContact(newClientId, pocPayload);
             <div className="space-y-1">
               <Label className="font-bold text-neutral-700 dark:text-neutral-300">Payment Terms</Label>
               <select
-                {...register("paymentTerms")}
+                {...register("paymentTerms")} disabled={!!selectedExistingClient}
                 className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
               >
                 <option value="">Select Terms</option>
@@ -316,11 +375,11 @@ await atsApi.clients.createContact(newClientId, pocPayload);
             {/* Compliance Flags */}
             <div className="md:col-span-2 flex items-center gap-6 py-2">
               <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                <input type="checkbox" {...register("msaSigned")} className="rounded border-neutral-300 text-primary focus:ring-primary h-4 w-4" />
+                <input type="checkbox" {...register("msaSigned")} disabled={!!selectedExistingClient} className="rounded border-neutral-300 text-primary focus:ring-primary h-4 w-4" />
                 MSA Signed
               </label>
               <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                <input type="checkbox" {...register("sowExecuted")} className="rounded border-neutral-300 text-primary focus:ring-primary h-4 w-4" />
+                <input type="checkbox" {...register("sowExecuted")} disabled={!!selectedExistingClient} className="rounded border-neutral-300 text-primary focus:ring-primary h-4 w-4" />
                 SOW Executed
               </label>
             </div>
@@ -398,7 +457,7 @@ await atsApi.clients.createContact(newClientId, pocPayload);
                 className="resize-none text-xs bg-white dark:bg-slate-955 border-neutral-300 dark:border-slate-700 focus:border-primary" 
                 rows={3} 
                 placeholder="Company info..."
-                {...register("aboutCompany")} 
+                {...register("aboutCompany")} disabled={!!selectedExistingClient} 
               />
             </div>
 
@@ -415,7 +474,7 @@ await atsApi.clients.createContact(newClientId, pocPayload);
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting} className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-              {isSubmitting ? "Saving..." : (hasDirectAddClearance ? "Add Client" : "Submit for Approval")}
+              {isSubmitting ? "Saving..." : selectedExistingClient ? "Add POC to Client" : (hasDirectAddClearance ? "Add Client" : "Submit for Approval")}
             </Button>
           </div>
         </form>
