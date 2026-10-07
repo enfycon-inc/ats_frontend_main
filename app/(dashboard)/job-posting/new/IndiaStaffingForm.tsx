@@ -159,7 +159,7 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
         return "manual";
       }
     }
-    return "landing";
+    return editJobId ? "manual" : "landing";
   });
 
   const [isCloningLoading, setIsCloningLoading] = useState<boolean>(() => {
