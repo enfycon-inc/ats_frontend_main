@@ -75,8 +75,9 @@ export function JobAssignmentModal({
     }
   };
 
-  const isAssignLaterEnabled = !activeBranch || activeBranch.allowUnassigned || activeBranch.allow_unassigned;
-  const isAllRecruitersEnabled = !activeBranch || activeBranch.allowAll || activeBranch.allow_all;
+    const isPodsEnabled = !activeBranch || (activeBranch.allowPods !== false && activeBranch.allow_pods !== false);
+  const isRecruitersEnabled = !activeBranch || activeBranch.allowNone === true || activeBranch.allow_none === true;
+  const isAssignLaterEnabled = !activeBranch || activeBranch.allowUnassigned === true || activeBranch.allow_unassigned === true;
 
   // For recruiters, determine if all filtered are selected
   const allFilteredSelected = filteredRecruiters.length > 0 && filteredRecruiters.every(r => recruiterIds.includes(r.id));
@@ -96,7 +97,7 @@ export function JobAssignmentModal({
 
         {/* Tab Navigation */}
         <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 px-4 pt-2">
-          {podsList.length > 0 && (
+          {isPodsEnabled && (
             <button
               onClick={() => { setType("pod"); setSearch(""); }}
               className={cn(
@@ -110,6 +111,7 @@ export function JobAssignmentModal({
             </button>
           )}
           
+          {isRecruitersEnabled && (
           <button
             onClick={() => { setType("recruiters"); setSearch(""); }}
             className={cn(
@@ -121,6 +123,7 @@ export function JobAssignmentModal({
           >
             Individual Recruiters
           </button>
+          )}
           
           {isAssignLaterEnabled && (
             <button
