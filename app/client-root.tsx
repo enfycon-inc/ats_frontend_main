@@ -71,18 +71,18 @@ export function ClientRoot({
               id: u.id,
               email: u.email,
               fullName: u.name,
-              roles: u.roles,
+              roles: initialNavigation?.profile?.roles || [],
               tenantId: u.tenantId,
               defaultMarket: u.defaultMarket,
-              permissions: u.permissions || [],
-              systemRole: u.systemRole || "RECRUITER",
+              permissions: initialNavigation?.profile?.permissions || [],
+              systemRole: initialNavigation?.profile?.systemRole || null,
               podId: u.podId || null,
             })
           );
         }
       }
     }
-  }, [session]);
+  }, [session, initialNavigation]);
 
   // Fix Radix UI scroll-lock padding-right injection on body
   useRadixScrollLockFix();

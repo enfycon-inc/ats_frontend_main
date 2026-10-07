@@ -113,6 +113,7 @@ export function DashboardProvider({ initialNavigation = null, children }: {
       else localStorage.removeItem("override_role");
     } catch { /* The in-memory switch remains available. */ }
     window.dispatchEvent(new CustomEvent("overrideRoleChanged", { detail: { role: roleId, profileId: profile.id, tenantId: profile.tenantId } }));
+    window.location.assign('/dashboard');
   }, [profile, selection.options]);
 
   return <DashboardContext.Provider value={{ profile, roles, selection, status: state.status, error: state.error, reload, selectRole }}>{children}</DashboardContext.Provider>;

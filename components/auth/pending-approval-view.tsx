@@ -151,7 +151,7 @@ export default function PendingApprovalView({
     setIsLoadingLocations(true);
     Promise.all([
       atsApi.branches.list().catch(() => []),
-      atsApi.businessUnits.list().catch(() => []),
+      atsApi.businessUnits.onboardingOptions().catch(() => []),
       atsApi.auth.listRoles(undefined, true).catch(() => []),
     ]).then(([bList, uList, rList]) => {
       if (!mounted) return;

@@ -15,6 +15,15 @@
  */
 
 import { getTenantIdentifier, getBaseDomain } from '@/utils/subdomain-helper';
+import { getSavedDashboardRole } from './dashboard-preference';
+
+export function activeRoleHeaders(): Record<string, string> {
+  const profile = getCurrentUser();
+  const selection = getSavedDashboardRole(profile);
+  // Old preferences may contain names; only exact assigned IDs cross the API boundary.
+  const roleId = selection && /^[0-9a-f-]{36}$/i.test(selection) ? selection : null;
+  return roleId ? { 'x-active-role-id': roleId } : {};
+}
 
 export function getApiBase(): string {
   if (typeof window !== 'undefined') {
@@ -265,6 +274,7 @@ async function apiFetch<T = any>(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
+    ...activeRoleHeaders(),
   };
 
   if (token) {
@@ -371,7 +381,9 @@ const auth = {
   },
 
   async me() {
-    return apiFetch('/api/auth/me');
+    const profile = await apiFetch<any>('/api/auth/me');
+    setCurrentUser(profile);
+    return profile;
   },
 
   async logout() {
@@ -391,7 +403,7 @@ const auth = {
   async getProfile(userId?: string): Promise<any> {
     // /api/auth/me returns the authenticated user's profile.
     // The old /api/auth/profile/:id route does not exist — use /me instead.
-    return apiFetch<any>('/api/auth/me').catch(() => null);
+    return auth.me().catch(() => null);
   },
 
   setCurrentUser(user: any) {
@@ -1181,7 +1193,7 @@ const candidates = {
     });
 
     const token = getToken();
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = activeRoleHeaders();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -1212,7 +1224,7 @@ const candidates = {
     formData.append('file', file);
 
     const token = getToken();
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = activeRoleHeaders();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -1256,7 +1268,7 @@ const candidates = {
 
     const token = getToken();
     const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = activeRoleHeaders();
     if (token) headers['Authorization'] = `Bearer ${token}`;
     if (activeBranchId && !headers['x-branch-id']) headers['x-branch-id'] = activeBranchId;
 
@@ -1275,7 +1287,7 @@ const candidates = {
   /** Fetch the stored CV as a blob (auth-aware) so it can be opened or downloaded. */
   async fetchResumeBlob(candidateId: string | number): Promise<Blob> {
     const token = getToken();
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = activeRoleHeaders();
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const res = await fetch(`${getApiBase()}/api/candidates/${candidateId}/resume`, { headers });
     if (!res.ok) throw new Error(res.status === 404 ? 'No CV on file for this candidate.' : `Download failed: ${res.status}`);
@@ -1599,6 +1611,9 @@ const branches = {
 };
 
 const businessUnits = {
+  async onboardingOptions(): Promise<{ id: string; name: string; branchId: string | null }[]> {
+    return apiFetch('/api/business-units/onboarding-options');
+  },
   async list(branchId?: string): Promise<any[]> {
     const q = branchId ? `?branchId=${encodeURIComponent(branchId)}` : '';
     return apiFetch<any[]>(`/api/business-units${q}`);

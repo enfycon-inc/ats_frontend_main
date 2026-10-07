@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import { activeRoleHeaders } from "@/lib/ats-api";
 import DashboardBreadcrumb from "@/components/layout/dashboard-breadcrumb";
 import { useSocket } from "@/contexts/SocketContext";
 import {
@@ -92,7 +93,7 @@ export default function AdminNotificationsPage() {
   useEffect(() => {
     if (!token) return;
     fetch(`${apiUrl}/api/branches`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { ...activeRoleHeaders(), Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
@@ -118,7 +119,7 @@ export default function AdminNotificationsPage() {
         if (searchQuery.trim()) params.append("search", searchQuery.trim());
 
         const res = await fetch(`${apiUrl}/api/notifications/admin/all?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { ...activeRoleHeaders(), Authorization: `Bearer ${token}` },
         });
 
         if (res.ok) {
@@ -159,7 +160,7 @@ export default function AdminNotificationsPage() {
       const res = await fetch(`${apiUrl}/api/notifications/${item.id}/toggle-read`, {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...activeRoleHeaders(), Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ isRead: nextStatus }),
@@ -170,7 +171,7 @@ export default function AdminNotificationsPage() {
         // Fallback to standard read endpoint if toggle-read isn't available
         await fetch(`${apiUrl}/api/notifications/${item.id}/read`, {
           method: "PATCH",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { ...activeRoleHeaders(), Authorization: `Bearer ${token}` },
         });
       }
     } catch (err) {
@@ -190,7 +191,7 @@ export default function AdminNotificationsPage() {
         const res = await fetch(`${apiUrl}/api/notifications/${item.id}/toggle-read`, {
           method: "PATCH",
           headers: {
-            Authorization: `Bearer ${token}`,
+            ...activeRoleHeaders(), Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ isRead: true }),
@@ -198,7 +199,7 @@ export default function AdminNotificationsPage() {
         if (!res.ok) {
           await fetch(`${apiUrl}/api/notifications/${item.id}/read`, {
             method: "PATCH",
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { ...activeRoleHeaders(), Authorization: `Bearer ${token}` },
           });
         }
       } catch (err) {
@@ -238,7 +239,7 @@ export default function AdminNotificationsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...activeRoleHeaders(), Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           title: broadcastTitle.trim(),

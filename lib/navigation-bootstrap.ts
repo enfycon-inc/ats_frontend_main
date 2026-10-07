@@ -21,13 +21,13 @@ export async function loadDashboardNavigation(
 }
 
 // Request-local data only: never cache one member's navigation for another.
-export const loadNavigationBootstrap = cache(async function(base: string, token: string): Promise<NavigationBootstrap | null> {
+export const loadNavigationBootstrap = cache(async function(base: string, token: string, activeRoleId?: string): Promise<NavigationBootstrap | null> {
   if (!token) return null;
   try {
     const signal = AbortSignal.timeout(8000);
     const get = async (path: string) => {
       const response = await fetch(`${base.replace(/\/$/, "")}${path}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, ...(activeRoleId ? { 'x-active-role-id': activeRoleId } : {}) },
       cache: "no-store",
       signal,
       });

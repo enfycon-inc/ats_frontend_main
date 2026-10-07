@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { atsApi } from "@/lib/ats-api";
+import { saveDashboardRole } from "@/lib/dashboard-preference";
 
 export default function ProfileDropdown() {
   const [open, setOpen] = useState(false);
@@ -367,6 +368,7 @@ export default function ProfileDropdown() {
 
   const handleSwitchRole = (roleName: string | null) => {
     if (typeof window !== "undefined") {
+      saveDashboardRole(currentUser, roleName);
       if (roleName) {
         localStorage.setItem("override_role", roleName);
       } else {
@@ -375,6 +377,7 @@ export default function ProfileDropdown() {
       setOverrideRole(roleName);
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new CustomEvent("overrideRoleChanged", { detail: { role: roleName } }));
+      window.location.assign("/dashboard");
     }
     setOpen(false);
   };
@@ -518,7 +521,7 @@ export default function ProfileDropdown() {
                 <button
                   key={opt.id || opt.key}
                   type="button"
-                  onClick={() => handleSwitchRole(opt.key)}
+                  onClick={() => handleSwitchRole(opt.id)}
                   className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] transition-all duration-150 cursor-pointer text-left group ${
                     isActive
                       ? "bg-slate-100/90 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold"

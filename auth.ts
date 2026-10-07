@@ -5,7 +5,8 @@ import Google from "next-auth/providers/google"
 import Keycloak from "next-auth/providers/keycloak"
 import { ZodError } from "zod"
 import { loginSchema } from "./lib/zod"
-import { headers } from "next/headers"
+import { headers, cookies } from "next/headers"
+import { dashboardPreferenceCookie } from "./lib/dashboard-preference"
 import { classifySsoError } from "./lib/sso-error"
 import { getTenantIdentifier } from "./utils/subdomain-helper"
 
@@ -382,6 +383,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as any).defaultMarket = token.defaultMarket;
         (session.user as any).isApproved = token.isApproved !== undefined ? token.isApproved : true;
         (session.user as any).requestedRole = token.requestedRole || null;
+        // Session consumers must see the same selected-role permissions as API requests.
+        const preferenceKey = dashboardPreferenceCookie({ id: token.id as string, tenantId: token.tenantId as string });
+        const savedRole = preferenceKey ? (await cookies()).get(preferenceKey)?.value : null;
+        if (savedRole && token.accessToken) {
+          (session.user as any).permissions = [];
+          (session.user as any).roles = [];
+          (session.user as any).systemRole = null;
+          try {
+            const response = await fetchBackend('/api/auth/me', {
+              headers: { Authorization: `Bearer ${token.accessToken}`, 'x-active-role-id': decodeURIComponent(savedRole) },
+              cache: 'no-store', signal: AbortSignal.timeout(8000),
+            });
+            if (response.ok) {
+              const profile = await response.json();
+              Object.assign(session.user, { permissions: profile.permissions, roles: profile.roles,
+                systemRole: profile.systemRole, activeRoleId: profile.activeRoleId,
+                branchId: profile.branchId, businessUnitId: profile.businessUnitId, podId: profile.podId });
+            }
+          } catch { /* Keep access empty until selected-role verification succeeds. */ }
+        }
         // Forward refresh error so client can detect and redirect to login
         (session as any).error = token.error || null;
       }

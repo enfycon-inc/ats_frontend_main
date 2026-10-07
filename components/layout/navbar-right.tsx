@@ -1201,7 +1201,7 @@ function ProfileDropdownNav() {
       window.dispatchEvent(new CustomEvent("overrideRoleChanged", { detail: { role: roleName } }));
       
       // Keep the shared layout mounted so the sidebar retains its loaded data.
-      router.push("/dashboard");
+      window.location.assign("/dashboard");
     }
     setOpen(false);
   };

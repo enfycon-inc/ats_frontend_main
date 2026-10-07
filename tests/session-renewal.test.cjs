@@ -16,11 +16,12 @@ function load(file, imports, globals = {}) {
   return module.exports;
 }
 
-function auth() {
+function auth(activeRole = null, activeProfile = {}) {
   let config, now = 1000000, calls = 0, failure = 0;
-  const fetch = async () => {
+  const fetch = async url => {
     calls++;
     if (failure) return new Response('{}', { status: failure });
+    if (String(url).endsWith('/api/auth/me')) return new Response(JSON.stringify(activeProfile));
     return new Response(JSON.stringify({ accessToken: `access-${calls}`, refreshToken: `refresh-${calls}`, expiresIn: 300 }));
   };
   const provider = options => options;
@@ -28,7 +29,8 @@ function auth() {
     'next-auth': options => { config = options; return {}; },
     'next-auth/providers/credentials': provider, 'next-auth/providers/github': provider,
     'next-auth/providers/google': provider, 'next-auth/providers/keycloak': provider,
-    zod: {}, './lib/zod': {}, 'next/headers': {}, './lib/sso-error': {}, './utils/subdomain-helper': {},
+    zod: {}, './lib/zod': {}, 'next/headers': { cookies: async () => ({ get: () => activeRole ? { value: activeRole } : undefined }) }, './lib/sso-error': {}, './utils/subdomain-helper': {},
+    './lib/dashboard-preference': { dashboardPreferenceCookie: () => activeRole ? 'role-cookie' : null },
   }, { fetch, Date: { now: () => now }, console: { log() {}, warn() {}, error() {} } });
   return { config, advance: ms => { now += ms; }, fail: status => { failure = status; }, get calls() { return calls; } };
 }
@@ -73,15 +75,45 @@ test('temporary renewal outage preserves credentials and recovers after access e
   assert.equal(token.refreshToken, 'refresh-2');
 });
 
-function api(respond) {
+function api(respond, activeRole = null) {
   const storage = new Map([['ats_refresh_token', 'valid-refresh']]);
   const browser = { location: { hostname: 'tenant.example.test', protocol: 'https:', pathname: '/dashboard', href: '' } };
   const localStorage = { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };
-  const exports = load('lib/ats-api.ts', { '@/utils/subdomain-helper': { getBaseDomain: () => 'example.test', getTenantIdentifier: () => 'tenant' } }, {
+  const exports = load('lib/ats-api.ts', { '@/utils/subdomain-helper': { getBaseDomain: () => 'example.test', getTenantIdentifier: () => 'tenant' }, './dashboard-preference': { getSavedDashboardRole: () => activeRole } }, {
     window: browser, localStorage, navigator: {}, fetch: respond, console: { error() {}, warn() {} },
   });
-  return { api: exports.atsApi, storage, browser };
+  return { api: exports.atsApi, storage, browser, activeRoleHeaders: exports.activeRoleHeaders };
 }
+
+test('session consumers receive only the switched role permissions', async () => {
+  const app = auth('11111111-1111-4111-8111-111111111111', {
+    permissions: ['unit_admin:manage'], roles: ['UNIT_ADMIN'], systemRole: 'UNIT_ADMIN', businessUnitId: 'unit',
+  });
+  const token = await login(app);
+  token.permissions = ['tenant:settings'];
+  token.roles = ['TENANT_ADMIN'];
+  const session = await app.config.callbacks.session({ session: { user: {} }, token });
+  assert.deepEqual(session.user.permissions, ['unit_admin:manage']);
+  assert.deepEqual(session.user.roles, ['UNIT_ADMIN']);
+  assert.equal(session.user.businessUnitId, 'unit');
+});
+
+test('failed selected-role verification does not restore primary administrator access', async () => {
+  const app = auth('11111111-1111-4111-8111-111111111111');
+  const token = await login(app);
+  token.permissions = ['tenant:settings'];
+  token.roles = ['TENANT_ADMIN'];
+  app.fail(403);
+  const session = await app.config.callbacks.session({ session: { user: {} }, token });
+  assert.deepEqual(session.user.permissions, []);
+  assert.deepEqual(session.user.roles, []);
+});
+
+test('API requests use the exact selected role ID and do not forward legacy role names', () => {
+  const roleId = '11111111-1111-4111-8111-111111111111';
+  assert.deepEqual(api(async () => {}, roleId).activeRoleHeaders(), { 'x-active-role-id': roleId });
+  assert.deepEqual(api(async () => {}, 'Tenant Admin').activeRoleHeaders(), {});
+});
 
 test('concurrent API calls share one refresh; outage settles all callers and keeps credentials', async () => {
   let calls = 0;

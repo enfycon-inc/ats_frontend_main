@@ -1,7 +1,7 @@
 import { CustomRoleDefinition, resolveActiveSystemRole } from "./role-permissions";
 import { getSavedDashboardRole } from "./dashboard-preference";
 
-// Selection changes presentation only; permissions remain the live backend union.
+// Assigned roles are switcher options; the backend grants only the active role's permissions.
 export function getDashboardRoleSelection(profile: any, roles: CustomRoleDefinition[], override?: string | null, readBrowserPreference = true) {
   if (readBrowserPreference) override = getSavedDashboardRole(profile) || override;
   const assignedIds = new Set<string>([...(profile?.assignedRoleIds || []), profile?.roleId].filter(Boolean));

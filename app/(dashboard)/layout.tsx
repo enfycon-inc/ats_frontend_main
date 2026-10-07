@@ -73,13 +73,19 @@ export default async function DashboardLayout({
     redirect("/auth/login");
   }
 
-  const initialNavigation = await loadNavigationBootstrap(getApiBase(), (session as any)?.user?.accessToken || "");
+  let initialNavigation = await loadNavigationBootstrap(getApiBase(), (session as any)?.user?.accessToken || "");
   const cookieStore = await cookies();
   if (initialNavigation) {
     const key = dashboardPreferenceCookie(initialNavigation.profile);
     const saved = key ? cookieStore.get(key)?.value : null;
     if (saved) {
-      try { initialNavigation.overrideRole = decodeURIComponent(saved); } catch { /* Ignore malformed preferences. */ }
+      try {
+        const roleId = decodeURIComponent(saved);
+        if (/^[0-9a-f-]{36}$/i.test(roleId)) {
+          initialNavigation = await loadNavigationBootstrap(getApiBase(), (session as any)?.user?.accessToken || "", roleId);
+          if (initialNavigation) initialNavigation.overrideRole = roleId;
+        }
+      } catch { /* Ignore malformed preferences. */ }
     }
   }
 
