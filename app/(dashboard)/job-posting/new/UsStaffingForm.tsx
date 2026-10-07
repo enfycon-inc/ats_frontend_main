@@ -294,8 +294,7 @@ const getInitialActiveBranchContext = () => {
     if (targetM === "IN") {
       setValue("country", "India");
       setValue("jobType", "Full Time");
-      setValue("shiftTiming", unit.shiftTiming || "General Shift (Day)");
-      setValue("taxTerms", "Permanent");
+      setValue("shiftTiming", unit.shiftTiming || "General Shift (Day)");      setValue("taxTerms", "Permanent");
       setBillCurrency("INR");
       setBillUnit("LPA");
       setBillTerm("Permanent");
@@ -305,8 +304,7 @@ const getInitialActiveBranchContext = () => {
     } else {
       setValue("country", "United States");
       setValue("jobType", "Full Time");
-      setValue("shiftTiming", unit.shiftTiming || "US Shift (Night)");
-      setValue("taxTerms", "C2C");
+      setValue("shiftTiming", unit.shiftTiming || "US Shift (Night)");      setValue("taxTerms", "C2C");
       setBillCurrency("USD");
       setBillUnit("Hourly");
       setBillTerm("C2C");
@@ -571,8 +569,7 @@ const getInitialActiveBranchContext = () => {
       setPayUnit("LPA");
       setPayTerm("Permanent");
       
-      setValue("taxTerms", "Permanent");
-      const commVal = commissionType === "custom" ? customCommission : commissionType;
+      setValue("taxTerms", "Permanent");      const commVal = commissionType === "custom" ? customCommission : commissionType;
       setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: false });
     } else if (selectedCountry === "United States") {
       
@@ -584,8 +581,7 @@ const getInitialActiveBranchContext = () => {
       setPayUnit("Hourly");
       setPayTerm("C2C");
       
-      setValue("taxTerms", "C2C");
-    }
+      setValue("taxTerms", "C2C");    }
   }, [selectedCountry, setValue, commissionType, customCommission]);
 
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
@@ -740,10 +736,9 @@ const getInitialActiveBranchContext = () => {
           const posterName = (session as any)?.user?.name || prof?.name || prof?.email || "Account Manager";
 
           
-//           if (targetMarket === "IN") {
+          if (targetMarket === "IN") {
             setValue("jobType", "Full Time");
-            setValue("shiftTiming", "General Shift (Day)");
-            setValue("taxTerms", "Permanent");
+            setValue("shiftTiming", "General Shift (Day)");            setValue("taxTerms", "Permanent");
             setValue("accountManager", posterName);
             setBillCurrency("INR");
             setBillUnit("LPA");
@@ -753,8 +748,7 @@ const getInitialActiveBranchContext = () => {
             setPayTerm("Permanent");
           } else {
             setValue("jobType", "Full Time");
-            setValue("shiftTiming", "US Shift (Night)");
-            setValue("taxTerms", "C2C");
+            setValue("shiftTiming", "US Shift (Night)");            setValue("taxTerms", "C2C");
             setBillCurrency("USD");
             setBillUnit("Hourly");
             setBillTerm("C2C");
@@ -924,7 +918,7 @@ const getInitialActiveBranchContext = () => {
       setValue("workAuthorization", jobData.visaType || "");
 
       if (jobData.jobTimezone) {
-        // setJobTiming(prev => ({ ...prev, jobTimezone: jobData.jobTimezone! }));
+        setJobTiming(prev => ({ ...prev, jobTimezone: jobData.jobTimezone! }));
       }
 
       // Parse Bill Rate
@@ -953,8 +947,8 @@ const getInitialActiveBranchContext = () => {
       setValue("hoursPerWeek", jobData.hoursPerWeek || 40);
       setValue("duration", jobData.duration || "");
       setValue("recruitmentManager", jobData.recruitmentManagerId || "");
-//       // setValue("recruiter", jobData.recruiterId || "");
-//       // setValue("assignedTo", jobData.assignedTo || "");
+      setValue("recruiter", jobData.recruiterId || "");
+      setValue("assignedTo", jobData.assignedTo || "");
       setValue("accountManager", jobData.accountManagerId || "");
       setValue("industry", jobData.industry || "");
       setValue("degree", jobData.degree || "");
@@ -964,11 +958,11 @@ const getInitialActiveBranchContext = () => {
 
       if (jobData.podId) {
         setSelectedPodId(`pod:${jobData.podId}`);
-//       } else if (jobData.recruiterId) {
-//         setSelectedPodId(`rec:${jobData.recruiterId}`);
-//       } else if (jobData.assignedTo === "ALL" || jobData.assignedTo === "All Branch Recruiters") {
+      } else if (jobData.recruiterId) {
+        setSelectedPodId(`rec:${jobData.recruiterId}`);
+      } else if (jobData.assignedTo === "ALL" || jobData.assignedTo === "All Branch Recruiters") {
         setSelectedPodId("all");
-//       } else if (jobData.assignedTo === "Unassigned") {
+      } else if (jobData.assignedTo === "Unassigned") {
         setSelectedPodId("none");
       }
 
@@ -1044,26 +1038,25 @@ const getInitialActiveBranchContext = () => {
         // Auto-assign work authorization if matched
         if (res.workAuthorization) {
           setValue("workAuthorization", res.workAuthorization);
-        } else {
-        }
+        } else {        }
 
         // Pre-fill location fields if returned (preserving active branch market)
-        if ((res.location || "")) {
+        if (res.location) {
           if (false) {
             setValue("country", "India");
-            if ((res.location || "").state && !["Texas", "California", "New York", "Florida", "Illinois", "Washington", "Virginia", "New Jersey", "Georgia", "North Carolina"].includes((res.location || "").state)) {
-              setValue("states", (res.location || "").state);
+            if (res.location.state && !["Texas", "California", "New York", "Florida", "Illinois", "Washington", "Virginia", "New Jersey", "Georgia", "North Carolina"].includes(res.location.state)) {
+              setValue("states", res.location.state);
             }
           } else {
-            if ((res.location || "").country) {
-              setValue("country", (res.location || "").country);
+            if (res.location.country) {
+              setValue("country", res.location.country);
             }
-            if ((res.location || "").state) {
-              setValue("states", (res.location || "").state);
+            if (res.location.state) {
+              setValue("states", res.location.state);
             }
           }
-          if ((res.location || "").city) {
-            setValue("city", (res.location || "").city);
+          if (res.location.city) {
+            setValue("city", res.location.city);
           }
         }
 
@@ -1275,7 +1268,7 @@ const getInitialActiveBranchContext = () => {
       let resolvedApproverId: string | undefined = selectedApproverId || undefined;
       let resolvedApproverRole: string = selectedApproverRole || "POD_LEAD";
       let resolvedPrimaryRecruiterId: string | undefined = data.recruiter || undefined;
-//       let resolvedAssignedTo: string | undefined = data.assignedTo || undefined;
+      let resolvedAssignedTo: string | undefined = data.assignedTo || undefined;
 
       if (selectedPodId.startsWith("pod:")) {
         resolvedPodId = selectedPodId.replace("pod:", "");
@@ -2238,8 +2231,8 @@ const getInitialActiveBranchContext = () => {
                               </div>
                             </>
                           )}
-                          {(errors.clientBillRate || "") && (
-                            <p className="text-[10px] text-red-655 font-bold">{(errors.clientBillRate || "").message}</p>
+                          {errors.clientBillRate && (
+                            <p className="text-[10px] text-red-655 font-bold">{errors.clientBillRate.message}</p>
                           )}
                         </div>
 
@@ -2292,8 +2285,8 @@ const getInitialActiveBranchContext = () => {
                             <option value="Other">Other</option>
                           </select>
                         </div>
-                        {(errors.clientBillRate || "") && (
-                          <p className="text-[10px] text-red-655 font-bold">{(errors.clientBillRate || "").message}</p>
+                        {errors.clientBillRate && (
+                          <p className="text-[10px] text-red-655 font-bold">{errors.clientBillRate.message}</p>
                         )}
                       </div>
                     )}
@@ -2559,12 +2552,12 @@ const getInitialActiveBranchContext = () => {
                                 if (e.key === "Enter") {
                                   const query = clientSearchText.trim();
                                   if (query) {
-//                                     const exactMatch = clientList.find((cl: any) => {
-//                                       const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                    const exactMatch = clientList.find((cl: any) => {
+                                      const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
                                       return cName === query.toLowerCase();
                                     });
-//                                     if (exactMatch) {
-//                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
+                                    if (exactMatch) {
+                                      const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
                                       setValue("client", clientNameStr, { shouldValidate: true });
                                       setClientDropdownOpen(false);
                                       setClientSearchText("");
@@ -2583,7 +2576,7 @@ const getInitialActiveBranchContext = () => {
                               {(() => {
                                 const query = clientSearchText.trim().toLowerCase();
                                 const filtered = clientList.filter((cl: any) => {
-//                                   const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                  const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
                                   return !query || cName.includes(query);
                                 });
 
@@ -2616,10 +2609,10 @@ const getInitialActiveBranchContext = () => {
                                 return (
                                   <CommandGroup heading="Existing Clients">
                                     {filtered.map((cl: any) => {
-//                                       const clientNameStr = cl.client_name || cl.clientName || cl.name || "";
+                                      const clientNameStr = cl.client_name || cl.clientName || cl.name || "";
                                       return (
                                         <CommandItem
-//                                           key={cl.id || clientNameStr}
+                                          key={cl.id || clientNameStr}
                                           value={clientNameStr}
                                           onSelect={() => {
                                             setValue("client", clientNameStr, { shouldValidate: true });
@@ -2649,12 +2642,12 @@ const getInitialActiveBranchContext = () => {
                                   className="text-primary font-bold text-xs hover:underline bg-transparent border-0 cursor-pointer"
                                   onClick={() => {
                                     const query = clientSearchText.trim();
-//                                     const exactMatch = clientList.find((cl: any) => {
-//                                       const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                    const exactMatch = clientList.find((cl: any) => {
+                                      const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
                                       return cName === query.toLowerCase();
                                     });
-//                                     if (exactMatch) {
-//                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
+                                    if (exactMatch) {
+                                      const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
                                       setValue("client", clientNameStr, { shouldValidate: true });
                                       setClientDropdownOpen(false);
                                       setClientSearchText("");
@@ -2724,12 +2717,12 @@ const getInitialActiveBranchContext = () => {
                                 if (e.key === "Enter") {
                                   const query = endClientSearchText.trim();
                                   if (query) {
-//                                     const exactMatch = clientList.find((cl: any) => {
-//                                       const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                    const exactMatch = clientList.find((cl: any) => {
+                                      const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
                                       return cName === query.toLowerCase();
                                     });
-//                                     if (exactMatch) {
-//                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
+                                    if (exactMatch) {
+                                      const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
                                       setValue("endClientName", clientNameStr, { shouldValidate: true });
                                       setEndClientDropdownOpen(false);
                                       setEndClientSearchText("");
@@ -2748,7 +2741,7 @@ const getInitialActiveBranchContext = () => {
                               {(() => {
                                 const query = endClientSearchText.trim().toLowerCase();
                                 const filtered = clientList.filter((cl: any) => {
-//                                   const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                  const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
                                   return !query || cName.includes(query);
                                 });
 
@@ -2781,10 +2774,10 @@ const getInitialActiveBranchContext = () => {
                                 return (
                                   <CommandGroup heading="Existing Clients">
                                     {filtered.map((cl: any) => {
-//                                       const clientNameStr = cl.client_name || cl.clientName || cl.name || "";
+                                      const clientNameStr = cl.client_name || cl.clientName || cl.name || "";
                                       return (
                                         <CommandItem
-//                                           key={cl.id || clientNameStr}
+                                          key={cl.id || clientNameStr}
                                           value={clientNameStr}
                                           onSelect={() => {
                                             setValue("endClientName", clientNameStr, { shouldValidate: true });
@@ -2814,12 +2807,12 @@ const getInitialActiveBranchContext = () => {
                                   className="text-primary font-bold text-xs hover:underline bg-transparent border-0 cursor-pointer"
                                   onClick={() => {
                                     const query = endClientSearchText.trim();
-//                                     const exactMatch = clientList.find((cl: any) => {
-//                                       const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
+                                    const exactMatch = clientList.find((cl: any) => {
+                                      const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
                                       return cName === query.toLowerCase();
                                     });
-//                                     if (exactMatch) {
-//                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
+                                    if (exactMatch) {
+                                      const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
                                       setValue("endClientName", clientNameStr, { shouldValidate: true });
                                       setEndClientDropdownOpen(false);
                                       setEndClientSearchText("");
