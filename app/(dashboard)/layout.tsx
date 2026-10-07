@@ -84,6 +84,12 @@ export default async function DashboardLayout({
         if (/^[0-9a-f-]{36}$/i.test(roleId)) {
           initialNavigation = await loadNavigationBootstrap(getApiBase(), (session as any)?.user?.accessToken || "", roleId);
           if (initialNavigation) initialNavigation.overrideRole = roleId;
+          else {
+            // A role can be removed or moved after the preference was saved.
+            // Keep the member in their workspace and let the server use the
+            // current primary assignment instead of rendering an empty shell.
+            initialNavigation = await loadNavigationBootstrap(getApiBase(), (session as any)?.user?.accessToken || "");
+          }
         }
       } catch { /* Ignore malformed preferences. */ }
     }

@@ -173,6 +173,8 @@ export default function ProfileDropdown() {
 
   // Resolve assigned role objects directly by UUID from availableRoles
   const userAssignedRoleObjs = useMemo(() => {
+    const exactAssigned = (currentUser as any)?.assignedRoles;
+    if (Array.isArray(exactAssigned) && exactAssigned.length > 0) return exactAssigned;
     if (!availableRoles || availableRoles.length === 0) return [];
 
     // 1. Primary: match by exact role UUID

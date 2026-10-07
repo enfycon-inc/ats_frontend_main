@@ -3124,7 +3124,7 @@ export default function UserManagementPage() {
                         </div>
                         <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-2">Administrative roles grant system-wide permissions across the entire scope (Tenant, Branch, or Unit).</p>
                         
-                        {(editFormAdminRole === "BRANCH_ADMIN" || editFormAdminRole === "UNIT_ADMIN") && (
+                        {(editFormAdminRole === "TENANT_ADMIN" || editFormAdminRole === "BRANCH_ADMIN") && (
                            <div className="space-y-3 pt-3 mt-4 border-t border-neutral-100 dark:border-slate-800">
                              <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Assign Administrative Scope</label>
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
