@@ -929,10 +929,10 @@ const getInitialActiveBranchContext = () => {
       setValue("jobStatus", jobData.jobStatus || "Active");
       setValue("workAuthorization", jobData.visaType || "");
 
-      if (jobData.jobTimezone) {
-        // @ts-ignore
-        setJobTiming(prev => ({ ...prev, jobTimezone: jobData.jobTimezone! }));
-      }
+      // if (jobData.jobTimezone) {
+      //   // @ts-ignore
+      //   setJobTiming(prev => ({ ...prev, jobTimezone: jobData.jobTimezone! }));
+      // }
 
       // Parse Bill Rate
       const rawBillRate = jobData.clientBillRate || "";

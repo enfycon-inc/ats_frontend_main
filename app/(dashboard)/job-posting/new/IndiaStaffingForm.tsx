@@ -997,10 +997,10 @@ const getInitialActiveBranchContext = () => {
       setValue("jobStatus", jobData.jobStatus || "Active");
       setValue("workAuthorization", jobData.visaType || "");
 
-      if (jobData.jobTimezone) {
-        // @ts-ignore
-        setJobTiming(prev => ({ ...prev, jobTimezone: jobData.jobTimezone! }));
-      }
+      // if (jobData.jobTimezone) {
+      //   // @ts-ignore
+      //   setJobTiming(prev => ({ ...prev, jobTimezone: jobData.jobTimezone! }));
+      // }
 
       // Parse Bill Rate
       const rawBillRate = jobData.clientBillRate || "";
@@ -2378,11 +2378,7 @@ const getInitialActiveBranchContext = () => {
 
               {/* -------------------- CLIENT INFORMATION SECTION -------------------- */}
               <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
-                // @ts-ignore
-                // @ts-ignore
                 <SectionHeader title="CLIENT INFORMATION" sectionKey={"clientInfo" as any} />
-                // @ts-ignore
-                // @ts-ignore
                 {!(collapsedSections as any).clientInfo && (
                   <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
                     {/* Client */}
@@ -2745,12 +2741,12 @@ const getInitialActiveBranchContext = () => {
 
                               {pocList.myContacts.length > 0 && (
                                 <CommandGroup heading="My Contacts">
-                                  {pocList.myContacts
+                                  {Array.from(new Map(pocList.myContacts.map(p => [p.name, p])).values())
                                     .filter(p => p.name.toLowerCase().includes(pocSearch.toLowerCase()))
                                     .map(p => (
                                       <CommandItem
                                         key={p.id}
-                                        value={p.name}
+                                        value={`${p.name} ${p.id}`}
                                         onSelect={() => {
                                           setSelectedPocId(p.id);
                                           setPocOpen(false);
@@ -2771,12 +2767,12 @@ const getInitialActiveBranchContext = () => {
 
                               {pocList.otherContacts.length > 0 && (
                                 <CommandGroup heading="Other Contacts">
-                                  {pocList.otherContacts
+                                  {Array.from(new Map(pocList.otherContacts.map(p => [p.name, p])).values())
                                     .filter(p => p.name.toLowerCase().includes(pocSearch.toLowerCase()))
                                     .map(p => (
                                       <CommandItem
                                         key={p.id}
-                                        value={p.name}
+                                        value={`${p.name} ${p.id}`}
                                         onSelect={() => {
                                           setSelectedPocId(p.id);
                                           setPocOpen(false);
@@ -3017,12 +3013,12 @@ const getInitialActiveBranchContext = () => {
 
                               {endPocList.myContacts.length > 0 && (
                                 <CommandGroup heading="My Contacts">
-                                  {endPocList.myContacts
+                                  {Array.from(new Map(endPocList.myContacts.map(p => [p.name, p])).values())
                                     .filter(p => p.name.toLowerCase().includes(endPocSearch.toLowerCase()))
                                     .map(p => (
                                       <CommandItem
                                         key={p.id}
-                                        value={p.name}
+                                        value={`${p.name} ${p.id}`}
                                         onSelect={() => {
                                           setSelectedEndPocId(p.id);
                                           setEndPocOpen(false);
@@ -3043,12 +3039,12 @@ const getInitialActiveBranchContext = () => {
 
                               {endPocList.otherContacts.length > 0 && (
                                 <CommandGroup heading="Company Contacts">
-                                  {endPocList.otherContacts
+                                  {Array.from(new Map(endPocList.otherContacts.map(p => [p.name, p])).values())
                                     .filter(p => p.name.toLowerCase().includes(endPocSearch.toLowerCase()))
                                     .map(p => (
                                       <CommandItem
                                         key={p.id}
-                                        value={p.name}
+                                        value={`${p.name} ${p.id}`}
                                         onSelect={() => {
                                           setSelectedEndPocId(p.id);
                                           setEndPocOpen(false);

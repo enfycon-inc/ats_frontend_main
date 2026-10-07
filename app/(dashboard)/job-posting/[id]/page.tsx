@@ -2308,7 +2308,8 @@ export default function JobDetailPage() {
         onSuccess={loadData}
       />
 
-      <CandidateSubmissionModal open={uploadSubmitOpen} onOpenChange={setUploadSubmitOpen} job={job} onSuccess={loadData} />\n\n        {/* APPROVE JOB CONFIRMATION MODAL */}
+      <CandidateSubmissionModal open={uploadSubmitOpen} onOpenChange={setUploadSubmitOpen} job={job} onSuccess={loadData} />
+        {/* APPROVE JOB CONFIRMATION MODAL */}
       <Dialog open={approveModalOpen} onOpenChange={setApproveModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
