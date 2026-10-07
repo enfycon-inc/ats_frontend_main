@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { isValidPhoneNumber } from "libphonenumber-js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { atsApi } from "@/lib/ats-api";
+import { CheckCircle2 } from "lucide-react";
 
 export function ContactDialog({ open, onOpenChange, clientId, onSaved, endClient = false, market = "IN" }: {
   open: boolean; onOpenChange: (open: boolean) => void; clientId: string | null;
@@ -21,6 +22,15 @@ export function ContactDialog({ open, onOpenChange, clientId, onSaved, endClient
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
+  const [addedContacts, setAddedContacts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!open) {
+      setAddedContacts([]);
+      setFirstName(""); setLastName(""); setDesignation(""); setCustomDesignation(""); setEmail(""); setPhone("");
+    }
+  }, [open]);
+
   async function save(event: React.FormEvent) {
     event.preventDefault();
     if (!clientId || saving) return;
@@ -34,8 +44,8 @@ export function ContactDialog({ open, onOpenChange, clientId, onSaved, endClient
       });
       const contact = await response.json();
       onSaved(contact);
+      setAddedContacts(prev => [...prev, contact]);
       toast.success("Contact saved.");
-      onOpenChange(false);
       setFirstName(""); setLastName(""); setDesignation(""); setCustomDesignation(""); setEmail(""); setPhone("");
     } catch (error: any) {
       toast.error(error.message || "Could not save contact. Please try again.");
@@ -44,6 +54,22 @@ export function ContactDialog({ open, onOpenChange, clientId, onSaved, endClient
   return <Dialog open={open} onOpenChange={value => { if (!saving) onOpenChange(value); }}>
     <DialogContent className="sm:max-w-[480px]">
       <DialogHeader><DialogTitle>{endClient ? "Add End Client Contact" : "Add Point of Contact"}</DialogTitle></DialogHeader>
+      
+      {addedContacts.length > 0 && (
+        <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-2 space-y-2">
+          <p className="text-xs font-semibold text-green-800 uppercase tracking-wider">Recently Added</p>
+          <div className="space-y-1">
+            {addedContacts.map((c, i) => (
+              <div key={i} className="flex items-center text-sm text-green-900 bg-green-100/50 px-2 py-1.5 rounded">
+                <CheckCircle2 className="w-4 h-4 text-green-600 mr-2 shrink-0" />
+                <span className="font-medium truncate">{c.name}</span>
+                {c.email && <span className="text-green-700 ml-2 text-xs truncate">({c.email})</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <form onSubmit={save} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div><Label htmlFor="contact-first">First Name *</Label><Input id="contact-first" required value={firstName} onChange={e => setFirstName(e.target.value)} /></div>
@@ -57,7 +83,14 @@ export function ContactDialog({ open, onOpenChange, clientId, onSaved, endClient
         </div>
         <div><Label htmlFor="contact-email">Email</Label><Input id="contact-email" type="email" value={email} onChange={e => setEmail(e.target.value)} /></div>
         <div><Label htmlFor="contact-phone">Mobile Number</Label><PhoneInput id="contact-phone" market={market} value={phone} onChange={value => setPhone(value || "")} /></div>
-        <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit" disabled={saving || !firstName.trim() || !clientId}>{saving ? "Saving…" : "Save Contact"}</Button></div>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
+            {addedContacts.length > 0 ? "Done" : "Cancel"}
+          </Button>
+          <Button type="submit" disabled={saving || !firstName.trim() || !clientId}>
+            {saving ? "Saving…" : "Save Contact"}
+          </Button>
+        </div>
       </form>
     </DialogContent>
   </Dialog>;
