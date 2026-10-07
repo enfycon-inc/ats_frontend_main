@@ -829,28 +829,20 @@ export default function UserManagementPage() {
         assignedRoleIds: finalRoles,
       });
 
-      const chosenReviewer = editForm.jobReviewerId
-        ? users.find((u) => u.id === editForm.jobReviewerId)
-        : null;
-
       setUsers((prevUsers) =>
         prevUsers.map((u) =>
           u.id === selectedUser.id
             ? {
                 ...u,
-                fullName: trimmedName,
-                email: editEmail,
-                branchId: editForm.branchId || null,
-                businessUnitId: editForm.businessUnitId || null,
-                jobReviewerId: editForm.jobReviewerId || null,
-                jobReviewerName: chosenReviewer ? chosenReviewer.fullName : null,
+                branchId: editForm.branchId || selectedUser.branchId || null,
+                businessUnitId: editForm.businessUnitId || selectedUser.businessUnitId || null,
                 roles: finalRoles,
               }
             : u
         )
       );
 
-      toast.success("User details updated successfully!");
+      toast.success("Role assignment updated successfully!");
       setIsEditModalOpen(false);
       setSelectedUser(null);
       await loadData();
@@ -3118,7 +3110,7 @@ export default function UserManagementPage() {
                                     </Select>
                                   )}
                                 </div>
-                                {editFormAdminRole === "UNIT_ADMIN" && (
+                                {false && (
                                 <div className="space-y-1">
                                   <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300">Branch Unit *</label>
                                   {!editForm.branchId ? (
