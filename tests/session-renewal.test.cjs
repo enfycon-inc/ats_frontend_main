@@ -190,3 +190,29 @@ test('full role catalog preserves explicit ALL scope over the active branch', as
   await app.api.auth.listRoles('ALL', true);
   assert.equal(sent['x-branch-id'], 'ALL');
 });
+
+test('job staffing uses the scoped jobs endpoint and exact active role without requesting user management', async () => {
+  const calls = [];
+  const role = '11111111-1111-4111-8111-111111111111';
+  const staff = [{ id: 'recruiter-id', fullName: 'Recruiter', canRecruit: true, canReview: false }];
+  const app = api(async (url, options) => {
+    calls.push({ url: String(url), headers: options.headers });
+    return new Response(JSON.stringify(staff));
+  }, role);
+  app.storage.set('ats_token', 'valid-token');
+  app.storage.set('ats_access_token', `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')}.signature`);
+  app.storage.set('ats_current_user', JSON.stringify({ id: 'user', tenantId: 'tenant', permissions: ['job:assign_recruiter'] }));
+  assert.deepEqual(await app.api.jobs.staffingOptions({ branchId: 'branch-id', businessUnitId: 'unit-id' }), staff);
+  assert.equal(calls.length, 1);
+  const url = new URL(calls[0].url);
+  assert.equal(url.pathname, '/api/jobs/staffing-options');
+  assert.equal(url.searchParams.get('branchId'), 'branch-id');
+  assert.equal(url.searchParams.get('businessUnitId'), 'unit-id');
+  assert.equal(calls[0].headers['x-active-role-id'], role);
+  calls.length = 0;
+  const scope = { branchId: 'branch-id', businessUnitId: 'unit-id' };
+  await Promise.all([app.api.jobs.staffingOptions(scope), app.api.jobs.staffingOptions(scope)]);
+  assert.equal(calls.length, 1, 'Concurrent staffing lookups share one request');
+  await app.api.jobs.staffingOptions(scope);
+  assert.equal(calls.length, 2, 'Completed staffing results are refreshed to respect changed assignments');
+});

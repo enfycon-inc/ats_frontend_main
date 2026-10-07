@@ -1018,7 +1018,31 @@ export interface JobMatchesResponse {
   parserOnline: boolean;
 }
 
+export interface JobStaffOption {
+  id: string;
+  fullName: string;
+  canRecruit: boolean;
+  canReview: boolean;
+}
+
+// Share concurrent lookups only. Completed results are never reused after roles or scope change.
+const staffingRequests = new Map<string, Promise<JobStaffOption[]>>();
+
 const jobs = {
+  async staffingOptions(scope?: { branchId?: string; businessUnitId?: string }): Promise<JobStaffOption[]> {
+    const query = new URLSearchParams();
+    if (scope?.branchId) query.set('branchId', scope.branchId);
+    if (scope?.businessUnitId) query.set('businessUnitId', scope.businessUnitId);
+    const requestKey = JSON.stringify([getApiBase(), getToken(), activeRoleHeaders(), query.toString(),
+      typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null]);
+    let request = staffingRequests.get(requestKey);
+    if (!request) {
+      request = apiFetch<JobStaffOption[]>(`/api/jobs/staffing-options?${query}`)
+        .finally(() => { staffingRequests.delete(requestKey); });
+      staffingRequests.set(requestKey, request);
+    }
+    return request;
+  },
   async list(opts?: { filter?: string }): Promise<JobPayload[]> {
     const qs = opts?.filter ? `?filter=${encodeURIComponent(opts.filter)}` : '';
     return apiFetch<JobPayload[]>(`/api/jobs${qs}`);

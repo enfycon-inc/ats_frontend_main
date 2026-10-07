@@ -62,7 +62,7 @@ import { Country, State, City } from "country-state-city";
 import ReactCountryFlag from "react-country-flag";
 import { WORK_AUTHORIZATION_OPTIONS, INDIAN_WORK_AUTHORIZATION_OPTIONS, INDIA_STATES_CITIES, US_STATES_CITIES } from "@/lib/job-form-constants";
 
-import { atsApi } from "@/lib/ats-api";
+import { atsApi, type JobStaffOption } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
 import { showErrorModal } from "@/components/shared/global-error-modal";
 
@@ -291,8 +291,7 @@ const getInitialActiveBranchContext = () => {
 
   // Pod & User selection and approver routing
   const [podsList, setPodsList] = useState<any[]>([]);
-  const [branchUsers, setBranchUsers] = useState<any[]>([]);
-  const [rolesList, setRolesList] = useState<any[]>([]);
+  const [branchUsers, setBranchUsers] = useState<JobStaffOption[]>([]);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
   const [assignmentType, setAssignmentType] = useState<AssignmentType>("unassigned");
   const [selectedPodId, setSelectedPodId] = useState<string | null>(null);
@@ -387,108 +386,10 @@ const getInitialActiveBranchContext = () => {
     return true;
   }, [userPerspective, session]);
 
-  const deliveryHeads = useMemo(() => {
-    const seen = new Set<string>();
-    const list: any[] = [];
-    for (const u of branchUsers) {
-      const uid = u.id || u.email;
-      if (!uid || seen.has(uid)) continue;
-      const r = (u.roles || []).map((x: string) => x.toUpperCase());
-      if (r.includes("DELIVERY_HEAD") || r.includes("TENANT_ADMIN") || r.includes("BRANCH_ADMIN") || r.includes("SUPER_ADMIN")) {
-        seen.add(uid);
-        list.push(u);
-      }
-    }
-    return list;
-  }, [branchUsers]);
-
-  const recruitersList = useMemo(() => {
-    const seen = new Set<string>();
-    const list: any[] = [];
-    const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
-
-    for (const u of branchUsers) {
-      const uid = u.id || u.email;
-      if (!uid || seen.has(uid)) continue;
-
-      // 1. Must be an active user
-      if (u.isActive === false || u.is_active === false) continue;
-
-      // 2. Branch isolation check if activeBranchId is set
-      if (activeBranchId) {
-        const userBranchId = u.branchId || u.branch_id;
-        const assignedBranches = Array.isArray(u.assignedBranchIds) ? u.assignedBranchIds : (Array.isArray(u.assigned_branch_ids) ? u.assigned_branch_ids : []);
-        const belongsToBranch = userBranchId === activeBranchId || assignedBranches.includes(activeBranchId) || !userBranchId;
-        if (!belongsToBranch) continue;
-      }
-
-      // 3. Granular permission capability check: user must have candidate submission / sourcing permission
-      const perms: string[] = Array.isArray(u.permissions) ? u.permissions : [];
-      const hasSourcingPermission = 
-        perms.includes("submission:create") || 
-        perms.includes("candidate:create") || 
-        perms.includes("submission:edit") || 
-        perms.includes("submission:view") || 
-        perms.includes("job:view");
-
-      // Backward compatibility check for role tokens
-      const r = (u.roles || []).map((x: string) => x.toUpperCase().replace(/[\s-_]+/g, ''));
-      const isSourcingStaff = hasSourcingPermission || r.includes("RECRUITER") || r.includes("BRANCHADMIN") || r.includes("PODLEAD") || r.length === 0;
-
-      if (isSourcingStaff) {
-        seen.add(uid);
-        list.push(u);
-      }
-    }
-    return list;
-  }, [branchUsers]);
-
-  const getUserRoleLabel = useCallback((u: any): string => {
-    const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
-    
-    // 1. Check branch-specific custom roles in active branch
-    if (activeBranchId && u.branchRoles && u.branchRoles[activeBranchId] && Array.isArray(u.branchRoles[activeBranchId]) && u.branchRoles[activeBranchId].length > 0) {
-      const branchRoleIdOrName = u.branchRoles[activeBranchId][0];
-      const matchedRole = (rolesList || []).find((cr: any) => cr.id === branchRoleIdOrName || cr.name?.toUpperCase() === String(branchRoleIdOrName).toUpperCase());
-      if (matchedRole?.name) return matchedRole.name;
-      if (typeof branchRoleIdOrName === 'string' && !branchRoleIdOrName.includes('-')) return branchRoleIdOrName;
-    }
-
-    // 2. Check any branch roles if user has branch assignments
-    if (u.branchRoles && typeof u.branchRoles === 'object') {
-      for (const bRoleArray of Object.values(u.branchRoles) as any[]) {
-        if (Array.isArray(bRoleArray) && bRoleArray.length > 0) {
-          const rItem = bRoleArray[0];
-          const matchedRole = (rolesList || []).find((cr: any) => cr.id === rItem || cr.name?.toUpperCase() === String(rItem).toUpperCase());
-          if (matchedRole?.name) return matchedRole.name;
-          if (typeof rItem === 'string' && !rItem.includes('-')) return rItem;
-        }
-      }
-    }
-
-    // 3. Check customRoleName or roleName
-    if (u.customRoleName) return u.customRoleName;
-    if (u.roleName) {
-      const matchedRole = (rolesList || []).find((cr: any) => cr.id === u.roleName || cr.name?.toUpperCase() === String(u.roleName).toUpperCase());
-      if (matchedRole?.name) return matchedRole.name;
-      return u.roleName;
-    }
-
-    // 4. System role
-    if (u.systemRole) {
-      return u.systemRole.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-    }
-
-    // 5. Roles array
-    if (Array.isArray(u.roles) && u.roles.length > 0) {
-      const rItem = u.roles[0];
-      const matchedRole = (rolesList || []).find((cr: any) => cr.id === rItem || cr.name?.toUpperCase() === String(rItem).toUpperCase());
-      if (matchedRole?.name) return matchedRole.name;
-      return rItem;
-    }
-
-    return "Staff";
-  }, [rolesList]);
+  const deliveryHeads = useMemo(() => branchUsers.filter(user => user.canReview), [branchUsers]);
+  const recruitersList = useMemo(() => branchUsers.filter(user => user.canRecruit), [branchUsers]);
+  const getUserRoleLabel = useCallback((user: JobStaffOption): string =>
+    user.canRecruit && user.canReview ? "Recruiter / Reviewer" : user.canRecruit ? "Recruiter" : "Reviewer", []);
 
   const branchPods = useMemo(() => {
     const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
@@ -617,6 +518,24 @@ const getInitialActiveBranchContext = () => {
 
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    setBranchUsers([]);
+    if (!currentUserProfile?.permissions?.includes("job:assign_recruiter") || !selectedUnitId) return;
+    const unit = availableUnits.find(unit => unit.id === selectedUnitId);
+    atsApi.jobs.staffingOptions({ branchId: unit?.branchId || unit?.branch_id || currentUserProfile.branchId,
+      businessUnitId: selectedUnitId }).then(staff => {
+      if (!cancelled) {
+        setBranchUsers(staff);
+        setSelectedRecruiterIds(ids => ids.filter(id => staff.some(person => person.id === id && person.canRecruit)));
+      }
+    }).catch(error => {
+      if (!cancelled) toast.error(error.message || "Unable to load eligible job staff.");
+    });
+    return () => { cancelled = true; };
+  }, [selectedUnitId, availableUnits, currentUserProfile]);
+
+
   const fetchClients = useCallback(async () => {
     try {
       const res = await atsApi.clients.list();
@@ -712,16 +631,7 @@ const getInitialActiveBranchContext = () => {
             }
 
             // Load heavier data in background without blocking job code generation
-            Promise.all([
-              atsApi.pods.list().catch(() => []),
-              atsApi.auth.listUsers().catch(() => []),
-              atsApi.auth.listRoles(undefined, true).catch(() => [])
-            ]).then(([pList, uList, rList]) => {
-              setPodsList(pList || []);
-              setBranchUsers(uList || []);
-              setRolesList(rList || []);
-            });
-            
+            atsApi.pods.list().then(list => setPodsList(list || [])).catch(() => setPodsList([]));
           } catch (e) {
             console.warn("Failed to load units:", e);
           }
