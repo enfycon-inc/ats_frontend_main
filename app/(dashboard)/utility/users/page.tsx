@@ -813,15 +813,6 @@ export default function UserManagementPage() {
   const handleUpdateMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
-    const firstName = (editForm.firstName || "").trim();
-    const lastName = (editForm.lastName || "").trim();
-    const trimmedName = `${firstName} ${lastName}`.trim();
-    const editEmail = (editForm.email || "").trim().toLowerCase();
-
-    if (!firstName || !lastName || !editEmail) {
-      return toast.error("First Name, Last Name, and Work Email are required.");
-    }
-
     const isTenantOrBranchAdminEdit = hasAdministrativeRole(editForm.roles, editRolesCatalog, 'TENANT_ADMIN') || hasAdministrativeRole(editForm.roles, editRolesCatalog, 'BRANCH_ADMIN');
 
     if (!isTenantOrBranchAdminEdit && !editForm.businessUnitId) {
@@ -833,11 +824,8 @@ export default function UserManagementPage() {
       const finalRoles = getSelectedMemberRoleIds(editForm, editRolesCatalog);
 
       await atsApi.auth.updateUserDetail(selectedUser.id, {
-        fullName: trimmedName,
-        email: editEmail,
-        branchId: editForm.branchId || undefined,
-        businessUnitId: editForm.businessUnitId || undefined,
-        jobReviewerId: editForm.jobReviewerId || null,
+        branchId: editForm.branchId || selectedUser.branchId || undefined,
+        businessUnitId: editForm.businessUnitId || selectedUser.businessUnitId || undefined,
         assignedRoleIds: finalRoles,
       });
 
@@ -3022,7 +3010,7 @@ export default function UserManagementPage() {
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-4xl lg:max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95">
             <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850 shrink-0">
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <Edit2 className="h-4 w-4 text-indigo-650" /> Edit Member Details
+                <Shield className="h-4 w-4 text-indigo-650" /> Assign Member Roles
               </h3>
               <button onClick={() => setIsEditModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 cursor-pointer">
                 <X className="h-4 w-4" />
@@ -3030,44 +3018,6 @@ export default function UserManagementPage() {
             </div>
 
             <form onSubmit={handleUpdateMember} className="p-5 space-y-4 overflow-y-auto flex-1">
-              {/* FIRST NAME + LAST NAME + EMAIL GRID */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">First Name *</label>
-                  <Input
-                    value={editForm.firstName}
-                    onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
-                    placeholder="e.g. Rajesh"
-                    className="h-8 text-xs rounded border-neutral-300"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Last Name *</label>
-                  <Input
-                    value={editForm.lastName}
-                    onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
-                    placeholder="e.g. Kumar"
-                    className="h-8 text-xs rounded border-neutral-300"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Work Email *</label>
-                  <Input
-                    type="email"
-                    value={editForm.email}
-                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    placeholder="e.g. rajesh.kumar@company.com"
-                    className="h-8 text-xs rounded border-neutral-300 font-mono"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* OFFICE BRANCH SELECTION */}
               {/* TABS FOR EDIT MODAL */}
               <div className="flex border-b border-neutral-200 dark:border-slate-800 mb-4 pt-4">
                 <button type="button" onClick={() => setEditModalTab("STAFF")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${editModalTab === "STAFF" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Staff & Business Roles</button>
@@ -3328,7 +3278,7 @@ export default function UserManagementPage() {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={submitting} size="sm" className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer">
-                  {submitting ? "Saving..." : "Save Changes"}
+                  {submitting ? "Saving..." : "Save Role Assignment"}
                 </Button>
               </div>
             </form>
