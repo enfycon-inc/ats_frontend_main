@@ -3587,11 +3587,11 @@ const getInitialActiveBranchContext = () => {
                 </div>
                 <div>
                   <span className="text-[10px] font-medium text-slate-400 block">Type & Location</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.jobType || "Full Time"} • {publishingModalState.location || "Remote"}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.jobType || "Full Time"} {"\u2022"} {publishingModalState.location || "Remote"}</span>
                 </div>
                 <div>
                   <span className="text-[10px] font-medium text-slate-400 block">Positions & Pay Rate</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.positions || 1} Pos • {publishingModalState.payRate || "N/A"}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.positions || 1} Pos {"\u2022"} {publishingModalState.payRate || "N/A"}</span>
                 </div>
               </div>
             </div>

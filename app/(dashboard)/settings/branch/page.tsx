@@ -1651,7 +1651,7 @@ function BranchManagementPageContent() {
                                 </span>
                               </div>
                               <p className="text-[10.5px] text-neutral-500 font-normal">
-                                {b.shiftTiming || (b.market === "US" ? "US Shift" : "General Shift")} • {Array.isArray(b.workingDays) && b.workingDays.length > 0 ? (b.workingDays.length === 5 ? "Mon - Fri" : b.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon - Fri"}
+                                {b.shiftTiming || (b.market === "US" ? "US Shift" : "General Shift")} {"\u2022"} {Array.isArray(b.workingDays) && b.workingDays.length > 0 ? (b.workingDays.length === 5 ? "Mon - Fri" : b.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon - Fri"}
                               </p>
                             </div>
                           </div>
@@ -2308,7 +2308,7 @@ function BranchManagementPageContent() {
                                     ? "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800" 
                                     : "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
                                 }`}>
-                                  {u.market === "US" ? "US IT" : "Domestic IT"} • {u.currency || "INR"}
+                                  {u.market === "US" ? "US IT" : "Domestic IT"} {"\u2022"} {u.currency || "INR"}
                                 </span>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
@@ -2346,16 +2346,16 @@ function BranchManagementPageContent() {
                                 <Clock className="h-3 w-3 inline mr-1 text-amber-500" />
                                 {u.shiftTiming || "General Shift"} ({formatTime12(u.workStartTime)} - {formatTime12(u.workEndTime)})
                               </span>
-                              <span>•</span>
+                              <span>{"\u2022"}</span>
                               <span>{u.timezone ? u.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}</span>
                             </p>
                             <p className="text-[10px] text-neutral-400">
-                              Days: {Array.isArray(u.workingDays) && u.workingDays.length > 0 ? (u.workingDays.length === 5 ? "Mon–Fri" : u.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon–Fri"} • Break: {u.breakDurationMinutes ?? 60}m
+                              Days: {Array.isArray(u.workingDays) && u.workingDays.length > 0 ? (u.workingDays.length === 5 ? "Mon–Fri" : u.workingDays.map((d: string) => d.slice(0, 3)).join(", ")) : "Mon–Fri"} {"\u2022"} Break: {u.breakDurationMinutes ?? 60}m
                             </p>
                           </div>
                           <div className="flex items-center gap-3 pt-2 border-t border-neutral-100 dark:border-slate-800 text-[10.5px] text-neutral-500 dark:text-neutral-400">
                             <span className="font-semibold text-neutral-700 dark:text-neutral-300">{u.usersCount || 0} Staff</span>
-                            <span>•</span>
+                            <span>{"\u2022"}</span>
                             <span className="font-semibold text-neutral-700 dark:text-neutral-300">{u.jobsCount || 0} Jobs</span>
                           </div>
                         </div>
@@ -2955,7 +2955,7 @@ function BranchManagementPageContent() {
                     <option value="">-- Select Branch Unit --</option>
                     {selectedBranchUnits.map((u: any) => (
                       <option key={u.id} value={u.id}>
-                        {u.name} ({u.shiftTiming || "General Shift"} • {u.market || "Domestic"} • {u.currency || "INR"})
+                        {u.name} ({u.shiftTiming || "General Shift"} {"\u2022"} {u.market || "Domestic"} {"\u2022"} {u.currency || "INR"})
                       </option>
                     ))}
                   </select>
@@ -3705,7 +3705,7 @@ function BranchManagementPageContent() {
                       {quickPodUnitId ? (editingUnit?.name || "Operating Practice Unit") : selectedBranch?.name}
                     </span>
                     <span className="text-[10.5px] text-neutral-500 font-mono">
-                      {selectedBranch?.name ? `${selectedBranch.name} • ` : ""}{selectedBranch?.city || "Location"}
+                      {selectedBranch?.name ? `${selectedBranch.name} {"\u2022"} ` : ""}{selectedBranch?.city || "Location"}
                     </span>
                   </div>
                 </div>
@@ -4210,12 +4210,12 @@ function BranchManagementPageContent() {
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold text-neutral-900 dark:text-white">{u.name}</span>
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
-                              {u.market || "Domestic"} • {u.currency || "INR"}
+                              {u.market || "Domestic"} {"\u2022"} {u.currency || "INR"}
                             </span>
                           </div>
                           <p className="text-[11px] text-neutral-500 dark:text-neutral-400 flex items-center gap-2">
                             <span><Clock className="h-3 w-3 inline mr-1 text-amber-500" />{u.shiftTiming || "General Shift"} ({u.workStartTime || "09:30"} - {u.workEndTime || "18:30"})</span>
-                            <span>•</span>
+                            <span>{"\u2022"}</span>
                             <span>{u.timezone ? u.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}</span>
                           </p>
                         </div>
@@ -4258,7 +4258,7 @@ function BranchManagementPageContent() {
 
                       <div className="flex items-center gap-4 pt-2 border-t border-neutral-100 dark:border-slate-800/80 text-[11px] text-neutral-600 dark:text-neutral-400">
                         <span className="font-semibold text-neutral-900 dark:text-white">{u.usersCount || 0} Staff Assigned</span>
-                        <span>•</span>
+                        <span>{"\u2022"}</span>
                         <span className="font-semibold text-neutral-900 dark:text-white">{u.jobsCount || 0} Active Requisitions</span>
                       </div>
                     </div>

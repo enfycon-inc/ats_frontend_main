@@ -425,7 +425,7 @@ function BranchAdminDashboardView({
               Office: {activeBranchName}
             </h2>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              {activeBranchMarket === "US" ? "US IT Staffing" : "Domestic India IT"} • Timezone: {activeBranchTimezone}
+              {activeBranchMarket === "US" ? "US IT Staffing" : "Domestic India IT"} {"\u2022"} Timezone: {activeBranchTimezone}
             </p>
           </div>
         </div>
@@ -528,7 +528,7 @@ function BranchAdminDashboardView({
                   <span className="text-[11px] font-semibold text-cyan-600 dark:text-cyan-400">In Progress</span>
                 </div>
                 <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                  {l1Count} L1 • {l2Count} L2 • {l3Count} Final
+                  {l1Count} L1 {"\u2022"} {l2Count} L2 {"\u2022"} {l3Count} Final
                 </p>
               </div>
             </CardContent>
@@ -549,7 +549,7 @@ function BranchAdminDashboardView({
                   <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">Total</span>
                 </div>
                 <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                  {offersCount} Offered • {joinsCount} Joined
+                  {offersCount} Offered {"\u2022"} {joinsCount} Joined
                 </p>
               </div>
             </CardContent>
@@ -605,7 +605,7 @@ function BranchAdminDashboardView({
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                        {sub.jobTitle} • Sourced by <span className="font-medium text-slate-700 dark:text-slate-300">{sub.recruiterName || "Recruiter"}</span>
+                        {sub.jobTitle} {"\u2022"} Sourced by <span className="font-medium text-slate-700 dark:text-slate-300">{sub.recruiterName || "Recruiter"}</span>
                       </p>
                     </div>
                     <Link href={`/applicants/CAN-${String(sub.candidateId || sub.candidate_id || sub.id).padStart(6, '0')}`}>
@@ -666,7 +666,7 @@ function BranchAdminDashboardView({
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                        Client: <span className="font-medium text-slate-700 dark:text-slate-300">{(job as any).clientName || 'N/A' || job.client || "Direct"}</span> • Assigned: <span className="font-semibold text-slate-700 dark:text-slate-300">{(job as any).assignedTo || 'N/A' || "Unassigned"}</span>
+                        Client: <span className="font-medium text-slate-700 dark:text-slate-300">{(job as any).clientName || 'N/A' || job.client || "Direct"}</span> {"\u2022"} Assigned: <span className="font-semibold text-slate-700 dark:text-slate-300">{(job as any).assignedTo || 'N/A' || "Unassigned"}</span>
                       </p>
                     </div>
                     <Button
@@ -974,7 +974,7 @@ function BranchAdminDashboardView({
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                           Pod Lead: <span className="font-medium text-slate-700 dark:text-slate-300">{pod.podHeadName || "Unassigned"}</span>
                           {pod.members && pod.members.length > 0 && (
-                            <span> • {pod.members.length} Member{pod.members.length !== 1 ? 's' : ''}</span>
+                            <span> {"\u2022"} {pod.members.length} Member{pod.members.length !== 1 ? 's' : ''}</span>
                           )}
                         </p>
                       </div>

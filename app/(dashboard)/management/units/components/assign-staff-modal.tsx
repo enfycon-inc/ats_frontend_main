@@ -193,7 +193,7 @@ export function AssignStaffModal({
                   <Building2 className="h-3 w-3 text-neutral-400" />
                   {unit.branchName || "Unassigned Branch"}
                 </span>
-                <span>•</span>
+                <span>{"\u2022"}</span>
                 <span>{unit.market === "US" ? "US IT Market" : "Domestic India"}</span>
               </p>
             </div>
@@ -280,7 +280,7 @@ export function AssignStaffModal({
               >
                 Select All
               </button>
-              <span>•</span>
+              <span>{"\u2022"}</span>
               <button
                 type="button"
                 onClick={handleDeselectAllFiltered}
@@ -369,7 +369,7 @@ export function AssignStaffModal({
                         <span className="truncate">{c.email}</span>
                         {c.podName && (
                           <>
-                            <span>•</span>
+                            <span>{"\u2022"}</span>
                             <span className="text-purple-600 dark:text-purple-400 font-medium">
                               Pod: {c.podName}
                             </span>

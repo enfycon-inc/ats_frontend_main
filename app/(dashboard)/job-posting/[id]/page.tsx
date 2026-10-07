@@ -269,7 +269,7 @@ function formatRemarkTimestamp(dateStr?: string | null, fallbackDateStr?: string
       month: "short",
       day: "numeric",
       year: "numeric"
-    }) + " • " + date.toLocaleTimeString(undefined, {
+    }) + " \u2022 " + date.toLocaleTimeString(undefined, {
       hour: "2-digit",
       minute: "2-digit"
     });
@@ -1253,7 +1253,7 @@ export default function JobDetailPage() {
                                 </Link>
                                 <div className="text-[11px] text-neutral-500 dark:text-neutral-400 flex items-center gap-2 mt-0.5 truncate">
                                   <span>{sub.candidateEmail || "—"}</span>
-                                  {sub.candidatePhone && <span>• {sub.candidatePhone}</span>}
+                                  {sub.candidatePhone && <span>{"\u2022"} {sub.candidatePhone}</span>}
                                 </div>
                               </div>
                             </div>
@@ -1342,8 +1342,8 @@ export default function JobDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
               
               {/* Left Description area */}
-              <div className="lg:col-span-8 space-y-4">
-                <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm">
+              <div className="lg:col-span-8 space-y-4 min-w-0">
+                <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
                   <CardContent className="p-5 space-y-4">
                     <h2 className="text-sm font-bold text-neutral-800 dark:text-white flex items-center gap-2 border-b border-neutral-100 dark:border-slate-800 pb-2">
                       <FileText className="h-4 w-4 text-indigo-500" /> Job Description
@@ -1840,7 +1840,7 @@ export default function JobDetailPage() {
                             </span>
                           </div>
                           <p className="text-xs text-neutral-500 font-medium truncate mt-0.5">
-                            {match.currentTitle} • {match.location || "Location N/A"} • {match.experienceYears} Years Exp
+                            {match.currentTitle} {"\u2022"} {match.location || "Location N/A"} {"\u2022"} {match.experienceYears} Years Exp
                           </p>
 
                           {/* Matched skills list */}

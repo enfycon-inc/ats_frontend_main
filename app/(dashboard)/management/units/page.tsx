@@ -500,7 +500,7 @@ export function UnitsContent({
                             {formatTime12(u.workStartTime)} - {formatTime12(u.workEndTime)}
                           </div>
                           <div className="text-[10.5px] text-neutral-400 font-mono">
-                            {u.shiftTiming || (u.market === "US" ? "US Shift" : "General Shift")} • {u.timezone ? u.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}
+                            {u.shiftTiming || (u.market === "US" ? "US Shift" : "General Shift")} {"\u2022"} {u.timezone ? u.timezone.split("/").pop()?.replace(/_/g, " ") : "IST"}
                           </div>
                         </div>
                       </td>

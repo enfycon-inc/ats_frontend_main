@@ -911,7 +911,7 @@ export default function EditUnitPage() {
                       </span>
                     </div>
                     <p className="text-[11px] text-neutral-400">
-                      {p.members?.length || 0} Members • Lead: {p.leadName || p.leadEmail || "Unassigned"}
+                      {p.members?.length || 0} Members {"\u2022"} Lead: {p.leadName || p.leadEmail || "Unassigned"}
                     </p>
                   </div>
                 ))}

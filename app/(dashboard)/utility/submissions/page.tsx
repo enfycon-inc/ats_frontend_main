@@ -602,7 +602,7 @@ function formatRemarkTimestamp(dateStr?: string | null, fallbackDateStr?: string
       month: "short",
       day: "numeric",
       year: "numeric"
-    }) + " • " + date.toLocaleTimeString(undefined, {
+    }) + " \u2022 " + date.toLocaleTimeString(undefined, {
       hour: "2-digit",
       minute: "2-digit"
     });
@@ -2102,7 +2102,7 @@ export default function SubmissionsPage() {
             <div>
               <h2 className="text-sm font-semibold text-foreground">Review Candidate</h2>
               {selectedSubmission && (
-                <p className="text-xs text-muted-foreground">{selectedSubmission.candidateName} • {selectedSubmission.jobCode}</p>
+                <p className="text-xs text-muted-foreground">{selectedSubmission.candidateName} {"\u2022"} {selectedSubmission.jobCode}</p>
               )}
             </div>
           </div>
@@ -2132,7 +2132,7 @@ export default function SubmissionsPage() {
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {selectedSubmission.jobTitle || "Job Requisition"} • {selectedSubmission.clientName || "Direct Client"}
+                      {selectedSubmission.jobTitle || "Job Requisition"} {"\u2022"} {selectedSubmission.clientName || "Direct Client"}
                     </p>
                   </div>
                   <Button

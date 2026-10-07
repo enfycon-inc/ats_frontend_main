@@ -323,9 +323,9 @@ export default function ClientDetailPage() {
 
               <div className="flex items-center gap-4 text-xs text-neutral-500 mt-1.5 flex-wrap">
                 <span>Business Unit: <strong className="text-neutral-700 dark:text-neutral-300">{clientData.business_unit || "Default"}</strong></span>
-                <span>•</span>
+                <span>{"\u2022"}</span>
                 <span>Primary Owner: <strong className="text-neutral-700 dark:text-neutral-300">{clientData.primary_owner || "N/A"}</strong></span>
-                <span>•</span>
+                <span>{"\u2022"}</span>
                 <span>Active Jobs: <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{clientData.active_jobs_count || 0}</strong></span>
               </div>
             </div>
@@ -731,7 +731,7 @@ export default function ClientDetailPage() {
                             <Badge variant="outline" className="text-[9px]">{job.status}</Badge>
                           </div>
                           <p className="text-[11px] text-neutral-500 mt-0.5">
-                            Primary: {job.client_name} • End Client: {job.end_client_name || job.client_name} • Location: {job.job_location || "N/A"}
+                            Primary: {job.client_name} {"\u2022"} End Client: {job.end_client_name || job.client_name} {"\u2022"} Location: {job.job_location || "N/A"}
                           </p>
                         </div>
                         <Button size="sm" variant="ghost" onClick={() => router.push(`/jobs/details/${job.id}`)} className="h-7 text-xs text-indigo-600 font-bold">

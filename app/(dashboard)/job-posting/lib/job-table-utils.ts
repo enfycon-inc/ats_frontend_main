@@ -105,7 +105,7 @@ export function getAssignedPersonDisplay(job: Job): AssignedPersonDisplay {
   // Combine outcomes:
   if (podsInfo && recruitersInfo) {
     return {
-      label: `${podsInfo.label} • ${recruitersInfo.label}`,
+      label: `${podsInfo.label} {"\u2022"} ${recruitersInfo.label}`,
       type: "both",
       pods: podsInfo,
       recruiters: recruitersInfo,

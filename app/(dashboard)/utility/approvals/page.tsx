@@ -533,7 +533,7 @@ export default function ApprovalsPage() {
                                 </div>
                                 <div>
                                   <div className="font-semibold text-default-900 text-sm">{user.fullName}</div>
-                                  <div className="text-xs text-default-500">{user.email} • {user.tenantName}</div>
+                                  <div className="text-xs text-default-500">{user.email} {"\u2022"} {user.tenantName}</div>
                                 </div>
                               </div>
                             </td>

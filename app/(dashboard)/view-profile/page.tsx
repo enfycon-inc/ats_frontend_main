@@ -116,7 +116,7 @@ export default function ViewProfilePage() {
               </h1>
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5">
                 <span className="font-semibold text-indigo-600 dark:text-indigo-400">{designation}</span>
-                <span>•</span>
+                <span>{"\u2022"}</span>
                 <span className="font-mono text-slate-500">{displayEmail}</span>
               </p>
             </div>

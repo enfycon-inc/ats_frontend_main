@@ -672,7 +672,7 @@ export function JobAssignModal({
                 <span className="font-medium text-slate-700 dark:text-slate-300">
                   {job.client || (job as any).clientName || (job as any).endClientName || "Direct"}
                 </span>
-                {targetBranch?.name ? ` • Branch: ${targetBranch.name}` : ""}
+                {targetBranch?.name ? ` \u2022 Branch: ${targetBranch.name}` : ""}
               </p>
             </div>
           </div>
@@ -956,7 +956,7 @@ export function JobAssignModal({
                           {pod.members && pod.members.length > 0 && (
                             <span>
                               {" "}
-                              • {pod.members.length} Member{pod.members.length !== 1 ? "s" : ""}
+                              {"\u2022"} {pod.members.length} Member{pod.members.length !== 1 ? "s" : ""}
                             </span>
                           )}
                         </p>

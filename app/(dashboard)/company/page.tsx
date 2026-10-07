@@ -745,7 +745,7 @@ function AccountManagerSettingsView({ profile, activeRoleName }: { profile: any;
                     </Badge>
                   </div>
                   <p className="text-xs text-neutral-500 mt-0.5">
-                    {profile?.email || "deb@deb.com"} • Assigned Branch: {profile?.branchName || "Domestic / Global Branch"}
+                    {profile?.email || "deb@deb.com"} {"\u2022"} Assigned Branch: {profile?.branchName || "Domestic / Global Branch"}
                   </p>
                 </div>
               </div>
@@ -918,10 +918,10 @@ function AccountManagerSettingsView({ profile, activeRoleName }: { profile: any;
               </p>
               <div className="p-2.5 rounded bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 text-[11.5px] space-y-1 text-indigo-900 dark:text-indigo-300">
                 <div className="font-bold">Operational Privileges:</div>
-                <div>• Create &amp; edit Client Job Requisitions</div>
-                <div>• View Candidate Talent Pool &amp; Submissions</div>
-                <div>• Manage Clients, Contacts &amp; Agreements</div>
-                <div>• Review Placements, Timesheets &amp; Reports</div>
+                <div>{"\u2022"} Create &amp; edit Client Job Requisitions</div>
+                <div>{"\u2022"} View Candidate Talent Pool &amp; Submissions</div>
+                <div>{"\u2022"} Manage Clients, Contacts &amp; Agreements</div>
+                <div>{"\u2022"} Review Placements, Timesheets &amp; Reports</div>
               </div>
               <p className="text-[11px] text-neutral-400 italic">
                 Note: Organization-wide settings (such as branch creation, custom domains, and user limits) are managed under the Tenant Admin perspective.
@@ -1033,9 +1033,9 @@ function RecruiterSettingsView({ profile, activeRoleName }: { profile: any; acti
                 As a Recruiter, you have access to Candidate Pools, Resume Parsing, Job Requisitions, and Submission Trackers.
               </p>
               <div className="p-2.5 rounded bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 text-[11.5px] space-y-1 text-emerald-900 dark:text-emerald-300">
-                <div>• Search &amp; Source Candidates</div>
-                <div>• Submit CVs to Open Jobs</div>
-                <div>• Track Candidate Submissions Status</div>
+                <div>{"\u2022"} Search &amp; Source Candidates</div>
+                <div>{"\u2022"} Submit CVs to Open Jobs</div>
+                <div>{"\u2022"} Track Candidate Submissions Status</div>
               </div>
             </CardContent>
           </Card>
@@ -1143,9 +1143,9 @@ function PodLeadSettingsView({
                 In the <strong>{isDeliveryHead ? "Delivery Head" : "Pod Lead"}</strong> perspective, you oversee requisition pipelines, submission reviews, and recruiter team allocation.
               </p>
               <div className="p-2.5 rounded bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 text-[11.5px] space-y-1 text-purple-900 dark:text-purple-300">
-                <div>• Manage Pod Team Allocations</div>
-                <div>• Review Team Performance &amp; Submissions</div>
-                <div>• Distribute Requisitions to Recruiters</div>
+                <div>{"\u2022"} Manage Pod Team Allocations</div>
+                <div>{"\u2022"} Review Team Performance &amp; Submissions</div>
+                <div>{"\u2022"} Distribute Requisitions to Recruiters</div>
               </div>
             </CardContent>
           </Card>

@@ -432,7 +432,7 @@ export default function EditBranchPage() {
                         </span>
                       </div>
                       <p className="text-[11px] text-neutral-400">
-                        {u.shiftTiming || 'General Shift'} ({formatUnitShiftTimes(u.workStartTime, u.workEndTime)}) • Currency: {u.currency || 'INR'} • {u.usersCount || 0} Staff
+                        {u.shiftTiming || 'General Shift'} ({formatUnitShiftTimes(u.workStartTime, u.workEndTime)}) {"\u2022"} Currency: {u.currency || 'INR'} {"\u2022"} {u.usersCount || 0} Staff
                       </p>
                     </div>
 

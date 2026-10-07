@@ -422,9 +422,9 @@ export default function CandidateDetailPage() {
                 <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 mt-0.5 flex flex-wrap items-center gap-1.5">
                   <Briefcase className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
                   {candidate.jobTitle}
-                  <span className="text-neutral-350 dark:text-slate-705">•</span>
+                  <span className="text-neutral-350 dark:text-slate-705">{"\u2022"}</span>
                   <span className="text-neutral-500">{candidate.experienceYears} Years Experience</span>
-                  <span className="text-neutral-350 dark:text-slate-705">•</span>
+                  <span className="text-neutral-350 dark:text-slate-705">{"\u2022"}</span>
                   <span className="text-blue-600 dark:text-blue-400 font-bold">Uploaded By: {candidate.uploadedByName || "System Upload"}</span>
                 </p>
               </div>
@@ -678,7 +678,7 @@ export default function CandidateDetailPage() {
                         <div className="flex items-center gap-1.5 mb-1 text-[10px] font-bold text-neutral-400 dark:text-neutral-500">
                           <User className="h-3 w-3 text-neutral-400" />
                           <span>Recruiter</span>
-                          <span>•</span>
+                          <span>{"\u2022"}</span>
                           <Clock className="h-3 w-3 text-neutral-400" />
                           <span>Just now</span>
                         </div>

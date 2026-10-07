@@ -2424,7 +2424,7 @@ export default function RolesPermissionsPage() {
                     Assign Staff: <span className="text-indigo-600 font-extrabold">{assignModalRole.name}</span>
                   </h3>
                   <p className="text-[11px] text-neutral-400">
-                    {assignModalRole.branchName || "Default Office"} • Multi-role assignment
+                    {assignModalRole.branchName || "Default Office"} {"\u2022"} Multi-role assignment
                   </p>
                 </div>
               </div>
@@ -2576,7 +2576,7 @@ export default function RolesPermissionsPage() {
                     Custom Permissions: {matrixEditingRole.name}
                   </h3>
                   <p className="text-[11px] text-neutral-400">
-                    Base Archetype: <span className="font-semibold text-neutral-700 dark:text-neutral-200">{matrixEditingRole.systemRole || "RECRUITER"}</span> • {matrixPermissions.filter(p => matrixAllowedPerms.includes(p)).length} / {matrixAllowedPerms.length} enabled permissions {permissions.length > matrixAllowedPerms.length && `(${permissions.length - matrixAllowedPerms.length} locked by archetype)`}
+                    Base Archetype: <span className="font-semibold text-neutral-700 dark:text-neutral-200">{matrixEditingRole.systemRole || "RECRUITER"}</span> {"\u2022"} {matrixPermissions.filter(p => matrixAllowedPerms.includes(p)).length} / {matrixAllowedPerms.length} enabled permissions {permissions.length > matrixAllowedPerms.length && `(${permissions.length - matrixAllowedPerms.length} locked by archetype)`}
                   </p>
                 </div>
               </div>

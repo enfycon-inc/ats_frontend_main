@@ -524,7 +524,7 @@ export default function BulkUploadPage() {
                           </Badge>
                         </p>
                         <p className="text-[10px] text-neutral-500 font-semibold">
-                          Run by: {h.created_by || "Tenant Admin"} • {dateStr}
+                          Run by: {h.created_by || "Tenant Admin"} {"\u2022"} {dateStr}
                         </p>
                       </div>
 
