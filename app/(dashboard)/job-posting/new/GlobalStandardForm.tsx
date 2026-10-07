@@ -55,6 +55,7 @@ import toast from "react-hot-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { AddClientModal } from "../components/add-client-modal";
+import { JobAssignmentModal, AssignmentType } from "@/components/ui/job-assignment-modal";
 import { resolveActiveSystemRole, isRoleAdmin } from "@/lib/role-permissions";
 
 import { Country, State, City } from "country-state-city";
@@ -292,7 +293,10 @@ const getInitialActiveBranchContext = () => {
   const [podsList, setPodsList] = useState<any[]>([]);
   const [branchUsers, setBranchUsers] = useState<any[]>([]);
   const [rolesList, setRolesList] = useState<any[]>([]);
-  const [selectedPodId, setSelectedPodId] = useState("");
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+  const [assignmentType, setAssignmentType] = useState<AssignmentType>("unassigned");
+  const [selectedPodId, setSelectedPodId] = useState<string | null>(null);
+  const [selectedRecruiterIds, setSelectedRecruiterIds] = useState<string[]>([]);
   const [selectedApproverRole, setSelectedApproverRole] = useState<string>("POD_LEAD");
   const [selectedApproverId, setSelectedApproverId] = useState<string>("");
   const [activeBranch, setActiveBranch] = useState<any>(null);
@@ -1271,8 +1275,8 @@ const getInitialActiveBranchContext = () => {
     }
   };
   const onSubmit = async (data: FormValues) => {
-    if (!selectedPodId) {
-      toast.error("Job Assignment is mandatory. Please select a Staff member, Pod, or Allocation Pool.");
+    if ((assignmentType === "pod" && !selectedPodId) || (assignmentType === "recruiters" && selectedRecruiterIds.length === 0)) {
+      toast.error("Job Assignment is mandatory. Please select a Pod, Recruiters, or Assign Later.");
       return;
     }
 
@@ -1335,24 +1339,22 @@ const getInitialActiveBranchContext = () => {
       // @ts-ignore
       let resolvedAssignedTo: string | undefined = data.assignedTo || undefined;
 
-      if (selectedPodId.startsWith("pod:")) {
-        resolvedPodId = selectedPodId.replace("pod:", "");
+      let resolvedRecruiterIds: string[] = [];
+
+      if (assignmentType === "pod" && selectedPodId) {
+        resolvedPodId = selectedPodId;
         resolvedApproverRole = "POD_LEAD";
         const pod = podsList.find((p) => p.id === resolvedPodId);
         if (pod?.podHeadId) resolvedApproverId = pod.podHeadId;
         resolvedAssignedTo = pod?.name || "Recruitment Pod";
-      } else if (selectedPodId.startsWith("dh:")) {
-        resolvedApproverId = selectedPodId.replace("dh:", "");
-        resolvedApproverRole = "DELIVERY_HEAD";
-        const dh = branchUsers.find((u) => u.id === resolvedApproverId);
-        resolvedAssignedTo = dh?.fullName || "Delivery Head";
-      } else if (selectedPodId.startsWith("rec:")) {
-        resolvedPrimaryRecruiterId = selectedPodId.replace("rec:", "");
+      } else if (assignmentType === "recruiters" && selectedRecruiterIds.length > 0) {
+        resolvedRecruiterIds = selectedRecruiterIds;
+        resolvedPrimaryRecruiterId = selectedRecruiterIds[0];
         resolvedApproverRole = "PRIMARY_RECRUITER";
         const rec = branchUsers.find((u) => u.id === resolvedPrimaryRecruiterId);
-        resolvedAssignedTo = rec?.fullName || "Primary Recruiter";
-      } else if (selectedPodId === "all") {
-        resolvedAssignedTo = "ALL";
+        resolvedAssignedTo = selectedRecruiterIds.length === 1 ? (rec?.fullName || "Primary Recruiter") : `${selectedRecruiterIds.length} Recruiters`;
+      } else if (assignmentType === "unassigned") {
+        resolvedAssignedTo = "Unassigned";
         resolvedApproverRole = "BRANCH_ADMIN";
       } else if (selectedPodId === "none") {
         resolvedAssignedTo = "Unassigned";
@@ -1406,6 +1408,7 @@ const getInitialActiveBranchContext = () => {
         duration: data.duration || undefined,
         recruitmentManagerId: data.recruitmentManager || undefined,
         recruiterId: resolvedPrimaryRecruiterId,
+        recruiterIds: resolvedRecruiterIds,
         
         accountManagerId: data.accountManager || undefined,
         industry: data.industry || undefined,
@@ -3141,7 +3144,7 @@ const getInitialActiveBranchContext = () => {
                       </div>
 
                       {/* Job Assignment Custom Dropdown */}
-                      <div className="space-y-1.5 relative" ref={assignmentDropdownRef}>
+                      <div className="space-y-1.5 relative">
                         <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center justify-between h-5">
                           <span className="flex items-center gap-1.5">
                             <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
@@ -3150,235 +3153,54 @@ const getInitialActiveBranchContext = () => {
                             Job Assignment <span className="text-red-500 ml-0.5">*</span>
                           </span>
                         </label>
-
-                        {/* Dropdown Trigger */}
-                        <button
-                          type="button"
-                          onClick={() => setIsAssignmentOpen(!isAssignmentOpen)}
+                        <div 
+                          onClick={() => setIsAssignmentModalOpen(true)}
                           className={cn(
-                            "w-full min-h-[38px] bg-white dark:bg-slate-950 border rounded-md px-3 py-1.5 text-left text-xs outline-none transition-all flex items-center justify-between gap-2 shadow-xs cursor-pointer",
-                            isSubmitted && !selectedPodId
-                              ? "border-red-500 ring-1 ring-red-500/20 bg-red-50/10 focus:border-red-500 focus:ring-red-500/20"
-                              : "border-neutral-300 dark:border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                            "flex items-center justify-between w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors shadow-sm",
+                            ((assignmentType === "pod" && !selectedPodId) || (assignmentType === "recruiters" && selectedRecruiterIds.length === 0)) && isSubmitted ? "border-red-500 bg-red-50 dark:bg-red-900/20" : ""
                           )}
                         >
-                          <div className="flex-1 min-w-0">
-                            {(() => {
-                              if (selectedPodId.startsWith("pod:")) {
-                                const pid = selectedPodId.replace("pod:", "");
-                                const pod = (branchPods || podsList).find((p: any) => p.id === pid);
-                                return (
-                                  <div className="flex items-center gap-1.5 truncate">
-                                    <span className="font-semibold text-neutral-900 dark:text-white">Pod: {pod?.name || "Recruitment Pod"}</span>
-                                    {pod?.podHeadName && (
-                                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-400">
-                                        Lead: {pod.podHeadName}
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              } else if (selectedPodId.startsWith("rec:")) {
-                                const recId = selectedPodId.replace("rec:", "");
-                                const rec = (recruitersList || branchUsers || []).find((u: any) => u.id === recId);
-                                if (rec) {
-                                  const roleLabel = getUserRoleLabel(rec);
-                                  return (
-                                    <div className="flex flex-col text-left py-0.5">
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="font-semibold text-neutral-900 dark:text-white">{rec.fullName || rec.name}</span>
-                                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800">
-                                          [{roleLabel}]
-                                        </span>
-                                      </div>
-                                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal">
-                                        {rec.email}
-                                      </span>
-                                    </div>
-                                  );
-                                }
-                                return <span className="text-neutral-400">Select Staff, Pod, or Pool...</span>;
-                              } else if (selectedPodId === "all") {
-                                return <span className="font-semibold text-neutral-900 dark:text-white">All recruiters</span>;
-                              } else if (selectedPodId === "none") {
-                                return <span className="font-semibold text-neutral-900 dark:text-white">Unassigned Allocation (Hold for Manager Assignment)</span>;
-                              } else if (selectedPodId === "auto_pod") {
-                                return <span className="font-semibold text-neutral-900 dark:text-white">Recruitment Pod System (Auto - Sequential)</span>;
-                              }
-                              return <span className="text-neutral-400">Select Staff, Pod, or Pool...</span>;
-                            })()}
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                              <Users className="h-4 w-4" />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">
+                                {assignmentType === "pod" && selectedPodId ? podsList.find(p => p.id === selectedPodId)?.name || "Recruitment Pod" :
+                                 assignmentType === "recruiters" && selectedRecruiterIds.length > 0 ? `${selectedRecruiterIds.length} Recruiter${selectedRecruiterIds.length > 1 ? 's' : ''} Selected` :
+                                 assignmentType === "unassigned" ? "Assign Later (Unassigned)" :
+                                 "Select Assignment..."}
+                              </span>
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                Click to configure job assignment
+                              </span>
+                            </div>
                           </div>
-                          <ChevronDown className={cn("h-4 w-4 text-neutral-400 transition-transform shrink-0", isAssignmentOpen && "rotate-180")} />
-                        </button>
-                        {isSubmitted && !selectedPodId && (
+                          <Button type="button" variant="outline" size="sm" className="h-7 text-[10px] px-2 font-bold uppercase tracking-wider">
+                            Change
+                          </Button>
+                        </div>
+                        {isSubmitted && ((assignmentType === "pod" && !selectedPodId) || (assignmentType === "recruiters" && selectedRecruiterIds.length === 0)) && (
                           <p className="text-[11px] text-red-500 font-medium mt-1">
-                            Job Assignment is required. Please select a Staff member, Pod, or Pool.
+                            Job Assignment is required. Please select a Pod, Recruiters, or Assign Later.
                           </p>
                         )}
-
-                        {/* Dropdown Overlay Menu */}
-                        {isAssignmentOpen && (
-                          <div className="absolute left-0 right-0 top-full z-50 mt-1 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xl overflow-hidden p-2 space-y-2">
-                            {/* Search Input */}
-                            <div className="relative flex items-center">
-                              <input
-                                type="text"
-                                placeholder="Search staff, role, email, or pod..."
-                                value={assignmentSearch}
-                                onChange={(e) => setAssignmentSearch(e.target.value)}
-                                className="w-full h-8 bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded pl-7 pr-2 text-xs text-neutral-800 dark:text-neutral-200 outline-none focus:border-indigo-500"
-                                autoFocus
-                              />
-                              <Search className="absolute left-2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
-                            </div>
-
-                            <div className="max-h-64 overflow-y-auto space-y-2 pr-1 scrollbar-thin select-none">
-                              {/* 1. Recruitment Pods */}
-                              {(!activeBranch || ((activeBranch.allowPods ?? activeBranch.allow_pods) !== false)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
-                                <div className="space-y-1">
-                                  <div className="px-2 py-1 text-[10.5px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 bg-neutral-50/80 dark:bg-slate-800/50 rounded">
-                                    Recruitment Pods
-                                  </div>
-                                  {branchPods && branchPods.length > 0 ? (
-                                    branchPods
-                                      .filter((pod: any) => !assignmentSearch.trim() || pod.name.toLowerCase().includes(assignmentSearch.toLowerCase()) || (pod.podHeadName && pod.podHeadName.toLowerCase().includes(assignmentSearch.toLowerCase())))
-                                      .map((pod: any) => {
-                                        const isSelected = selectedPodId === `pod:${pod.id}`;
-                                        return (
-                                          <div
-                                            key={`pod:${pod.id}`}
-                                            onClick={() => {
-                                              setSelectedPodId(`pod:${pod.id}`);
-                                              setSelectedApproverRole("POD_LEAD");
-                                              setSelectedApproverId(pod?.podHeadId || "");
-                                              setIsAssignmentOpen(false);
-                                            }}
-                                            className={cn(
-                                              "px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800/70 transition-colors flex items-center justify-between text-xs",
-                                              isSelected && "bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60"
-                                            )}
-                                          >
-                                            <div className="flex items-center gap-2">
-                                              <span className="font-semibold text-neutral-800 dark:text-neutral-200">Pod: {pod.name}</span>
-                                              {pod.podHeadName && (
-                                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-400">
-                                                  Lead: {pod.podHeadName}
-                                                </span>
-                                              )}
-                                            </div>
-                                            {isSelected && <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />}
-                                          </div>
-                                        );
-                                      })
-                                  ) : (
-                                    <div
-                                      onClick={() => {
-                                        setSelectedPodId("auto_pod");
-                                        setIsAssignmentOpen(false);
-                                      }}
-                                      className="px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800/70 text-xs font-semibold text-neutral-700 dark:text-neutral-300"
-                                    >
-                                      Recruitment Pod System (Auto - Sequential)
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* 2. Direct Staff Assignment */}
-                              {(!activeBranch || !!(activeBranch.allowNone ?? activeBranch.allow_none)) && recruitersList && recruitersList.length > 0 && (
-                                <div className="space-y-1">
-                                  <div className="px-2 py-1 text-[10.5px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 bg-neutral-50/80 dark:bg-slate-800/50 rounded">
-                                    Direct Staff Assignment
-                                  </div>
-                                  {recruitersList
-                                    .filter((rec: any) => {
-                                      if (!assignmentSearch.trim()) return true;
-                                      const q = assignmentSearch.toLowerCase();
-                                      const name = (rec.fullName || rec.name || "").toLowerCase();
-                                      const email = (rec.email || "").toLowerCase();
-                                      const role = getUserRoleLabel(rec).toLowerCase();
-                                      return name.includes(q) || email.includes(q) || role.includes(q);
-                                    })
-                                    .map((rec: any) => {
-                                      const name = rec.fullName || rec.name || "User";
-                                      const roleLabel = getUserRoleLabel(rec);
-                                      const isSelected = selectedPodId === `rec:${rec.id}`;
-                                      return (
-                                        <div
-                                          key={`rec:${rec.id}`}
-                                          onClick={() => {
-                                            setSelectedPodId(`rec:${rec.id}`);
-                                            setSelectedApproverRole("PRIMARY_RECRUITER");
-                                            setSelectedApproverId(rec.id);
-                                            setIsAssignmentOpen(false);
-                                          }}
-                                          className={cn(
-                                            "px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800/70 transition-colors flex items-center justify-between text-xs",
-                                            isSelected && "bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60"
-                                          )}
-                                        >
-                                          <div className="flex flex-col text-left">
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="font-semibold text-neutral-900 dark:text-white">{name}</span>
-                                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800">
-                                                [{roleLabel}]
-                                              </span>
-                                            </div>
-                                            <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal mt-0.5">
-                                              {rec.email}
-                                            </span>
-                                          </div>
-                                          {isSelected && <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
-                                        </div>
-                                      );
-                                    })}
-                                </div>
-                              )}
-
-                              {/* 3. Assign to */}
-                              {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true) || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) === true)) && !(activeBranch?.allowNone ?? activeBranch?.allow_none) && (
-                                <div className="space-y-1">
-                                  <div className="px-2 py-1 text-[10.5px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 bg-neutral-50/80 dark:bg-slate-800/50 rounded">
-                                    Assign to
-                                  </div>
-                                  {(!activeBranch || ((activeBranch.allowAll ?? activeBranch.allow_all) === true)) && (
-                                    <div
-                                      onClick={() => {
-                                        setSelectedPodId("all");
-                                        setSelectedApproverRole("BRANCH_ADMIN");
-                                        setSelectedApproverId("");
-                                        setIsAssignmentOpen(false);
-                                      }}
-                                      className={cn(
-                                        "px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800/70 transition-colors flex items-center justify-between text-xs",
-                                        selectedPodId === "all" && "bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60"
-                                      )}
-                                    >
-                                      <span className="font-semibold text-neutral-800 dark:text-neutral-200">All recruiters</span>
-                                      {selectedPodId === "all" && <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />}
-                                    </div>
-                                  )}
-                                  {(!activeBranch || ((activeBranch.allowUnassigned ?? activeBranch.allow_unassigned) === true)) && (
-                                    <div
-                                      onClick={() => {
-                                        setSelectedPodId("none");
-                                        setSelectedApproverRole("BRANCH_ADMIN");
-                                        setSelectedApproverId("");
-                                        setIsAssignmentOpen(false);
-                                      }}
-                                      className={cn(
-                                        "px-2.5 py-2 rounded-md cursor-pointer hover:bg-neutral-100 dark:hover:bg-slate-800/70 transition-colors flex items-center justify-between text-xs",
-                                        selectedPodId === "none" && "bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60"
-                                      )}
-                                    >
-                                      <span className="font-semibold text-neutral-800 dark:text-neutral-200">Unassigned Allocation (Hold for Manager Assignment)</span>
-                                      {selectedPodId === "none" && <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
+                        
+                        <JobAssignmentModal
+                          isOpen={isAssignmentModalOpen}
+                          onClose={() => setIsAssignmentModalOpen(false)}
+                          assignmentType={assignmentType}
+                          selectedPodId={selectedPodId}
+                          selectedRecruiterIds={selectedRecruiterIds}
+                          onApply={(type, podId, recruiterIds) => {
+                            setAssignmentType(type);
+                            setSelectedPodId(podId);
+                            setSelectedRecruiterIds(recruiterIds);
+                          }}
+                          podsList={branchPods}
+                          recruitersList={recruitersList}
+                          activeBranch={activeBranch}
+                        />
                       </div>
                     </div>
                   </div>
