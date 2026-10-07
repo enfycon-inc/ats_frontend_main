@@ -266,6 +266,15 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
     fetchEndPocs();
   }, [selectedEndClientId, session?.user?.email]);
 
+  // Auto-sync End POC with Client POC if they are the same company
+  useEffect(() => {
+    if (selectedClientId && selectedEndClientId && selectedClientId === selectedEndClientId && selectedPocId) {
+      if (selectedEndPocId !== selectedPocId) {
+        setSelectedEndPocId(selectedPocId);
+      }
+    }
+  }, [selectedClientId, selectedEndClientId, selectedPocId, selectedEndPocId]);
+
   const [addPocOpen, setAddPocOpen] = useState(false);
   const [newPocName, setNewPocName] = useState('');
   const [newPocDesignation, setNewPocDesignation] = useState('');
@@ -2850,7 +2859,7 @@ const getInitialActiveBranchContext = () => {
                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
                                       setValue("endClientName", clientNameStr, { shouldValidate: true });
                                       // @ts-ignore
-                                      if (cl?.id) setSelectedEndClientId(cl.id);
+                                      if (exactMatch?.id) setSelectedEndClientId(exactMatch.id); else if (typeof cl !== "undefined" && cl?.id) setSelectedEndClientId(cl.id);
                                       setEndClientDropdownOpen(false);
                                       setEndClientSearchText("");
                                     } else {
@@ -2909,7 +2918,7 @@ const getInitialActiveBranchContext = () => {
                                           onSelect={() => {
                                             setValue("endClientName", clientNameStr, { shouldValidate: true });
                                       // @ts-ignore
-                                      if (cl?.id) setSelectedEndClientId(cl.id);
+                                      if (exactMatch?.id) setSelectedEndClientId(exactMatch.id); else if (typeof cl !== "undefined" && cl?.id) setSelectedEndClientId(cl.id);
                                             setEndClientDropdownOpen(false);
                                             setEndClientSearchText("");
                                           }}
@@ -2944,7 +2953,7 @@ const getInitialActiveBranchContext = () => {
                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
                                       setValue("endClientName", clientNameStr, { shouldValidate: true });
                                       // @ts-ignore
-                                      if (cl?.id) setSelectedEndClientId(cl.id);
+                                      if (exactMatch?.id) setSelectedEndClientId(exactMatch.id); else if (typeof cl !== "undefined" && cl?.id) setSelectedEndClientId(cl.id);
                                       setEndClientDropdownOpen(false);
                                       setEndClientSearchText("");
                                     } else {
