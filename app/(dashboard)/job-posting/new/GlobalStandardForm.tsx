@@ -1005,7 +1005,7 @@ const getInitialActiveBranchContext = () => {
       setValue("duration", jobData.duration || "");
       setValue("recruitmentManager", jobData.recruitmentManagerId || "");
       setValue("recruiter", jobData.primaryRecruiterId || "");
-      setValue("assignedTo", jobData.assignedTo || "");
+      // setValue("assignedTo", jobData.assignedTo || "");
       setValue("accountManager", jobData.accountManagerId || "");
       setValue("industry", jobData.industry || "");
       setValue("degree", jobData.degree || "");
