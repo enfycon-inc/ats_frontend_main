@@ -91,6 +91,7 @@ export default function PodsPage() {
   const [modalRecruiters, setModalRecruiters] = useState<any[]>([]);
   const [businessUnits, setBusinessUnits] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
+  const [tenantUsers, setTenantUsers] = useState<any[]>([]);
 
   // Filtering states
   const [selectedUnitFilter, setSelectedUnitFilter] = useState<string>("all");
@@ -194,17 +195,19 @@ export default function PodsPage() {
       if (effectiveUnitId) scopeParams.businessUnitId = effectiveUnitId;
       if (effectiveBranchId) scopeParams.branchId = effectiveBranchId;
 
-      const [podsData, availRecruitersData, unitsData, branchesData] = await Promise.all([
+      const [podsData, availRecruitersData, unitsData, branchesData, usersData] = await Promise.all([
         atsApi.pods.list(scopeParams).catch(() => []),
         atsApi.pods.getAvailableRecruiters(scopeParams).catch(() => []),
         atsApi.businessUnits.list().catch(() => []),
         atsApi.branches.list().catch(() => []),
+        atsApi.auth.listUsers().catch(() => []),
       ]);
 
       setPods(podsData || []);
       setAvailableRecruiters(availRecruitersData || []);
       setBusinessUnits(unitsData || []);
       setBranches(branchesData || []);
+      setTenantUsers(usersData || []);
     } catch (err: any) {
       toast.error("Failed to load recruitment pods: " + err.message);
     } finally {
@@ -243,6 +246,7 @@ export default function PodsPage() {
     setRecruiterSearch("");
     setSelectedPod(null);
     setPodHeadId("");
+    setPodBranchId(selectedBranchFilter !== "all" ? selectedBranchFilter : "");
 
     let defaultUnitId = "";
     if (isUnitScoped) {
@@ -270,6 +274,7 @@ export default function PodsPage() {
     setPodName(pod.name);
     setPodDescription(pod.description || "");
     setPodHeadId(pod.podHeadId || "");
+    setPodBranchId(pod.branchId || "");
     setRecruiterSearch("");
 
     const targetUnitId = pod.businessUnitId || currentUser?.businessUnitId || "";
@@ -326,6 +331,7 @@ export default function PodsPage() {
       setSubmitting(true);
       await atsApi.pods.create({
         name: podName.trim(),
+        branchId: isUnitScoped ? undefined : podBranchId || undefined,
         businessUnitId: effectiveUnitId,
         podHeadId: podHeadId || undefined,
         description: podDescription.trim() || undefined,
@@ -354,6 +360,7 @@ export default function PodsPage() {
       setSubmitting(true);
       await atsApi.pods.update(selectedPod.id, {
         name: podName.trim(),
+        branchId: isUnitScoped ? undefined : podBranchId || undefined,
         businessUnitId: effectiveUnitId || undefined,
         podHeadId: podHeadId || null,
         description: podDescription.trim() || null,
@@ -410,16 +417,25 @@ export default function PodsPage() {
     );
   };
 
-  // Pod Lead Candidates: Available recruiters in the modal who are not already leading another pod
+  // Pod Lead Candidates: Users in the unit who are not already leading another pod
   const podLeadCandidates = useMemo(() => {
-    return modalRecruiters.filter((u) => {
+    const targetUnitId = isUnitScoped
+      ? currentUser?.businessUnitId || currentUser?.business_unit_id
+      : podUnitId;
+
+    const usersInUnit = tenantUsers.filter((u) => {
+      const uUnitId = u.businessUnitId || u.business_unit_id;
+      return uUnitId === targetUnitId;
+    });
+
+    return usersInUnit.filter((u) => {
       // Exclude users already heading another pod
       const isHeadOfAnotherPod = pods.some(
         (p) => p.podHeadId === u.id && (!selectedPod || p.id !== selectedPod.id)
       );
       return !isHeadOfAnotherPod;
     });
-  }, [modalRecruiters, pods, selectedPod]);
+  }, [tenantUsers, pods, selectedPod, podUnitId, isUnitScoped, currentUser]);
 
   // Filtered recruiters checklist for modal
   const filteredModalRecruiters = useMemo(() => {
@@ -905,7 +921,7 @@ export default function PodsPage() {
               className="flex flex-col flex-1 overflow-hidden"
             >
               <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                   {/* Pod Name */}
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block">
@@ -920,13 +936,39 @@ export default function PodsPage() {
                     />
                   </div>
 
+                  {/* Branch (Only for non-unit-scoped users) */}
+                  {!isUnitScoped && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block">
+                        Branch
+                      </label>
+                      <select
+                        value={podBranchId}
+                        onChange={(e) => {
+                          setPodBranchId(e.target.value);
+                          setPodUnitId("");
+                          setPodHeadId("");
+                          setSelectedRecruiterIds([]);
+                        }}
+                        className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                      >
+                        <option value="">— Select Branch (Optional) —</option>
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   {/* Operating Unit */}
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block">
                       Operating Unit <span className="text-red-500">*</span>
                     </label>
                     {isUnitScoped ? (
-                      <div className="w-full text-xs font-semibold border border-neutral-200 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-100/70 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
+                      <div className="w-full h-9 text-xs font-semibold border border-neutral-200 dark:border-slate-700 rounded-lg p-2 bg-neutral-100/70 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
                         <Icon icon="heroicons:rectangle-group" className="h-4 w-4 text-indigo-600 shrink-0" />
                         <span>{assignedUnitName}</span>
                       </div>
@@ -944,11 +986,13 @@ export default function PodsPage() {
                         required
                       >
                         <option value="">— Select Operating Unit —</option>
-                        {businessUnits.map((bu) => (
-                          <option key={bu.id} value={bu.id}>
-                            {bu.name}
-                          </option>
-                        ))}
+                        {businessUnits
+                          .filter((bu) => !podBranchId || bu.branchId === podBranchId)
+                          .map((bu) => (
+                            <option key={bu.id} value={bu.id}>
+                              {bu.name}
+                            </option>
+                          ))}
                       </select>
                     )}
                   </div>
@@ -1011,10 +1055,13 @@ export default function PodsPage() {
                                   }
                                   setPodHeadOpen(false);
                                 }}
-                                className="cursor-pointer"
+                                className="cursor-pointer flex items-center gap-2.5"
                               >
-                                <div className="flex flex-col flex-1 truncate">
-                                  <span className="font-semibold text-neutral-900 dark:text-neutral-100 text-xs">
+                                <div className="h-6 w-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                  {u.fullName?.charAt(0)?.toUpperCase()}
+                                </div>
+                                <div className="flex flex-col flex-1 min-w-0">
+                                  <span className="font-semibold text-neutral-900 dark:text-neutral-100 text-xs truncate">
                                     {u.fullName}
                                   </span>
                                   <span className="text-[10px] text-neutral-400 truncate">{u.email}</span>

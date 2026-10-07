@@ -88,7 +88,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
           const prof = await atsApi.auth.me();
           if (prof) {
             const onboardingUser = prof.fullName || prof.full_name || prof.name || prof.email || "";
-            setValue("ownership", onboardingUser);
+            setValue("ownership", prof.id || onboardingUser);
 
             const userRoles = (prof.roles || []).map((r: string) => String(r).toUpperCase().replace(/[\s-_]+/g, ''));
             const userPermissions = prof.permissions || [];
@@ -111,10 +111,10 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
 
   const onSubmit = async (data: AddClientFormValues) => {
     try {
-      const activeBranch = (typeof window !== "undefined" ? localStorage.getItem("active_branch_name") : null) || "bbsr-domestic";
+      const activeBranchName = (typeof window !== "undefined" ? localStorage.getItem("active_branch_name") : null) || "bbsr-domestic"; const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
       
       
-      const payload = {
+      const payload = { branch_id: activeBranchId, business_unit: activeBranchName,
         clientName: data.clientName,
         client_name: data.clientName,
         emailId: data.emailId,
@@ -172,7 +172,7 @@ await atsApi.clients.createContact(newClientId, pocPayload);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl md:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">Add Client</DialogTitle>
           <DialogDescription className="sr-only">Form to add a new client</DialogDescription>
@@ -415,7 +415,7 @@ await atsApi.clients.createContact(newClientId, pocPayload);
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting} className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-              {hasDirectAddClearance ? "Add Client" : "Submit for Approval"}
+              {isSubmitting ? "Saving..." : (hasDirectAddClearance ? "Add Client" : "Submit for Approval")}
             </Button>
           </div>
         </form>

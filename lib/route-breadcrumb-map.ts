@@ -425,11 +425,11 @@ export function getRouteBreadcrumbInfo(
 
     if (sub === "edit") {
       return {
-        pageTitle: `Edit Client • #${id}`,
+        pageTitle: "Edit Client Account",
         breadcrumbs: [
           { label: "ATS", href: "/dashboard" },
           { label: "Clients", href: "/clients" },
-          { label: `Client #${id}`, href: `/clients/${id}` },
+          { label: "Client Account", href: `/clients/${id}` },
           { label: "Edit", isCurrent: true },
         ],
         showBackButton: true,
@@ -438,11 +438,11 @@ export function getRouteBreadcrumbInfo(
     }
 
     return {
-      pageTitle: `Client Account • #${id}`,
+      pageTitle: "Client Account",
       breadcrumbs: [
         { label: "ATS", href: "/dashboard" },
         { label: "Clients", href: "/clients" },
-        { label: `Client #${id}`, isCurrent: true },
+        { label: "Client Account", isCurrent: true },
       ],
       showBackButton: true,
       backHref: "/clients",

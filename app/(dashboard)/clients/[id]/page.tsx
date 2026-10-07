@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { atsApi } from "@/lib/ats-api";
+import { resolveClientPoc, type ClientPoc } from "@/lib/client-poc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -38,6 +39,8 @@ export default function ClientDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "tax" | "qualifier" | "jobs">("overview");
   const [clientData, setClientData] = useState<any>(null);
+  const [poc, setPoc] = useState<ClientPoc>({});
+  const [contactsFailed, setContactsFailed] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [clientToReject, setClientToReject] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -91,7 +94,15 @@ export default function ClientDetailPage() {
     if (!clientId) return;
     setIsLoading(true);
     try {
-      const data = await atsApi.clients.get(clientId);
+      const [data, contacts] = await Promise.all([
+        atsApi.clients.get(clientId),
+        atsApi.clients.getContacts(clientId).then(
+          value => ({ value, failed: false }),
+          () => ({ value: null, failed: true }),
+        ),
+      ]);
+      setPoc(resolveClientPoc(data, contacts.value));
+      setContactsFailed(contacts.failed);
       setClientData(data);
       setFormData({
         client_name: data?.client_name || "",
@@ -230,8 +241,8 @@ export default function ClientDetailPage() {
   const isRejected = clientData?.status === "Rejected" || clientData?.approval_status === "REJECTED";
 
   return (
-    <div className="h-full flex flex-col min-h-0 bg-neutral-50 dark:bg-slate-950 font-sans p-6 overflow-auto">
-      <div className="max-w-6xl w-full mx-auto space-y-6 pb-12">
+    <div className="h-full flex flex-col min-h-0 min-w-0 bg-neutral-50 dark:bg-slate-950 font-sans p-3 md:p-6 overflow-auto">
+      <div className="w-full min-w-0 space-y-6 pb-12">
         {/* APPROVAL STATUS NOTICES */}
         {isPendingApproval && (
           <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
@@ -426,7 +437,7 @@ export default function ClientDetailPage() {
         )}
 
         {/* TABS NAVIGATION */}
-        <div className="flex items-center gap-2 border-b border-neutral-200 dark:border-slate-800">
+        <div className="flex items-center gap-2 overflow-x-auto shrink-0 border-b border-neutral-200 dark:border-slate-800">
           <button
             onClick={() => setActiveTab("overview")}
             className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
@@ -541,6 +552,11 @@ export default function ClientDetailPage() {
                 <CardContent className="pt-4 space-y-4 text-xs">
                   <div className="space-y-1">
                     <label className="font-bold text-neutral-700 dark:text-neutral-300">POC Contact Name</label>
+                    {contactsFailed && (
+                      <p role="status" className="text-amber-700 dark:text-amber-400">
+                        Unable to load saved contacts. Showing available client profile details.
+                      </p>
+                    )}
                     {isEditing ? (
                       <input
                         name="contact_person"
@@ -549,7 +565,7 @@ export default function ClientDetailPage() {
                         className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded outline-none"
                       />
                     ) : (
-                      <p className="font-semibold text-neutral-900 dark:text-white text-sm">{clientData.contact_person || clientData.client_lead || "N/A"}</p>
+                      <p className="font-semibold text-neutral-900 dark:text-white text-sm">{poc.name || (poc.email || poc.phone ? "Name not provided" : contactsFailed ? "Unavailable" : "No POC added")}</p>
                     )}
                   </div>
 
@@ -563,7 +579,7 @@ export default function ClientDetailPage() {
                         className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded outline-none"
                       />
                     ) : (
-                      <p className="font-semibold text-neutral-800 dark:text-neutral-200">{clientData.contact_designation || "N/A"}</p>
+                      <p className="font-semibold text-neutral-800 dark:text-neutral-200">{poc.designation || "Not provided"}</p>
                     )}
                   </div>
 
@@ -571,13 +587,13 @@ export default function ClientDetailPage() {
                     <div>
                       <span className="text-neutral-400 block text-[11px]">Work Email</span>
                       <p className="font-medium text-neutral-800 dark:text-neutral-200 flex items-center gap-1">
-                        <Mail className="h-3 w-3 text-neutral-400" /> {clientData.email_id || "N/A"}
+                        <Mail className="h-3 w-3 shrink-0 text-neutral-400" /> <span className="break-all">{poc.email || "Not provided"}</span>
                       </p>
                     </div>
                     <div>
                       <span className="text-neutral-400 block text-[11px]">Phone Number</span>
                       <p className="font-medium text-neutral-800 dark:text-neutral-200 flex items-center gap-1">
-                        <Phone className="h-3 w-3 text-neutral-400" /> {clientData.contact_number || "N/A"}
+                        <Phone className="h-3 w-3 shrink-0 text-neutral-400" /> {poc.phone || "Not provided"}
                       </p>
                     </div>
                   </div>
