@@ -1,6 +1,7 @@
 "use client";
 
 import { SubmissionHistory } from "@/components/submissions/submission-history";
+import { ReviewWorkspace } from "@/components/submissions/review-workspace";
 import { stageRemarkSuggestions } from "@/lib/stage-remarks";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -255,6 +256,7 @@ export default function SubmissionsPage() {
   const detailHref = useCallback((id: string) => { const query = new URLSearchParams(params.toString()); query.set("submission", id); return `/utility/submissions?${query}`; }, [params]);
   function backToTracker() { const query = new URLSearchParams(params.toString()); query.delete("submission"); router.push(`/utility/submissions?${query}`); }
   if (workspaceStatus === "error") return <div role="alert" className="text-sm text-red-700">Unable to load workspace access. Refresh the page to retry.</div>;
+  if (editor?.action === "review" && workspaceStatus === "ready") return <ReviewWorkspace key={editor.submission.id} submissionId={editor.submission.id} onClose={() => setEditor(null)} onSaved={saved => { setEditor(null); setDetail(saved); setRevision(r => r + 1); }} />;
   return <main className="space-y-5 min-w-0 text-foreground">
     {submissionId ? <Button variant="ghost" size="sm" className="text-xs -ml-2" onClick={backToTracker}><ArrowLeft className="h-3.5 w-3.5" />Back to submissions</Button> : <div><h1 className="text-xl font-bold tracking-tight">{view === "my" ? "My submissions" : view === "pod" ? "Pod submissions" : "Submissions"}</h1><p className="mt-1 text-xs text-muted-foreground">Track progress. Take the next action.</p></div>}
     {!submissionId && <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs" aria-label="Submission tracker">
