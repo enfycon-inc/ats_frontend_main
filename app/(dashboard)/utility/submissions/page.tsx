@@ -7,7 +7,7 @@ import { stageRemarkSuggestions } from "@/lib/stage-remarks";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, X, Download, Filter, Loader2, RefreshCw, Search, XCircle } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, X, Download, Filter, Loader2, RefreshCw, Search, XCircle, MoreHorizontal } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import { useDashboardContext } from "@/contexts/DashboardContext";
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { TrackerBucket, TrackerResponse, TrackerSubmission, TrackerUpdate } from "@/lib/submission-contract";
 import { ACTION_LABELS, canRejectRound, canRecordResult, rejectionStage, canUpdateOutcome, needsOutcomeReason, currentRound, formatInterview, interviewInstant, localInterviewParts, primaryAction, stage, validTimezone, ROUNDS, type TrackerAction } from "@/lib/submission-tracker";
@@ -174,11 +175,11 @@ function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to save. Please try again."); }
     finally { saveLock.current = false; setSaving(false); }
   }
-  const saveLabel = action === "reject" ? `Reject at ${round?.label || "current stage"}` : action === "schedule" ? "Save interview" : action === "result" ? "Save result" : action === "outcome" ? "Save status" : action === "rate" ? "Save rate" : "Save notes";
+  const saveLabel = action === "reject" ? "Reject Candidate" : action === "schedule" ? "Save interview" : action === "result" ? "Save result" : action === "outcome" ? "Save status" : action === "rate" ? "Save rate" : "Save notes";
   return <Dialog open onOpenChange={open => { if (!open && !saving) onClose(); }}>
     <DialogContent className="sm:max-w-[440px] max-h-[90dvh] overflow-y-auto rounded-xl p-0 gap-0" onInteractOutside={event => event.preventDefault()} onEscapeKeyDown={event => { if (saving) event.preventDefault(); }}>
       <DialogHeader className="px-6 pt-6 pb-4 text-left">
-        <DialogTitle className="text-lg font-bold">{["schedule", "result", "reject", "outcome"].includes(initialAction) ? "Update submission" : ACTION_LABELS[action]}</DialogTitle>
+        <DialogTitle className="text-lg font-bold">{action === "reject" ? "Reject Candidate" : ACTION_LABELS[action] || "Update submission"}</DialogTitle>
         <DialogDescription className="text-xs pt-2">
           <span className="block font-semibold text-[#1a4fa0] dark:text-blue-300">{current?.candidateName || submission.candidateName || "Name unavailable"}</span>
           <span className="block mt-1">{[current?.jobTitle || submission.jobTitle, current?.clientName || submission.clientName].filter(Boolean).join(" · ") || "Job details unavailable"}</span>
@@ -187,12 +188,6 @@ function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
       {loadError ? <div role="alert" className="px-6 pb-6 text-xs text-red-700">{loadError}<Button variant="outline" className="ml-2 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : !current ? <div role="status" className="p-8 text-center text-xs text-muted-foreground"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading submission…</div> : !permitted ? <div className="px-6 pb-6 text-xs" role="alert">This action is no longer available. The submission or your permissions may have changed.</div> :
       <form onSubmit={event => { event.preventDefault(); if (action !== "review") void save(); }}>
         <fieldset disabled={saving} className="space-y-4 px-6 pb-6">
-          {["schedule", "result", "reject", "outcome"].includes(initialAction) && <div className="space-y-1.5"><Label htmlFor="submission-action" className="text-xs">Action</Label><select id="submission-action" className={SELECT} value={action} onChange={event => { setBypassReason(""); setAction(event.target.value as TrackerAction); }}>
-            {current.finalStatus === "SUBMITTED" && round && (current.capabilities?.schedule || current.capabilities?.results[round.key]) && <option value="schedule">{current[`${round.key}Status`] === "SCHEDULED" ? "Reschedule interview" : "Schedule interview"}</option>}
-            {canRecordResult(current) && <option value="result">Record result</option>}
-            {canRejectRound(current) && round && <option value="reject">Reject at {round.label}</option>}
-            {canUpdateOutcome(current) && <option value="outcome">Update final status</option>}
-          </select></div>}
           {(action === "schedule" || action === "result" || action === "reject") && round && <div className="space-y-1.5"><Label htmlFor="update-round" className="text-xs">Round</Label><Input id="update-round" readOnly value={round.label} className="text-xs h-9" /></div>}
           {action === "schedule" && <>
             <div className="space-y-4">
@@ -205,11 +200,11 @@ function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
           {action === "review" && <div className="flex items-center justify-between rounded-md border border-border p-3"><span className="text-xs">Review candidate resume</span><Button type="button" variant="outline" size="sm" className="text-xs" disabled={resumeLoading} onClick={async () => { setResumeLoading(true); await downloadResume(current); setResumeLoading(false); }}><Download className="h-3.5 w-3.5" />Resume</Button></div>}
           {action === "result" && <div className="space-y-1.5"><Label htmlFor="interview-result" className="text-xs">Result</Label><select id="interview-result" className={SELECT} value={result} onChange={e => setResult(e.target.value)}><option value="CLEARED">Selected</option><option value="REJECTED">Rejected</option></select></div>}
           {action === "outcome" && <><div className="space-y-1.5"><Label htmlFor="submission-outcome" className="text-xs">Status</Label><select id="submission-outcome" className={SELECT} value={outcome} onChange={e => setOutcome(e.target.value)}>{current.finalStatus !== "OFFER" && <option value="OFFER">Offer issued</option>}<option value="JOIN">Joined</option><option value="REJECTED">Rejected</option></select></div>{needsOutcomeReason(current, outcome) && <div className="space-y-1.5"><Label htmlFor="bypass-reason" className="text-xs">Remarks</Label><Textarea id="bypass-reason" value={bypassReason} onChange={e => setBypassReason(e.target.value)} maxLength={4000} required rows={2} className="text-xs" placeholder="Add remarks…" /><p className="text-xs text-muted-foreground">These remarks will be recorded in the history.</p></div>}</>}
-          {action === "rate" ? <div className="space-y-1.5"><Label htmlFor="submission-rate" className="text-xs">Submitted rate {[current.submittedRateCurrency, current.submittedRateTerm].filter(Boolean).join(" / ")}</Label><Input id="submission-rate" type="number" min="0" max="99999999.99" step="0.01" required value={rate} onChange={e => setRate(e.target.value)} className="text-xs h-9" /></div> : <div className="space-y-1.5">
+          <div className="space-y-1.5">
             <Label htmlFor="submission-notes" className="text-xs">{action === "outcome" || action === "reject" ? "Remarks" : action === "result" ? "Feedback" : "Notes (optional)"}</Label>
             {suggestions.length > 0 && <select aria-label="Use a configured remark" className={SELECT} value="" onChange={e => setNotes(e.target.value)}><option value="" disabled>Use a configured remark…</option>{suggestions.map(t => <option key={t.id} value={t.remarkText}>{t.remarkText}</option>)}</select>}
             <Textarea id="submission-notes" value={notes} onChange={e => setNotes(e.target.value)} required={action === "reject"} rows={3} className="text-xs min-h-[76px]" placeholder="Add relevant notes…" />
-          </div>}
+          </div>
           {error && <div role="alert" className="rounded-md bg-red-50 p-3 text-xs text-red-800 dark:bg-red-950 dark:text-red-200">{error}<button type="button" className="block mt-2 underline" onClick={() => setRevision(r => r + 1)}>Reload latest submission</button></div>}
         </fieldset>
         <DialogFooter className="border-t border-border px-6 py-4 flex-row">
@@ -232,7 +227,7 @@ function SubmissionDetails({ submission, onAction }: { submission: TrackerSubmis
   return <div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h1 className="text-xl font-bold tracking-tight">{submission.candidateName || "Name unavailable"}</h1><p className="mt-1 text-xs text-muted-foreground">{[submission.jobTitle, submission.clientName].filter(Boolean).join(" · ") || "Job details unavailable"}</p></div>
-      <div className="flex flex-wrap gap-2"><Button variant="outline" className="text-xs" onClick={() => void downloadResume(submission)}><Download className="h-3.5 w-3.5" />Resume</Button>{submission.capabilities?.notes && <Button variant="outline" className="text-xs" onClick={() => onAction("notes")}>Edit notes</Button>}{submission.capabilities?.rate && <Button variant="outline" className="text-xs" onClick={() => onAction("rate")}>Edit rate</Button>}{submission.finalStatus === "SUBMITTED" && currentRound(submission) && submission[`${currentRound(submission)!.key}Status`] === "SCHEDULED" && submission.capabilities?.schedule && <Button variant="outline" className="text-xs" onClick={() => onAction("schedule")}>Reschedule interview</Button>}{action !== "outcome" && canUpdateOutcome(submission) && <Button variant="outline" className="text-xs" onClick={() => onAction("outcome")}>Update status</Button>}{action !== "reject" && canRejectRound(submission) && <Button variant="outline" className="text-xs text-red-700" onClick={() => onAction("reject")}>Reject at {currentRound(submission)?.label}</Button>}{action !== "result" && canRecordResult(submission) && <Button variant="outline" className="text-xs" onClick={() => onAction("result")}>Record result</Button>}{action && <Button className={cn("text-xs", PRIMARY)} onClick={() => onAction(action)}>{ACTION_LABELS[action]}</Button>}</div>
+      <div className="flex flex-wrap gap-2"><Button variant="outline" className="text-xs" onClick={() => void downloadResume(submission)}><Download className="h-3.5 w-3.5" />Resume</Button>{submission.finalStatus === "SUBMITTED" && currentRound(submission) && submission[`${currentRound(submission)!.key}Status`] === "SCHEDULED" && submission.capabilities?.schedule && <Button variant="outline" className="text-xs" onClick={() => onAction("schedule")}>Reschedule interview</Button>}{action !== "outcome" && canUpdateOutcome(submission) && <Button variant="outline" className="text-xs" onClick={() => onAction("outcome")}>Update status</Button>}{action !== "reject" && canRejectRound(submission) && <Button variant="outline" className="text-xs text-red-700" onClick={() => onAction("reject")}>Reject at {currentRound(submission)?.label}</Button>}{action !== "result" && canRecordResult(submission) && <Button variant="outline" className="text-xs" onClick={() => onAction("result")}>Record result</Button>}{action && <Button className={cn("text-xs", PRIMARY)} onClick={() => onAction(action)}>{ACTION_LABELS[action]}</Button>}</div>
     </div>
     <div className="rounded-xl border border-border bg-card p-5"><StageBadge submission={submission} /><dl className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{detail.map(([label, value]) => <div key={label}><dt className="text-[11px] text-muted-foreground">{label}</dt><dd className="mt-1 text-xs break-words">{value || "—"}</dd></div>)}</dl></div>
     <SubmissionHistory submission={submission} />
@@ -322,7 +317,33 @@ export default function SubmissionsPage() {
                 <td className="px-4 py-3"><Link href={detailHref(sub.id)} className="font-semibold text-[#1a4fa0] hover:underline">{sub.candidateName || "Name unavailable"}</Link></td>
                 <td className="px-4 py-4 text-center"><Pipeline submission={sub} /></td><td className="px-4 py-3 text-center"><StageBadge submission={sub} /></td>
                 <td className="px-4 py-3 text-center text-muted-foreground">{sub.finalStatus === "PENDING_APPROVAL" ? "Awaiting review" : ["JOIN", "REJECTED", "OFFER"].includes(sub.finalStatus) || !round ? "—" : <><p className="font-semibold">{round.label}</p><p className="mt-1 text-[10.5px]">{formatInterview(sub[`${round.key}Date`], validTimezone(sub.timezone))}</p></>}</td>
-                <td className="px-4 py-3 text-center">{action ? <Button variant={action === "schedule" ? "default" : "outline"} className={cn("min-h-9 h-auto max-w-full whitespace-normal px-3 py-2 text-xs", action === "schedule" ? PRIMARY : OUTLINE)} onClick={() => setEditor({ submission: sub, action })}>{action === "review" ? ACTION_LABELS[action] : "Update"}</Button> : <Button variant="outline" className={cn("min-h-9 h-auto max-w-full whitespace-normal px-3 py-2 text-xs", OUTLINE)} asChild><Link href={detailHref(sub.id)}>View details</Link></Button>}</td>
+                <td className="px-4 py-3 text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    {action ? (
+                      <Button variant={action === "schedule" ? "default" : "outline"} className={cn("min-h-9 h-auto whitespace-normal px-3 py-2 text-xs", action === "schedule" ? PRIMARY : OUTLINE)} onClick={() => setEditor({ submission: sub, action })}>
+                        {ACTION_LABELS[action]}
+                      </Button>
+                    ) : (
+                      <Button variant="outline" className={cn("min-h-9 h-auto whitespace-normal px-3 py-2 text-xs", OUTLINE)} asChild>
+                        <Link href={detailHref(sub.id)}>View details</Link>
+                      </Button>
+                    )}
+                    {sub.finalStatus !== 'JOIN' && sub.finalStatus !== 'REJECTED' && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="icon" className="h-9 w-9 shrink-0"><MoreHorizontal className="h-4 w-4"/></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="text-xs">
+                          {canRejectRound(sub) && <DropdownMenuItem onClick={() => setEditor({ submission: sub, action: "reject" })} className="text-red-600 focus:text-red-600"><XCircle className="mr-2 h-4 w-4"/> Reject Candidate</DropdownMenuItem>}
+                          {canRecordResult(sub) && action !== "result" && <DropdownMenuItem onClick={() => setEditor({ submission: sub, action: "result" })}>Record result</DropdownMenuItem>}
+                          {canUpdateOutcome(sub) && action !== "outcome" && <DropdownMenuItem onClick={() => setEditor({ submission: sub, action: "outcome" })}>Update final status</DropdownMenuItem>}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem asChild><Link href={detailHref(sub.id)}>View details</Link></DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+                </td>
               </tr>;
             }) : Array.from(new Set(response.data.map(sub => sub.jobId))).map(jobId => {
               const submissions = response.data.filter(sub => sub.jobId === jobId);
@@ -334,7 +355,33 @@ export default function SubmissionsPage() {
                 <td className="px-5 py-3"><Link href={detailHref(sub.id)} className="font-semibold text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.candidateName || "Name unavailable"}</Link>{sub.candidateEmail && <p className="mt-1 break-words text-xs text-muted-foreground">{sub.candidateEmail}</p>}{sub.candidatePhone && <p className="mt-1 break-words text-xs text-muted-foreground">{sub.candidatePhone}</p>}</td>
                 <td className="px-5 py-4 text-center"><Pipeline submission={sub} /></td><td className="px-4 py-3 text-center"><StageBadge submission={sub} /></td>
                 <td className="px-4 py-3 text-center text-muted-foreground">{sub.finalStatus === "PENDING_APPROVAL" ? "Awaiting review" : closed || !round ? "—" : <><p className="font-semibold">{round.label}</p><p className="mt-1 text-[10.5px]">{formatInterview(sub[`${round.key}Date`], validTimezone(sub.timezone))}</p></>}</td>
-                <td className="px-4 py-3 text-center">{action ? <Button variant={action === "schedule" ? "default" : "outline"} className={cn("min-h-9 h-auto max-w-full whitespace-normal px-3 py-2 text-xs", action === "schedule" ? PRIMARY : OUTLINE)} onClick={() => setEditor({ submission: sub, action })}>{action === "review" ? ACTION_LABELS[action] : "Update"}</Button> : <Button variant="outline" className={cn("min-h-9 h-auto max-w-full whitespace-normal px-3 py-2 text-xs", OUTLINE)} asChild><Link href={detailHref(sub.id)}>View details</Link></Button>}</td>
+                <td className="px-4 py-3 text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    {action ? (
+                      <Button variant={action === "schedule" ? "default" : "outline"} className={cn("min-h-9 h-auto whitespace-normal px-3 py-2 text-xs", action === "schedule" ? PRIMARY : OUTLINE)} onClick={() => setEditor({ submission: sub, action })}>
+                        {ACTION_LABELS[action]}
+                      </Button>
+                    ) : (
+                      <Button variant="outline" className={cn("min-h-9 h-auto whitespace-normal px-3 py-2 text-xs", OUTLINE)} asChild>
+                        <Link href={detailHref(sub.id)}>View details</Link>
+                      </Button>
+                    )}
+                    {sub.finalStatus !== 'JOIN' && sub.finalStatus !== 'REJECTED' && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="icon" className="h-9 w-9 shrink-0"><MoreHorizontal className="h-4 w-4"/></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="text-xs">
+                          {canRejectRound(sub) && <DropdownMenuItem onClick={() => setEditor({ submission: sub, action: "reject" })} className="text-red-600 focus:text-red-600"><XCircle className="mr-2 h-4 w-4"/> Reject Candidate</DropdownMenuItem>}
+                          {canRecordResult(sub) && action !== "result" && <DropdownMenuItem onClick={() => setEditor({ submission: sub, action: "result" })}>Record result</DropdownMenuItem>}
+                          {canUpdateOutcome(sub) && action !== "outcome" && <DropdownMenuItem onClick={() => setEditor({ submission: sub, action: "outcome" })}>Update final status</DropdownMenuItem>}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem asChild><Link href={detailHref(sub.id)}>View details</Link></DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+                </td>
               </tr>;
             })}</Fragment>;
             })}
