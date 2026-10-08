@@ -2,9 +2,9 @@ import type { RoundKey, TrackerSubmission } from './submission-contract';
 
 // Labels describe workflow states, never candidate/client/role relationships.
 export const ROUNDS: { key: RoundKey; label: string }[] = [
-  { key: 'l1', label: 'Round 1 (L1)' },
-  { key: 'l2', label: 'Round 2 (L2)' },
-  { key: 'l3', label: 'Round 3 (L3)' },
+  { key: 'l1', label: 'L1' },
+  { key: 'l2', label: 'L2' },
+  { key: 'l3', label: 'L3' },
 ];
 export type TrackerAction = 'review' | 'schedule' | 'result' | 'outcome' | 'notes' | 'rate';
 export const ACTION_LABELS: Record<TrackerAction, string> = {

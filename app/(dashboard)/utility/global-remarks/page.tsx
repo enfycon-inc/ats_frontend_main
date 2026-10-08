@@ -22,9 +22,9 @@ interface RemarkTemplate { id: number; stage: string; remarkText: string; remark
 
 const STAGES = [
   { key: "review", label: "Review" },
-  { key: "l1", label: "Round 1 (L1)" },
-  { key: "l2", label: "Round 2 (L2)" },
-  { key: "l3", label: "Round 3 (L3)" },
+  { key: "l1", label: "L1" },
+  { key: "l2", label: "L2" },
+  { key: "l3", label: "L3" },
   { key: "final", label: "Final" },
   { key: "all", label: "All Stages" },
 ];

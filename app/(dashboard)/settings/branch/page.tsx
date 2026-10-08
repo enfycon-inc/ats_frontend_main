@@ -3166,9 +3166,9 @@ function BranchManagementPageContent() {
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mr-1.5 shrink-0">Stage:</span>
               {[
                 { key: "review", label: "Internal Review Gate", count: branchRemarks.filter(r => r.stage === "review" || r.stage === "internal_review").length },
-                { key: "l1", label: "Round 1 (L1)", count: branchRemarks.filter(r => r.stage === "l1").length },
-                { key: "l2", label: "Round 2 (L2)", count: branchRemarks.filter(r => r.stage === "l2").length },
-                { key: "l3", label: "Round 3 (L3)", count: branchRemarks.filter(r => r.stage === "l3").length },
+                { key: "l1", label: "L1", count: branchRemarks.filter(r => r.stage === "l1").length },
+                { key: "l2", label: "L2", count: branchRemarks.filter(r => r.stage === "l2").length },
+                { key: "l3", label: "L3", count: branchRemarks.filter(r => r.stage === "l3").length },
                 { key: "final", label: "Final Milestone", count: branchRemarks.filter(r => r.stage === "final").length },
                 { key: "all", label: "All Stages", count: branchRemarks.length },
               ].map((tab) => (

@@ -122,7 +122,7 @@ function renderPipelineProgress(sub: any) {
       statusTitle = "Pending";
     }
 
-    const roundName = stage === "L1" ? "Round 1 (L1) - Screening" : stage === "L2" ? "Round 2 (L2) - Technical" : "Round 3 (L3) - Client Final";
+    const roundName = stage === "L1" ? "L1" : stage === "L2" ? "L2" : "L3";
 
     return (
       <HoverCard key={stage} openDelay={150} closeDelay={150}>
@@ -296,7 +296,7 @@ function renderClutterFreeRemarks(sub: any) {
   }
   if (sub.l3Remarks) {
     allRemarks.push({
-      stage: "Round 3 (L3)",
+      stage: "L3",
       label: "L3",
       text: sub.l3Remarks,
       timestamp: formatRemarkTimestamp(sub.l3Date, sub.updatedAt || sub.createdAt),
@@ -307,7 +307,7 @@ function renderClutterFreeRemarks(sub: any) {
   }
   if (sub.l2Remarks) {
     allRemarks.push({
-      stage: "Round 2 (L2)",
+      stage: "L2",
       label: "L2",
       text: sub.l2Remarks,
       timestamp: formatRemarkTimestamp(sub.l2Date, sub.updatedAt || sub.createdAt),
@@ -318,7 +318,7 @@ function renderClutterFreeRemarks(sub: any) {
   }
   if (sub.l1Remarks) {
     allRemarks.push({
-      stage: "Round 1 (L1)",
+      stage: "L1",
       label: "L1",
       text: sub.l1Remarks,
       timestamp: formatRemarkTimestamp(sub.l1Date, sub.updatedAt || sub.createdAt),
@@ -1976,12 +1976,12 @@ export default function JobDetailPage() {
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   
-                  {/* Stage 1: Round 1 (L1) */}
+                  {/* Stage 1: L1 */}
                   <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2 flex flex-col justify-between">
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
-                          Round 1 (L1)
+                          L1
                         </span>
                         {!canAuditL1 && (
                           <Badge variant="secondary" className="text-[9px] py-0">View Only</Badge>
@@ -2025,12 +2025,12 @@ export default function JobDetailPage() {
                     )}
                   </div>
 
-                  {/* Stage 2: Round 2 (L2) */}
+                  {/* Stage 2: L2 */}
                   <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2 flex flex-col justify-between">
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
-                          Round 2 (L2)
+                          L2
                         </span>
                         {!canAuditL2 && (
                           <Badge variant="secondary" className="text-[9px] py-0">View Only</Badge>
@@ -2075,12 +2075,12 @@ export default function JobDetailPage() {
                     )}
                   </div>
 
-                  {/* Stage 3: Round 3 (L3) */}
+                  {/* Stage 3: L3 */}
                   <div className="p-3 border border-neutral-200 dark:border-slate-800 rounded-lg bg-neutral-50/40 dark:bg-slate-850/40 space-y-2 flex flex-col justify-between">
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
-                          Round 3 (L3)
+                          L3
                         </span>
                         {!canAuditL3 && (
                           <Badge variant="secondary" className="text-[9px] py-0">View Only</Badge>
