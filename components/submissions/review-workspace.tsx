@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Download, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { atsApi } from '@/lib/ats-api';
-import type { TrackerSubmission } from '@/lib/submission-contract';
+import type { CandidateAssessment, TrackerSubmission, TrackerUpdate } from '@/lib/submission-contract';
 import { stageRemarkSuggestions } from '@/lib/stage-remarks';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,9 +26,10 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
     return () => setOpen(wasOpen);
   }, []);
   const [submission, setSubmission] = useState<TrackerSubmission | null>(null);
+  const [assessment, setAssessment] = useState<CandidateAssessment | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [notes, setNotes] = useState('');
-  const [checks, setChecks] = useState<Record<string, string>>({});
+  const [checks, setChecks] = useState<NonNullable<TrackerUpdate['reviewOverrides']>>({});
   const [resume, setResume] = useState<{ url: string; pdf: boolean; extension: string } | null>(null);
   const [resumeError, setResumeError] = useState('');
   const [loadError, setLoadError] = useState('');
@@ -40,8 +41,10 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
   useEffect(() => {
     let active = true;
     let objectUrl: string | undefined;
-    void atsApi.submissions.get(submissionId).then(async fresh => {
+    void atsApi.submissions.assessment(submissionId).then(async response => {
       if (!active) return;
+      const fresh = response.submission;
+      setAssessment(response.assessment);
       const document = new DOMParser().parseFromString(fresh.jobDescription || '', 'text/html');
       document.querySelectorAll('script, style, iframe, object').forEach(node => node.remove());
       document.querySelectorAll('p, div, li, h1, h2, h3, h4, br').forEach(node => node.append('\n'));
@@ -58,26 +61,20 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
     }).catch(() => { if (active) setLoadError('Unable to load the submission. Retry to check your access and the latest state.'); });
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [submissionId, revision]);
-  const retry = () => { setSubmission(null); setResume(null); setResumeError(''); setLoadError(''); setError(''); setRevision(r => r + 1); };
+  const retry = () => { setSubmission(null); setAssessment(null); setResume(null); setResumeError(''); setLoadError(''); setError(''); setRevision(r => r + 1); };
   const permitted = submission?.capabilities?.review && submission.finalStatus === 'PENDING_APPROVAL';
-  const required = [...new Set(submission?.jobSkillsRequired || [])];
-  const criteria = submission ? [
-    ...required.map(skill => ({ key: `skill:${skill}`, requirement: skill, evidence: (submission.candidateSkills || []).some(candidate => candidate.trim().toLowerCase() === skill.trim().toLowerCase()) ? 'Listed in candidate profile — verify résumé' : 'Not listed in profile — verify résumé' })),
-    ...(submission.jobExperienceMin != null || submission.jobExperienceMax != null ? [{ key: 'experience', requirement: `Experience: ${submission.jobExperienceMin ?? '—'}–${submission.jobExperienceMax ?? '—'} years`, evidence: submission.candidateExperience != null ? `${submission.candidateExperience} years in profile` : 'Experience not provided' }] : []),
-    ...(submission.jobLocation || submission.jobWorkMode ? [{ key: 'location', requirement: [submission.jobWorkMode, submission.jobLocation].filter(Boolean).join(' · '), evidence: submission.candidateCurrentLocation || 'Candidate location not provided' }] : []),
-    ...(submission.jobDegree ? [{ key: 'degree', requirement: `Education: ${submission.jobDegree}`, evidence: 'Verify résumé' }] : []),
-    ...(submission.jobNoticePeriod ? [{ key: 'notice', requirement: `Notice: ${submission.jobNoticePeriod}`, evidence: submission.candidateNoticePeriod != null ? `${submission.candidateNoticePeriod} days in profile` : 'Notice period not provided' }] : []),
-  ] : [];
+  const criteria = assessment?.criteria || [];
+  const findingLabels = { EVIDENCE_FOUND: 'Evidence found', NO_EVIDENCE: 'No evidence found', MEETS: 'Meets stated requirement', DOES_NOT_MEET: 'Below stated requirement', NEEDS_CLARIFICATION: 'Needs clarification' };
   async function save(decision: 'SUBMITTED' | 'REJECTED') {
-    if (!submission || !permitted || lock.current) return;
+    if (!submission || !assessment || !permitted || lock.current) return;
     if (decision === 'REJECTED' && !notes.trim()) { setError('Add a reason for rejecting this submission.'); return; }
     lock.current = true; setSaving(true); setError('');
     const reviewed = criteria.filter(row => checks[row.key]).map(row => `${row.requirement}: ${checks[row.key]}`);
     const feedback = [notes.trim(), reviewed.length ? `Reviewer criteria checks:\n${reviewed.join('\n')}` : ''].filter(Boolean).join('\n\n') || null;
-    const content = JSON.stringify({ decision, feedback });
+    const content = JSON.stringify({ decision, feedback, assessmentVersion: assessment.version, checks });
     if (request.current?.content !== content) request.current = { id: crypto.randomUUID(), content };
     try {
-      const saved = await atsApi.submissions.update(submission.id, { finalStatus: decision, reviewFeedback: feedback, expectedUpdatedAt: submission.updatedAt, requestId: request.current.id });
+      const saved = await atsApi.submissions.update(submission.id, { finalStatus: decision, reviewFeedback: feedback, expectedUpdatedAt: submission.updatedAt, requestId: request.current.id, assessmentVersion: assessment.version, reviewOverrides: checks });
       toast.success(decision === 'SUBMITTED' ? 'Submission approved.' : 'Submission rejected.'); onSaved(saved);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to save the review.'); }
     finally { lock.current = false; setSaving(false); }
@@ -96,7 +93,8 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
     <dl className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-card p-5 lg:grid-cols-5">{facts.map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 text-xs font-semibold">{value}</dd></div>)}</dl>
     <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <div className="space-y-4"><section className="rounded-xl border border-border bg-card p-5"><div className="flex justify-between gap-3"><h2 className="text-sm font-bold">Job requirements</h2><span className="text-[10.5px] text-muted-foreground">{submission.jobCode}</span></div><p className="mt-3 text-sm font-semibold">{submission.jobTitle}</p><details open className="mt-3"><summary className="cursor-pointer text-xs font-semibold text-[#1a4fa0] dark:text-blue-300">Job description</summary><div className="mt-3 max-h-72 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-relaxed">{submission.jobDescription || 'No job description provided.'}</div></details>
-        <h3 className="mt-5 text-sm font-bold">Required criteria</h3><div className="mt-3 overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-muted/40"><tr>{['Requirement', 'Candidate evidence', 'Reviewer check'].map(text => <th key={text} className="p-2 text-[10.5px] font-bold uppercase text-muted-foreground">{text}</th>)}</tr></thead><tbody>{criteria.map(row => <tr key={row.key} className="border-t border-border"><td className="p-2">{row.requirement}</td><td className="p-2 text-muted-foreground">{row.evidence}</td><td className="p-2"><select aria-label={`Reviewer check: ${row.requirement}`} className={selectClass} disabled={saving || !permitted} value={checks[row.key] || ''} onChange={event => setChecks(previous => ({ ...previous, [row.key]: event.target.value }))}><option value="">Unchecked</option><option>Meets</option><option>Does not meet</option><option>Needs clarification</option></select></td></tr>)}</tbody></table>{!criteria.length && <p className="py-3 text-xs text-muted-foreground">No structured requirements provided. Review the job description.</p>}</div><p className="mt-3 text-[10.5px] text-muted-foreground">Profile evidence is not verified. Your checks are saved with the review remarks.</p>{!!submission.jobSecondarySkills?.length && <p className="mt-4 text-xs"><strong>Additional skills: </strong>{submission.jobSecondarySkills.join(', ')}</p>}</section>
+        {assessment && <div className="mt-5 rounded-lg border border-border bg-muted/20 p-4"><div className="flex flex-wrap gap-6"><div><p className="text-xs text-muted-foreground">Match score</p><p className="mt-1 text-xl font-bold">{assessment.score == null ? 'Insufficient evidence' : `${assessment.score}%`}</p></div><div><p className="text-xs text-muted-foreground">Evidence coverage</p><p className="mt-1 text-lg font-bold">{assessment.coverage}%</p></div><div><p className="text-xs text-muted-foreground">Needs attention</p><p className="mt-1 text-lg font-bold">{criteria.filter(row => !['EVIDENCE_FOUND', 'MEETS'].includes(row.finding)).length}</p></div></div><details className="mt-3 text-xs"><summary className="cursor-pointer font-semibold">How this score is calculated</summary><ul className="mt-2 space-y-1">{assessment.breakdown.map(part => <li key={part.label}>{part.label}: {part.score == null ? 'Unknown — excluded' : `${part.score}%`} · weight {part.weight}</li>)}</ul><p className="mt-2">Unknown factors are excluded and remaining weights are normalized. Coverage shows how much of the configured assessment could be scored.</p>{assessment.limitations.map(text => <p key={text} className="mt-1 text-muted-foreground">{text}</p>)}<p className="mt-2 text-muted-foreground">{assessment.engine} · Calculated {new Date(assessment.calculatedAt).toLocaleString()}</p></details></div>}
+        <h3 className="mt-5 text-sm font-bold">Required criteria</h3><div className="mt-3 overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-muted/40"><tr>{['Requirement', 'Evidence', 'Automated finding', 'Reviewer override'].map(text => <th key={text} className="p-2 text-[10.5px] font-bold uppercase text-muted-foreground">{text}</th>)}</tr></thead><tbody>{criteria.map(row => <tr key={row.key} className="border-t border-border"><td className="p-2">{row.requirement}</td><td className="p-2 text-muted-foreground break-words">{row.evidence}</td><td className="p-2"><span className={`inline-block rounded-md px-2 py-1 ${['EVIDENCE_FOUND', 'MEETS'].includes(row.finding) ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200' : 'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200'}`}>{findingLabels[row.finding]}</span></td><td className="p-2"><select aria-label={`Reviewer override: ${row.requirement}`} className={`${selectClass} min-w-[140px]`} disabled={saving || !permitted} value={checks[row.key] || ''} onChange={event => setChecks(previous => { const next = {...previous}; if (event.target.value) next[row.key] = event.target.value as NonNullable<TrackerUpdate['reviewOverrides']>[string]; else delete next[row.key]; return next; })}><option value="">No override</option><option>Meets</option><option>Does not meet</option><option>Needs clarification</option></select></td></tr>)}</tbody></table>{!criteria.length && <p className="py-3 text-xs text-muted-foreground">No structured requirements provided. Review the job description.</p>}</div><p className="mt-3 text-[10.5px] text-muted-foreground">Findings are pre-filled from available evidence. Only override when needed. The assessment and your overrides are recorded with your decision.</p></section>
         <section className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">Recruiter notes</h2><p className="mt-2 whitespace-pre-wrap text-xs">{submission.recruiterComment || 'No recruiter notes provided.'}</p><p className="mt-3 text-xs"><strong>Candidate skills: </strong>{submission.candidateSkills?.join(', ') || 'Not provided'}</p></section>
       </div>
       <section className="overflow-hidden rounded-xl border border-border bg-card"><div className="flex items-center justify-between border-b border-border p-4"><h2 className="text-sm font-bold">Résumé</h2>{resume && <Button variant="outline" className="text-xs" asChild><a href={resume.url} download={`${submission.candidateName || submission.candidateId}-resume${resume.extension}`}><Download className="h-3.5 w-3.5" />Download</a></Button>}</div>{resumeError ? <div role="alert" className="p-6 text-xs">{resumeError}<Button variant="outline" className="mt-3 block text-xs" onClick={retry} disabled={saving}>Retry</Button></div> : !resume ? <p role="status" className="p-8 text-xs">Loading résumé…</p> : resume.pdf ? <iframe title="Candidate résumé preview" src={resume.url} className="h-[65vh] min-h-[480px] w-full border-0" /> : <div className="p-8 text-xs">This file format cannot be previewed here. Download the original résumé to review it.</div>}</section>

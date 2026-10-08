@@ -1,4 +1,4 @@
-import type { SubmissionHistoryResponse, TrackerResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
+import type { CandidateAssessment, SubmissionHistoryResponse, TrackerResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
 
 /**
  * ats-api.ts — Typed API client for the NestJS ATS backend
@@ -986,6 +986,7 @@ export interface JobPayload {
 }
 
 export interface CandidateMatch {
+  assessment?: CandidateAssessment;
   candidateId: number;
   fullName: string;
   email: string;
@@ -1008,7 +1009,7 @@ export interface CandidateMatch {
   breakdown: {
     primarySkills: string;
     secondarySkills: string;
-    experienceFit: number;
+    experienceFit: number | null;
     semantic: number | null;
   };
 }
@@ -1484,6 +1485,9 @@ const pods = {
 };
 
 const submissions = {
+  async assessment(id: string): Promise<{ submission: TrackerSubmission; assessment: CandidateAssessment }> {
+    return apiFetch(`/api/recruiter-submissions/${id}/assessment`);
+  },
   async history(id: string, page = 1): Promise<SubmissionHistoryResponse> {
     return apiFetch<SubmissionHistoryResponse>(`/api/recruiter-submissions/${id}/history?page=${page}`);
   },

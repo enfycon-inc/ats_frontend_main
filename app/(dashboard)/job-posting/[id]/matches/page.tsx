@@ -203,7 +203,7 @@ export default function JobMatchesPage() {
                   }`}
                   title={data.parserOnline
                     ? "Semantic similarity from the resume parser is included in scores."
-                    : "Resume parser offline — scores use skill overlap + experience only."}
+                    : "Evidence scoring is active. Semantic blending is disabled until parser search supports tenant isolation."}
                 >
                   {data.parserOnline ? <Zap className="h-3 w-3" /> : <ZapOff className="h-3 w-3" />}
                   {data.parserOnline ? "Semantic ON" : "Semantic OFF"}
@@ -488,7 +488,8 @@ function MatchCard({ rank, m, job, submittedIds, onSubmitClick }: { rank: number
       <div className="flex items-start gap-4">
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-xs font-bold tabular-nums text-neutral-400 w-5 text-right">{rank}</span>
-          <ScoreMeter score={m.matchScore} tier={m.matchTier} />
+          {m.assessment?.score === null ? <span className="text-xs text-muted-foreground">Insufficient evidence</span> : <ScoreMeter score={m.matchScore} tier={m.matchTier} />}
+          {m.assessment && <p className="text-[10.5px] text-muted-foreground">{m.assessment.coverage}% evidence coverage</p>}
         </div>
 
         <div className="min-w-0 flex-1">
@@ -575,7 +576,7 @@ function MatchCard({ rank, m, job, submittedIds, onSubmitClick }: { rank: number
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-neutral-500">
               <BreakdownStat label="Primary skills" value={m.breakdown.primarySkills} />
               <BreakdownStat label="Secondary" value={m.breakdown.secondarySkills} />
-              <BreakdownStat label="Experience fit" value={`${m.breakdown.experienceFit}%`} />
+              <BreakdownStat label="Experience fit" value={m.breakdown.experienceFit == null ? 'Unknown' : `${m.breakdown.experienceFit}%`} />
               <BreakdownStat label="Semantic" value={m.breakdown.semantic == null ? "—" : `${m.breakdown.semantic}%`} />
             </div>
             <div className="flex items-center gap-1.5">
