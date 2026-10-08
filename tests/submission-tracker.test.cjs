@@ -6,7 +6,7 @@ const mod = { exports: {} };
 new Function('exports', ts.transpileModule(fs.readFileSync('lib/submission-tracker.ts', 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS },
 }).outputText)(mod.exports);
-const { stage, primaryAction, canRecordResult, rejectionStage, canUpdateOutcome, needsOutcomeReason, interviewInstant, localInterviewParts } = mod.exports;
+const { stage, primaryAction, canRejectRound, canRecordResult, rejectionStage, canUpdateOutcome, needsOutcomeReason, interviewInstant, localInterviewParts } = mod.exports;
 const base = {
   finalStatus: 'SUBMITTED', l1Status: 'PENDING', l2Status: null, l3Status: null,
   capabilities: { review: false, schedule: false, results: { l1: false, l2: false, l3: false }, outcome: false },
@@ -40,6 +40,16 @@ test('internal review is distinct from screening and blocks interview actions', 
   assert.equal(primaryAction(sub), null);
   sub.capabilities.review = true;
   assert.equal(primaryAction(sub), 'review');
+});
+test('current pending rounds can be rejected without exposing selected results', () => {
+  for (const round of ['l1', 'l2', 'l3']) {
+    const sub = { ...base, l1Status: round === 'l1' ? 'PENDING' : 'CLEARED', l2Status: round === 'l3' ? 'CLEARED' : 'PENDING', capabilities: { ...base.capabilities, results: { l1: true, l2: true, l3: true } } };
+    assert.equal(canRejectRound(sub), true);
+    assert.equal(canRecordResult(sub), false);
+    assert.equal(canRejectRound({ ...sub, finalStatus: 'REJECTED' }), false);
+    assert.equal(canRejectRound({ ...sub, finalStatus: 'PENDING_APPROVAL' }), false);
+    assert.equal(canRejectRound({ ...sub, capabilities: base.capabilities }), false);
+  }
 });
 test('a scheduler can schedule but cannot record an interview result', () => {
   const sub = { ...base, capabilities: { ...base.capabilities, schedule: true } };

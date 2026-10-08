@@ -6,10 +6,10 @@ export const ROUNDS: { key: RoundKey; label: string }[] = [
   { key: 'l2', label: 'L2' },
   { key: 'l3', label: 'L3' },
 ];
-export type TrackerAction = 'review' | 'schedule' | 'result' | 'outcome' | 'notes' | 'rate';
+export type TrackerAction = 'review' | 'schedule' | 'result' | 'reject' | 'outcome' | 'notes' | 'rate';
 export const ACTION_LABELS: Record<TrackerAction, string> = {
   review: 'Review submission', schedule: 'Schedule interview', result: 'Record result',
-  outcome: 'Update status', notes: 'Edit notes', rate: 'Edit rate',
+  reject: 'Reject at current stage', outcome: 'Update status', notes: 'Edit notes', rate: 'Edit rate',
 };
 export function canUpdateOutcome(sub: TrackerSubmission) {
   return Boolean(sub.capabilities?.outcome && ['SUBMITTED', 'OFFER'].includes(sub.finalStatus));
@@ -25,6 +25,10 @@ export function currentRound(sub: TrackerSubmission) {
 export function canRecordResult(sub: TrackerSubmission) {
   const round = currentRound(sub);
   return Boolean(sub.finalStatus === 'SUBMITTED' && round && sub[`${round.key}Status`] === 'SCHEDULED' && sub[`${round.key}Date`] && Number.isFinite(new Date(sub[`${round.key}Date`]!).getTime()) && sub.capabilities?.results[round.key]);
+}
+export function canRejectRound(sub: TrackerSubmission) {
+  const round = currentRound(sub);
+  return Boolean(sub.finalStatus === 'SUBMITTED' && round && [null, 'PENDING', 'SCHEDULED'].includes(sub[`${round.key}Status`]) && sub.capabilities?.results[round.key]);
 }
 export function rejectionStage(sub: TrackerSubmission): string | null {
   if (sub.finalStatus !== 'REJECTED') return null;
