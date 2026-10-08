@@ -6,11 +6,29 @@ const mod = { exports: {} };
 new Function('exports', ts.transpileModule(fs.readFileSync('lib/submission-tracker.ts', 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS },
 }).outputText)(mod.exports);
-const { stage, primaryAction, canUpdateOutcome, needsOutcomeReason, interviewInstant, localInterviewParts } = mod.exports;
+const { stage, primaryAction, canRecordResult, rejectionStage, canUpdateOutcome, needsOutcomeReason, interviewInstant, localInterviewParts } = mod.exports;
 const base = {
   finalStatus: 'SUBMITTED', l1Status: 'PENDING', l2Status: null, l3Status: null,
   capabilities: { review: false, schedule: false, results: { l1: false, l2: false, l3: false }, outcome: false },
 };
+test('rejection identifies internal review, pre-interview and interview decisions without remark inference', () => {
+  const rejected = { ...base, finalStatus: 'REJECTED' };
+  assert.equal(rejectionStage({ ...rejected, rejectionFromStatus: 'PENDING_APPROVAL' }), 'review');
+  assert.equal(stage({ ...rejected, rejectionFromStatus: 'PENDING_APPROVAL' }).label, 'Internal review rejected');
+  assert.equal(rejectionStage({ ...rejected, rejectionFromStatus: 'SUBMITTED' }), 'final');
+  assert.equal(stage({ ...rejected, rejectionFromStatus: 'SUBMITTED' }).label, 'Rejected before L1');
+  assert.equal(rejectionStage({ ...rejected, l1Status: 'REJECTED' }), 'l1');
+  assert.equal(stage({ ...rejected, l1Status: 'CLEARED', l2Status: 'REJECTED' }).label, 'L2 rejected');
+  assert.equal(stage({ ...rejected, reviewFeedback: 'approved' }).label, 'Rejected');
+});
+test('unscheduled results use active round capability and do not grant scheduling permission', () => {
+  const sub = { ...base, capabilities: { ...base.capabilities, results: { l1: true, l2: false, l3: false } } };
+  assert.equal(canRecordResult(sub), true);
+  assert.equal(primaryAction(sub), 'result');
+  assert.equal(canRecordResult({ ...sub, finalStatus: 'PENDING_APPROVAL' }), false);
+  assert.equal(canRecordResult({ ...sub, finalStatus: 'REJECTED' }), false);
+  assert.equal(canRecordResult({ ...sub, l1Status: 'CLEARED' }), false);
+});
 test('internal review is distinct from screening and blocks interview actions', () => {
   const sub = { ...base, finalStatus: 'PENDING_APPROVAL', capabilities: { ...base.capabilities, schedule: true } };
   assert.equal(stage(sub).label, 'Needs internal review');

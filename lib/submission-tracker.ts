@@ -22,9 +22,26 @@ export function currentRound(sub: TrackerSubmission) {
   if (sub.currentRoundKey !== undefined) return ROUNDS.find(round => round.key === sub.currentRoundKey) ?? null;
   return ROUNDS.find(round => sub[`${round.key}Status`] !== 'CLEARED') ?? null;
 }
+export function canRecordResult(sub: TrackerSubmission) {
+  const round = currentRound(sub);
+  return Boolean(sub.finalStatus === 'SUBMITTED' && round && sub[`${round.key}Status`] !== 'REJECTED' && sub.capabilities?.results[round.key]);
+}
+export function rejectionStage(sub: TrackerSubmission): string | null {
+  if (sub.finalStatus !== 'REJECTED') return null;
+  const rejected = ROUNDS.find(round => sub[`${round.key}Status`] === 'REJECTED');
+  if (rejected) return rejected.key;
+  return sub.rejectionFromStatus === 'PENDING_APPROVAL' ? 'review' : 'final';
+}
 export function stage(sub: TrackerSubmission): { label: string; tone: 'amber' | 'blue' | 'green' | 'red' | 'neutral' } {
   if (sub.finalStatus === 'PENDING_APPROVAL') return { label: 'Needs internal review', tone: 'amber' };
-  if (sub.finalStatus === 'REJECTED') return { label: 'Rejected', tone: 'red' };
+  if (sub.finalStatus === 'REJECTED') {
+    const rejected = rejectionStage(sub);
+    const round = currentRound(sub);
+    const label = rejected === 'review' ? 'Internal review rejected'
+      : rejected !== 'final' ? `${rejected?.toUpperCase()} rejected`
+      : sub.rejectionFromStatus === 'SUBMITTED' && round && !sub[`${round.key}Date`] ? `Rejected before ${round.label}` : 'Rejected';
+    return { label, tone: 'red' };
+  }
   if (sub.finalStatus === 'JOIN') return { label: 'Joined', tone: 'green' };
   if (sub.finalStatus === 'OFFER') return { label: 'Offer issued', tone: 'green' };
   if (sub.finalStatus !== 'SUBMITTED') return { label: sub.finalStatus.replaceAll('_', ' '), tone: 'neutral' };
@@ -46,7 +63,7 @@ export function primaryAction(sub: TrackerSubmission): TrackerAction | null {
   if (!round) return caps.outcome ? 'outcome' : null;
   if (sub[`${round.key}Status`] === 'REJECTED') return null;
   if (sub[`${round.key}Status`] === 'SCHEDULED') return caps.results[round.key] ? 'result' : null;
-  return caps.schedule || caps.results[round.key] ? 'schedule' : null;
+  return caps.schedule ? 'schedule' : caps.results[round.key] ? 'result' : null;
 }
 export function validTimezone(value?: string | null): string {
   if (value) {

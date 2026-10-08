@@ -118,7 +118,7 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
   const isMoreLoading = isLoadingProfile || filteredMoreNav.length === 0;
 
   return (
-    <Sidebar collapsible={pathname?.startsWith("/utility/submissions") ? "offcanvas" : "icon"} className="border-r border-default-200 dark:border-slate-800">
+    <Sidebar collapsible="icon" className="border-r border-default-200 dark:border-slate-800">
       <SidebarHeader className="h-[46px] min-h-[46px] max-h-[46px] px-3 bg-[#1a4fa0] dark:bg-[#0f2d6b] border-b border-[#1545a0]/40 dark:border-[#0a2050]/60 flex items-center justify-center group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:h-[46px] transition-colors">
         <NavbarLogo />
       </SidebarHeader>
