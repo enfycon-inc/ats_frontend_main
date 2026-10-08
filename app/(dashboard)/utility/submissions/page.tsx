@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { TrackerBucket, TrackerResponse, TrackerSubmission, TrackerUpdate } from "@/lib/submission-contract";
-import { ACTION_LABELS, canUpdateOutcome, needsOutcomeReason, currentRound, formatInterview, interviewInstant, localInterviewParts, primaryAction, stage, validTimezone, type TrackerAction } from "@/lib/submission-tracker";
+import { ACTION_LABELS, canUpdateOutcome, needsOutcomeReason, currentRound, formatInterview, interviewInstant, localInterviewParts, primaryAction, stage, validTimezone, ROUNDS, type TrackerAction } from "@/lib/submission-tracker";
 
 const FILTERS: { key: TrackerBucket; label: string }[] = [
   { key: "all", label: "All" }, { key: "review", label: "Needs review" },
@@ -38,6 +38,15 @@ function StageBadge({ submission }: { submission: TrackerSubmission }) {
   const state = stage(submission);
   const Icon = state.tone === "green" ? CheckCircle2 : state.tone === "red" ? XCircle : state.tone === "blue" ? CalendarDays : Clock3;
   return <span className={cn("inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[10.5px] font-semibold whitespace-nowrap", TONES[state.tone])}><Icon className="h-3.5 w-3.5" />{state.label}</span>;
+}
+function Pipeline({ submission }: { submission: TrackerSubmission }) {
+  const state = stage(submission);
+  const reviewComplete = submission.finalStatus !== "PENDING_APPROVAL";
+  const terminal = ["JOIN", "OFFER"].includes(submission.finalStatus);
+  const current = currentRound(submission)?.key;
+  const stages = [{ key: "review", label: "Internal review", complete: reviewComplete }, ...ROUNDS.map(round => ({ key: round.key, label: round.label, complete: terminal || submission[`${round.key}Status`] === "CLEARED" })) , { key: "final", label: "Final", complete: terminal }];
+  const activeKey = submission.finalStatus === "PENDING_APPROVAL" ? "review" : current || "final";
+  return <div className="min-w-[300px] max-w-[470px]" aria-label={`Pipeline: ${state.label}`}><div className="flex items-start">{stages.map((item, index) => { const active = item.key === activeKey && !item.complete; const tone = state.tone === "red" && active ? "border-red-500 bg-red-50 text-red-700" : item.complete ? "border-emerald-500 bg-emerald-500 text-white" : active ? "border-[#1a4fa0] bg-[#1a4fa0] text-white shadow-[0_0_0_5px_rgba(26,79,160,0.16)] animate-pulse" : "border-slate-300 bg-white text-slate-400"; return <div key={item.key} className="flex min-w-0 flex-1 items-start"><div className="flex min-w-0 flex-1 flex-col items-center gap-1"><span className={cn("flex h-5 w-5 items-center justify-center rounded-full border-2", tone)}>{item.complete ? <CheckCircle2 className="h-3.5 w-3.5" /> : active ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : null}</span><span className={cn("text-center text-[10px] leading-tight", active ? "font-semibold text-[#1a4fa0]" : "text-muted-foreground")}>{item.label}</span></div>{index < stages.length - 1 && <span className={cn("mt-2.5 h-px flex-1", item.complete ? "bg-emerald-400" : "bg-slate-200")} />}</div>; })}</div><span className={cn("mt-2 inline-flex rounded-md px-2 py-1 text-[10.5px] font-semibold", TONES[state.tone])}>{state.label}</span></div>;
 }
 async function downloadResume(sub: TrackerSubmission) {
   try {
@@ -268,7 +277,7 @@ export default function SubmissionsPage() {
       </div>
       {showFilters && <div className="flex flex-wrap items-end gap-3 border-t border-border bg-muted/30 px-5 py-4"><div className="space-y-1"><Label htmlFor="from-date" className="text-xs">Submitted from</Label><Input id="from-date" type="date" className="h-9 text-xs" value={startDate} max={endDate || undefined} onChange={e => { setStartDate(e.target.value); setPage(1); }} /></div><div className="space-y-1"><Label htmlFor="to-date" className="text-xs">Submitted to</Label><Input id="to-date" type="date" className="h-9 text-xs" value={endDate} min={startDate || undefined} onChange={e => { setEndDate(e.target.value); setPage(1); }} /></div><Button variant="ghost" className="text-xs" onClick={() => { setStartDate(""); setEndDate(""); setSearch(""); setPage(1); }}>Clear filters</Button></div>}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-xs"><thead className="border-y border-border bg-muted/40"><tr>{["Candidate", "Job / Client", "Current stage", "Next interview", "Action"].map(label => <th scope="col" key={label} className="px-5 py-3 text-left text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground last:w-[185px]">{label}</th>)}</tr></thead>
+        <table className="w-full min-w-[900px] text-xs"><thead className="border-y border-border bg-muted/40"><tr>{["Candidate", "Job / Client", "Pipeline", "Next interview", "Action"].map(label => <th scope="col" key={label} className="px-5 py-3 text-left text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground last:w-[185px]">{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-border">
             {loading || workspaceStatus !== "ready" ? <tr><td colSpan={5} className="py-16 text-center text-muted-foreground" role="status"><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading submissions…</td></tr> : error ? <tr><td colSpan={5} className="py-12 text-center" role="alert">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></td></tr> : !response?.data.length ? <tr><td colSpan={5} className="py-16 text-center text-muted-foreground">No submissions match these filters.</td></tr> : response.data.map(sub => {
               const action = primaryAction(sub); const round = currentRound(sub);
@@ -276,7 +285,7 @@ export default function SubmissionsPage() {
               return <tr key={sub.id} className="hover:bg-muted/25 transition-colors">
                 <td className="px-5 py-5"><Link href={detailHref(sub.id)} className="font-semibold text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.candidateName || "Name unavailable"}</Link></td>
                 <td className="px-5 py-5"><p>{[sub.jobTitle, sub.clientName].filter(Boolean).join(" · ") || "Job details unavailable"}</p><p className="mt-1 text-[10.5px] text-muted-foreground">{sub.jobCode || "—"}</p></td>
-                <td className="px-5 py-5"><StageBadge submission={sub} /></td>
+                <td className="px-5 py-5"><Pipeline submission={sub} /></td>
                 <td className="px-5 py-5 whitespace-nowrap text-muted-foreground">{closed || !round ? "—" : formatInterview(sub[`${round.key}Date`], validTimezone(sub.timezone))}</td>
                 <td className="px-5 py-5">{action ? <Button variant={action === "schedule" ? "default" : "outline"} className={cn("h-9 w-full text-xs", action === "schedule" ? PRIMARY : OUTLINE)} onClick={() => setEditor({ submission: sub, action })}>{ACTION_LABELS[action]}</Button> : <Button variant="outline" className={cn("h-9 w-full text-xs", OUTLINE)} asChild><Link href={detailHref(sub.id)}>View details</Link></Button>}</td>
               </tr>;
