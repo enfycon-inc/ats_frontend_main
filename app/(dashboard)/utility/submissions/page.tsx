@@ -4,7 +4,7 @@ import { SubmissionHistory } from "@/components/submissions/submission-history";
 import { ReviewWorkspace } from "@/components/submissions/review-workspace";
 import { stageRemarkSuggestions } from "@/lib/stage-remarks";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Download, Filter, Loader2, RefreshCw, Search, XCircle } from "lucide-react";
@@ -231,6 +231,7 @@ export default function SubmissionsPage() {
   const [revision, setRevision] = useState(0);
   const [detail, setDetail] = useState<TrackerSubmission | null>(null);
   const [editor, setEditor] = useState<{ submission: TrackerSubmission; action: TrackerAction } | null>(null);
+  const [collapsedJobs, setCollapsedJobs] = useState<Record<string, boolean>>({});
   useEffect(() => { const timer = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 300); return () => clearTimeout(timer); }, [search]);
   useEffect(() => {
     const refresh = () => { setEditor(null); setRevision(r => r + 1); };
@@ -277,18 +278,21 @@ export default function SubmissionsPage() {
       </div>
       {showFilters && <div className="flex flex-wrap items-end gap-3 border-t border-border bg-muted/30 px-5 py-4"><div className="space-y-1"><Label htmlFor="from-date" className="text-xs">Submitted from</Label><Input id="from-date" type="date" className="h-9 text-xs" value={startDate} max={endDate || undefined} onChange={e => { setStartDate(e.target.value); setPage(1); }} /></div><div className="space-y-1"><Label htmlFor="to-date" className="text-xs">Submitted to</Label><Input id="to-date" type="date" className="h-9 text-xs" value={endDate} min={startDate || undefined} onChange={e => { setEndDate(e.target.value); setPage(1); }} /></div><Button variant="ghost" className="text-xs" onClick={() => { setStartDate(""); setEndDate(""); setSearch(""); setPage(1); }}>Clear filters</Button></div>}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] text-xs"><thead className="border-y border-border bg-muted/40"><tr>{["Candidate", "Job / Client", "Pipeline", "Next interview", "Action"].map(label => <th scope="col" key={label} className="px-5 py-3 text-left text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground last:w-[185px]">{label}</th>)}</tr></thead>
+        <table className="w-full min-w-[1100px] text-xs"><thead className="border-y border-border bg-muted/40"><tr>{["Job code", "Job title", "Client / End client", "Pipeline", "Next round", "Action"].map(label => <th scope="col" key={label} className="px-5 py-3 text-left text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground last:w-[185px]">{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-border">
-            {loading || workspaceStatus !== "ready" ? <tr><td colSpan={5} className="py-16 text-center text-muted-foreground" role="status"><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading submissions…</td></tr> : error ? <tr><td colSpan={5} className="py-12 text-center" role="alert">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></td></tr> : !response?.data.length ? <tr><td colSpan={5} className="py-16 text-center text-muted-foreground">No submissions match these filters.</td></tr> : response.data.map(sub => {
+            {loading || workspaceStatus !== "ready" ? <tr><td colSpan={6} className="py-16 text-center text-muted-foreground" role="status"><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading submissions…</td></tr> : error ? <tr><td colSpan={6} className="py-12 text-center" role="alert">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></td></tr> : !response?.data.length ? <tr><td colSpan={6} className="py-16 text-center text-muted-foreground">No submissions match these filters.</td></tr> : Array.from(new Set(response.data.map(sub => sub.jobId))).map(jobId => {
+              const submissions = response.data.filter(sub => sub.jobId === jobId);
+              const job = submissions[0];
+              return <Fragment key={jobId}><tr className="bg-muted/20"><td className="px-5 py-4"><button type="button" className="font-semibold text-[#1a4fa0]" aria-expanded={!collapsedJobs[jobId]} onClick={() => setCollapsedJobs(previous => ({ ...previous, [jobId]: !previous[jobId] }))}>{collapsedJobs[jobId] ? "▸" : "▾"} {job.jobCode || "Code unavailable"}</button><div className="mt-2 flex gap-1.5">{job.jobIsCoSourced && <span className="rounded bg-blue-50 px-2 py-1 text-[10.5px] text-blue-800">Co-sourced</span>}{job.jobUrgency && <span className="rounded bg-muted px-2 py-1 text-[10.5px]">{job.jobUrgency}</span>}</div><p className="mt-2 text-[10.5px] text-muted-foreground">{job.matchingJobSubmissionCount ?? submissions.length} matching submissions{submissions.length < (job.matchingJobSubmissionCount ?? submissions.length) && ` · ${submissions.length} on this page`}</p></td><td className="px-5 py-4 font-semibold">{job.jobTitle || "Title unavailable"}</td><td className="px-5 py-4"><p>{job.clientName || "Client unavailable"}</p><p className="mt-1 text-[10.5px] text-muted-foreground">End client: {job.endClientName || "Not provided"}</p></td><td colSpan={3} /></tr>{!collapsedJobs[jobId] && submissions.map(sub => {
               const action = primaryAction(sub); const round = currentRound(sub);
               const closed = ["PENDING_APPROVAL", "REJECTED", "OFFER", "JOIN"].includes(sub.finalStatus);
               return <tr key={sub.id} className="hover:bg-muted/25 transition-colors">
-                <td className="px-5 py-5"><Link href={detailHref(sub.id)} className="font-semibold text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.candidateName || "Name unavailable"}</Link></td>
-                <td className="px-5 py-5"><p>{[sub.jobTitle, sub.clientName].filter(Boolean).join(" · ") || "Job details unavailable"}</p><p className="mt-1 text-[10.5px] text-muted-foreground">{sub.jobCode || "—"}</p></td>
+                <td colSpan={3} className="px-8 py-5"><p className="mb-1 text-[10.5px] text-muted-foreground">Candidate submission</p><Link href={detailHref(sub.id)} className="font-semibold text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.candidateName || "Name unavailable"}</Link></td>
                 <td className="px-5 py-5"><Pipeline submission={sub} /></td>
-                <td className="px-5 py-5 whitespace-nowrap text-muted-foreground">{closed || !round ? "—" : formatInterview(sub[`${round.key}Date`], validTimezone(sub.timezone))}</td>
+                <td className="px-5 py-5 whitespace-nowrap text-muted-foreground">{closed || !round ? "—" : <><p className="font-semibold">{round.label}</p><p className="mt-1 text-[10.5px]">{formatInterview(sub[`${round.key}Date`], validTimezone(sub.timezone))}</p></>}</td>
                 <td className="px-5 py-5">{action ? <Button variant={action === "schedule" ? "default" : "outline"} className={cn("h-9 w-full text-xs", action === "schedule" ? PRIMARY : OUTLINE)} onClick={() => setEditor({ submission: sub, action })}>{ACTION_LABELS[action]}</Button> : <Button variant="outline" className={cn("h-9 w-full text-xs", OUTLINE)} asChild><Link href={detailHref(sub.id)}>View details</Link></Button>}</td>
               </tr>;
+            })}</Fragment>;
             })}
           </tbody>
         </table>
