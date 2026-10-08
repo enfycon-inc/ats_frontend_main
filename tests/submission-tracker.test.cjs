@@ -21,10 +21,15 @@ test('rejection identifies internal review, pre-interview and interview decision
   assert.equal(stage({ ...rejected, l1Status: 'CLEARED', l2Status: 'REJECTED' }).label, 'L2 rejected');
   assert.equal(stage({ ...rejected, reviewFeedback: 'approved' }).label, 'Rejected');
 });
-test('unscheduled results use active round capability and do not grant scheduling permission', () => {
+test('results require a persisted scheduled interview and active round permission', () => {
   const sub = { ...base, capabilities: { ...base.capabilities, results: { l1: true, l2: false, l3: false } } };
-  assert.equal(canRecordResult(sub), true);
-  assert.equal(primaryAction(sub), 'result');
+  assert.equal(canRecordResult(sub), false);
+  assert.equal(primaryAction(sub), null);
+  const scheduled = { ...sub, l1Status: 'SCHEDULED', l1Date: '2026-10-09T05:30:00Z' };
+  assert.equal(canRecordResult(scheduled), true);
+  assert.equal(primaryAction(scheduled), 'result');
+  assert.equal(canRecordResult({ ...scheduled, l1Date: null }), false);
+  assert.equal(canRecordResult({ ...scheduled, l1Date: 'invalid' }), false);
   assert.equal(canRecordResult({ ...sub, finalStatus: 'PENDING_APPROVAL' }), false);
   assert.equal(canRecordResult({ ...sub, finalStatus: 'REJECTED' }), false);
   assert.equal(canRecordResult({ ...sub, l1Status: 'CLEARED' }), false);
@@ -43,7 +48,7 @@ test('a scheduler can schedule but cannot record an interview result', () => {
 });
 test('each result requires the permission for the active round', () => {
   const caps = { ...base.capabilities, results: { l1: true, l2: false, l3: false } };
-  assert.equal(primaryAction({ ...base, l1Status: 'SCHEDULED', capabilities: caps }), 'result');
+  assert.equal(primaryAction({ ...base, l1Status: 'SCHEDULED', l1Date: '2026-10-09T05:30:00Z', capabilities: caps }), 'result');
   assert.equal(primaryAction({ ...base, l1Status: 'CLEARED', l2Status: 'SCHEDULED', capabilities: caps }), null);
 });
 test('final round clearance is not an issued offer', () => {

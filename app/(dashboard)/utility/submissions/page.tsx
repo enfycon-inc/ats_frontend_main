@@ -76,9 +76,10 @@ async function downloadResume(sub: TrackerSubmission) {
 }
 
 interface RemarkTemplate { id: number; stage: string; remarkText: string; remarkType?: string }
-function UpdateDialog({ submission, action, onClose, onSaved }: {
+function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
   submission: TrackerSubmission; action: TrackerAction; onClose: () => void; onSaved: (sub: TrackerSubmission) => void;
 }) {
+  const [action, setAction] = useState<TrackerAction>(initialAction);
   const [current, setCurrent] = useState<TrackerSubmission | null>(null);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -103,6 +104,7 @@ function UpdateDialog({ submission, action, onClose, onSaved }: {
     let cancelled = false;
     void Promise.resolve().then(() => {
       if (cancelled) return;
+      requestId.current = null;
       setCurrent(null); setLoadError(""); setError("");
       return atsApi.submissions.get(submission.id);
     }).then(async fresh => {
@@ -126,7 +128,7 @@ function UpdateDialog({ submission, action, onClose, onSaved }: {
   }, [submission.id, action, revision]);
 
   const round = current ? currentRound(current) : null;
-  const permitted = current && (action === "schedule" && round && current.finalStatus === "SUBMITTED" && current.capabilities?.schedule ? true : action === "result" ? canRecordResult(current) : action === "outcome" ? canUpdateOutcome(current) : action === "notes" ? current.capabilities?.notes : action === "rate" ? current.capabilities?.rate : primaryAction(current) === action);
+  const permitted = current && (action === "schedule" && round && current.finalStatus === "SUBMITTED" && (current.capabilities?.schedule || current.capabilities?.results[round.key]) ? true : action === "result" ? canRecordResult(current) : action === "outcome" ? canUpdateOutcome(current) : action === "notes" ? current.capabilities?.notes : action === "rate" ? current.capabilities?.rate : primaryAction(current) === action);
   const templateStage = action === "review" ? "review" : action === "outcome" ? "final" : round?.key;
   const suggestions = stageRemarkSuggestions(templates, templateStage);
 
@@ -172,7 +174,7 @@ function UpdateDialog({ submission, action, onClose, onSaved }: {
   return <Dialog open onOpenChange={open => { if (!open && !saving) onClose(); }}>
     <DialogContent className="sm:max-w-[440px] max-h-[90dvh] overflow-y-auto rounded-xl p-0 gap-0" onInteractOutside={event => event.preventDefault()} onEscapeKeyDown={event => { if (saving) event.preventDefault(); }}>
       <DialogHeader className="px-6 pt-6 pb-4 text-left">
-        <DialogTitle className="text-lg font-bold">{ACTION_LABELS[action]}</DialogTitle>
+        <DialogTitle className="text-lg font-bold">{["schedule", "result", "outcome"].includes(initialAction) ? "Update submission" : ACTION_LABELS[action]}</DialogTitle>
         <DialogDescription className="text-xs pt-2">
           <span className="block font-semibold text-[#1a4fa0] dark:text-blue-300">{current?.candidateName || submission.candidateName || "Name unavailable"}</span>
           <span className="block mt-1">{[current?.jobTitle || submission.jobTitle, current?.clientName || submission.clientName].filter(Boolean).join(" · ") || "Job details unavailable"}</span>
@@ -181,6 +183,11 @@ function UpdateDialog({ submission, action, onClose, onSaved }: {
       {loadError ? <div role="alert" className="px-6 pb-6 text-xs text-red-700">{loadError}<Button variant="outline" className="ml-2 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : !current ? <div role="status" className="p-8 text-center text-xs text-muted-foreground"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading submission…</div> : !permitted ? <div className="px-6 pb-6 text-xs" role="alert">This action is no longer available. The submission or your permissions may have changed.</div> :
       <form onSubmit={event => { event.preventDefault(); if (action !== "review") void save(); }}>
         <fieldset disabled={saving} className="space-y-4 px-6 pb-6">
+          {["schedule", "result", "outcome"].includes(initialAction) && <div className="space-y-1.5"><Label htmlFor="submission-action" className="text-xs">Action</Label><select id="submission-action" className={SELECT} value={action} onChange={event => { setBypassReason(""); setAction(event.target.value as TrackerAction); }}>
+            {current.finalStatus === "SUBMITTED" && round && (current.capabilities?.schedule || current.capabilities?.results[round.key]) && <option value="schedule">{current[`${round.key}Status`] === "SCHEDULED" ? "Reschedule interview" : "Schedule interview"}</option>}
+            {canRecordResult(current) && <option value="result">Record result</option>}
+            {canUpdateOutcome(current) && <option value="outcome">Update final status</option>}
+          </select></div>}
           {(action === "schedule" || action === "result") && round && <div className="space-y-1.5"><Label htmlFor="update-round" className="text-xs">Round</Label><Input id="update-round" readOnly value={round.label} className="text-xs h-9" /></div>}
           {action === "schedule" && <>
             <div className="space-y-4">
@@ -301,7 +308,7 @@ export default function SubmissionsPage() {
         <table className={cn("w-full table-fixed text-xs", groupByJob ? "min-w-[1000px]" : "min-w-[1450px]")}><colgroup>{(groupByJob ? [23, 35, 17, 12, 13] : [13, 12, 14, 11, 24, 10, 8, 8]).map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup><thead className="border-y border-border bg-muted/40"><tr>{(groupByJob ? ["Candidate", "Pipeline", "Current status", "Next round", "Action"] : ["Job code", "Job title", "Client / End client", "Candidate", "Pipeline", "Current status", "Next round", "Action"]).map(label => <th scope="col" key={label} className={cn("px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground", ["Pipeline", "Current status", "Next round", "Action"].includes(label) ? "text-center" : "text-left")}>{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-border">
             {loading || workspaceStatus !== "ready" ? <tr><td colSpan={groupByJob ? 5 : 8} className="py-16 text-center text-muted-foreground" role="status"><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading submissions…</td></tr> : error ? <tr><td colSpan={groupByJob ? 5 : 8} className="py-12 text-center" role="alert">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></td></tr> : !response?.data.length ? <tr><td colSpan={groupByJob ? 5 : 8} className="py-16 text-center text-muted-foreground">No submissions match these filters.</td></tr> : !groupByJob ? response.data.map(sub => {
-              const action = primaryAction(sub); const round = currentRound(sub);
+              const action = primaryAction(sub) || (canUpdateOutcome(sub) ? "outcome" : sub.finalStatus === "SUBMITTED" && currentRound(sub) && sub.capabilities?.schedule ? "schedule" : null); const round = currentRound(sub);
               const count = sub.matchingJobSubmissionCount ?? 1;
               return <tr key={sub.id} className="hover:bg-muted/25">
                 <td className="px-4 py-3"><p className="whitespace-nowrap font-semibold text-[#1a4fa0]">{sub.jobCode || "Code unavailable"}</p><div className="mt-1 flex flex-wrap gap-1">{sub.jobUrgency && <span className="rounded bg-muted px-1.5 py-0.5 text-[10.5px]">{sub.jobUrgency}</span>}{sub.jobIsCoSourced && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10.5px] text-blue-800">Co-sourced</span>}</div><button type="button" className="mt-1 text-[10.5px] text-[#1a4fa0] underline" onClick={() => { setJobFilter({ id: sub.jobId, label: sub.jobCode || sub.jobTitle || "Selected job", previousPage: jobFilter?.previousPage ?? page }); setPage(1); }}>{count} {count === 1 ? "submission" : "submissions"}</button></td>
@@ -310,19 +317,19 @@ export default function SubmissionsPage() {
                 <td className="px-4 py-3"><Link href={detailHref(sub.id)} className="font-semibold text-[#1a4fa0] hover:underline">{sub.candidateName || "Name unavailable"}</Link></td>
                 <td className="px-4 py-4 text-center"><Pipeline submission={sub} /></td><td className="px-4 py-3 text-center"><StageBadge submission={sub} /></td>
                 <td className="px-4 py-3 text-center text-muted-foreground">{sub.finalStatus === "PENDING_APPROVAL" ? "Awaiting review" : ["JOIN", "REJECTED", "OFFER"].includes(sub.finalStatus) || !round ? "—" : <><p className="font-semibold">{round.label}</p><p className="mt-1 text-[10.5px]">{formatInterview(sub[`${round.key}Date`], validTimezone(sub.timezone))}</p></>}</td>
-                <td className="px-4 py-3 text-center">{action ? <Button variant={action === "schedule" ? "default" : "outline"} className={cn("min-h-9 h-auto max-w-full whitespace-normal px-3 py-2 text-xs", action === "schedule" ? PRIMARY : OUTLINE)} onClick={() => setEditor({ submission: sub, action })}>{ACTION_LABELS[action]}</Button> : <Button variant="outline" className={cn("min-h-9 h-auto max-w-full whitespace-normal px-3 py-2 text-xs", OUTLINE)} asChild><Link href={detailHref(sub.id)}>View details</Link></Button>}</td>
+                <td className="px-4 py-3 text-center">{action ? <Button variant={action === "schedule" ? "default" : "outline"} className={cn("min-h-9 h-auto max-w-full whitespace-normal px-3 py-2 text-xs", action === "schedule" ? PRIMARY : OUTLINE)} onClick={() => setEditor({ submission: sub, action })}>{action === "review" ? ACTION_LABELS[action] : "Update"}</Button> : <Button variant="outline" className={cn("min-h-9 h-auto max-w-full whitespace-normal px-3 py-2 text-xs", OUTLINE)} asChild><Link href={detailHref(sub.id)}>View details</Link></Button>}</td>
               </tr>;
             }) : Array.from(new Set(response.data.map(sub => sub.jobId))).map(jobId => {
               const submissions = response.data.filter(sub => sub.jobId === jobId);
               const job = submissions[0];
               return <Fragment key={jobId}><tr className="bg-blue-50/70 dark:bg-blue-950/40"><td colSpan={5} className="px-5 py-3"><div className="flex items-center justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-x-3 gap-y-2"><button type="button" className="font-semibold text-[#1a4fa0] dark:text-blue-200" aria-expanded={!collapsedJobs[jobId]} onClick={() => setCollapsedJobs(previous => ({ ...previous, [jobId]: !previous[jobId] }))}>{collapsedJobs[jobId] ? "▸" : "▾"} {job.jobCode || "Code unavailable"}</button><span className="font-semibold text-[#1a4fa0] dark:text-blue-200">{job.jobTitle || "Title unavailable"}</span>{job.jobUrgency && <span className="rounded bg-amber-100 px-2 py-1 text-[10.5px] text-amber-900">{job.jobUrgency}</span>}{job.jobIsCoSourced && <span className="rounded bg-violet-100 px-2 py-1 text-[10.5px] text-violet-800">Co-sourced</span>}</div><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>Client: {job.clientName || "Not provided"}</span><span>End client: {job.endClientName || "Not provided"}</span></div></div><span className="shrink-0 text-xs font-medium text-muted-foreground">{job.matchingJobSubmissionCount ?? submissions.length} {(job.matchingJobSubmissionCount ?? submissions.length) === 1 ? "submission" : "submissions"}{submissions.length < (job.matchingJobSubmissionCount ?? submissions.length) && ` · ${submissions.length} on this page`}</span></div></td></tr>{!collapsedJobs[jobId] && submissions.map(sub => {
-              const action = primaryAction(sub); const round = currentRound(sub);
+              const action = primaryAction(sub) || (canUpdateOutcome(sub) ? "outcome" : sub.finalStatus === "SUBMITTED" && currentRound(sub) && sub.capabilities?.schedule ? "schedule" : null); const round = currentRound(sub);
               const closed = ["PENDING_APPROVAL", "REJECTED", "OFFER", "JOIN"].includes(sub.finalStatus);
               return <tr key={sub.id} className="hover:bg-muted/25 transition-colors">
                 <td className="px-5 py-3"><Link href={detailHref(sub.id)} className="font-semibold text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.candidateName || "Name unavailable"}</Link>{sub.candidateEmail && <p className="mt-1 break-words text-xs text-muted-foreground">{sub.candidateEmail}</p>}{sub.candidatePhone && <p className="mt-1 break-words text-xs text-muted-foreground">{sub.candidatePhone}</p>}</td>
                 <td className="px-5 py-4 text-center"><Pipeline submission={sub} /></td><td className="px-4 py-3 text-center"><StageBadge submission={sub} /></td>
                 <td className="px-4 py-3 text-center text-muted-foreground">{sub.finalStatus === "PENDING_APPROVAL" ? "Awaiting review" : closed || !round ? "—" : <><p className="font-semibold">{round.label}</p><p className="mt-1 text-[10.5px]">{formatInterview(sub[`${round.key}Date`], validTimezone(sub.timezone))}</p></>}</td>
-                <td className="px-4 py-3 text-center">{action ? <Button variant={action === "schedule" ? "default" : "outline"} className={cn("min-h-9 h-auto max-w-full whitespace-normal px-3 py-2 text-xs", action === "schedule" ? PRIMARY : OUTLINE)} onClick={() => setEditor({ submission: sub, action })}>{ACTION_LABELS[action]}</Button> : <Button variant="outline" className={cn("min-h-9 h-auto max-w-full whitespace-normal px-3 py-2 text-xs", OUTLINE)} asChild><Link href={detailHref(sub.id)}>View details</Link></Button>}</td>
+                <td className="px-4 py-3 text-center">{action ? <Button variant={action === "schedule" ? "default" : "outline"} className={cn("min-h-9 h-auto max-w-full whitespace-normal px-3 py-2 text-xs", action === "schedule" ? PRIMARY : OUTLINE)} onClick={() => setEditor({ submission: sub, action })}>{action === "review" ? ACTION_LABELS[action] : "Update"}</Button> : <Button variant="outline" className={cn("min-h-9 h-auto max-w-full whitespace-normal px-3 py-2 text-xs", OUTLINE)} asChild><Link href={detailHref(sub.id)}>View details</Link></Button>}</td>
               </tr>;
             })}</Fragment>;
             })}

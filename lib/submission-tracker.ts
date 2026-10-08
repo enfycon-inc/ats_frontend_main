@@ -24,7 +24,7 @@ export function currentRound(sub: TrackerSubmission) {
 }
 export function canRecordResult(sub: TrackerSubmission) {
   const round = currentRound(sub);
-  return Boolean(sub.finalStatus === 'SUBMITTED' && round && sub[`${round.key}Status`] !== 'REJECTED' && sub.capabilities?.results[round.key]);
+  return Boolean(sub.finalStatus === 'SUBMITTED' && round && sub[`${round.key}Status`] === 'SCHEDULED' && sub[`${round.key}Date`] && Number.isFinite(new Date(sub[`${round.key}Date`]!).getTime()) && sub.capabilities?.results[round.key]);
 }
 export function rejectionStage(sub: TrackerSubmission): string | null {
   if (sub.finalStatus !== 'REJECTED') return null;
@@ -62,8 +62,8 @@ export function primaryAction(sub: TrackerSubmission): TrackerAction | null {
   const round = currentRound(sub);
   if (!round) return caps.outcome ? 'outcome' : null;
   if (sub[`${round.key}Status`] === 'REJECTED') return null;
-  if (sub[`${round.key}Status`] === 'SCHEDULED') return caps.results[round.key] ? 'result' : null;
-  return caps.schedule ? 'schedule' : caps.results[round.key] ? 'result' : null;
+  if (sub[`${round.key}Status`] === 'SCHEDULED') return canRecordResult(sub) ? 'result' : null;
+  return caps.schedule ? 'schedule' : null;
 }
 export function validTimezone(value?: string | null): string {
   if (value) {
