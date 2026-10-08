@@ -64,6 +64,10 @@ export interface TrackerSubmission {
   endClientName?: string;
   recruiterName?: string;
   accountManagerName?: string;
+  accountManagerRole?: string | null;
+  jobCreatedAt?: string | null;
+  jobSubmissionRequired?: number | null;
+  jobSubmissionDone?: number | null;
   branchId?: string | null;
   timezone?: string | null;
   createdAt: string;
