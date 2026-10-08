@@ -17,7 +17,7 @@ function getSubdomain(hostname: string): string | null {
   const host = hostname.split(':')[0].toLowerCase();
   if (host === MAIN_DOMAIN || host === `www.${MAIN_DOMAIN}`) return null;
   if (host === 'localhost' || host === '127.0.0.1') return null;
-  if (host.endsWith(`.${MAIN_DOMAIN}`)) {
+  if (host.endsWith('.localhost')) { return host.slice(0, host.length - '.localhost'.length) || null; } if (host.endsWith(`.${MAIN_DOMAIN}`)) {
     return host.slice(0, host.length - MAIN_DOMAIN.length - 1) || null;
   }
   return null;
