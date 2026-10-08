@@ -1365,6 +1365,12 @@ const candidates = {
 };
 
 const clients = {
+  async getVisibilityPolicy(): Promise<{ clientsVisibleAcrossUnits: boolean }> {
+    return apiFetch('/api/clients/visibility-policy');
+  },
+  async setVisibilityPolicy(enabled: boolean): Promise<{ clientsVisibleAcrossUnits: boolean }> {
+    return apiFetch('/api/clients/visibility-policy', { method: 'PATCH', body: JSON.stringify({ clientsVisibleAcrossUnits: enabled }) });
+  },
   async getContacts(id: string): Promise<any> {
     return apiFetch(`/clients/${id}/contacts`);
   },

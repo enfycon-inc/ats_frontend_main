@@ -228,3 +228,16 @@ test('pod assignment lookup uses jobs permission context instead of pod administ
   assert.equal(url.searchParams.get('businessUnitId'), 'unit-id');
   assert.equal(sent.headers['x-active-role-id'], role);
 });
+
+test('tenant client visibility saves a boolean using the switched role context', async () => {
+  const calls = [];
+  const role = '11111111-1111-4111-8111-111111111111';
+  const app = api(async (url, options) => { calls.push({ url: String(url), options }); return new Response(JSON.stringify({ clientsVisibleAcrossUnits: true })); }, role);
+  app.storage.set('ats_access_token', `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')}.signature`);
+  assert.deepEqual(await app.api.clients.getVisibilityPolicy(), { clientsVisibleAcrossUnits: true });
+  await app.api.clients.setVisibilityPolicy(false);
+  assert.equal(new URL(calls[1].url).pathname, '/api/clients/visibility-policy');
+  assert.equal(calls[1].options.method, 'PATCH');
+  assert.deepEqual(JSON.parse(calls[1].options.body), { clientsVisibleAcrossUnits: false });
+  assert.equal(calls[1].options.headers['x-active-role-id'], role);
+});
