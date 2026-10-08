@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmissionHistory } from "@/components/submissions/submission-history";
 import { stageRemarkSuggestions } from "@/lib/stage-remarks";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -16,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { TrackerBucket, TrackerResponse, TrackerSubmission, TrackerUpdate } from "@/lib/submission-contract";
-import { ACTION_LABELS, ROUNDS, currentRound, formatInterview, interviewInstant, localInterviewParts, primaryAction, stage, validTimezone, type TrackerAction } from "@/lib/submission-tracker";
+import { ACTION_LABELS, canUpdateOutcome, needsOutcomeReason, currentRound, formatInterview, interviewInstant, localInterviewParts, primaryAction, stage, validTimezone, type TrackerAction } from "@/lib/submission-tracker";
 
 const FILTERS: { key: TrackerBucket; label: string }[] = [
   { key: "all", label: "All" }, { key: "review", label: "Needs review" },
@@ -58,6 +59,8 @@ function UpdateDialog({ submission, action, onClose, onSaved }: {
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const saveLock = useRef(false);
+  const requestId = useRef<string | null>(null);
+  const [bypassReason, setBypassReason] = useState("");
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const [date, setDate] = useState("");
@@ -99,7 +102,7 @@ function UpdateDialog({ submission, action, onClose, onSaved }: {
   }, [submission.id, action, revision]);
 
   const round = current ? currentRound(current) : null;
-  const permitted = current && (action === "schedule" && round && current.finalStatus === "SUBMITTED" && current.capabilities?.schedule ? true : action === "notes" ? current.capabilities?.notes : action === "rate" ? current.capabilities?.rate : primaryAction(current) === action);
+  const permitted = current && (action === "schedule" && round && current.finalStatus === "SUBMITTED" && current.capabilities?.schedule ? true : action === "outcome" ? canUpdateOutcome(current) : action === "notes" ? current.capabilities?.notes : action === "rate" ? current.capabilities?.rate : primaryAction(current) === action);
   const templateStage = action === "review" ? "review" : action === "outcome" ? "final" : round?.key;
   const suggestions = stageRemarkSuggestions(templates, templateStage);
 
@@ -107,7 +110,8 @@ function UpdateDialog({ submission, action, onClose, onSaved }: {
     if (!current || !permitted || saveLock.current) return;
     saveLock.current = true; setSaving(true); setError("");
     try {
-      const payload: TrackerUpdate = { expectedUpdatedAt: current.updatedAt };
+      requestId.current ??= crypto.randomUUID();
+      const payload: TrackerUpdate = { expectedUpdatedAt: current.updatedAt, requestId: requestId.current };
       if (action === "review") {
         if (!reviewDecision) throw new Error("Choose approve or reject.");
         if (reviewDecision === "REJECTED" && !notes.trim()) throw new Error("Add a reason for rejecting the submission.");
@@ -122,7 +126,9 @@ function UpdateDialog({ submission, action, onClose, onSaved }: {
         if (result === "REJECTED" && !notes.trim()) throw new Error("Add feedback for the rejected interview.");
         payload[`${round.key}Status`] = result; payload[`${round.key}Remarks`] = notes.trim() || null;
       } else if (action === "outcome") {
+        if (needsOutcomeReason(current, outcome) && !bypassReason.trim()) throw new Error("Add a reason for bypassing remaining hiring steps.");
         payload.finalStatus = outcome; payload.remarks = notes.trim() || null;
+        payload.bypassReason = bypassReason.trim();
       } else if (action === "notes") {
         if ((notes.trim() || null) === (current.recruiterComment || null)) { onClose(); return; }
         payload.recruiterComment = notes.trim() || null;
@@ -161,7 +167,7 @@ function UpdateDialog({ submission, action, onClose, onSaved }: {
           </>}
           {action === "review" && <div className="flex items-center justify-between rounded-md border border-border p-3"><span className="text-xs">Review candidate resume</span><Button type="button" variant="outline" size="sm" className="text-xs" disabled={resumeLoading} onClick={async () => { setResumeLoading(true); await downloadResume(current); setResumeLoading(false); }}><Download className="h-3.5 w-3.5" />Resume</Button></div>}
           {action === "result" && <div className="space-y-1.5"><Label htmlFor="interview-result" className="text-xs">Result</Label><select id="interview-result" className={SELECT} value={result} onChange={e => setResult(e.target.value)}><option value="CLEARED">Cleared</option><option value="REJECTED">Rejected</option></select></div>}
-          {action === "outcome" && <div className="space-y-1.5"><Label htmlFor="submission-outcome" className="text-xs">Outcome</Label><select id="submission-outcome" className={SELECT} value={outcome} onChange={e => setOutcome(e.target.value)}><option value={current.finalStatus === "OFFER" ? "JOIN" : "OFFER"}>{current.finalStatus === "OFFER" ? "Joined" : "Offer issued"}</option><option value="REJECTED">Rejected</option></select></div>}
+          {action === "outcome" && <><div className="space-y-1.5"><Label htmlFor="submission-outcome" className="text-xs">Outcome</Label><select id="submission-outcome" className={SELECT} value={outcome} onChange={e => setOutcome(e.target.value)}>{current.finalStatus !== "OFFER" && <option value="OFFER">Offer issued</option>}<option value="JOIN">Joined</option><option value="REJECTED">Rejected</option></select></div>{needsOutcomeReason(current, outcome) && <div className="space-y-1.5"><Label htmlFor="bypass-reason" className="text-xs">Reason for bypassing remaining hiring steps</Label><Textarea id="bypass-reason" value={bypassReason} onChange={e => setBypassReason(e.target.value)} maxLength={4000} required rows={2} className="text-xs" /><p className="text-xs text-muted-foreground">This reason will be recorded in the history. Interview results remain unchanged.</p></div>}</>}
           {action === "rate" ? <div className="space-y-1.5"><Label htmlFor="submission-rate" className="text-xs">Submitted rate {[current.submittedRateCurrency, current.submittedRateTerm].filter(Boolean).join(" / ")}</Label><Input id="submission-rate" type="number" min="0" max="99999999.99" step="0.01" required value={rate} onChange={e => setRate(e.target.value)} className="text-xs h-9" /></div> : <div className="space-y-1.5">
             <Label htmlFor="submission-notes" className="text-xs">{action === "result" ? "Feedback" : "Notes (optional)"}</Label>
             {suggestions.length > 0 && <select aria-label="Use a configured remark" className={SELECT} value="" onChange={e => setNotes(e.target.value)}><option value="" disabled>Use a configured remark…</option>{suggestions.map(t => <option key={t.id} value={t.remarkText}>{t.remarkText}</option>)}</select>}
@@ -180,7 +186,6 @@ function UpdateDialog({ submission, action, onClose, onSaved }: {
 
 function SubmissionDetails({ submission, onAction }: { submission: TrackerSubmission; onAction: (action: TrackerAction) => void }) {
   const action = primaryAction(submission);
-  const timezone = validTimezone(submission.timezone);
   const detail = [
     ["Job code", submission.jobCode], ["Client", submission.clientName], ["End client", submission.endClientName],
     ["Recruiter", submission.recruiterName], ["Account manager", submission.accountManagerName],
@@ -190,14 +195,10 @@ function SubmissionDetails({ submission, onAction }: { submission: TrackerSubmis
   return <div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h1 className="text-xl font-bold tracking-tight">{submission.candidateName || "Name unavailable"}</h1><p className="mt-1 text-xs text-muted-foreground">{[submission.jobTitle, submission.clientName].filter(Boolean).join(" · ") || "Job details unavailable"}</p></div>
-      <div className="flex flex-wrap gap-2"><Button variant="outline" className="text-xs" onClick={() => void downloadResume(submission)}><Download className="h-3.5 w-3.5" />Resume</Button>{submission.capabilities?.notes && <Button variant="outline" className="text-xs" onClick={() => onAction("notes")}>Edit notes</Button>}{submission.capabilities?.rate && <Button variant="outline" className="text-xs" onClick={() => onAction("rate")}>Edit rate</Button>}{submission.finalStatus === "SUBMITTED" && currentRound(submission) && submission[`${currentRound(submission)!.key}Status`] === "SCHEDULED" && submission.capabilities?.schedule && <Button variant="outline" className="text-xs" onClick={() => onAction("schedule")}>Reschedule interview</Button>}{action && <Button className={cn("text-xs", PRIMARY)} onClick={() => onAction(action)}>{ACTION_LABELS[action]}</Button>}</div>
+      <div className="flex flex-wrap gap-2"><Button variant="outline" className="text-xs" onClick={() => void downloadResume(submission)}><Download className="h-3.5 w-3.5" />Resume</Button>{submission.capabilities?.notes && <Button variant="outline" className="text-xs" onClick={() => onAction("notes")}>Edit notes</Button>}{submission.capabilities?.rate && <Button variant="outline" className="text-xs" onClick={() => onAction("rate")}>Edit rate</Button>}{submission.finalStatus === "SUBMITTED" && currentRound(submission) && submission[`${currentRound(submission)!.key}Status`] === "SCHEDULED" && submission.capabilities?.schedule && <Button variant="outline" className="text-xs" onClick={() => onAction("schedule")}>Reschedule interview</Button>}{action !== "outcome" && canUpdateOutcome(submission) && <Button variant="outline" className="text-xs" onClick={() => onAction("outcome")}>Update outcome</Button>}{action && <Button className={cn("text-xs", PRIMARY)} onClick={() => onAction(action)}>{ACTION_LABELS[action]}</Button>}</div>
     </div>
     <div className="rounded-xl border border-border bg-card p-5"><StageBadge submission={submission} /><dl className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{detail.map(([label, value]) => <div key={label}><dt className="text-[11px] text-muted-foreground">{label}</dt><dd className="mt-1 text-xs break-words">{value || "—"}</dd></div>)}</dl></div>
-    <div className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">Submission timeline</h2><ol className="mt-5 border-l border-border ml-2 space-y-6">
-      <li className="relative pl-5"><span className="absolute -left-1.5 top-1 h-3 w-3 rounded-full bg-slate-400" /><p className="text-xs font-semibold">Submitted</p><p className="mt-1 text-xs text-muted-foreground">{formatInterview(submission.createdAt, timezone)}</p>{submission.recruiterComment && <p className="mt-2 text-xs whitespace-pre-wrap">{submission.recruiterComment}</p>}</li>
-      <li className="relative pl-5"><span className="absolute -left-1.5 top-1 h-3 w-3 rounded-full bg-blue-500" /><p className="text-xs font-semibold">Internal review</p><p className="mt-1 text-xs text-muted-foreground">{submission.finalStatus === "PENDING_APPROVAL" ? "Pending review" : submission.reviewFeedback || submission.podLeadRemarks || "No review feedback recorded"}</p></li>
-      {ROUNDS.map(r => <li key={r.key} className="relative pl-5"><span className={cn("absolute -left-1.5 top-1 h-3 w-3 rounded-full", submission[`${r.key}Status`] === "CLEARED" ? "bg-emerald-500" : submission[`${r.key}Status`] === "REJECTED" ? "bg-red-500" : "bg-slate-400")} /><p className="text-xs font-semibold">{r.label} · {submission[`${r.key}Status`]?.replaceAll("_", " ") || "Not started"}</p>{submission[`${r.key}Date`] && <p className="mt-1 text-xs text-muted-foreground">{formatInterview(submission[`${r.key}Date`], timezone)}</p>}{submission[`${r.key}Interviewer`] && <p className="mt-1 text-xs">Interviewer: {submission[`${r.key}Interviewer`]}</p>}{submission[`${r.key}Remarks`] && <p className="mt-2 text-xs whitespace-pre-wrap">{submission[`${r.key}Remarks`]}</p>}</li>)}
-    </ol>{submission.remarks && <div className="mt-5 border-t border-border pt-4"><h3 className="text-xs font-semibold">Outcome notes</h3><p className="mt-2 text-xs whitespace-pre-wrap">{submission.remarks}</p></div>}<p className="mt-5 text-[10.5px] text-muted-foreground">Last updated {formatInterview(submission.updatedAt, timezone)}</p></div>
+    <SubmissionHistory submission={submission} />
   </div>;
 }
 

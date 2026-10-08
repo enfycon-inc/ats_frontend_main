@@ -6,7 +6,7 @@ const mod = { exports: {} };
 new Function('exports', ts.transpileModule(fs.readFileSync('lib/submission-tracker.ts', 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS },
 }).outputText)(mod.exports);
-const { stage, primaryAction, interviewInstant, localInterviewParts } = mod.exports;
+const { stage, primaryAction, canUpdateOutcome, needsOutcomeReason, interviewInstant, localInterviewParts } = mod.exports;
 const base = {
   finalStatus: 'SUBMITTED', l1Status: 'PENDING', l2Status: null, l3Status: null,
   capabilities: { review: false, schedule: false, results: { l1: false, l2: false, l3: false }, outcome: false },
@@ -46,4 +46,15 @@ test('job timezone produces correct UTC timestamps rather than browser-local gue
 test('daylight-saving gaps and duplicated times cannot silently schedule the wrong instant', () => {
   assert.throws(() => interviewInstant('2026-03-08', '02:30', 'America/New_York'), /daylight saving/);
   assert.throws(() => interviewInstant('2026-11-01', '01:30', 'America/New_York'), /daylight saving/);
+});
+
+test('outcome updates are available independently from the current interview', () => {
+  const sub = { ...base, capabilities: { ...base.capabilities, outcome: true, schedule: true } };
+  assert.equal(primaryAction(sub), 'schedule');
+  assert.equal(canUpdateOutcome(sub), true);
+  assert.equal(needsOutcomeReason(sub, 'JOIN'), true);
+  assert.equal(canUpdateOutcome({ ...sub, finalStatus: 'PENDING_APPROVAL' }), false);
+  assert.equal(canUpdateOutcome({ ...sub, finalStatus: 'JOIN' }), false);
+  assert.equal(canUpdateOutcome({ ...sub, capabilities: { ...sub.capabilities, outcome: false } }), false);
+  assert.equal(needsOutcomeReason({ ...sub, finalStatus: 'OFFER', l3Status: 'CLEARED' }, 'JOIN'), false);
 });

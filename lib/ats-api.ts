@@ -1,4 +1,4 @@
-import type { TrackerResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
+import type { SubmissionHistoryResponse, TrackerResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
 
 /**
  * ats-api.ts — Typed API client for the NestJS ATS backend
@@ -1484,6 +1484,9 @@ const pods = {
 };
 
 const submissions = {
+  async history(id: string, page = 1): Promise<SubmissionHistoryResponse> {
+    return apiFetch<SubmissionHistoryResponse>(`/api/recruiter-submissions/${id}/history?page=${page}`);
+  },
   async list(filters?: Record<string, any>): Promise<TrackerResponse> {
     const cleanFilters: Record<string, string> = {};
     if (filters) {

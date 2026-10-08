@@ -11,6 +11,13 @@ export const ACTION_LABELS: Record<TrackerAction, string> = {
   review: 'Review submission', schedule: 'Schedule interview', result: 'Record result',
   outcome: 'Update outcome', notes: 'Edit notes', rate: 'Edit rate',
 };
+export function canUpdateOutcome(sub: TrackerSubmission) {
+  return Boolean(sub.capabilities?.outcome && ['SUBMITTED', 'OFFER'].includes(sub.finalStatus));
+}
+export function needsOutcomeReason(sub: TrackerSubmission, outcome: string) {
+  return (outcome === 'OFFER' && sub.l3Status !== 'CLEARED') ||
+    (outcome === 'JOIN' && (sub.finalStatus !== 'OFFER' || sub.l3Status !== 'CLEARED'));
+}
 export function currentRound(sub: TrackerSubmission) {
   if (sub.currentRoundKey !== undefined) return ROUNDS.find(round => round.key === sub.currentRoundKey) ?? null;
   return ROUNDS.find(round => sub[`${round.key}Status`] !== 'CLEARED') ?? null;
