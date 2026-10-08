@@ -6,6 +6,7 @@ import { formatInterview, validTimezone } from '@/lib/submission-tracker';
 import { Button } from '@/components/ui/button';
 
 function label(field: string) {
+  if (field === 'podLeadRemarks') return 'Internal Review Remarks';
   if (/^l[123]Date$/.test(field)) return `${field.slice(0, 2).toUpperCase()} interview time`;
   return field.replace(/^l([123])/, 'L$1 ').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
 }

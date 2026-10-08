@@ -450,7 +450,7 @@ export default function PipelinePage() {
                 activeTab === "pod_lead" ? "border-indigo-600 text-indigo-600 bg-indigo-50/50" : "border-transparent text-default-500 hover:text-default-800"
               }`}
             >
-              Team Lead Review
+              Internal Review
             </button>
             <button
               onClick={() => setActiveTab("final")}
@@ -626,11 +626,11 @@ export default function PipelinePage() {
               <div className="space-y-3 text-xs">
                 <div>
                   <label className="font-semibold text-default-700 block mb-1">
-                    Team Lead / Pod Lead Internal Approval Remarks
+                    Internal Review Remarks
                   </label>
                   <textarea
                     rows={3}
-                    placeholder="Enter internal pod review comments, candidate quality check notes..."
+                    placeholder="Enter internal review comments, candidate quality check notes..."
                     value={formData.podLeadRemarks}
                     onChange={(e) => setFormData({ ...formData, podLeadRemarks: e.target.value })}
                     className="w-full p-2.5 text-xs rounded border border-default-200 bg-white dark:bg-slate-800 outline-none text-default-900"
@@ -685,7 +685,7 @@ export default function PipelinePage() {
                 )}
                 {selectedSubmission?.podLeadRemarks && (
                   <div className="p-2 rounded bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 text-amber-900 dark:text-amber-300">
-                    <span className="font-bold">Team Lead Review: </span>
+                    <span className="font-bold">Internal Review Remarks: </span>
                     <span>{selectedSubmission.podLeadRemarks}</span>
                   </div>
                 )}
