@@ -9,7 +9,7 @@ export const ROUNDS: { key: RoundKey; label: string }[] = [
 export type TrackerAction = 'review' | 'schedule' | 'result' | 'outcome' | 'notes' | 'rate';
 export const ACTION_LABELS: Record<TrackerAction, string> = {
   review: 'Review submission', schedule: 'Schedule interview', result: 'Record result',
-  outcome: 'Update outcome', notes: 'Edit notes', rate: 'Edit rate',
+  outcome: 'Update status', notes: 'Edit notes', rate: 'Edit rate',
 };
 export function canUpdateOutcome(sub: TrackerSubmission) {
   return Boolean(sub.capabilities?.outcome && ['SUBMITTED', 'OFFER'].includes(sub.finalStatus));
