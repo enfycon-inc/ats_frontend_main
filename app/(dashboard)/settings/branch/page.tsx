@@ -235,8 +235,7 @@ function BranchManagementPageContent() {
   const [branchRemarks, setBranchRemarks] = useState<any[]>([]);
   const [loadingRemarks, setLoadingRemarks] = useState(false);
   const [remarksStageFilter, setRemarksStageFilter] = useState("review");
-  const [newAcceptText, setNewAcceptText] = useState("");
-  const [newRejectText, setNewRejectText] = useState("");
+  const [newRemarkText, setNewRemarkText] = useState("");
   const [addingBranchRemark, setAddingBranchRemark] = useState(false);
   const [isTogglingGlobalRemarks, setIsTogglingGlobalRemarks] = useState(false);
 
@@ -884,8 +883,7 @@ function BranchManagementPageContent() {
     setIsRemarksOpen(true);
     setLoadingRemarks(true);
     setRemarksStageFilter("review");
-    setNewAcceptText("");
-    setNewRejectText("");
+    setNewRemarkText("");
     try {
       const data = await atsApi.submissions.getCustomRemarks(undefined, true);
       const globalOnly = (data || []).filter((r: any) => !r.branchId || r.isGlobal);
@@ -903,8 +901,7 @@ function BranchManagementPageContent() {
     setIsRemarksOpen(true);
     setLoadingRemarks(true);
     setRemarksStageFilter("review");
-    setNewAcceptText("");
-    setNewRejectText("");
+    setNewRemarkText("");
 
     let initialSelectedIds: number[] = [];
     if (branch.selectedGlobalRemarkIds && branch.selectedGlobalRemarkIds !== 'ALL') {
@@ -989,8 +986,9 @@ function BranchManagementPageContent() {
     }
   };
 
-  const handleAddDirectRemark = async (type: "ACCEPT" | "REJECT", text: string) => {
+  const handleAddDirectRemark = async (type: "GENERAL", text: string) => {
     if (!selectedBranchForRemarks || !text.trim()) return;
+    if (remarksStageFilter === "all") { toast.error("Choose a stage before adding a remark."); return; }
     const items = text
       .split(/,|\n/)
       .map((s) => s.trim())
@@ -1015,12 +1013,11 @@ function BranchManagementPageContent() {
         )
       );
       setBranchRemarks((prev) => [...prev, ...(Array.isArray(createdList) ? createdList.flat() : [createdList])]);
-      if (type === "ACCEPT") setNewAcceptText("");
-      if (type === "REJECT") setNewRejectText("");
+      setNewRemarkText("");
       if (items.length === 1) {
-        toast.success(`✓ ${type === "ACCEPT" ? "Acceptance" : "Rejection"} template added!`);
+        toast.success("Stage remark added");
       } else {
-        toast.success(`✓ Added ${items.length} ${type === "ACCEPT" ? "acceptance" : "rejection"} templates!`);
+        toast.success(`Added ${items.length} stage remarks`);
       }
     } catch (err: any) {
       toast.error("Failed to add remark: " + err.message);
@@ -3204,31 +3201,30 @@ function BranchManagementPageContent() {
                   Loading templates...
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+                <div className="grid grid-cols-1 gap-5 items-start">
                   
-                  {/* ── LEFT COLUMN: ACCEPTANCE REMARKS ── */}
+                  {/* ── STAGE REMARKS ── */}
                   <div className="bg-white dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
                     
                     {/* Header */}
                     <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <div className="h-6 w-6 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center font-bold text-xs">
-                          ✓
+                          •
                         </div>
                         <div>
                           <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                            Acceptance / Approval Templates
+                            Stage Remarks
                           </h4>
                           <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                            Predefined remarks when approving or clearing candidates
+                            Shared remarks for acceptance and rejection
                           </p>
                         </div>
                       </div>
                       <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
                         {
                           branchRemarks.filter(r => 
-                            (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review")) &&
-                            r.remarkType === "ACCEPT"
+                            (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review"))
                           ).length
                         } items
                       </span>
@@ -3238,20 +3234,20 @@ function BranchManagementPageContent() {
                     <form 
                       onSubmit={(e) => {
                         e.preventDefault();
-                        handleAddDirectRemark("ACCEPT", newAcceptText);
+                        handleAddDirectRemark("GENERAL", newRemarkText);
                       }} 
                       className="p-3 bg-white dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex gap-2"
                     >
                       <Input
                         placeholder="Type remark(s) — separate multiple with comma (,)..."
-                        value={newAcceptText}
-                        onChange={(e) => setNewAcceptText(e.target.value)}
+                        value={newRemarkText}
+                        onChange={(e) => setNewRemarkText(e.target.value)}
                         className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
                       />
                       <Button
                         type="submit"
                         size="sm"
-                        disabled={addingBranchRemark || !newAcceptText.trim()}
+                        disabled={addingBranchRemark || !newRemarkText.trim()}
                         className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
                       >
                         <Plus className="h-3.5 w-3.5 mr-1" /> Add
@@ -3261,17 +3257,15 @@ function BranchManagementPageContent() {
                     {/* Items List */}
                     <div className="p-3 space-y-2 max-h-[380px] overflow-y-auto">
                       {branchRemarks.filter(r => 
-                        (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review")) &&
-                        r.remarkType === "ACCEPT"
+                        (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review"))
                       ).length === 0 ? (
                         <div className="p-6 text-center text-xs text-slate-400 italic">
-                          No acceptance remarks added yet for this stage. Type above to add (comma-separated supported).
+                          No stage remarks added yet for this stage. Type above to add (comma-separated supported).
                         </div>
                       ) : (
                         branchRemarks
                           .filter(r => 
-                            (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review")) &&
-                            r.remarkType === "ACCEPT"
+                            (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review"))
                           )
                           .map((rem) => (
                             <div 
@@ -3279,7 +3273,7 @@ function BranchManagementPageContent() {
                               className="p-2.5 bg-slate-50/60 dark:bg-slate-800/50 rounded-lg border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between gap-2.5 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors text-xs"
                             >
                               <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                                <span className="text-emerald-600 font-bold text-xs mt-0.5">✓</span>
+                                <span className="text-emerald-600 font-bold text-xs mt-0.5">•</span>
                                 <span className="text-slate-800 dark:text-slate-200 font-normal leading-relaxed">
                                   {rem.remarkText}
                                 </span>
@@ -3316,115 +3310,6 @@ function BranchManagementPageContent() {
                     </div>
                   </div>
 
-                  {/* ── RIGHT COLUMN: REJECTION REMARKS ── */}
-                  <div className="bg-white dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
-                    
-                    {/* Header */}
-                    <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className="h-6 w-6 rounded-md bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 flex items-center justify-center font-bold text-xs">
-                          ✕
-                        </div>
-                        <div>
-                          <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                            Rejection / Issue Templates
-                          </h4>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                            Predefined feedback reasons when candidate does not qualify
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                        {
-                          branchRemarks.filter(r => 
-                            (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review")) &&
-                            r.remarkType === "REJECT"
-                          ).length
-                        } items
-                      </span>
-                    </div>
-
-                    {/* Quick Add Bar */}
-                    <form 
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        handleAddDirectRemark("REJECT", newRejectText);
-                      }} 
-                      className="p-3 bg-white dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex gap-2"
-                    >
-                      <Input
-                        placeholder="Type rejection reason(s) — separate multiple with comma (,)..."
-                        value={newRejectText}
-                        onChange={(e) => setNewRejectText(e.target.value)}
-                        className="h-9 text-xs bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-lg flex-1 text-slate-900 dark:text-white placeholder:text-slate-400"
-                      />
-                      <Button
-                        type="submit"
-                        size="sm"
-                        disabled={addingBranchRemark || !newRejectText.trim()}
-                        className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-lg shrink-0 cursor-pointer shadow-xs"
-                      >
-                        <Plus className="h-3.5 w-3.5 mr-1" /> Add
-                      </Button>
-                    </form>
-
-                    {/* Items List */}
-                    <div className="p-3 space-y-2 max-h-[380px] overflow-y-auto">
-                      {branchRemarks.filter(r => 
-                        (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review")) &&
-                        r.remarkType === "REJECT"
-                      ).length === 0 ? (
-                        <div className="p-6 text-center text-xs text-slate-400 italic">
-                          No rejection remarks added yet for this stage. Type above to add (comma-separated supported).
-                        </div>
-                      ) : (
-                        branchRemarks
-                          .filter(r => 
-                            (remarksStageFilter === "all" || r.stage === remarksStageFilter || (remarksStageFilter === "review" && r.stage === "internal_review")) &&
-                            r.remarkType === "REJECT"
-                          )
-                          .map((rem) => (
-                            <div 
-                              key={rem.id}
-                              className="p-2.5 bg-slate-50/60 dark:bg-slate-800/50 rounded-lg border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between gap-2.5 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors text-xs"
-                            >
-                              <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                                <span className="text-rose-500 font-bold text-xs mt-0.5">✕</span>
-                                <span className="text-slate-800 dark:text-slate-200 font-normal leading-relaxed">
-                                  {rem.remarkText}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {remarksStageFilter === "all" && (
-                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded uppercase bg-slate-200/70 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                                    {rem.stage}
-                                  </span>
-                                )}
-                                {rem.branchId ? (
-                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                                    Branch
-                                  </span>
-                                ) : (
-                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
-                                    Global
-                                  </span>
-                                )}
-                                {(rem.branchId ? canEditBranchFunc(rem.branchId) : isGlobalAdmin) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteBranchRemark(rem.id)}
-                                    className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                                    title="Delete template"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          ))
-                      )}
-                    </div>
-                  </div>
 
                 </div>
               )}
@@ -3588,15 +3473,6 @@ function BranchManagementPageContent() {
                               />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                  {rem.remarkType === "ACCEPT" ? (
-                                    <span className="text-emerald-700 dark:text-emerald-400 font-semibold text-[10px] bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.2 rounded inline-flex items-center gap-1">
-                                      <span>✓</span> Accept
-                                    </span>
-                                  ) : (
-                                    <span className="text-rose-700 dark:text-rose-400 font-semibold text-[10px] bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 px-1.5 py-0.2 rounded inline-flex items-center gap-1">
-                                      <span>✕</span> Reject
-                                    </span>
-                                  )}
                                   <span className="text-[10px] font-medium px-1.5 py-0.2 rounded uppercase bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
                                     {rem.stage}
                                   </span>

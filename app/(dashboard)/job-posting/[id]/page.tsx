@@ -1,5 +1,7 @@
 "use client";
 
+import { stageRemarkSuggestions } from "@/lib/stage-remarks";
+
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -552,39 +554,8 @@ export default function JobDetailPage() {
   const [customRemarks, setCustomRemarks] = useState<any[]>([]);
 
   const renderCategorizedRemarkOptions = (stage: string) => {
-    const stageKey = stage.toLowerCase();
-    const stageItems = customRemarks.filter(
-      (r) => r.stage?.toLowerCase() === stageKey || (stageKey === "review" && r.stage?.toLowerCase() === "internal_review")
-    );
-    const acceptItems = stageItems.filter((r) => r.remarkType === "ACCEPT");
-    const rejectItems = stageItems.filter((r) => r.remarkType === "REJECT");
-    const generalItems = stageItems.filter((r) => r.remarkType === "GENERAL" || !r.remarkType);
-
-    return (
-      <>
-        {acceptItems.length > 0 && (
-          <optgroup label="✓ Accept / Cleared">
-            {acceptItems.map((r) => (
-              <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
-            ))}
-          </optgroup>
-        )}
-        {rejectItems.length > 0 && (
-          <optgroup label="✕ Reject / Issue">
-            {rejectItems.map((r) => (
-              <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
-            ))}
-          </optgroup>
-        )}
-        {generalItems.length > 0 && (
-          <optgroup label="ℹ General Feedback">
-            {generalItems.map((r) => (
-              <option key={r.id} value={r.remarkText}>{r.remarkText}</option>
-            ))}
-          </optgroup>
-        )}
-      </>
-    );
+    return stageRemarkSuggestions(customRemarks, stage)
+      .map(item => <option key={item.id} value={item.remarkText}>{item.remarkText}</option>);
   };
 
   const resolvedTemplates = useMemo(() => ({

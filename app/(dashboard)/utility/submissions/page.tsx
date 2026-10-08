@@ -1,5 +1,7 @@
 "use client";
 
+import { stageRemarkSuggestions } from "@/lib/stage-remarks";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -99,8 +101,7 @@ function UpdateDialog({ submission, action, onClose, onSaved }: {
   const round = current ? currentRound(current) : null;
   const permitted = current && (action === "schedule" && round && current.finalStatus === "SUBMITTED" && current.capabilities?.schedule ? true : action === "notes" ? current.capabilities?.notes : action === "rate" ? current.capabilities?.rate : primaryAction(current) === action);
   const templateStage = action === "review" ? "review" : action === "outcome" ? "final" : round?.key;
-  const suggestions = templates.filter(t => (t.stage.toLowerCase() === templateStage || (templateStage === "review" && t.stage.toLowerCase() === "internal_review")) &&
-    (action !== "result" || !t.remarkType || t.remarkType === "GENERAL" || t.remarkType === (result === "REJECTED" ? "REJECT" : "ACCEPT")));
+  const suggestions = stageRemarkSuggestions(templates, templateStage);
 
   async function save(reviewDecision?: "SUBMITTED" | "REJECTED") {
     if (!current || !permitted || saveLock.current) return;
@@ -195,7 +196,7 @@ function SubmissionDetails({ submission, onAction }: { submission: TrackerSubmis
     <div className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">Submission timeline</h2><ol className="mt-5 border-l border-border ml-2 space-y-6">
       <li className="relative pl-5"><span className="absolute -left-1.5 top-1 h-3 w-3 rounded-full bg-slate-400" /><p className="text-xs font-semibold">Submitted</p><p className="mt-1 text-xs text-muted-foreground">{formatInterview(submission.createdAt, timezone)}</p>{submission.recruiterComment && <p className="mt-2 text-xs whitespace-pre-wrap">{submission.recruiterComment}</p>}</li>
       <li className="relative pl-5"><span className="absolute -left-1.5 top-1 h-3 w-3 rounded-full bg-blue-500" /><p className="text-xs font-semibold">Internal review</p><p className="mt-1 text-xs text-muted-foreground">{submission.finalStatus === "PENDING_APPROVAL" ? "Pending review" : submission.reviewFeedback || submission.podLeadRemarks || "No review feedback recorded"}</p></li>
-      {ROUNDS.filter(r => submission[`${r.key}Status`] || submission[`${r.key}Remarks`] || submission[`${r.key}Date`]).map(r => <li key={r.key} className="relative pl-5"><span className={cn("absolute -left-1.5 top-1 h-3 w-3 rounded-full", submission[`${r.key}Status`] === "CLEARED" ? "bg-emerald-500" : submission[`${r.key}Status`] === "REJECTED" ? "bg-red-500" : "bg-slate-400")} /><p className="text-xs font-semibold">{r.label} · {submission[`${r.key}Status`]?.replaceAll("_", " ") || "Not started"}</p>{submission[`${r.key}Date`] && <p className="mt-1 text-xs text-muted-foreground">{formatInterview(submission[`${r.key}Date`], timezone)}</p>}{submission[`${r.key}Interviewer`] && <p className="mt-1 text-xs">Interviewer: {submission[`${r.key}Interviewer`]}</p>}{submission[`${r.key}Remarks`] && <p className="mt-2 text-xs whitespace-pre-wrap">{submission[`${r.key}Remarks`]}</p>}</li>)}
+      {ROUNDS.map(r => <li key={r.key} className="relative pl-5"><span className={cn("absolute -left-1.5 top-1 h-3 w-3 rounded-full", submission[`${r.key}Status`] === "CLEARED" ? "bg-emerald-500" : submission[`${r.key}Status`] === "REJECTED" ? "bg-red-500" : "bg-slate-400")} /><p className="text-xs font-semibold">{r.label} · {submission[`${r.key}Status`]?.replaceAll("_", " ") || "Not started"}</p>{submission[`${r.key}Date`] && <p className="mt-1 text-xs text-muted-foreground">{formatInterview(submission[`${r.key}Date`], timezone)}</p>}{submission[`${r.key}Interviewer`] && <p className="mt-1 text-xs">Interviewer: {submission[`${r.key}Interviewer`]}</p>}{submission[`${r.key}Remarks`] && <p className="mt-2 text-xs whitespace-pre-wrap">{submission[`${r.key}Remarks`]}</p>}</li>)}
     </ol>{submission.remarks && <div className="mt-5 border-t border-border pt-4"><h3 className="text-xs font-semibold">Outcome notes</h3><p className="mt-2 text-xs whitespace-pre-wrap">{submission.remarks}</p></div>}<p className="mt-5 text-[10.5px] text-muted-foreground">Last updated {formatInterview(submission.updatedAt, timezone)}</p></div>
   </div>;
 }

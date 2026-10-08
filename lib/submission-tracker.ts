@@ -2,9 +2,9 @@ import type { RoundKey, TrackerSubmission } from './submission-contract';
 
 // Labels describe workflow states, never candidate/client/role relationships.
 export const ROUNDS: { key: RoundKey; label: string }[] = [
-  { key: 'l1', label: 'Screening (L1)' },
-  { key: 'l2', label: 'Technical (L2)' },
-  { key: 'l3', label: 'Final (L3)' },
+  { key: 'l1', label: 'Round 1 (L1)' },
+  { key: 'l2', label: 'Round 2 (L2)' },
+  { key: 'l3', label: 'Round 3 (L3)' },
 ];
 export type TrackerAction = 'review' | 'schedule' | 'result' | 'outcome' | 'notes' | 'rate';
 export const ACTION_LABELS: Record<TrackerAction, string> = {
@@ -12,6 +12,7 @@ export const ACTION_LABELS: Record<TrackerAction, string> = {
   outcome: 'Update outcome', notes: 'Edit notes', rate: 'Edit rate',
 };
 export function currentRound(sub: TrackerSubmission) {
+  if (sub.currentRoundKey !== undefined) return ROUNDS.find(round => round.key === sub.currentRoundKey) ?? null;
   return ROUNDS.find(round => sub[`${round.key}Status`] !== 'CLEARED') ?? null;
 }
 export function stage(sub: TrackerSubmission): { label: string; tone: 'amber' | 'blue' | 'green' | 'red' | 'neutral' } {
@@ -23,7 +24,7 @@ export function stage(sub: TrackerSubmission): { label: string; tone: 'amber' | 
   const round = currentRound(sub);
   if (!round) return { label: 'Final round cleared', tone: 'green' };
   const status = sub[`${round.key}Status`];
-  const label = round.label.split(' (')[0];
+  const label = round.label;
   if (status === 'REJECTED') return { label: `${label} rejected`, tone: 'red' };
   return { label: `${label} ${status === 'SCHEDULED' ? 'scheduled' : 'pending'}`, tone: status === 'SCHEDULED' ? 'blue' : 'amber' };
 }
