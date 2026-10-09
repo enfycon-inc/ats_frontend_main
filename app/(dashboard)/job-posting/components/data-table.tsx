@@ -286,6 +286,8 @@ export default function DataTable({
   const [statusModalJob, setStatusModalJob] = useState<Job | null>(null);
   const [statusModalValue, setStatusModalValue] = useState("");
   const [statusModalComment, setStatusModalComment] = useState("");
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState("");
   const [assignModalJob, setAssignModalJob] = useState<Job | null>(null);
 
   // Sourcing & Delegation Modals
@@ -628,6 +630,7 @@ export default function DataTable({
                     setSourceModalOpen(true);
                   }}
                   onOpenDelegateModal={setDelegateModalJob}
+                  onOpenStatusModal={(job, status) => { setStatusModalJob(job); setStatusModalValue(status || job.jobStatus); setStatusModalComment(''); setStatusError(''); }}
                   onStartQuickEdit={startQuickEdit}
                   onUpdateJob={onUpdateJob}
                   onRefresh={onRefresh}
@@ -734,13 +737,19 @@ export default function DataTable({
         onStatusValueChange={setStatusModalValue}
         comment={statusModalComment}
         onCommentChange={setStatusModalComment}
-        onConfirm={() => {
-          if (statusModalJob && onUpdateJob) {
-            onUpdateJob(statusModalJob.id, { jobStatus: statusModalValue as any });
-          }
-          setStatusModalJob(null);
+        saving={statusSaving}
+        error={statusError}
+        onConfirm={async () => {
+          if (!statusModalJob || statusSaving) return;
+          setStatusSaving(true); setStatusError('');
+          try {
+            const saved = await atsApi.jobs.changeStatus(statusModalJob.id, { status: statusModalValue, expectedStatus: statusModalJob.jobStatus, reason: statusModalComment.trim() });
+            onUpdateJob?.(statusModalJob.id, { jobStatus: saved.status, _alreadySaved: true } as Partial<Job>);
+            onRefresh?.(); setStatusModalJob(null); toast.success('Job status updated.');
+          } catch (error) { setStatusError(error instanceof Error ? error.message : 'Unable to change status.'); }
+          finally { setStatusSaving(false); }
         }}
-        onClose={() => setStatusModalJob(null)}
+        onClose={() => { if (!statusSaving) setStatusModalJob(null); }}
       />
 
       {/* Assign Recruiters Modal Dialog */}

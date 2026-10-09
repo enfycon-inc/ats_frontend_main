@@ -1,3 +1,4 @@
+import type { JobStatus } from '@/lib/job-status-contract';
 export interface Job {
   id: string;
   jobCode: string;
@@ -11,7 +12,7 @@ export interface Job {
   clientJobId: string;
   location: string;
   states: string;
-  jobStatus: "Active" | "Close" | "Filled" | "Hold by Client" | "Draft" | "Closed" | "Hold" | "Archived" | "Pending Approval";
+  jobStatus: JobStatus | "Close" | "Hold";
   priority?: "Hot" | "Warm" | "Cold" | "High" | "Medium" | "Low" | "Urgent";
   clientBillRate: string;
   payRate: string;

@@ -1,4 +1,6 @@
 "use client";
+import { EDITABLE_JOB_STATUSES, normalizeJobStatus } from '@/lib/job-status-contract';
+
 
 import React from "react";
 import Link from "next/link";
@@ -79,6 +81,7 @@ export interface JobTableRowProps {
   onOpenAssignModal: (job: Job) => void;
   onOpenSourceModal: (job: Job) => void;
   onOpenDelegateModal: (job: Job) => void;
+  onOpenStatusModal: (job: Job, status?: string) => void;
   onStartQuickEdit: (job: Job) => void;
   onUpdateJob?: (jobId: string, updatedFields: Partial<Job>) => void;
   onRefresh?: () => void;
@@ -114,6 +117,7 @@ export function JobTableRow({
   onOpenAssignModal,
   onOpenSourceModal,
   onOpenDelegateModal,
+  onOpenStatusModal,
   onStartQuickEdit,
   onUpdateJob,
   onRefresh,
@@ -802,6 +806,7 @@ export function JobTableRow({
                         </>
                       )}
 
+                    {hasEditPermission && job.jobStatus !== 'Pending Approval' && (!job.approvalStatus || job.approvalStatus === 'APPROVED') && <DropdownMenuItem onSelect={() => onOpenStatusModal(job)} className="text-xs cursor-pointer">Change status</DropdownMenuItem>}
                     {hasEditPermission && job.jobStatus === "Draft" && (
                       <DropdownMenuItem
                         onClick={() => {
