@@ -15,6 +15,7 @@ import { useSession } from "next-auth/react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopNavbar } from "@/components/layout/top-navbar";
+import { PageHeaderProvider } from "@/components/layout/page-header-context";
 import { SitePageHeader } from "@/components/layout/site-page-header";
 import { SocketProvider } from "@/contexts/SocketContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
@@ -182,7 +183,7 @@ export function ClientRoot({
         <SocketProvider>
           <NotificationProvider>
             <NotificationListener />
-            <SidebarProvider defaultOpen={defaultOpen}>
+            <PageHeaderProvider><SidebarProvider defaultOpen={defaultOpen}>
               <AppSidebar initialNavigation={initialNavigation} />
               <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-y-auto max-h-screen h-screen">
                 <header className="sticky top-0 z-40 flex h-[46px] min-h-[46px] shrink-0 items-center gap-2 border-b border-[#1a4fa0] dark:border-[#0f2d6b] bg-[#1a4fa0] dark:bg-[#0f2d6b] px-4 shadow-sm">
@@ -197,7 +198,7 @@ export function ClientRoot({
                 </Suspense>
                 {MainContent}
               </SidebarInset>
-            </SidebarProvider>
+            </SidebarProvider></PageHeaderProvider>
 
             {/* <ThemeCustomizer /> */}
             <Toaster position="top-center" reverseOrder={false} />

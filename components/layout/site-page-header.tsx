@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getRouteBreadcrumbInfo } from "@/lib/route-breadcrumb-map";
 import { SiteBreadcrumbPill } from "./site-breadcrumb-pill";
+import { usePageHeader } from "./page-header-context";
 import { cn } from "@/lib/utils";
 
 interface SitePageHeaderProps {
@@ -13,6 +14,7 @@ interface SitePageHeaderProps {
 }
 
 export function SitePageHeader({ className, customTitle }: SitePageHeaderProps) {
+  const { hidden } = usePageHeader();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -34,6 +36,7 @@ export function SitePageHeader({ className, customTitle }: SitePageHeaderProps) 
     }
   };
 
+  if (hidden) return null;
   return (
     <header
       className={cn(
