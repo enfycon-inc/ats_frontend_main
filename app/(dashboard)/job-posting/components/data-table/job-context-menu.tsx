@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { UserPlus, Sparkles, Pencil, Edit, Plus, Archive } from "lucide-react";
+import { UserPlus, Sparkles, Pencil, Plus, Archive } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { Job } from "../../data/mock-jobs";
 
@@ -17,7 +17,6 @@ export interface JobContextMenuProps {
   onFindMatches: (job: Job) => void;
   onDelegateJob: (job: Job) => void;
   onEditJob: (job: Job) => void;
-  onQuickEdit: (job: Job) => void;
   onOpenAssignModal: (job: Job) => void;
   onArchiveJob: (job: Job) => void;
   onClose: () => void;
@@ -35,7 +34,6 @@ export function JobContextMenu({
   onFindMatches,
   onDelegateJob,
   onEditJob,
-  onQuickEdit,
   onOpenAssignModal,
   onArchiveJob,
   onClose,
@@ -115,18 +113,6 @@ export function JobContextMenu({
                 <Pencil className="h-3.5 w-3.5" />
               </div>
               <span>Edit Job</span>
-            </button>
-            <button
-              onClick={() => {
-                onQuickEdit(job);
-                onClose();
-              }}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer font-semibold"
-            >
-              <div className="h-6 w-6 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0 shadow-2xs">
-                <Edit className="h-3.5 w-3.5" />
-              </div>
-              <span>Quick Edit</span>
             </button>
 
             <button

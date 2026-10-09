@@ -22,7 +22,6 @@ import { getActiveRolePermissions, resolveActiveSystemRole } from "@/lib/role-pe
 import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 import { Job } from "../data/mock-jobs";
 import AddCandidateModal from "@/components/dashboard/AddCandidateModal";
-import { AddClientModal } from "./add-client-modal";
 import { DelegateJobModal } from "@/components/shared/delegate-job-modal";
 
 // Re-export utility functions so consumers importing from this file remain unaffected
@@ -273,11 +272,6 @@ export default function DataTable({
 
   // Modal States
   const [isSavingView, setIsSavingView] = useState(false);
-  const [editingCell, setEditingCell] = useState<{ rowId: string; colId: string } | null>(null);
-  const [editCellValue, setEditCellValue] = useState<string>("");
-  const [clientList, setClientList] = useState<any[]>([]);
-  const [clientSearchText, setClientSearchText] = useState("");
-  const [addClientModalOpen, setAddClientModalOpen] = useState(false);
 
   // Approval Modals
   const [approveModalJob, setApproveModalJob] = useState<Job | null>(null);
@@ -286,7 +280,6 @@ export default function DataTable({
   // Status & Assignment Modals
   const [statusModalJob, setStatusModalJob] = useState<Job | null>(null);
   const [statusModalValue, setStatusModalValue] = useState("");
-  const [statusModalComment, setStatusModalComment] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState("");
   const [assignModalJob, setAssignModalJob] = useState<Job | null>(null);
@@ -303,45 +296,6 @@ export default function DataTable({
     jobId: string;
   } | null>(null);
 
-  const fetchClientsList = async () => {
-    try {
-      const clients = await atsApi.clients.list();
-      setClientList(clients || []);
-    } catch (e) {
-      console.warn("Could not load clients list:", e);
-    }
-  };
-
-  useEffect(() => {
-    fetchClientsList();
-  }, []);
-
-  const availableClientNames = useMemo(() => {
-    const namesSet = new Set<string>();
-    if (Array.isArray(clientList)) {
-      clientList.forEach((cl) => {
-        const nameStr =
-          typeof cl === "string"
-            ? cl
-            : cl?.name || cl?.companyName || cl?.clientName || cl?.title || "";
-        if (nameStr && nameStr.trim()) {
-          namesSet.add(nameStr.trim());
-        }
-      });
-    }
-    if (Array.isArray(data)) {
-      data.forEach((job) => {
-        if (job.client && job.client !== "N/A" && job.client.trim()) {
-          namesSet.add(job.client.trim());
-        }
-      });
-    }
-    ["prolays", "Google", "Tcs", "Deb Tech Enterprise", "enfysync Inc"].forEach((n) =>
-      namesSet.add(n)
-    );
-    return Array.from(namesSet).sort((a, b) => a.localeCompare(b));
-  }, [clientList, data]);
-
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedRowIds(paginatedData.map((job) => job.id));
@@ -356,37 +310,6 @@ export default function DataTable({
     } else {
       setSelectedRowIds((prev) => prev.filter((id) => id !== jobId));
     }
-  };
-
-  const handleCellDoubleClick = (rowId: string, colId: string, currentValue: string) => {
-    if (!hasEditPermission) return;
-    setEditingCell({ rowId, colId });
-    setEditCellValue(currentValue === "N/A" ? "" : currentValue);
-    if (colId === "client" || colId === "endClientName") {
-      setClientSearchText("");
-      fetchClientsList();
-    }
-  };
-
-  const handleCellSave = () => {
-    if (editingCell && onUpdateJob) {
-      onUpdateJob(editingCell.rowId, {
-        [editingCell.colId]: editCellValue || "N/A",
-      } as Partial<Job>);
-    }
-    setEditingCell(null);
-    setEditCellValue("");
-  };
-
-  const handleCellCancel = () => {
-    setEditingCell(null);
-    setEditCellValue("");
-  };
-
-  const startQuickEdit = (job: Job) => {
-    if (!hasEditPermission) return;
-    setEditingCell({ rowId: job.id, colId: "jobTitle" });
-    setEditCellValue(job.jobTitle);
   };
 
   useEffect(() => {
@@ -599,19 +522,6 @@ export default function DataTable({
                   isSelected={selectedRowIds.includes(job.id)}
                   onToggleSelect={handleSelectRow}
                   activeSelectedColumns={activeSelectedColumns}
-                  editingCell={editingCell}
-                  editCellValue={editCellValue}
-                  onEditCellValueChange={setEditCellValue}
-                  onCellDoubleClick={handleCellDoubleClick}
-                  onCellSave={handleCellSave}
-                  onCellCancel={handleCellCancel}
-                  clientSearchText={clientSearchText}
-                  onClientSearchTextChange={setClientSearchText}
-                  availableClientNames={availableClientNames}
-                  onSelectClientFromPopover={(colId, clientName) => {
-                    if (onUpdateJob) onUpdateJob(job.id, { [colId]: clientName });
-                  }}
-                  onOpenAddClientModal={() => setAddClientModalOpen(true)}
                   hasEditPermission={hasEditPermission}
                   hasCreatePermission={hasCreatePermission}
                   hasSubmitCandidatePermission={hasSubmitCandidatePermission}
@@ -631,8 +541,7 @@ export default function DataTable({
                     setSourceModalOpen(true);
                   }}
                   onOpenDelegateModal={setDelegateModalJob}
-                  onOpenStatusModal={(job, status) => { setStatusModalJob(job); const initialStatus = normalizeJobStatus(status || job.jobStatus); setStatusModalValue(initialStatus && QUICK_CHANGE_JOB_STATUSES.some(option => option === initialStatus) ? initialStatus : ""); setStatusModalComment(''); setStatusError(''); }}
-                  onStartQuickEdit={startQuickEdit}
+                  onOpenStatusModal={(job, status) => { setStatusModalJob(job); const initialStatus = normalizeJobStatus(status || job.jobStatus); setStatusModalValue(initialStatus && QUICK_CHANGE_JOB_STATUSES.some(option => option === initialStatus) ? initialStatus : ""); setStatusError(''); }}
                   onUpdateJob={onUpdateJob}
                   onRefresh={onRefresh}
                 />
@@ -722,7 +631,6 @@ export default function DataTable({
               onFindMatches={(j) => router.push(`/job-posting/${j.id}/matches`)}
               onDelegateJob={setDelegateModalJob}
               onEditJob={(j) => router.push(`/job-posting/${j.id}/edit`)}
-              onQuickEdit={startQuickEdit}
               onOpenAssignModal={setAssignModalJob}
               onArchiveJob={(j) => onUpdateJob?.(j.id, { jobStatus: "Archived" })}
               onClose={() => setContextMenu(null)}
@@ -736,15 +644,13 @@ export default function DataTable({
         job={statusModalJob}
         statusValue={statusModalValue}
         onStatusValueChange={setStatusModalValue}
-        comment={statusModalComment}
-        onCommentChange={setStatusModalComment}
         saving={statusSaving}
         error={statusError}
         onConfirm={async () => {
           if (!statusModalJob || statusSaving) return;
           setStatusSaving(true); setStatusError('');
           try {
-            const saved = await atsApi.jobs.changeStatus(statusModalJob.id, { status: statusModalValue, expectedStatus: statusModalJob.jobStatus, reason: statusModalComment.trim() });
+            const saved = await atsApi.jobs.changeStatus(statusModalJob.id, { status: statusModalValue, expectedStatus: statusModalJob.jobStatus });
             onUpdateJob?.(statusModalJob.id, { jobStatus: saved.status, _alreadySaved: true } as Partial<Job>);
             onRefresh?.(); setStatusModalJob(null); toast.success('Job status updated.');
           } catch (error) { setStatusError(error instanceof Error ? error.message : 'Unable to change status.'); }
@@ -818,21 +724,6 @@ export default function DataTable({
           job={selectedJobForSourcing}
         />
       )}
-
-      {/* Add Client Modal */}
-      <AddClientModal
-        open={addClientModalOpen}
-        onOpenChange={setAddClientModalOpen}
-        initialClientName={clientSearchText.trim()}
-        onClientAdded={(newClientName) => {
-          if (editingCell?.rowId && onUpdateJob) {
-            onUpdateJob(editingCell.rowId, { client: newClientName });
-          }
-          fetchClientsList();
-          handleCellCancel();
-          toast.success(`Client "${newClientName}" added and assigned!`);
-        }}
-      />
 
       {/* Delegate Job Modal */}
       {delegateModalJob && (

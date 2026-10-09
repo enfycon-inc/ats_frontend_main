@@ -1031,7 +1031,7 @@ export interface JobStaffOption {
 const staffingRequests = new Map<string, Promise<JobStaffOption[]>>();
 
 const jobs = {
-  async changeStatus(id: string, data: { status: string; expectedStatus: string; reason: string }): Promise<{ status: string }> {
+  async changeStatus(id: string, data: { status: string; expectedStatus: string; reason?: string }): Promise<{ status: string }> {
     return apiFetch('/api/jobs/' + id + '/status', { method: 'PATCH', body: JSON.stringify(data) });
   },
   async podOptions(scope: { branchId?: string; businessUnitId: string }): Promise<any[]> {

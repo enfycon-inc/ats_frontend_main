@@ -9,8 +9,6 @@ interface JobStatusModalProps {
   job: Job | null;
   statusValue: string;
   onStatusValueChange: (val: string) => void;
-  comment: string;
-  onCommentChange: (val: string) => void;
   saving: boolean;
   error: string;
   onConfirm: () => void;
@@ -21,8 +19,6 @@ export function JobStatusModal({
   job,
   statusValue,
   onStatusValueChange,
-  comment,
-  onCommentChange,
   saving,
   error,
   onConfirm,
@@ -61,27 +57,13 @@ export function JobStatusModal({
               {QUICK_CHANGE_JOB_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-4 items-start gap-4">
-            <span className="col-span-1 text-neutral-600 dark:text-neutral-400 font-semibold text-right pt-1.5">
-              Comment
-            </span>
-            <textarea
-              aria-label="Reason for job status change"
-              disabled={saving}
-              maxLength={2000}
-              placeholder="Reason for this status change"
-              value={comment}
-              onChange={(e) => onCommentChange(e.target.value)}
-              className="col-span-3 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden text-neutral-800 dark:text-neutral-200 focus:border-primary h-20 text-xs"
-            />
-          </div>
         </div>
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-4 py-2 bg-neutral-50 dark:bg-slate-900 border-t border-neutral-200 dark:border-slate-800 text-xs">
           <Button
             size="sm"
             onClick={onConfirm}
-            disabled={saving || !statusValue || !comment.trim() || normalizeJobStatus(statusValue) === normalizeJobStatus(job.jobStatus)}
+            disabled={saving || !statusValue || normalizeJobStatus(statusValue) === normalizeJobStatus(job.jobStatus)}
             className="h-8 bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer rounded-sm"
           >
             {saving ? "Saving…" : "Confirm change"}
