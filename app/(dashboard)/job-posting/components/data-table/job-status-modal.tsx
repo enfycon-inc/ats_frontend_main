@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { EDITABLE_JOB_STATUSES, normalizeJobStatus } from "@/lib/job-status-contract";
+import { QUICK_CHANGE_JOB_STATUSES, normalizeJobStatus } from "@/lib/job-status-contract";
 import { Job } from "../../data/mock-jobs";
 import { Button } from "@/components/ui/button";
 
@@ -32,10 +32,10 @@ export function JobStatusModal({
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center font-sans">
-      <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 w-[450px] shadow-2xl rounded overflow-hidden">
+      <div role="dialog" aria-modal="true" aria-label="Edit Job Status" className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 w-[450px] max-w-[calc(100vw-2rem)] shadow-2xl rounded overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 bg-neutral-100 dark:bg-slate-800 border-b border-neutral-200 dark:border-slate-700">
-          <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Job Status</h3>
+          <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Edit Job Status</h3>
           <button
             disabled={saving}
             onClick={onClose}
@@ -57,7 +57,8 @@ export function JobStatusModal({
               onChange={(e) => onStatusValueChange(e.target.value)}
               className="col-span-3 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded px-2 py-1.5 outline-hidden text-neutral-800 dark:text-neutral-200 focus:border-primary text-xs cursor-pointer font-medium"
             >
-              {EDITABLE_JOB_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+              <option value="" disabled>Select status</option>
+              {QUICK_CHANGE_JOB_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
             </select>
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
@@ -80,7 +81,7 @@ export function JobStatusModal({
           <Button
             size="sm"
             onClick={onConfirm}
-            disabled={saving || !comment.trim() || normalizeJobStatus(statusValue) === normalizeJobStatus(job.jobStatus)}
+            disabled={saving || !statusValue || !comment.trim() || normalizeJobStatus(statusValue) === normalizeJobStatus(job.jobStatus)}
             className="h-8 bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer rounded-sm"
           >
             {saving ? "Saving…" : "Confirm change"}

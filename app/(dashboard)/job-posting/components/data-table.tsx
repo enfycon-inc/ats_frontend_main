@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { QUICK_CHANGE_JOB_STATUSES, normalizeJobStatus } from "@/lib/job-status-contract";
 import { atsApi } from "@/lib/ats-api";
 import { getActiveRolePermissions, resolveActiveSystemRole } from "@/lib/role-permissions";
 import { getDashboardRoleSelection } from "@/lib/dashboard-role";
@@ -630,7 +631,7 @@ export default function DataTable({
                     setSourceModalOpen(true);
                   }}
                   onOpenDelegateModal={setDelegateModalJob}
-                  onOpenStatusModal={(job, status) => { setStatusModalJob(job); setStatusModalValue(status || job.jobStatus); setStatusModalComment(''); setStatusError(''); }}
+                  onOpenStatusModal={(job, status) => { setStatusModalJob(job); const initialStatus = normalizeJobStatus(status || job.jobStatus); setStatusModalValue(initialStatus && QUICK_CHANGE_JOB_STATUSES.some(option => option === initialStatus) ? initialStatus : ""); setStatusModalComment(''); setStatusError(''); }}
                   onStartQuickEdit={startQuickEdit}
                   onUpdateJob={onUpdateJob}
                   onRefresh={onRefresh}
