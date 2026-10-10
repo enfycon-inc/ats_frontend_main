@@ -1497,8 +1497,8 @@ const submissions = {
   async assessment(id: string): Promise<{ submission: TrackerSubmission; assessment: CandidateAssessment }> {
     return apiFetch(`/api/recruiter-submissions/${id}/assessment`);
   },
-  async history(id: string, page = 1): Promise<SubmissionHistoryResponse> {
-    return apiFetch<SubmissionHistoryResponse>(`/api/recruiter-submissions/${id}/history?page=${page}`);
+  async history(id: string, page = 1, order: 'asc' | 'desc' = 'asc'): Promise<SubmissionHistoryResponse> {
+    return apiFetch<SubmissionHistoryResponse>(`/api/recruiter-submissions/${id}/history?page=${page}&order=${order}`);
   },
   async list(filters?: Record<string, any>): Promise<TrackerResponse> {
     const cleanFilters: Record<string, string> = {};
@@ -1844,6 +1844,5 @@ export const atsApi = {
   email,
   fetch: apiFetch,
 };
-
 
 
