@@ -28,7 +28,7 @@ import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
-import { getSelectedMemberRoleIds, hasAdministrativeRole, toggleAdministrativeRole } from "@/lib/member-role-selection";
+import { getSelectedMemberRoleIds, getMemberRoleAssignment, hasAdministrativeRole, toggleAdministrativeRole } from "@/lib/member-role-selection";
 
 interface UserItem {
   id: string;
@@ -821,12 +821,13 @@ export default function UserManagementPage() {
 
     try {
       setSubmitting(true);
-      const finalRoles = getSelectedMemberRoleIds(editForm, editRolesCatalog);
-      const isTenantAdminAssignment = hasAdministrativeRole(editForm.roles, editRolesCatalog, "TENANT_ADMIN");
+      const assignment = getMemberRoleAssignment(editForm, editRolesCatalog);
+      const finalRoles = assignment.assignedRoleIds;
+
 
       await atsApi.auth.updateUserDetail(selectedUser.id, {
-        branchId: isTenantAdminAssignment ? null : (editForm.branchId || selectedUser.branchId || undefined),
-        businessUnitId: isTenantAdminAssignment ? null : (editForm.businessUnitId || selectedUser.businessUnitId || undefined),
+        branchId: assignment.branchId,
+        businessUnitId: assignment.businessUnitId,
         assignedRoleIds: finalRoles,
       });
 
@@ -835,8 +836,8 @@ export default function UserManagementPage() {
           u.id === selectedUser.id
             ? {
                 ...u,
-                branchId: isTenantAdminAssignment ? null : (editForm.branchId || selectedUser.branchId || null),
-                businessUnitId: isTenantAdminAssignment ? null : (editForm.businessUnitId || selectedUser.businessUnitId || null),
+                branchId: assignment.branchId || selectedUser.branchId || null,
+                businessUnitId: assignment.businessUnitId || selectedUser.businessUnitId || null,
                 roles: finalRoles,
               }
             : u
@@ -3097,7 +3098,7 @@ export default function UserManagementPage() {
                                         <SelectValue placeholder="Select Primary Branch..." />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        {assignedBranches.map((b) => (
+                                        {assignedBranches.filter(b => !selectedUser?.branchId || b.id === selectedUser.branchId).map((b) => (
                                           <SelectItem key={b.id} value={b.id} className="text-xs">
                                             <div className="flex flex-col text-left">
                                               <span className="font-semibold text-neutral-900 dark:text-white">{b.name}</span>
@@ -3119,7 +3120,7 @@ export default function UserManagementPage() {
                                   ) : (
                                     <select value={editForm.businessUnitId} onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer" required>
                                       <option value="">-- Select a Unit --</option>
-                                      {assignedBusinessUnits.filter((bu) => bu.branchId === editForm.branchId || bu.branch_id === editForm.branchId).map((bu) => (<option key={bu.id} value={bu.id}>{bu.name}</option>))}
+                                      {assignedBusinessUnits.filter((bu) => (bu.branchId === editForm.branchId || bu.branch_id === editForm.branchId) && (!selectedUser?.businessUnitId || bu.id === selectedUser.businessUnitId)).map((bu) => (<option key={bu.id} value={bu.id}>{bu.name}</option>))}
                                     </select>
                                   )}
                                 </div>
@@ -3133,7 +3134,7 @@ export default function UserManagementPage() {
                     {editModalTab === "STAFF" && (
                       <div className="space-y-4 mb-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {editFormAdminRole === "TENANT_ADMIN" ? (
+                          {editFormAdminRole === "TENANT_ADMIN" && !editForm.branchId ? (
                             <div className="space-y-1 opacity-50">
                               <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch</label>
                               <div className="text-[10px] py-2">Not Applicable (Tenant Scope)</div>
@@ -3165,7 +3166,7 @@ export default function UserManagementPage() {
                                     <SelectValue placeholder="Select Primary Branch..." />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {assignedBranches.map((b) => (
+                                    {assignedBranches.filter(b => !selectedUser?.branchId || b.id === selectedUser.branchId).map((b) => (
                                       <SelectItem key={b.id} value={b.id} className="text-xs">
                                         <div className="flex flex-col text-left py-0.5">
                                           <span className="font-semibold text-neutral-900 dark:text-white">{b.name}</span>
@@ -3181,7 +3182,7 @@ export default function UserManagementPage() {
                             </div>
                           )}
 
-                          {editFormAdminRole === "TENANT_ADMIN" ? (
+                          {editFormAdminRole === "TENANT_ADMIN" && !editForm.branchId ? (
                             <div className="space-y-1 opacity-50">
                               <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Branch Unit</label>
                               <div className="text-[10px] py-2">Not Applicable (Tenant Scope)</div>
@@ -3205,14 +3206,14 @@ export default function UserManagementPage() {
                               ) : (
                                 <select value={editForm.businessUnitId} onChange={(e) => setEditForm((prev) => ({ ...prev, businessUnitId: e.target.value }))} className="w-full h-8.5 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-semibold text-neutral-900 dark:text-white outline-none hover:border-indigo-500 cursor-pointer" required>
                                   <option value="">-- Select a Unit{editFormAdminRole === "BRANCH_ADMIN" ? " (Optional for Custom Roles)" : ""} --</option>
-                                  {assignedBusinessUnits.filter((bu) => bu.branchId === editForm.branchId || bu.branch_id === editForm.branchId).map((bu) => (<option key={bu.id} value={bu.id}>{bu.name}</option>))}
+                                  {assignedBusinessUnits.filter((bu) => (bu.branchId === editForm.branchId || bu.branch_id === editForm.branchId) && (!selectedUser?.businessUnitId || bu.id === selectedUser.businessUnitId)).map((bu) => (<option key={bu.id} value={bu.id}>{bu.name}</option>))}
                                 </select>
                               )}
                             </div>
                           )}
                         </div>
 
-                        {editFormAdminRole !== "TENANT_ADMIN" && (
+                        {(editFormAdminRole !== "TENANT_ADMIN" || !!editForm.businessUnitId) && (
                           <div className="space-y-2 pt-4 border-t border-neutral-100 dark:border-slate-800">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-indigo-600" /><label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Custom / Business Roles</label></div>

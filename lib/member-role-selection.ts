@@ -24,6 +24,15 @@ export function getSelectedMemberRoleIds(form: MemberRoleForm, availableRoles: A
 
 export type MemberRole = AvailableMemberRole & { isSystem?: boolean; systemRole?: string; system_role?: string };
 
+/** Adding administration does not remove the member's staffing scope. */
+export function getMemberRoleAssignment(form: MemberRoleForm & { businessUnitId: string }, roles: MemberRole[]) {
+  return {
+    branchId: form.branchId || undefined,
+    businessUnitId: form.businessUnitId || undefined,
+    assignedRoleIds: getSelectedMemberRoleIds(form, roles),
+  };
+}
+
 export function getAdministrativeRoleKey(role?: MemberRole): string {
   if (!role?.isSystem) return "NONE";
   const key = role.systemRole || role.system_role;

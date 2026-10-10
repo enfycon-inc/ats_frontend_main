@@ -6,7 +6,7 @@ const { execFileSync } = require('node:child_process');
 const source = process.env.ROLE_BASELINE ? execFileSync('git', ['show', 'HEAD:lib/member-role-selection.ts'], { encoding: 'utf8' }) : fs.readFileSync('lib/member-role-selection.ts', 'utf8');
 const mod = { exports: {} };
 new Function('exports', ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText)(mod.exports);
-const { hasAdministrativeRole, toggleAdministrativeRole, getSelectedMemberRoleIds } = mod.exports;
+const { hasAdministrativeRole, toggleAdministrativeRole, getSelectedMemberRoleIds, getMemberRoleAssignment } = mod.exports;
 const roles = [
   { id: 'tenant', name: 'Tenant Admin', isSystem: true, systemRole: 'TENANT_ADMIN' },
   { id: 'branch', name: 'Branch Admin', isSystem: true, systemRole: 'BRANCH_ADMIN' },
@@ -27,5 +27,15 @@ test('adding unit admin preserves tenant admin and staff', () => {
 });
 test('an unavailable role cannot be added using assigned metadata', () => {
   assert.throws(() => toggleAdministrativeRole(['staff'], roles, roles.filter(r => r.id !== 'tenant'), 'TENANT_ADMIN'), /current access scope/);
+});
+
+test('adding all admin levels retains the BDM branch, unit and exact role IDs in the save payload', () => {
+  let selected = ['staff'];
+  for (const key of ['TENANT_ADMIN', 'BRANCH_ADMIN', 'UNIT_ADMIN']) {
+    selected = toggleAdministrativeRole(selected, roles, roles, key);
+  }
+  assert.deepEqual(getMemberRoleAssignment({ branchId: 'location', businessUnitId: 'business-unit', roles: selected }, roles), {
+    branchId: 'location', businessUnitId: 'business-unit', assignedRoleIds: ['staff', 'tenant', 'branch', 'unit'],
+  });
 });
 
