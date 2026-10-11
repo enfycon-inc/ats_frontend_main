@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { UserPlus, Loader2, UploadCloud, RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
+import { candidateAmountSchema, candidatePhoneSchema, normalizeCandidateLocation } from "@/lib/candidate-submission-input";
 import { CandidateForm } from "@/components/candidates/candidate-form";
 
 export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, job, onSuccess }: { open: boolean; onOpenChange: (open: boolean) => void; job: any; onSuccess?: () => void }) {
@@ -75,7 +76,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
       let parsedLocation = typeof parsedLocationObj === 'object' && parsedLocationObj !== null && !Array.isArray(parsedLocationObj)
         ? (parsedLocationObj.raw || parsedLocationObj.canonical)
         : (Array.isArray(parsedLocationObj) && parsedLocationObj.length > 0 ? (parsedLocationObj[0]?.raw || parsedLocationObj[0]?.canonical) : '');
-      parsedLocation = parsed?.location || parsedLocation || "";
+      parsedLocation = normalizeCandidateLocation(parsed?.location || parsedLocation || "", job?.market?.toUpperCase() === "US" ? "US" : "IN");
 
       let parsedSkills = parsed.skills ? parsed.skills.join(", ") : "";
       
@@ -181,11 +182,17 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
       return;
     }
 
+    const phoneCheck = candidatePhoneSchema.safeParse(formData.phone);
+    if (!phoneCheck.success) { toast.error(phoneCheck.error.issues[0].message); return; }
+    if (!isContractual && (!candidateAmountSchema.safeParse(formData.currentCtc).success || !candidateAmountSchema.safeParse(formData.expectedCtc).success)) { toast.error('Enter valid current and expected CTC amounts.'); return; }
+    if (!isContractual && (!/^\d+$/.test(formData.noticePeriodDays) || Number(formData.noticePeriodDays) < 0)) { toast.error("Select Immediate or enter notice period days."); return; }
     setLoading(true);
     try {
       const fullName = `${formData.firstName} ${formData.lastName}`.trim();
       const uploadResponse = await atsApi.candidates.uploadCv(file, formData.source, {
         fullName,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
         email: formData.email,
         phone: formData.phone || "",
         relevantExperienceYears: formData.relevantExperienceYears,

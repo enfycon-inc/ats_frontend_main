@@ -18,6 +18,7 @@ export interface PhoneInputProps {
   disabled?: boolean;
   id?: string;
   name?: string;
+  limitMaxLength?: boolean;
 }
 
 export function PhoneInput({
@@ -30,6 +31,7 @@ export function PhoneInput({
   disabled,
   id,
   name,
+  limitMaxLength,
 }: PhoneInputProps) {
   // Resolve default country: US for US IT market, IN for domestic India market
   const resolvedDefaultCountry: Country = React.useMemo(() => {
@@ -52,6 +54,7 @@ export function PhoneInput({
         id={id}
         name={name}
         international
+        limitMaxLength={limitMaxLength}
         defaultCountry={resolvedDefaultCountry}
         value={value as Value}
         onChange={(val) => onChange?.(val || "")}

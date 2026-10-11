@@ -1,13 +1,14 @@
+import { formatCandidateAmount } from '@/lib/candidate-submission-input';
 import type { TrackerSubmission } from '@/lib/submission-contract';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export function SubmittedCandidateDetails({ submission: s }: { submission: TrackerSubmission }) {
   const contract = /contract/i.test(s.jobType || '');
-  const amount = (value: string | null | undefined, currency?: string | null, term?: string | null) => value != null && value !== '' ? [value, currency, term].filter(Boolean).join(' / ') : 'Not provided';
+  const amount = (value: string | null | undefined, currency?: string | null, term?: string | null) => value != null && value !== '' ? [formatCandidateAmount(value), currency, term].filter(Boolean).join(' / ') : 'Not provided';
   const years = (value: number | null | undefined) => value != null ? `${value} years` : 'Not provided';
   const groups = [
     { title: 'Contact', fields: [['First name', s.candidateFirstName], ['Last name', s.candidateLastName], ['Email', s.candidateEmail], ['Mobile', s.candidatePhone]] },
-    { title: 'Experience & availability', fields: [['Current company', s.candidateCurrentCompany], ['Total experience', years(s.candidateExperience)], ['Relevant experience', years(s.candidateRelevantExperience)], ['Current location', s.candidateCurrentLocation], ['Preferred locations', s.candidatePreferredLocations?.join(', ')], ['Notice period', s.candidateNoticePeriod != null ? `${s.candidateNoticePeriod} days` : null]] },
+    { title: 'Experience & availability', fields: [['Current company', s.candidateCurrentCompany], ['Total experience', years(s.candidateExperience)], ['Relevant experience', years(s.candidateRelevantExperience)], ['Current location', s.candidateCurrentLocation], ['Preferred locations', s.candidatePreferredLocations?.join(', ')], ['Notice period', s.candidateNoticePeriod === 0 ? "Immediate" : s.candidateNoticePeriod != null ? `${s.candidateNoticePeriod} days` : null]] },
     { title: 'Compensation', fields: contract ? [['Submitted rate', amount(s.submittedRate, s.submittedRateCurrency, s.submittedRateTerm)]] : [['Current CTC', amount(s.candidateCurrentCtc, s.candidateCtcCurrency, s.candidateCtcTerm)], ['Expected CTC', amount(s.candidateExpectedCtc, s.candidateCtcCurrency, s.candidateCtcTerm)]] },
   ];
   return <section aria-label="Submitted candidate details" className="min-w-0 rounded-xl border border-border bg-card p-3">

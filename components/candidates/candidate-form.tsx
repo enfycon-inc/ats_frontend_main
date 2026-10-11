@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { candidatePhoneSchema, formatCandidateAmount } from "@/lib/candidate-submission-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -9,11 +10,11 @@ import { TagInput } from "@/components/ui/tag-input";
 import { CityAutocomplete } from "@/components/city-autocomplete";
 
 interface CandidateFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: Record<'firstName' | 'lastName' | 'email' | 'phone' | 'totalExperienceYears' | 'currentLocation' | 'preferredLocations' | 'source' | 'skills' | 'relevantExperienceYears' | 'currentCtc' | 'expectedCtc' | 'currentCompany' | 'noticePeriodDays' | 'availabilityToStart', string>;
+  setFormData: (data: CandidateFormProps['formData']) => void;
   recruiterComment: string;
   setRecruiterComment: (comment: string) => void;
-  job: any;
+  job: { market?: string | null } | null;
   isContractual: boolean;
 }
 
@@ -52,8 +53,9 @@ export function CandidateForm({
               <Input type="email" placeholder="john.doe@example.com" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="h-10 bg-slate-50 dark:bg-slate-950 focus:bg-white" />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Phone Number</Label>
-              <PhoneInput placeholder="Enter phone" defaultCountry={defaultPhoneCountry as any} value={formData.phone} onChange={(v) => setFormData({...formData, phone: v?.toString() || ""})} className="h-10 bg-slate-50 dark:bg-slate-950 [&>div]:bg-transparent" />
+              <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Mobile number <span className="text-red-500">*</span></Label>
+              <PhoneInput limitMaxLength placeholder="Enter phone" defaultCountry={defaultPhoneCountry} value={formData.phone} onChange={(v) => setFormData({...formData, phone: v?.toString() || ""})} className="h-10 bg-slate-50 dark:bg-slate-950 [&>div]:bg-transparent" />
+              {formData.phone && !candidatePhoneSchema.safeParse(formData.phone).success && <p className="text-xs text-red-600">Enter a valid mobile number; India requires exactly 10 digits.</p>}
             </div>
           </div>
         </div>
@@ -110,7 +112,7 @@ export function CandidateForm({
               <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Current Location <span className="text-red-500">*</span></Label>
               <CityAutocomplete
                   value={formData.currentLocation}
-                  onChange={(city, state, country) => {
+                  onChange={(city, state) => {
                     const fullLoc = [city, state].filter(Boolean).join(", ");
                     setFormData({ ...formData, currentLocation: fullLoc || city });
                   }}
@@ -122,7 +124,7 @@ export function CandidateForm({
               <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Preferred Location <span className="text-red-500">*</span></Label>
               <CityAutocomplete
                   value={formData.preferredLocations}
-                  onChange={(city, state, country) => {
+                  onChange={(city, state) => {
                     const fullLoc = [city, state].filter(Boolean).join(", ");
                     setFormData({ ...formData, preferredLocations: fullLoc || city });
                   }}
@@ -137,8 +139,9 @@ export function CandidateForm({
               </div>
             ) : (
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Notice Period (Days) <span className="text-red-500">*</span></Label>
-                <Input type="number" placeholder="e.g. 30, 60" value={formData.noticePeriodDays} onChange={(e) => setFormData({...formData, noticePeriodDays: e.target.value})} className="h-10 bg-slate-50 dark:bg-slate-950 focus:bg-white" />
+                <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Notice Period <span className="text-red-500">*</span></Label>
+                <div className="flex gap-4 text-xs"><label><input type="radio" name="noticeMode" checked={formData.noticePeriodDays === "0"} onChange={() => setFormData({...formData, noticePeriodDays: "0"})} /> Immediate</label><label><input type="radio" name="noticeMode" checked={formData.noticePeriodDays !== "0"} onChange={() => setFormData({...formData, noticePeriodDays: ""})} /> Enter days</label></div>
+                <Input type="number" min="1" step="1" disabled={formData.noticePeriodDays === "0"} placeholder="Number of days" value={formData.noticePeriodDays === "0" ? "" : formData.noticePeriodDays} onChange={(e) => setFormData({...formData, noticePeriodDays: e.target.value})} className="h-10 bg-slate-50 dark:bg-slate-950 focus:bg-white" />
               </div>
             )}
           </div>
@@ -155,14 +158,14 @@ export function CandidateForm({
                 <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Current CTC <span className="text-red-500">*</span></Label>
                 <div className="relative flex items-center">
                   <span className="absolute left-3 text-slate-500 font-medium">{currencyPrefix}</span>
-                  <Input type="number" placeholder={isIndianMarket ? "e.g. 1200000 (INR)" : "e.g. 120000"} value={formData.currentCtc} onChange={(e) => setFormData({...formData, currentCtc: e.target.value})} className="h-10 pl-8 bg-slate-50 dark:bg-slate-950 focus:bg-white" />
+                  <Input type="text" inputMode="decimal" placeholder="e.g. 120,000" value={formatCandidateAmount(formData.currentCtc)} onChange={(e) => setFormData({...formData, currentCtc: e.target.value.replaceAll(",", "").replace(/[^0-9.]/g, "")})} className="h-10 pl-8 bg-slate-50 dark:bg-slate-950 focus:bg-white" />
                 </div>
               </div>
               <div className="space-y-2 relative">
                 <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Expected CTC <span className="text-red-500">*</span></Label>
                 <div className="relative flex items-center">
                   <span className="absolute left-3 text-slate-500 font-medium">{currencyPrefix}</span>
-                  <Input type="number" placeholder={isIndianMarket ? "e.g. 1500000 (INR)" : "e.g. 150000"} value={formData.expectedCtc} onChange={(e) => setFormData({...formData, expectedCtc: e.target.value})} className="h-10 pl-8 bg-slate-50 dark:bg-slate-950 focus:bg-white" />
+                  <Input type="text" inputMode="decimal" placeholder="e.g. 150,000" value={formatCandidateAmount(formData.expectedCtc)} onChange={(e) => setFormData({...formData, expectedCtc: e.target.value.replaceAll(",", "").replace(/[^0-9.]/g, "")})} className="h-10 pl-8 bg-slate-50 dark:bg-slate-950 focus:bg-white" />
                 </div>
               </div>
             </div>
