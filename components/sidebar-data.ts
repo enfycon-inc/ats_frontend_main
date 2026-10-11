@@ -359,6 +359,11 @@ export const data = {
       isActive: true,
       items: [
         {
+          title: "Client Access",
+          url: "/settings/client-access",
+          circleColor: "bg-primary",
+        },
+        {
           title: "Company & Structure",
           url: "/company?tab=general",
           circleColor: "bg-primary",

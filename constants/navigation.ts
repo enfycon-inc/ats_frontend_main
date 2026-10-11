@@ -227,6 +227,7 @@ export const MORE_NAV_ITEMS: NavItem[] = [
     icon: Settings,
     children: [
       { label: "Company & Structure", href: "/company?tab=general" },
+      { label: "Client Access", href: "/settings/client-access" },
       { label: "Authentication & SSO", href: "/company?tab=auth" },
       { label: "Custom Domains", href: "/company?tab=domains" },
       { label: "Email Dispatch", href: "/company?tab=email" },
@@ -310,6 +311,7 @@ export const GLOBAL_ADMIN_MORE_ITEMS: NavItem[] = [
     icon: Settings,
     children: [
       { label: "Company & Structure", href: "/company?tab=general" },
+      { label: "Client Access", href: "/settings/client-access" },
       { label: "Authentication & SSO", href: "/company?tab=auth" },
       { label: "Custom Domains", href: "/company?tab=domains" },
       { label: "Email Dispatch", href: "/company?tab=email" },

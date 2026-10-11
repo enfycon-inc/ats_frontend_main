@@ -65,6 +65,7 @@ import { WORK_AUTHORIZATION_OPTIONS, INDIAN_WORK_AUTHORIZATION_OPTIONS, INDIA_ST
 
 import { atsApi, type JobStaffOption } from "@/lib/ats-api";
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
+import { formatIndiaAmount, normalizeAmount, indiaBudget, isMonthlyIndiaJob } from "@/lib/india-job-commercials";
 import { showErrorModal } from "@/components/shared/global-error-modal";
 
 
@@ -125,7 +126,7 @@ const formSchema = zod.object({
 
   // Org Info
   numPositions: zod.number({ invalid_type_error: "Number of Positions is required" }).min(1, "Number of Positions is required"),
-  maxSubmissions: zod.number({ invalid_type_error: "Maximum Allowed Submissions is required" }).min(1, "Maximum Allowed Submissions is required"),
+  maxSubmissions: zod.number({ invalid_type_error: "Maximum Allowed Submissions is required" }).int("Enter a whole number").min(1, "Enter at least 1"),
   department: zod.string().optional(),
   salesManager: zod.string().optional(),
   secondarySalesManager: zod.string().optional(),
@@ -149,6 +150,11 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [isJobLoading, setIsJobLoading] = useState(!!editJobId);
+  const draftIdRef = useRef<string | null>(null);
+  const savingRef = useRef(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [loadedJobStatus, setLoadedJobStatus] = useState<string | null>(null);
+  const profileInitialized = useRef(false);
 
 // Workflow active screen state: 'landing' | 'manual' | 'parse'
   // Detect cloneFrom query parameter immediately to smoothly transition directly to manual edit page
@@ -198,6 +204,8 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
   const [prefilledClientName, setPrefilledClientName] = useState("");
   const [clientModalTarget, setClientModalTarget] = useState<"client" | "endClientName">("client");
   const [clientList, setClientList] = useState<any[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(true);
+  const [clientsError, setClientsError] = useState("");
   const [clientSearchText, setClientSearchText] = useState("");
   const [endClientSearchText, setEndClientSearchText] = useState("");
   const [publishingModalState, setPublishingModalState] = useState<{
@@ -212,6 +220,7 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
     payRate: string;
     businessUnit: string;
     createdJobId?: string;
+    jobStatus?: string;
     errorMessage?: string;
   } | null>(null);
 
@@ -250,20 +259,14 @@ export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
       setSelectedEndPocId(null);
       return;
     }
-    const fetchEndPocs = async () => {
-      try {
-        const data = await atsApi.clients.getContacts(selectedEndClientId);
-        {
-          const me = session?.user?.email || "me";
-          const mine = data.filter((p: any) => p.created_by_email === me || p.createdByEmail === me);
-          const others = data.filter((p: any) => p.created_by_email !== me && p.createdByEmail !== me);
-          setEndPocList({ myContacts: mine, otherContacts: others });
-        }
-      } catch (err) {
-        console.error("Failed to fetch end POCs", err);
-      }
-    };
-    fetchEndPocs();
+    let active = true;
+    setEndPocList({ myContacts: [], otherContacts: [] });
+    atsApi.clients.getContacts(selectedEndClientId).then(data => {
+      if (active) setEndPocList(data);
+    }).catch(() => {
+      if (active) setEndPocList({ myContacts: [], otherContacts: [] });
+    });
+    return () => { active = false; };
   }, [selectedEndClientId, session?.user?.email]);
 
   // Auto-sync End POC with Client POC if they are the same company
@@ -349,37 +352,10 @@ const getInitialActiveBranchContext = () => {
 
     setValue("businessUnit", unit.name);
 
-    // Determine market from unit
-    const unitMarket = (unit.market || "").toUpperCase();
-    
-    const targetM = "IN";
-
-    
-    if (targetM === "IN") {
-      setValue("country", "India");
-      setValue("jobType", "Full Time");
-      setValue("shiftTiming", unit.shiftTiming || "General Shift (Day)");
-      setValue("taxTerms", "Permanent");
-                                    setBillUnit("LPA");
-                                    setPayUnit("LPA");
-      setBillCurrency("INR");
-      setBillUnit("LPA");
-      setBillTerm("Permanent");
-      setPayCurrency("INR");
-      setPayUnit("LPA");
-      setPayTerm("Permanent");
-    } else {
-      setValue("country", "United States");
-      setValue("jobType", "Full Time");
-      setValue("shiftTiming", unit.shiftTiming || "US Shift (Night)");
-      setValue("taxTerms", "C2C");
-      setBillCurrency("USD");
-      setBillUnit("Hourly");
-      setBillTerm("C2C");
-      setPayCurrency("USD");
-      setPayUnit("Hourly");
-      setPayTerm("C2C");
-    }
+    setValue("country", "India");
+    setValue("shiftTiming", unit.shiftTiming || "General Shift (Day)");
+    setBillCurrency("INR");
+    setPayCurrency("INR");
 
     try {
       const res = await atsApi.jobs.getNextCode({
@@ -503,7 +479,7 @@ const getInitialActiveBranchContext = () => {
       expMin: undefined,
       expMax: undefined,
       numPositions: 1,
-      maxSubmissions: 5,
+      maxSubmissions: 1,
       postToPortal: true,
       displayContactOnPortal: false,
       jobDescription: "",
@@ -537,35 +513,26 @@ const getInitialActiveBranchContext = () => {
     }
   }, [watchTaxTerms, commissionType, customCommission, setValue]);
 
-  useEffect(() => {
-    if (selectedCountry === "India") {
-      
-      setBillCurrency("INR");
-      setBillUnit("LPA");
-      setBillTerm("Permanent");
-
-      setPayCurrency("INR");
-      setPayUnit("LPA");
-      setPayTerm("Permanent");
-      
-      setValue("taxTerms", "Permanent");
-                                    setBillUnit("LPA");
-                                    setPayUnit("LPA");
-      const commVal = commissionType === "custom" ? customCommission : commissionType;
-      setValue("clientBillRate", `${commVal}% Placement Commission`, { shouldValidate: false });
-    } else if (selectedCountry === "United States") {
-      
-      setBillCurrency("USD");
-      setBillUnit("Hourly");
-      setBillTerm("C2C");
-
-      setPayCurrency("USD");
-      setPayUnit("Hourly");
-      setPayTerm("C2C");
-      
-      setValue("taxTerms", "C2C");
+  const selectedJobType = watch("jobType");
+  const selectClient = (name: string, id: string | null, endClient = false) => {
+    setValue(endClient ? "endClientName" : "client", name, { shouldValidate: true, shouldDirty: true });
+    if (endClient) {
+      if (id !== selectedEndClientId) setSelectedEndPocId(null);
+      setSelectedEndClientId(id);
+    } else {
+      if (id !== selectedClientId) setSelectedPocId(null);
+      setSelectedClientId(id);
     }
-  }, [selectedCountry, setValue, commissionType, customCommission]);
+  };
+  useEffect(() => {
+    setBillCurrency("INR");
+    setPayCurrency("INR");
+    const unit = isMonthlyIndiaJob(selectedJobType) ? "Monthly" : "LPA";
+    setBillUnit(unit);
+    setPayUnit(unit);
+    if (isMonthlyIndiaJob(selectedJobType)) setValue("taxTerms", "Contract (3rd Party)");
+    else if (selectedJobType === "Full Time") setValue("taxTerms", "Permanent");
+  }, [selectedJobType, setValue]);
 
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const assignmentPolicy = selectedUnitObj;
@@ -605,11 +572,19 @@ const getInitialActiveBranchContext = () => {
 
 
   const fetchClients = useCallback(async () => {
+    setClientsLoading(true);
+    setClientsError("");
     try {
       const res = await atsApi.clients.list();
       setClientList(res || []);
-    } catch (e) {
+    } catch (e: any) {
+      setClientList([]);
+      setClientsError(/403|permission|access denied|forbidden/i.test(e.message || "")
+        ? "Client access is unavailable for your active role or workspace."
+        : "Unable to load clients. Please try again.");
       console.error("Failed to fetch clients", e);
+    } finally {
+      setClientsLoading(false);
     }
   }, []);
 
@@ -617,6 +592,8 @@ const getInitialActiveBranchContext = () => {
     if (status === "loading") return;
 
     async function fetchProfile() {
+      if (profileInitialized.current) return;
+      profileInitialized.current = true;
       try {
         const prof = await atsApi.auth.me();
         if (prof) {
@@ -693,7 +670,7 @@ const getInitialActiveBranchContext = () => {
             if (!matchedUnit && finalUnits && finalUnits.length > 0) {
               matchedUnit = finalUnits[0];
             }
-            if (matchedUnit) {
+            if (matchedUnit && !editJobId) {
               setSelectedUnitId(matchedUnit.id);
               setValue("businessUnit", matchedUnit.name);
             }
@@ -717,61 +694,26 @@ const getInitialActiveBranchContext = () => {
           
           
 
-          try {
-            const res = await atsApi.jobs.getNextCode({ 
-              branchId: activeBranchId || undefined,
-              businessUnitId: matchedUnit?.id || undefined,
-              shift: 'DAY'
-            });
-            if (res && res.code) {
-              setValue("jobCode", res.code);
-            } else {
-              const date = new Date();
-              const yy = date.getFullYear().toString().slice(-2);
-              const mm = String(date.getMonth() + 1).padStart(2, '0');
-              const dd = String(date.getDate()).padStart(2, '0');
-              const sCode = 'D';
-              setValue("jobCode", `GEN-${yy}${mm}${dd}-${sCode}00001`);
+          if (!editJobId && !draftIdRef.current) {
+            try {
+              const res = await atsApi.jobs.getNextCode({ branchId: matchedUnit?.branchId || activeBranchId || undefined, businessUnitId: matchedUnit?.id || undefined, shift: 'DAY' });
+              if (res?.code && !draftIdRef.current) setValue("jobCode", res.code);
+            } catch {
+              toast.error("Unable to load a job code. Please retry after the workspace loads.");
             }
-          } catch (e) {
-            const date = new Date();
-            const yy = date.getFullYear().toString().slice(-2);
-            const mm = String(date.getMonth() + 1).padStart(2, '0');
-            const dd = String(date.getDate()).padStart(2, '0');
-            const sCode = 'D';
-            setValue("jobCode", `GEN-${yy}${mm}${dd}-${sCode}00001`);
           }
 
           const posterName = (session as any)?.user?.name || prof?.name || prof?.email || "Account Manager";
 
           
-          const tMarket = "IN";
-          if (tMarket === "IN") {
-            setValue("jobType", "Full Time");
-            setValue("shiftTiming", "General Shift (Day)");
-            setValue("taxTerms", "Permanent");
-                                    setBillUnit("LPA");
-                                    setPayUnit("LPA");
-            setValue("accountManager", posterName);
-            setBillCurrency("INR");
-            setBillUnit("LPA");
-            setBillTerm("Permanent");
-            setPayCurrency("INR");
-            setPayUnit("LPA");
-            setPayTerm("Permanent");
-          } else {
-            setValue("jobType", "Full Time");
-            setValue("shiftTiming", "US Shift (Night)");
-            setValue("taxTerms", "C2C");
-            setBillCurrency("USD");
-            setBillUnit("Hourly");
-            setBillTerm("C2C");
-            setPayCurrency("USD");
-            setPayUnit("Hourly");
-            setPayTerm("C2C");
+          if (!editJobId) {
+            if (!getValues("shiftTiming")) setValue("shiftTiming", "General Shift (Day)");
+            if (!getValues("accountManager")) setValue("accountManager", prof.id || prof.dbId || posterName);
           }
+
         }
       } catch (err) {
+        profileInitialized.current = false;
         console.error("Failed to load user profile:", err);
       }
     }
@@ -799,6 +741,13 @@ const getInitialActiveBranchContext = () => {
           if (u) setSelectedUnitId(u.id);
         }
         if (sourceJob.client) setValue("client", sourceJob.client);
+        setSelectedClientId(sourceJob.clientId || null);
+        setSelectedEndClientId(sourceJob.endClientId || null);
+        setSelectedPocId(sourceJob.pocId || null);
+        setSelectedEndPocId(sourceJob.endClientPocId || null);
+        const budgetBounds = (sourceJob.payRate || "").replace(/,/g, '').match(/\d+(?:\.\d+)?/g) || [];
+        setPayRateMin(budgetBounds[0] || "");
+        setPayRateMax(budgetBounds[1] || budgetBounds[0] || "");
         if (sourceJob.endClientName) setValue("endClientName", sourceJob.endClientName);
         if (sourceJob.clientJobId) setValue("clientJobId", sourceJob.clientJobId);
         if (sourceJob.location) setValue("city", sourceJob.location);
@@ -882,19 +831,6 @@ const getInitialActiveBranchContext = () => {
     return `${list[0]} (+${list.length - 1} others)`;
   };
 
-  // Autocomplete auto-save simulation
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (isDirty && activeWorkflow === "manual") {
-        toast("Draft auto-saved successfully", {
-          icon: undefined,
-          duration: 2000,
-        });
-      }
-    }, 45000);
-    return () => clearInterval(timer);
-  }, [isDirty, activeWorkflow]);
-
   // Skill tags handlers
 
   useEffect(() => {
@@ -902,6 +838,13 @@ const getInitialActiveBranchContext = () => {
     setIsJobLoading(true);
     atsApi.jobs.get(editJobId).then(jobData => {
       if (!jobData) return;
+      setLoadedJobStatus(jobData.jobStatus);
+      if (jobData.jobStatus === "Draft") draftIdRef.current = jobData.id;
+      if (jobData.businessUnitId) setSelectedUnitId(jobData.businessUnitId);
+      setSelectedClientId(jobData.clientId || null);
+      setSelectedEndClientId(jobData.endClientId || null);
+      setSelectedPocId(jobData.pocId || null);
+      setSelectedEndPocId(jobData.endClientPocId || null);
       setValue("jobCode", jobData.jobCode || "");
       setValue("jobTitle", jobData.jobTitle || "");
       setValue("client", jobData.client || "");
@@ -948,19 +891,22 @@ const getInitialActiveBranchContext = () => {
         }
         setValue("clientBillRate", "N/A");
       } else {
-        setValue("clientBillRate", rawBillRate);
+        setValue("clientBillRate", rawBillRate === "N/A" ? "" : rawBillRate.replace(/,/g, '').match(/\d+(?:\.\d+)?/)?.[0] || "");
       }
 
       // Parse Pay Rate (CTC)
       const matchesPay = (jobData.payRate || "").match(/([\d.]+)/);
       setValue("payRate", matchesPay ? matchesPay[1] : (jobData.payRate || ""));
+      const budgetBounds = (jobData.payRate || "").replace(/,/g, '').match(/\d+(?:\.\d+)?/g) || [];
+      setPayRateMin(budgetBounds[0] || "");
+      setPayRateMax(budgetBounds[1] || budgetBounds[0] || "");
 
       setValue("numPositions", jobData.noOfPositions || 1);
-      setValue("maxSubmissions", jobData.submissionRequired || 5);
+      setValue("maxSubmissions", jobData.submissionRequired ?? 1);
       setValue("priority", (jobData.priority || "Warm") as any);
       setValue("taxTerms", jobData.taxTerms || "Permanent");
       
-      const rLower = (jobData.remoteJob || "").toLowerCase();
+      const rLower = (jobData.workMode || jobData.remoteJob || "").toLowerCase();
       setValue("remoteJob", (rLower.includes("remote") || rLower === "yes") ? "Remote" : rLower.includes("hybrid") ? "Hybrid" : "In Office");
       
       setValue("startDate", jobData.startDate ? jobData.startDate.split("T")[0] : "");
@@ -979,19 +925,11 @@ const getInitialActiveBranchContext = () => {
       setValue("expMax", jobData.expMax);
       setValue("noticePeriod", jobData.noticePeriod || "Select Notice Period");
 
-      if (jobData.podId) {
-        setSelectedPodId(`pod:${jobData.podId}`);
-      // @ts-ignore
-      } else if (jobData.recruiterId) {
-        // @ts-ignore
-        setSelectedPodId(`rec:${jobData.recruiterId}`);
-      // @ts-ignore
-      } else if (jobData.assignedTo === "ALL" || jobData.assignedTo === "All Branch Recruiters") {
-        setSelectedPodId("all");
-      // @ts-ignore
-      } else if (jobData.assignedTo === "Unassigned") {
-        setSelectedPodId("none");
-      }
+      const podId = jobData.podId?.split(',')[0] || null;
+      setSelectedPodId(podId);
+      const recruiters = jobData.recruiterIds || [];
+      setSelectedRecruiterIds(recruiters);
+      setAssignmentType(podId ? "pod" : recruiters.length ? "recruiters" : "unassigned");
 
       if (jobData.respondBy) {
         setRespondByType("Date Option");
@@ -1238,51 +1176,48 @@ const getInitialActiveBranchContext = () => {
       setIsExtractingSkills(false);
     }
   };
-  const onSubmit = async (data: FormValues) => {
-    if (assignmentRequired && !assignmentValid) {
+  const onSubmit = async (data: FormValues, draft = false) => {
+    if (savingRef.current) return;
+    if (isJobLoading || !currentUserProfile || !selectedUnitId) {
+      toast.error("Wait for your staffing workspace to load before saving.");
+      return;
+    }
+    if (draft && loadedJobStatus && loadedJobStatus !== "Draft") {
+      toast.error("This job has already been published. Open it from the job catalog to edit.");
+      return;
+    }
+    if (!editJobId && !draft && draftIdRef.current && loadedJobStatus && loadedJobStatus !== "Draft") {
+      toast.error("This job has already been submitted. Open it from the job catalog.");
+      return;
+    }
+    if (!Number.isSafeInteger(data.maxSubmissions) || data.maxSubmissions < 1) {
+      toast.error("Maximum allowed submissions must be a whole number of at least 1.");
+      return;
+    }
+    if (!draft && assignmentRequired && !assignmentValid) {
       toast.error("Select a pod or at least one recruiter. Your active role must have assignment permission.");
       return;
     }
 
-    const formatRatePayload = (val: string, cur: string, unit: string, term: string) => {
-      if (!val || val === "N/A" || val === "Rate") return "N/A";
-      const cleanVal = val.replace(/[^0-9.]/g, "");
-      if (!cleanVal) return "N/A";
-      if (cur === "INR") {
-        const suffix = ["Contract", "C2H", "Freelance"].includes(data.jobType) ? "/mo" : "LPA";
-        return `INR - ${cleanVal} ${suffix}`;
-      } else {
-        const unitLabel = unit === "Hourly" ? "hr" : unit === "Yearly" ? "yr" : "hr";
-        return `USD - $${cleanVal}/${unitLabel}`;
-      }
-    };
-
-    let assembledBillRate = "";
-    if (true && data.taxTerms === "Permanent") {
-      const commValue = commissionType === "custom" ? customCommission : commissionType;
-      assembledBillRate = `${commValue}% Placement Commission`;
-    } else {
-      assembledBillRate = formatRatePayload(data.clientBillRate, billCurrency, billUnit, billTerm);
+    let assembledBillRate: string;
+    let assembledPayRate: string;
+    try {
+      assembledBillRate = data.taxTerms === "Permanent"
+        ? `${commissionType === "custom" ? customCommission : commissionType}% Placement Commission`
+        : indiaBudget(data.clientBillRate || "", "", data.jobType);
+      assembledPayRate = indiaBudget(payRateMin || data.payRate || "", payRateMax, data.jobType);
+      if (!normalizeAmount(payRateMin || data.payRate || "") && normalizeAmount(payRateMax)) throw new Error("Enter the minimum budget before the maximum.");
+    } catch (error: any) {
+      toast.error(error.message);
+      return;
     }
-
-    let assembledPayRate = "";
-    if (true) {
-      const minVal = payRateMin || data.payRate || "";
-      const maxVal = payRateMax || minVal;
-      const suffix = ["Contract", "C2H", "Freelance"].includes(data.jobType) ? "/mo" : "LPA";
-      assembledPayRate = minVal && maxVal && minVal !== maxVal 
-        ? `INR - ${minVal} to ${maxVal} ${suffix}` 
-        : minVal 
-          ? `INR - ${minVal} ${suffix}` 
-          : "N/A";
-    } else {
-      assembledPayRate = formatRatePayload(data.payRate, payCurrency, payUnit, payTerm);
-    }
+    savingRef.current = true;
+    if (draft) setIsSavingDraft(true);
 
     const locSummary = [data.city, data.states, data.country].filter(Boolean).join(", ") || data.locationAutocomplete || "Remote";
 
     // Show posting popup window immediately with short details
-    setPublishingModalState({
+    if (!draft) setPublishingModalState({
       isOpen: true,
       status: "publishing",
       jobTitle: data.jobTitle,
@@ -1328,8 +1263,7 @@ const getInitialActiveBranchContext = () => {
       }
 
       // Determine initial approval status based on creator's permissions
-      const hasDirectPublish = currentUserProfile?.permissions?.includes("job:publish_direct") || 
-        currentUserProfile?.roles?.some((r: string) => ["TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
+      const hasDirectPublish = currentUserProfile?.permissions?.some((permission: string) => ["job:publish_direct", "tenant:settings", "tenant:manage"].includes(permission));
       const hasDesignatedReviewer = Boolean(currentUserProfile?.jobReviewerId || currentUserProfile?.jobReviewerName || currentUserProfile?.job_reviewer_id);
 
       const shouldRequireApproval = !hasDirectPublish;
@@ -1344,10 +1278,12 @@ const getInitialActiveBranchContext = () => {
         branchId: selectedUnitObj?.branchId || (typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') || undefined : undefined),
         businessUnitId: selectedUnitId || undefined,
         title: data.jobTitle,
-        client: data.client || data.endClientName || "Direct Client",
+        client: data.client || "",
+        clientId: selectedClientId || undefined,
+        endClientId: selectedEndClientId || undefined,
         endClientName: data.endClientName || undefined,
-        pocId: selectedPocId || undefined,
-        endClientPocId: selectedEndPocId || undefined,
+        pocId: selectedPocId || null,
+        endClientPocId: selectedEndPocId || null,
         location: data.locationAutocomplete || data.city || data.states || "Remote",
         type: data.jobType || "Full Time",
         description: finalDescription,
@@ -1355,9 +1291,9 @@ const getInitialActiveBranchContext = () => {
         secondarySkills: secondarySkills,
         businessUnit: data.businessUnit,
         state: data.states,
-        city: data.city || undefined,
+        city: data.city || (draft ? null : undefined),
         country: data.country,
-        status: initialJobStatus,
+        status: draft ? "Draft" : initialJobStatus,
           market: selectedUnitObj?.market,
         approvalStatus: initialApprovalStatus,
         assignedApproverId: finalApproverId,
@@ -1370,10 +1306,10 @@ const getInitialActiveBranchContext = () => {
         priority: data.priority,
         taxTerms: data.taxTerms,
         remoteJob: data.remoteJob,
-        startDate: data.startDate || undefined,
-        endDate: data.endDate || undefined,
+        startDate: data.startDate || (draft ? "" : undefined),
+        endDate: data.endDate || (draft ? "" : undefined),
         hoursPerWeek: data.hoursPerWeek,
-        duration: data.duration || undefined,
+        duration: data.duration || (draft ? "" : undefined),
         recruitmentManagerId: data.recruitmentManager || undefined,
         recruiterId: canAssignRecruiters ? resolvedPrimaryRecruiterId : undefined,
         recruiterIds: canAssignRecruiters ? resolvedRecruiterIds : undefined,
@@ -1392,22 +1328,40 @@ const getInitialActiveBranchContext = () => {
 
       
       let created;
-      if (editJobId) {
+      if (draft) {
+        if (!draftIdRef.current) draftIdRef.current = crypto.randomUUID();
+        created = await atsApi.jobs.saveDraft({ ...payload, draftId: draftIdRef.current }, editJobId);
+        draftIdRef.current = created.id;
+        setLoadedJobStatus("Draft");
+        setValue("jobCode", created.jobCode);
+        toast.success("Draft saved successfully");
+        return;
+      } else if (draftIdRef.current) {
+        created = await atsApi.jobs.publishDraft(draftIdRef.current, payload);
+        setLoadedJobStatus(created.jobStatus);
+      } else if (editJobId) {
         created = await atsApi.jobs.update(editJobId, payload);
       } else {
         created = await atsApi.jobs.create(payload);
+        draftIdRef.current = created.id;
+        setLoadedJobStatus(created.jobStatus);
       }
   
 
       setPublishingModalState(prev => prev ? {
         ...prev,
         status: "success",
+        jobStatus: created.jobStatus,
         jobCode: created.jobCode || prev.jobCode,
         createdJobId: created.id,
       } : null);
 
-      toast.success(`Job requirement published successfully! Code: ${created.jobCode}`);
+      toast.success(created.jobStatus === "Pending Approval" ? "Job requirement submitted for approval" : `Job requirement published successfully! Code: ${created.jobCode}`);
     } catch (err: any) {
+      if (draft) {
+        toast.error(err.message || "Unable to save draft. Your entries are still available.");
+        return;
+      }
       console.error("[NewJob] API error:", err);
       setPublishingModalState(prev => prev ? {
         ...prev,
@@ -1418,6 +1372,9 @@ const getInitialActiveBranchContext = () => {
         return;
       }
       showErrorModal(err.message || "Backend connection failed.", "Job Posting Error");
+    } finally {
+      savingRef.current = false;
+      setIsSavingDraft(false);
     }
   };
 
@@ -1820,7 +1777,7 @@ const getInitialActiveBranchContext = () => {
       {/* 3. MANUAL JOB CREATION FORM */}
       {activeWorkflow === "manual" && (
         <form
-          onSubmit={handleSubmit(onSubmit)}
+          onSubmit={handleSubmit((data) => onSubmit(data))}
           className="flex-1 flex flex-col min-h-0 bg-neutral-50/20 dark:bg-slate-900/10"
         >
           {/* Top Sticky Action Bar */}
@@ -1848,10 +1805,8 @@ const getInitialActiveBranchContext = () => {
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  toast.success("Draft saved successfully to local catalog");
-                  router.push("/job-posting");
-                }}
+                onClick={() => onSubmit(getValues(), true)}
+                disabled={isSavingDraft || isJobLoading || Boolean(loadedJobStatus && loadedJobStatus !== "Draft")}
                 className="h-8.5 font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-slate-800 cursor-pointer text-xs"
               >
                 Save as Draft
@@ -2226,10 +2181,10 @@ const getInitialActiveBranchContext = () => {
                               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">Min</span>
                               <input
                                 type="text"
-                                value={payRateMin}
+                                value={isMonthlyIndiaJob(selectedJobType) ? formatIndiaAmount(payRateMin) : payRateMin}
                                 onChange={(e) => {
-                                  setPayRateMin(e.target.value);
-                                  setValue("payRate", e.target.value, { shouldValidate: true });
+                                  setPayRateMin(normalizeAmount(e.target.value));
+                                  setValue("payRate", normalizeAmount(e.target.value), { shouldValidate: true });
                                 }}
                                 placeholder={["Contract", "C2H", "Freelance"].includes(watch("jobType")) ? "e.g. 50000" : "e.g. 10.0"}
                                 className="w-full h-8 pl-10 pr-10 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold"
@@ -2241,8 +2196,8 @@ const getInitialActiveBranchContext = () => {
                               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">Max</span>
                               <input
                                 type="text"
-                                value={payRateMax}
-                                onChange={(e) => setPayRateMax(e.target.value)}
+                                value={isMonthlyIndiaJob(selectedJobType) ? formatIndiaAmount(payRateMax) : payRateMax}
+                                onChange={(e) => setPayRateMax(normalizeAmount(e.target.value))}
                                 placeholder={["Contract", "C2H", "Freelance"].includes(watch("jobType")) ? "e.g. 80000" : "e.g. 15.0"}
                                 className="w-full h-8 pl-10 pr-10 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1.5 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold"
                               />
@@ -2353,7 +2308,7 @@ const getInitialActiveBranchContext = () => {
                                     });
                                     if (exactMatch) {
                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
-                                      setValue("client", clientNameStr, { shouldValidate: true });
+                                      selectClient(clientNameStr, exactMatch.id);
                                       setClientDropdownOpen(false);
                                       setClientSearchText("");
                                     } else {
@@ -2369,6 +2324,8 @@ const getInitialActiveBranchContext = () => {
                             />
                             <CommandList className="max-h-[240px] overflow-y-auto">
                               {(() => {
+                                if (clientsLoading) return <div className="py-4 px-3 text-xs text-neutral-500" role="status">Loading clients...</div>;
+                                if (clientsError) return <div className="py-4 px-3 text-xs" role="alert"><p>{clientsError}</p><button type="button" onClick={fetchClients} className="mt-2 text-primary underline">Try again</button></div>;
                                 const query = clientSearchText.trim().toLowerCase();
                                 const filtered = clientList.filter((cl: any) => {
                                   const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
@@ -2395,7 +2352,7 @@ const getInitialActiveBranchContext = () => {
                                           </button>
                                         </div>
                                       ) : (
-                                        "No clients available in database."
+                                        "No clients available to your active role in this workspace."
                                       )}
                                     </div>
                                   );
@@ -2410,22 +2367,18 @@ const getInitialActiveBranchContext = () => {
                                           key={cl.id || clientNameStr}
                                           value={clientNameStr}
                                           onSelect={() => {
-                                            setValue("client", clientNameStr, { shouldValidate: true });
+                                            selectClient(clientNameStr, cl.id);
                                             setClientDropdownOpen(false);
                                             setClientSearchText("");
                                             // Auto-fill commission & load POCs
-                                            const found = clientList.find((c: any) => (c.client_name || c.clientName || c.name || '') === clientNameStr);
+                                            const found = cl;
                                             if (found) {
                                               setSelectedClientId(found.id);
                                               if (found.commissionPercentage || found.commission_percentage) {
                                                 const pct = found.commissionPercentage || found.commission_percentage;
                                                 setCommissionType(String(pct));
                                               }
-                                              // Load POCs for this client
-                                              atsApi.clients?.getContacts
-                                                ? atsApi.clients.getContacts(found.id).then((data: any) => setPocList(data)).catch(() => {})
-                                                : fetch(`/api/ats/clients/${found.id}/contacts`, { credentials: 'include' })
-                                                    .then(r => r.json()).then(data => setPocList(data)).catch(() => {});
+
                                             }
                                           }}
                                           className="text-xs cursor-pointer"
@@ -2457,7 +2410,7 @@ const getInitialActiveBranchContext = () => {
                                     });
                                     if (exactMatch) {
                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
-                                      setValue("client", clientNameStr, { shouldValidate: true });
+                                      selectClient(clientNameStr, exactMatch.id);
                                       setClientDropdownOpen(false);
                                       setClientSearchText("");
                                     } else {
@@ -2554,14 +2507,7 @@ const getInitialActiveBranchContext = () => {
                                 <span className="h-3.5 w-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold cursor-help" title="Bill rate information">?</span>
                               </div>
                               <div className="flex gap-1.5 items-center w-full">
-                                <select
-                                  value={billCurrency}
-                                  onChange={(e) => setBillCurrency(e.target.value)}
-                                  className="w-16 h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 shrink-0 font-semibold"
-                                >
-                                  <option value="INR">INR</option>
-                                  <option value="USD">USD</option>
-                                </select>
+                                <span className="w-16 h-8 flex items-center justify-center bg-neutral-50 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded text-xs font-semibold" aria-label="Billing currency INR">INR</span>
                                 <Input
                                   type="text"
                                   {...register("clientBillRate")}
@@ -2780,9 +2726,7 @@ const getInitialActiveBranchContext = () => {
                                     });
                                     if (exactMatch) {
                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
-                                      setValue("endClientName", clientNameStr, { shouldValidate: true });
-                                      // @ts-ignore
-                                      if (exactMatch?.id) setSelectedEndClientId(exactMatch.id); else if (typeof cl !== "undefined" && cl?.id) setSelectedEndClientId(cl.id);
+                                      selectClient(clientNameStr, exactMatch.id, true);
                                       setEndClientDropdownOpen(false);
                                       setEndClientSearchText("");
                                     } else {
@@ -2798,6 +2742,8 @@ const getInitialActiveBranchContext = () => {
                             />
                             <CommandList className="max-h-[240px] overflow-y-auto">
                               {(() => {
+                                if (clientsLoading) return <div className="py-4 px-3 text-xs text-neutral-500" role="status">Loading clients...</div>;
+                                if (clientsError) return <div className="py-4 px-3 text-xs" role="alert"><p>{clientsError}</p><button type="button" onClick={fetchClients} className="mt-2 text-primary underline">Try again</button></div>;
                                 const query = endClientSearchText.trim().toLowerCase();
                                 const filtered = clientList.filter((cl: any) => {
                                   const cName = (cl.client_name || cl.clientName || cl.name || "").toLowerCase();
@@ -2824,7 +2770,7 @@ const getInitialActiveBranchContext = () => {
                                           </button>
                                         </div>
                                       ) : (
-                                        "No clients available in database."
+                                        "No clients available to your active role in this workspace."
                                       )}
                                     </div>
                                   );
@@ -2839,9 +2785,7 @@ const getInitialActiveBranchContext = () => {
                                           key={cl.id || clientNameStr}
                                           value={clientNameStr}
                                           onSelect={() => {
-                                            setValue("endClientName", clientNameStr, { shouldValidate: true });
-                                      // @ts-ignore
-                                      if (exactMatch?.id) setSelectedEndClientId(exactMatch.id); else if (typeof cl !== "undefined" && cl?.id) setSelectedEndClientId(cl.id);
+                                            selectClient(clientNameStr, cl.id, true);
                                             setEndClientDropdownOpen(false);
                                             setEndClientSearchText("");
                                           }}
@@ -2874,9 +2818,7 @@ const getInitialActiveBranchContext = () => {
                                     });
                                     if (exactMatch) {
                                       const clientNameStr = exactMatch.client_name || exactMatch.clientName || exactMatch.name || "";
-                                      setValue("endClientName", clientNameStr, { shouldValidate: true });
-                                      // @ts-ignore
-                                      if (exactMatch?.id) setSelectedEndClientId(exactMatch.id); else if (typeof cl !== "undefined" && cl?.id) setSelectedEndClientId(cl.id);
+                                      selectClient(clientNameStr, exactMatch.id, true);
                                       setEndClientDropdownOpen(false);
                                       setEndClientSearchText("");
                                     } else {
@@ -3285,6 +3227,9 @@ const getInitialActiveBranchContext = () => {
                         </label>
                         <input
                           type="number"
+                          min={1}
+                          step={1}
+                          onWheel={(event) => event.currentTarget.blur()}
                           {...register("numPositions", { valueAsNumber: true })}
                           className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 font-medium"
                         />
@@ -3297,9 +3242,16 @@ const getInitialActiveBranchContext = () => {
                         </label>
                         <input
                           type="number"
+                          min={1}
+                          step={1}
+                          onWheel={(event) => event.currentTarget.blur()}
+                          onKeyDown={(event) => {
+                            if (["e", "E", "+", "-", "."].includes(event.key) || (event.key === "ArrowDown" && Number(event.currentTarget.value) <= 1)) event.preventDefault();
+                          }}
                           {...register("maxSubmissions", { valueAsNumber: true })}
                           className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 font-medium"
                         />
+                        {errors.maxSubmissions && <p className="text-xs text-red-600" role="alert">{errors.maxSubmissions.message}</p>}
                       </div>
 
                       {/* Job Assignment Custom Dropdown */}
@@ -3448,10 +3400,8 @@ const getInitialActiveBranchContext = () => {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    toast.success("Draft saved successfully to local catalog");
-                    router.push("/job-posting");
-                  }}
+                  onClick={() => onSubmit(getValues(), true)}
+                  disabled={isSavingDraft || isJobLoading || Boolean(loadedJobStatus && loadedJobStatus !== "Draft")}
                   className="h-8.5 font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-slate-800 cursor-pointer text-xs"
                 >
                   Save as Draft
@@ -3527,15 +3477,15 @@ const getInitialActiveBranchContext = () => {
         onClientAdded={async (clientName) => {
           const latestClients = await atsApi.clients.list();
           const addedClient = latestClients.find((c: any) => (c.client_name || c.clientName) === clientName);
-          if (addedClient && clientModalTarget === "client") setSelectedClientId(addedClient.id);
-          fetchClients();
+          setClientList(latestClients);
+          setClientsError("");
           if (clientModalTarget === "client") {
-            setValue("client", clientName, { shouldValidate: true });
+            selectClient(clientName, addedClient?.id || null);
             if (!getValues("endClientName")) {
-              setValue("endClientName", clientName, { shouldValidate: true });
+              selectClient(clientName, addedClient?.id || null, true);
             }
           } else {
-            setValue("endClientName", clientName, { shouldValidate: true });
+            selectClient(clientName, addedClient?.id || null, true);
           }
           setPrefilledClientName("");
         }}
@@ -3566,12 +3516,12 @@ const getInitialActiveBranchContext = () => {
               <div className="min-w-0 flex-1">
                 <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
                   {publishingModalState.status === "publishing" ? "Posting New Job Requirement..." :
-                   publishingModalState.status === "success" ? "Job Requirement Published!" :
+                   publishingModalState.status === "success" ? (publishingModalState.jobStatus === "Pending Approval" ? "Job Submitted for Approval" : "Job Requirement Published!") :
                    "Job Posting Failed"}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   {publishingModalState.status === "publishing" ? "Registering requisition and configuring allocation..." :
-                   publishingModalState.status === "success" ? "Your job posting is now active and published to the workspace." :
+                   publishingModalState.status === "success" ? (publishingModalState.jobStatus === "Pending Approval" ? "Your job requirement is awaiting review before publication." : "Your job posting is now active and published to the workspace.") :
                    publishingModalState.errorMessage || "An error occurred while publishing the job."}
                 </p>
               </div>

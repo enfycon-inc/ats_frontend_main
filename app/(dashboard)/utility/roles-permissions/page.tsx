@@ -80,7 +80,7 @@ const SYSTEM_ARCHETYPES = [
       "job:assign_recruiter",
       "candidate:view", "candidate:create",
       "submission:view", "submission:create", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
-      "pod:view", "client:view", "client:create", "client:direct_add", "client:edit",
+      "pod:view", "client:view", "client:bdm_access", "client:create", "client:direct_add", "client:edit",
       "placement:view", "placement:create", "report:view"
     ]
   },

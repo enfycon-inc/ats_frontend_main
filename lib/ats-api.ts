@@ -1,3 +1,4 @@
+export interface ClientAccessPolicy { clientsVisibleAcrossUnits: boolean; bdmClientsTenantWide: boolean; otherOwnerPocsVisible: boolean; maskOtherOwnerPocDetails: boolean; }
 import type { CandidateAssessment, SubmissionHistoryResponse, TrackerResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
 
 /**
@@ -920,6 +921,13 @@ const email = {
 
 // ─── Jobs API ───────────────────────────────────────────────────────
 export interface JobPayload {
+  businessUnitId?: string | null;
+  clientId?: string | null;
+  endClientId?: string | null;
+  pocId?: string | null;
+  endClientPocId?: string | null;
+  recruiterIds?: string[];
+  workMode?: string;
   id: string;
   jobCode: string;
   jobTitle: string;
@@ -1031,6 +1039,14 @@ export interface JobStaffOption {
 const staffingRequests = new Map<string, Promise<JobStaffOption[]>>();
 
 const jobs = {
+  async saveDraft(data: Record<string, any>, id?: string): Promise<JobPayload> {
+    return apiFetch<JobPayload>(id ? `/api/jobs/${id}/draft` : '/api/jobs/drafts', {
+      method: id ? 'PATCH' : 'POST', body: JSON.stringify(data),
+    });
+  },
+  async publishDraft(id: string, data: Record<string, any>): Promise<JobPayload> {
+    return apiFetch<JobPayload>(`/api/jobs/${id}/publish`, { method: 'POST', body: JSON.stringify(data) });
+  },
   async changeStatus(id: string, data: { status: string; expectedStatus: string; reason?: string }): Promise<{ status: string }> {
     return apiFetch('/api/jobs/' + id + '/status', { method: 'PATCH', body: JSON.stringify(data) });
   },
@@ -1370,11 +1386,11 @@ const candidates = {
 };
 
 const clients = {
-  async getVisibilityPolicy(): Promise<{ clientsVisibleAcrossUnits: boolean }> {
+  async getVisibilityPolicy(): Promise<ClientAccessPolicy> {
     return apiFetch('/api/clients/visibility-policy');
   },
-  async setVisibilityPolicy(enabled: boolean): Promise<{ clientsVisibleAcrossUnits: boolean }> {
-    return apiFetch('/api/clients/visibility-policy', { method: 'PATCH', body: JSON.stringify({ clientsVisibleAcrossUnits: enabled }) });
+  async setVisibilityPolicy(enabled: boolean | Partial<ClientAccessPolicy>): Promise<ClientAccessPolicy> {
+    return apiFetch('/api/clients/visibility-policy', { method: 'PATCH', body: JSON.stringify(typeof enabled === "boolean" ? { clientsVisibleAcrossUnits: enabled } : enabled) });
   },
   async getContacts(id: string): Promise<any> {
     return apiFetch(`/clients/${id}/contacts`);

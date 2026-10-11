@@ -124,7 +124,7 @@ const formSchema = zod.object({
 
   // Org Info
   numPositions: zod.number({ invalid_type_error: "Number of Positions is required" }).min(1, "Number of Positions is required"),
-  maxSubmissions: zod.number({ invalid_type_error: "Maximum Allowed Submissions is required" }).min(1, "Maximum Allowed Submissions is required"),
+  maxSubmissions: zod.number({ invalid_type_error: "Maximum Allowed Submissions is required" }).int("Enter a whole number").min(1, "Enter at least 1"),
   department: zod.string().optional(),
   salesManager: zod.string().optional(),
   secondarySalesManager: zod.string().optional(),
@@ -463,7 +463,7 @@ const getInitialActiveBranchContext = () => {
       expMin: undefined,
       expMax: undefined,
       numPositions: 1,
-      maxSubmissions: 5,
+      maxSubmissions: 1,
       postToPortal: true,
       displayContactOnPortal: false,
       jobDescription: "",
@@ -919,7 +919,7 @@ const getInitialActiveBranchContext = () => {
       setValue("payRate", matchesPay ? matchesPay[1] : (jobData.payRate || ""));
 
       setValue("numPositions", jobData.noOfPositions || 1);
-      setValue("maxSubmissions", jobData.submissionRequired || 5);
+      setValue("maxSubmissions", jobData.submissionRequired ?? 1);
       setValue("priority", (jobData.priority || "Warm") as any);
       setValue("taxTerms", jobData.taxTerms || "C2C");
       
@@ -3061,6 +3061,12 @@ const getInitialActiveBranchContext = () => {
                         </label>
                         <input
                           type="number"
+                          min={1}
+                          step={1}
+                          onWheel={(event) => event.currentTarget.blur()}
+                          onKeyDown={(event) => {
+                            if (["e", "E", "+", "-", "."].includes(event.key) || (event.key === "ArrowDown" && Number(event.currentTarget.value) <= 1)) event.preventDefault();
+                          }}
                           {...register("maxSubmissions", { valueAsNumber: true })}
                           className="w-full h-9 bg-white dark:bg-slate-950 border border-neutral-300 dark:border-slate-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-xs text-neutral-800 dark:text-neutral-200 font-medium"
                         />
