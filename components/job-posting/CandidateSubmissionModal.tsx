@@ -8,6 +8,7 @@ import { UserPlus, Loader2, UploadCloud, RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import { candidateAmountSchema, candidatePhoneSchema, normalizeCandidateLocation } from "@/lib/candidate-submission-input";
+import { ContractCandidateSubmissionForm } from '@/components/candidates/contract-candidate-submission-form';
 import { CandidateForm } from "@/components/candidates/candidate-form";
 
 export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, job, onSuccess }: { open: boolean; onOpenChange: (open: boolean) => void; job: any; onSuccess?: () => void }) {
@@ -34,7 +35,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
     totalExperienceYears: "",
     currentLocation: "",
     preferredLocations: "",
-    source: "Market",
+    source: "Market", sourceChannel: "", sourceDetail: "",
     skills: "",
     relevantExperienceYears: "",
     currentCtc: "",
@@ -46,7 +47,10 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   
   const [recruiterComment, setRecruiterComment] = useState("");
 
-  const isContractual = job?.type?.toLowerCase().includes("contract") || job?.jobType?.toLowerCase().includes("contract");
+  const savedJobType = job?.type?.trim() || job?.jobType?.trim() || job?.job_type?.trim() || '';
+  const isContractual = /^(contract|contractual|contract to hire|contract-to-hire|c2h|freelance)$/i.test(savedJobType.trim());
+  const isIndia = !job?.market || /^(IN|IND|INDIA)$/i.test(job.market);
+  const SubmissionForm = isContractual ? ContractCandidateSubmissionForm : CandidateForm;
 
   const handleFileSelect = async (selectedFile: File | null) => {
     if (!selectedFile) return;
@@ -161,7 +165,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
     setFormData({ 
       firstName: "", lastName: "", email: "", phone: "",
       totalExperienceYears: "", currentLocation: "", preferredLocations: "",
-      source: "Market", skills: "", relevantExperienceYears: "",
+      source: "Market", sourceChannel: "", sourceDetail: "", skills: "", relevantExperienceYears: "",
       currentCtc: "", expectedCtc: "", currentCompany: "", noticePeriodDays: "",
       availabilityToStart: ""
     });
@@ -173,6 +177,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   };
 
   const handleSubmit = async () => {
+    if (!savedJobType) { toast.error('Job type is unavailable. Reload the job before submitting.'); return; }
     if (!file) {
       toast.error("Please upload candidate resume (CV).");
       return;
@@ -185,21 +190,24 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
     const phoneCheck = candidatePhoneSchema.safeParse(formData.phone);
     if (!phoneCheck.success) { toast.error(phoneCheck.error.issues[0].message); return; }
     if (!isContractual && (!candidateAmountSchema.safeParse(formData.currentCtc).success || !candidateAmountSchema.safeParse(formData.expectedCtc).success)) { toast.error('Enter valid current and expected CTC amounts.'); return; }
-    if (!isContractual && (!/^\d+$/.test(formData.noticePeriodDays) || Number(formData.noticePeriodDays) < 0)) { toast.error("Select Immediate or enter notice period days."); return; }
+    if (!/^\d+$/.test(formData.noticePeriodDays) || !Number.isSafeInteger(Number(formData.noticePeriodDays))) { toast.error("Select Immediate or enter notice period days."); return; }
+    if (formData.source === 'Market' && (!formData.sourceChannel || (['Job Portal', 'Other'].includes(formData.sourceChannel) && !formData.sourceDetail.trim()))) { toast.error('Select a source channel and enter any required source details.'); return; }
+    if (!candidateAmountSchema.safeParse(formData.expectedCtc).success || Number(formData.expectedCtc) <= 0 || (formData.currentCtc && !candidateAmountSchema.safeParse(formData.currentCtc).success)) { toast.error('Enter valid current and expected compensation amounts.'); return; }
+    if (!/^\d+(?:\.\d+)?$/.test(formData.totalExperienceYears) || !formData.currentLocation.trim() || !formData.preferredLocations.trim()) { toast.error('Complete experience, locations and availability.'); return; }
+    const availabilityToStart = isContractual ? (formData.noticePeriodDays === "0" ? "Immediate" : `${Number(formData.noticePeriodDays)} days`) : formData.availabilityToStart;
     setLoading(true);
     try {
       const fullName = `${formData.firstName} ${formData.lastName}`.trim();
       const uploadResponse = await atsApi.candidates.uploadCv(file, formData.source, {
         fullName,
+        totalExperienceYears: formData.totalExperienceYears,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email,
         phone: formData.phone || "",
         relevantExperienceYears: formData.relevantExperienceYears,
         currentCompany: formData.currentCompany,
-        availabilityToStart: formData.availabilityToStart,
-        currentCtc: formData.currentCtc,
-        expectedCtc: formData.expectedCtc,
+        availabilityToStart,
         noticePeriodDays: formData.noticePeriodDays,
         skills: formData.skills,
         currentLocation: formData.currentLocation,
@@ -218,7 +226,16 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
         jobId: job?.id,
         recruiterId: currentUser.id,
         finalStatus: "PENDING_APPROVAL",
-        recruiterComment: recruiterComment.trim() || null
+        recruiterComment: recruiterComment.trim() || null,
+        currentCompensation: formData.currentCtc,
+        expectedCompensation: formData.expectedCtc,
+        compensationCurrency: isIndia ? 'INR' : 'USD',
+        compensationInputUnit: isContractual ? 'MONTH' : isIndia ? 'LPA' : 'YEAR',
+        sourceCategory: formData.source,
+        sourceChannel: formData.source === 'Market' ? formData.sourceChannel : undefined,
+        sourceDetail: formData.source === 'Market' ? formData.sourceDetail : undefined,
+        availabilityToStart,
+        candidateRelevantExperience: formData.relevantExperienceYears ? Number(formData.relevantExperienceYears) : undefined
       });
 
       resetForm();
@@ -321,7 +338,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
 
           {/* RIGHT: Componentized Form Pane (50%) */}
           <div className="w-full lg:w-1/2 p-0 bg-white dark:bg-slate-900 relative">
-            <CandidateForm 
+            <SubmissionForm
               formData={formData} 
               setFormData={setFormData} 
               recruiterComment={recruiterComment} 

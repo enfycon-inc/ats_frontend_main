@@ -116,7 +116,7 @@ export function mapApiJobToJob(api: any): Job {
     skillsRequired: api.skillsRequired || [],
     noOfPositions: api.noOfPositions || 1,
     submissionRequired: api.submissionRequired || 5,
-    jobType: api.jobType || "Full Time",
+    jobType: api.type?.trim() || api.jobType?.trim() || api.job_type?.trim() || undefined,
     approvalStatus: api.approvalStatus || (api.status === "Pending Approval" ? "PENDING_APPROVAL" : "APPROVED"),
     assignedApproverId: api.assignedApproverId || null,
     assignedApproverName: api.assignedApproverName || null,

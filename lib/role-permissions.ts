@@ -165,6 +165,7 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
       const children = [];
       if (company) children.push(
         { label: "Company & Structure", href: "/company?tab=general" },
+        ...(has("tenant:settings") ? [{ label: "Client & POC Access", href: "/settings/client-access" }] : []),
         { label: "Authentication & SSO", href: "/company?tab=auth" },
         { label: "Custom Domains", href: "/company?tab=domains" },
         { label: "Email Dispatch", href: "/company?tab=email" },

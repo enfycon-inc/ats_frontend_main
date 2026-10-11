@@ -359,7 +359,7 @@ export const data = {
       isActive: true,
       items: [
         {
-          title: "Client Access",
+          title: "Client & POC Access",
           url: "/settings/client-access",
           circleColor: "bg-primary",
         },

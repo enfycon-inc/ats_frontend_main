@@ -1296,12 +1296,13 @@ const candidates = {
   async uploadCv(
     file: File, 
     source = 'CV Upload',
-    overrides?: { firstName?: string; lastName?: string; fullName?: string; email?: string; phone?: string; relevantExperienceYears?: string; currentCompany?: string; availabilityToStart?: string; currentCtc?: string; expectedCtc?: string; noticePeriodDays?: string; skills?: string; currentLocation?: string; preferredLocations?: string }
+    overrides?: { totalExperienceYears?: string; firstName?: string; lastName?: string; fullName?: string; email?: string; phone?: string; relevantExperienceYears?: string; currentCompany?: string; availabilityToStart?: string; currentCtc?: string; expectedCtc?: string; noticePeriodDays?: string; skills?: string; currentLocation?: string; preferredLocations?: string }
   ): Promise<{ candidate: any; duplicate: boolean; parsed: boolean; updated?: boolean }> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('source', source);
     if (overrides) {
+      if (overrides.totalExperienceYears) formData.append('totalExperienceYears', overrides.totalExperienceYears);
       if (overrides.firstName) formData.append('firstName', overrides.firstName);
       if (overrides.lastName) formData.append('lastName', overrides.lastName);
       if (overrides.fullName) formData.append('fullName', overrides.fullName);

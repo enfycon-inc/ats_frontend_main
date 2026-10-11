@@ -642,7 +642,6 @@ function TenantAdminSettingsView(props: any) {
 
         {currentTab === "hiring" && (
           <HiringTab
-            canManageClientVisibility={!!props.profile?.permissions?.includes("tenant:settings")}
             candidatePoolMode={props.candidatePoolMode}
             updatingPoolMode={props.updatingPoolMode}
             handleUpdatePoolMode={props.handleUpdatePoolMode}

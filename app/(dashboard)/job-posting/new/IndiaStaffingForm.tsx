@@ -1190,6 +1190,10 @@ const getInitialActiveBranchContext = () => {
       toast.error("This job has already been submitted. Open it from the job catalog.");
       return;
     }
+    if (data.startDate && data.endDate && data.endDate < data.startDate) {
+      toast.error("Expected End Date must be on or after Expected Start Date.");
+      return;
+    }
     if (!Number.isSafeInteger(data.maxSubmissions) || data.maxSubmissions < 1) {
       toast.error("Maximum allowed submissions must be a whole number of at least 1.");
       return;
@@ -1990,12 +1994,9 @@ const getInitialActiveBranchContext = () => {
                       )}
                     </div>
 
-                    {/* Row 2, Col 1: Job Type (with End Date subfield if not Full Time) */}
+                    {/* Row 2, Col 1: Job Type */}
                     <div className="space-y-1">
-                      {watch("jobType") !== "Full Time" ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Type <span className="text-red-500">*</span></Label>
+                          <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Type <span className="text-red-500">*</span></Label>
                             <select
                               {...register("jobType", {
                                 onChange: (e) => {
@@ -2021,46 +2022,6 @@ const getInitialActiveBranchContext = () => {
                               <option value="Seasonal">Seasonal</option>
                               <option value="Freelance">Freelance</option>
                             </select>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="font-bold text-neutral-700 dark:text-neutral-300">End Date</Label>
-                            <input
-                              type="date"
-                              {...register("endDate")}
-                              className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2 py-1 outline-hidden focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold"
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <Label className="font-bold text-neutral-700 dark:text-neutral-300">Job Type <span className="text-red-500">*</span></Label>
-                          <select
-                            {...register("jobType", {
-                              onChange: (e) => {
-                                const val = e.target.value;
-                                if (val === "Full Time") {
-                                  setValue("taxTerms", "Permanent");
-                                    setBillUnit("LPA");
-                                    setPayUnit("LPA");
-                                } else if (val === "Contract") {
-                                  setValue("taxTerms", true ? "Contract (3rd Party)" : "C2C");
-                                    setBillUnit("Monthly");
-                                    setPayUnit("Monthly");
-                                }
-                              }
-                            })}
-                            className="w-full h-8 bg-white dark:bg-slate-955 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 outline-hidden focus:border-primary text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer font-semibold"
-                          >
-                            <option value="Full Time">Full Time</option>
-                            <option value="Part Time">Part Time</option>
-                            <option value="Contract">Contract</option>
-                            <option value="C2H">C2H</option>
-                            <option value="Intern">Intern</option>
-                            <option value="Seasonal">Seasonal</option>
-                            <option value="Freelance">Freelance</option>
-                          </select>
-                        </>
-                      )}
                       {errors.jobType && (
                         <p className="text-[10px] text-red-655 font-bold">{errors.jobType.message}</p>
                       )}
@@ -2259,6 +2220,22 @@ const getInitialActiveBranchContext = () => {
                       )}
                     </div>
 
+                    {watch("jobType") !== "Full Time" && (
+                      <div className="md:col-span-4 -mx-4 -mb-4 mt-1 border-t border-neutral-200 dark:border-slate-700">
+                        <div className="bg-blue-50 dark:bg-slate-800 px-4 py-2 text-xs font-semibold text-blue-900 dark:text-blue-200">Contract dates (optional)</div>
+                        <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="expected-start-date" className="font-bold text-neutral-700 dark:text-neutral-300">Expected Start Date</Label>
+                            <input id="expected-start-date" type="date" aria-describedby="contract-date-help" {...register("startDate")} className="w-full h-8 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2 py-1 focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="expected-end-date" className="font-bold text-neutral-700 dark:text-neutral-300">Expected End Date</Label>
+                            <input id="expected-end-date" type="date" min={watch("startDate") || undefined} aria-describedby="contract-date-help" {...register("endDate")} className="w-full h-8 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2 py-1 focus:border-primary text-xs text-neutral-900 dark:text-neutral-200 font-semibold" />
+                          </div>
+                          <p id="contract-date-help" className="self-center text-xs text-neutral-500 sm:col-span-2 lg:col-span-1 lg:border-l lg:border-neutral-200 lg:pl-4 dark:lg:border-slate-700">Leave dates blank for ASAP or until confirmed.</p>
+                        </div>
+                      </div>
+                    )}
                                       </div>
                 )}
               </div>

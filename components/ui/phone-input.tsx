@@ -7,6 +7,15 @@ import PhoneInputWithCountrySelect, {
 } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { cn } from "@/lib/utils";
+import { limitIndiaPhoneInput } from "@/lib/phone-input-limit";
+
+const IndiaLimitedInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
+  ({ onChange, ...props }, ref) => <input {...props} ref={ref} onChange={event => {
+    event.currentTarget.value = limitIndiaPhoneInput(event.currentTarget.value);
+    onChange?.(event);
+  }} />
+);
+IndiaLimitedInput.displayName = 'IndiaLimitedInput';
 
 export interface PhoneInputProps {
   value?: string;
@@ -55,9 +64,10 @@ export function PhoneInput({
         name={name}
         international
         limitMaxLength={limitMaxLength}
+        inputComponent={limitMaxLength ? IndiaLimitedInput : undefined}
         defaultCountry={resolvedDefaultCountry}
         value={value as Value}
-        onChange={(val) => onChange?.(val || "")}
+        onChange={(val) => onChange?.(limitMaxLength ? limitIndiaPhoneInput(val || "") : val || "")}
         placeholder={placeholder || (resolvedDefaultCountry === "US" ? "(555) 000-0000" : "98765 43210")}
         disabled={disabled}
       />

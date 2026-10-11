@@ -73,7 +73,7 @@ test('comparison preserves zero experience and notice and keeps qualification un
   const html = renderToStaticMarkup(React.createElement(RequirementsComparison, { submission: {
     candidateExperience: 0, candidateNoticePeriod: 0, jobExperienceMin: 1, jobSkillsRequired: ['Python'], candidateSkills: ['Python', 'Java'],
   }, assessment: { candidateQualifications: ['MCA'], criteria: [{ key: 'primary:python', category: 'primary', requirement: 'Python', finding: 'EVIDENCE_FOUND', evidence: 'Listed in profile' }] } }));
-  for (const text of ['0 years', '0 days', 'MCA', 'Matched', 'Additional profile skills', 'Java']) assert.ok(html.includes(text), text);
+  for (const text of ['0 years', '0 days', 'MCA', 'Matched', 'Candidate skills', 'Java']) assert.ok(html.includes(text), text);
 });
 test('missing data and unknown evidence cannot become confirmed mismatches', () => {
   const html = renderToStaticMarkup(React.createElement(RequirementsComparison, { submission: {}, assessment: { criteria: [{ key: 'location', category: 'location', requirement: 'Pune', finding: 'NEEDS_CLARIFICATION', evidence: 'Confirm relocation' }] } }));
@@ -107,4 +107,14 @@ test('separator keyboard and pointer resizing clamp widths and reset the saved p
   assert.equal(states.at(-1), 35);
   divider.props.onDoubleClick(); assert.equal(memory['submission-review-split'], '55');
   delete global.localStorage;
+});
+
+test('requirements own skill indicators and candidate side has only deduplicated profile skills', () => {
+ const tree = RequirementsComparison({ submission: { jobSkillsRequired: ['Java', 'AWS'], candidateSkills: ['Java', 'Python', 'Python.'] }, assessment: { criteria: [{ key: 'java', category: 'primary', requirement: 'Java', finding: 'EVIDENCE_FOUND', evidence: '' }, { key: 'aws', category: 'primary', requirement: 'AWS', finding: 'NO_EVIDENCE', evidence: '' }] } });
+ const group = tree.props.children[2].find(row => row.key === 'Skills');
+ const columns = group.props.children[1].props.children;
+ const left = renderToStaticMarkup(columns[0]), right = renderToStaticMarkup(columns[1]);
+ assert.ok(left.includes('Java: Matched')); assert.ok(left.includes('AWS: Not matched'));
+ assert.ok(right.includes('Java')); assert.ok(right.includes('Python'));
+ assert.ok(!right.includes('AWS')); assert.ok(!right.includes('Python.')); assert.ok(!right.includes('lucide-check')); assert.ok(!right.includes('lucide-x'));
 });

@@ -16,5 +16,5 @@ export function formatCandidateAmount(value: string) {
 export const candidatePhoneSchema = z.string().refine(value => {
   const phone = parsePhoneNumberFromString(value);
   return !!phone && phone.isValid() && (phone.country !== 'IN' || phone.nationalNumber.length === 10);
-}, 'Enter a valid mobile number for the selected country (India requires exactly 10 digits).');
+}, 'Enter valid mobile number');
 export const candidateAmountSchema = z.string().regex(/^\d+(?:\.\d{1,2})?$/, 'Enter a valid nonnegative amount with up to two decimal places.');

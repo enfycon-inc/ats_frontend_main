@@ -6,10 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { ShieldCheck, Users, Shield, Globe, ExternalLink } from "lucide-react";
-import { ClientVisibilitySetting } from "../client-visibility-setting";
 
 interface HiringTabProps {
-  canManageClientVisibility?: boolean;
   candidatePoolMode: string;
   updatingPoolMode: boolean;
   handleUpdatePoolMode: (mode: string) => void;
@@ -23,7 +21,6 @@ interface HiringTabProps {
 }
 
 export function HiringTab({
-  canManageClientVisibility = false,
   candidatePoolMode,
   updatingPoolMode,
   handleUpdatePoolMode,
@@ -63,7 +60,6 @@ export function HiringTab({
 
 return (
     <div className="space-y-6">
-      <ClientVisibilitySetting canManage={canManageClientVisibility} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* LEFT COLUMN */}
         <div className="space-y-6">

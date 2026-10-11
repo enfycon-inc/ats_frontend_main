@@ -33,6 +33,8 @@ export function JobStatusModal({
         <div className="flex items-center justify-between px-4 py-2 bg-neutral-100 dark:bg-slate-800 border-b border-neutral-200 dark:border-slate-700">
           <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Edit Job Status</h3>
           <button
+            data-window-close
+            aria-label="Close"
             disabled={saving}
             onClick={onClose}
             className="text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-250 font-bold text-lg select-none cursor-pointer"

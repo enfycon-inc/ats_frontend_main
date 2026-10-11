@@ -621,3 +621,35 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   -webkit-appearance: none;
 }
 
+/* Shared feedback for close crosses in dialogs, drawers and custom windows.
+   Existing custom windows use Lucide X; new implementations can use the marker. */
+:is([data-window-close], button:has(> svg.lucide-x), button:has(> svg.lucide-x-icon)) {
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+:is([data-window-close], button:has(> svg.lucide-x), button:has(> svg.lucide-x-icon)):not(:disabled):is(:hover, :focus-visible) {
+  color: #dc2626 !important;
+  background-color: #fef2f2 !important;
+  opacity: 1 !important;
+}
+
+:is([data-window-close], button:has(> svg.lucide-x), button:has(> svg.lucide-x-icon)):not(:disabled):active {
+  color: #b91c1c !important;
+  background-color: #fee2e2 !important;
+  opacity: 1 !important;
+}
+
+:is([data-window-close], button:has(> svg.lucide-x), button:has(> svg.lucide-x-icon)):not(:disabled):is(:hover, :focus-visible, :active) > svg {
+  color: inherit !important;
+}
+
+.dark :is([data-window-close], button:has(> svg.lucide-x), button:has(> svg.lucide-x-icon)):not(:disabled):is(:hover, :focus-visible) {
+  color: #f87171 !important;
+  background-color: #450a0a !important;
+}
+
+.dark :is([data-window-close], button:has(> svg.lucide-x), button:has(> svg.lucide-x-icon)):not(:disabled):active {
+  color: #fca5a5 !important;
+  background-color: #7f1d1d !important;
+}
+
