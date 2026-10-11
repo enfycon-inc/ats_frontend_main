@@ -1,0 +1,19 @@
+import type { TrackerSubmission } from '@/lib/submission-contract';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
+export function SubmittedCandidateDetails({ submission: s }: { submission: TrackerSubmission }) {
+  const contract = /contract/i.test(s.jobType || '');
+  const amount = (value: string | null | undefined, currency?: string | null, term?: string | null) => value != null && value !== '' ? [value, currency, term].filter(Boolean).join(' / ') : 'Not provided';
+  const years = (value: number | null | undefined) => value != null ? `${value} years` : 'Not provided';
+  const groups = [
+    { title: 'Contact', fields: [['First name', s.candidateFirstName], ['Last name', s.candidateLastName], ['Email', s.candidateEmail], ['Mobile', s.candidatePhone]] },
+    { title: 'Experience & availability', fields: [['Current company', s.candidateCurrentCompany], ['Total experience', years(s.candidateExperience)], ['Relevant experience', years(s.candidateRelevantExperience)], ['Current location', s.candidateCurrentLocation], ['Preferred locations', s.candidatePreferredLocations?.join(', ')], ['Notice period', s.candidateNoticePeriod != null ? `${s.candidateNoticePeriod} days` : null]] },
+    { title: 'Compensation', fields: contract ? [['Submitted rate', amount(s.submittedRate, s.submittedRateCurrency, s.submittedRateTerm)]] : [['Current CTC', amount(s.candidateCurrentCtc, s.candidateCtcCurrency, s.candidateCtcTerm)], ['Expected CTC', amount(s.candidateExpectedCtc, s.candidateCtcCurrency, s.candidateCtcTerm)]] },
+  ];
+  return <section aria-label="Submitted candidate details" className="min-w-0 rounded-xl border border-border bg-card p-3">
+    <div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-bold">{s.candidateName || 'Candidate details'}</h2>{s.jobType && <span className="rounded-md bg-blue-50 px-2 py-1 text-[10.5px] text-blue-800 dark:bg-blue-950 dark:text-blue-200">{s.jobType}</span>}</div>
+    {groups.map(group => <div key={group.title} className="mt-4"><h3 className="border-b border-border pb-1.5 text-xs font-semibold text-blue-800 dark:text-blue-200">{group.title}</h3><dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">{group.fields.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-[10.5px] text-muted-foreground">{label}</dt><dd className="mt-0.5 text-xs font-medium [overflow-wrap:anywhere]">{value || 'Not provided'}</dd></div>)}</dl></div>)}
+    <div className="mt-4"><h3 className="border-b border-border pb-1.5 text-xs font-semibold text-blue-800 dark:text-blue-200">Recruiter notes</h3><p className="mt-2 whitespace-pre-wrap text-xs [overflow-wrap:anywhere]">{s.recruiterComment || 'No recruiter notes provided.'}</p></div>
+    <div className="mt-4 flex items-center gap-3 rounded-lg bg-blue-50/60 p-3 dark:bg-blue-950/30"><Avatar className="h-9 w-9 shrink-0">{s.recruiterAvatar && <AvatarImage src={s.recruiterAvatar} alt={s.recruiterName || 'Submitter'} />}<AvatarFallback className="bg-blue-100 text-xs text-blue-800">{(s.recruiterName || s.recruiterEmail || '?').split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</AvatarFallback></Avatar><div className="min-w-0"><p className="text-[10.5px] text-muted-foreground">Submitted by</p><p className="text-xs font-semibold">{s.recruiterName || 'Not provided'}</p><p className="text-[10.5px] text-muted-foreground [overflow-wrap:anywhere]">{s.recruiterEmail || 'Email not provided'}</p></div></div>
+  </section>;
+}
