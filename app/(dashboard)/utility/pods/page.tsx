@@ -77,6 +77,18 @@ function checkIsUnitScoped(user: any): boolean {
   );
 }
 
+function checkIsBranchAdmin(user: any): boolean {
+  if (!user || checkIsTenantAdmin(user) || checkIsUnitScoped(user)) return false;
+  const sysRole = (user.systemRole || "").toUpperCase();
+  const roles: string[] = Array.isArray(user.roles) ? user.roles.map((r: string) => r.toUpperCase()) : [];
+  const perms: string[] = Array.isArray(user.permissions) ? user.permissions : [];
+  return (
+    roles.includes("BRANCH_ADMIN") ||
+    sysRole === "BRANCH_ADMIN" ||
+    perms.includes("branch_admin:manage")
+  );
+}
+
 export default function PodsPage() {
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
@@ -85,6 +97,7 @@ export default function PodsPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isTenantAdmin, setIsTenantAdmin] = useState<boolean>(false);
   const [isUnitScoped, setIsUnitScoped] = useState<boolean>(false);
+  const [isBranchAdmin, setIsBranchAdmin] = useState<boolean>(false);
 
   const [pods, setPods] = useState<Pod[]>([]);
   const [availableRecruiters, setAvailableRecruiters] = useState<any[]>([]);
@@ -128,8 +141,10 @@ export default function PodsPage() {
 
         const tenantAdmin = checkIsTenantAdmin(user);
         const unitScoped = checkIsUnitScoped(user);
+        const branchAdmin = checkIsBranchAdmin(user);
         setIsTenantAdmin(tenantAdmin);
         setIsUnitScoped(unitScoped);
+        setIsBranchAdmin(branchAdmin);
 
         const userRoles = Array.isArray(user?.roles) ? user.roles.map((r: string) => r.toUpperCase()) : [];
         const userPerms = Array.isArray(user?.permissions) ? user.permissions : [];
