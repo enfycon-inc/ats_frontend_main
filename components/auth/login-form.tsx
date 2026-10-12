@@ -174,35 +174,6 @@ const LoginForm = () => {
         setIsAuthorizingSso(false);
         toast.error("SSO handoff failed.");
       });
-    } else if (!isExpired && !errorParam) {
-      // If user lands on login page while already authenticated, redirect them appropriately
-      fetch("/api/auth/session", { cache: "no-store" })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((session) => {
-          if (session?.user && (session as any).error !== "RefreshAccessTokenError") {
-            const user = session.user as any;
-            const isSuperAdmin = user.roles?.includes("SUPER_ADMIN") || user.systemRole === "SUPER_ADMIN";
-            const rawUserSub = user.tenantDomain || "";
-            const userSub = rawUserSub.split(".")[0].toLowerCase().trim();
-            const isMasterTenant = !userSub || userSub === "enfy" || userSub === "www" || userSub === "localhost";
-
-            const currentSub = getCurrentSubdomain();
-            const base = getBaseDomain();
-            const protocol = window.location.protocol;
-
-            if (userSub && !isMasterTenant) {
-              const isPlatformOwnerOnRoot = (userSub === "enfycon" || userSub === "enfy") && currentSub === "";
-              if (currentSub === userSub || isPlatformOwnerOnRoot) {
-                window.location.replace("/dashboard");
-              } else if (!currentSub) {
-                signOut({ redirect: false });
-              }
-            } else if (isMasterTenant && !currentSub) {
-              window.location.replace("/dashboard");
-            }
-          }
-        })
-        .catch(() => {});
     }
   }, [searchParams, setValue]);
 
