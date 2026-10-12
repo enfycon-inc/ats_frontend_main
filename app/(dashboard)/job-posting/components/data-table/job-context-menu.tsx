@@ -11,6 +11,7 @@ export interface JobContextMenuProps {
   job: Job;
   hasSubmitCandidatePermission: boolean;
   hasEditPermission: boolean;
+  canAssignRecruiters?: boolean;
   hasDelegatePermission: boolean;
   currentUserBranchId: string | null | undefined;
   onOpenSourceModal: (job: Job) => void;
@@ -28,6 +29,7 @@ export function JobContextMenu({
   job,
   hasSubmitCandidatePermission,
   hasEditPermission,
+  canAssignRecruiters,
   hasDelegatePermission,
   currentUserBranchId,
   onOpenSourceModal,
@@ -115,18 +117,20 @@ export function JobContextMenu({
               <span>Edit Job</span>
             </button>
 
-            <button
-              onClick={() => {
-                onOpenAssignModal(job);
-                onClose();
-              }}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer font-semibold"
-            >
-              <div className="h-6 w-6 rounded-md bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-2xs">
-                <Plus className="h-3.5 w-3.5" />
-              </div>
-              <span>Assign Recruiters / Pods</span>
-            </button>
+            {(canAssignRecruiters ?? hasEditPermission) && (
+              <button
+                onClick={() => {
+                  onOpenAssignModal(job);
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer font-semibold"
+              >
+                <div className="h-6 w-6 rounded-md bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-2xs">
+                  <Plus className="h-3.5 w-3.5" />
+                </div>
+                <span>Assign Recruiters / Pods</span>
+              </button>
+            )}
           </>
         )}
 

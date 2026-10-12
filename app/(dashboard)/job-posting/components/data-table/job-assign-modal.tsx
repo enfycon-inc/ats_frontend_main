@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
 import { Job } from "../../data/mock-jobs";
-import { getAssignedPersonDisplay } from "../../lib/job-table-utils";
+import { getAssignedPersonDisplay, canAssignRecruitersToJob } from "../../lib/job-table-utils";
 
 export interface JobAssignModalProps {
   job: Job | null;
@@ -54,16 +54,22 @@ export function JobAssignModal({
 
   // Load context data when modal is open
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !job) return;
     async function loadAssignmentData() {
       try {
-        const [users, pods, branches, roles] = await Promise.all([
-          atsApi.auth.listUsers().catch(() => []),
+        const targetBranchId = job?.branchId || targetBranch?.id || currentUserBranchId || undefined;
+        const targetUnitId = (job as any)?.businessUnitId || (job as any)?.business_unit_id || targetUnit?.id || (currentUser as any)?.businessUnitId || undefined;
+
+        const [staff, pods, branches, roles] = await Promise.all([
+          atsApi.jobs.staffingOptions({
+            branchId: targetBranchId,
+            businessUnitId: targetUnitId,
+          }).catch(() => []),
           atsApi.pods.list().catch(() => []),
           atsApi.branches.list().catch(() => []),
           atsApi.auth.listRoles(undefined, true).catch(() => []),
         ]);
-        if (users && users.length > 0) setUsersList(users);
+        if (staff && staff.length > 0) setUsersList(staff);
         if (pods && pods.length > 0) setPodsList(pods);
         if (branches && branches.length > 0) setBranchesList(branches);
         if (roles && roles.length > 0) setRolesList(roles);
@@ -72,10 +78,14 @@ export function JobAssignModal({
       }
     }
     loadAssignmentData();
-  }, [isOpen]);
+  }, [isOpen, job, targetBranch, targetUnit, currentUserBranchId, currentUser]);
 
   const getUserRoleLabel = useCallback(
     (u: any, branchId?: string): string => {
+      if (u?.canRecruit !== undefined) {
+        return u.canRecruit ? "Recruiter" : u.canReview ? "Reviewer" : "Staff";
+      }
+
       const activeBranchId =
         branchId || (typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null);
 
@@ -178,7 +188,7 @@ export function JobAssignModal({
     return null;
   }, [job, targetBranch]);
 
-  // ─── ROLE & PERMISSION SCOPING FOR ASSIGNMENT ─────────────────────────
+  // â”€â”€â”€ ROLE & PERMISSION SCOPING FOR ASSIGNMENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const userRoles = useMemo(() => {
     return (currentUser?.roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
   }, [currentUser]);
@@ -206,11 +216,17 @@ export function JobAssignModal({
     );
   }, [userRoles, userPerms]);
 
+  const isUnitAdmin = useMemo(() => {
+    return userRoles.includes("UNITADMIN") || userPerms.includes("unit_admin:manage");
+  }, [userRoles, userPerms]);
+
   const isDeliveryHead = useMemo(() => {
     return userRoles.includes("DELIVERYHEAD") || userRoles.includes("DELIVERY_HEAD");
   }, [userRoles]);
 
-  const isHigherRole = isSuperOrTenantAdmin || isBranchAdmin || isDeliveryHead;
+  const isHigherRole = isSuperOrTenantAdmin || isBranchAdmin || isUnitAdmin || isDeliveryHead || userPerms.includes("job:assign");
+
+  const canAssignPods = isHigherRole || userPerms.includes("job:assign_pod");
 
   // Pod Head role & active pod detection
   const myPod = useMemo(() => {
@@ -245,15 +261,16 @@ export function JobAssignModal({
     );
   }, [isHigherRole, userRoles, currentUser, podsList]);
 
-  // ─── UNIT / BRANCH POLICY ENFORCEMENT ─────────────────────────────────
+  // â”€â”€â”€ UNIT / BRANCH POLICY ENFORCEMENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const branchAllowsPods = useMemo(() => {
+    if (!canAssignPods) return false;
     const targetPolicy = targetUnit || targetBranch;
     if (!targetPolicy) return true;
     const allowNone = Boolean(targetPolicy.allowNone ?? targetPolicy.allow_none);
     if (allowNone) return false; // allowNone = Direct Assignment Only
     const allowPods = (targetPolicy.allowPods ?? targetPolicy.allow_pods) !== false;
     return allowPods;
-  }, [targetUnit, targetBranch]);
+  }, [canAssignPods, targetUnit, targetBranch]);
 
   const branchAllowsDirectStaff = useMemo(() => {
     const targetPolicy = targetUnit || targetBranch;
@@ -265,7 +282,7 @@ export function JobAssignModal({
     return true;
   }, [targetUnit, targetBranch]);
 
-  // ─── SCOPED PODS & USERS (Role Scoping) ─────────────────────────────────
+  // â”€â”€â”€ SCOPED PODS & USERS (Role Scoping) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const targetBranchPods = useMemo(() => {
     const bId = targetBranch?.id;
     const uId = job?.businessUnitId || (job as any)?.business_unit_id || targetUnit?.id;
@@ -293,6 +310,25 @@ export function JobAssignModal({
   }, [podsList, targetBranch, job, targetUnit, isPodHead, myPod]);
 
   const branchRecruiterUsers = useMemo(() => {
+    // When populated from atsApi.jobs.staffingOptions (capability-checked for the job):
+    if (usersList.length > 0 && usersList[0].canRecruit !== undefined) {
+      let list = usersList.filter((u: any) => u.canRecruit !== false);
+      if (isPodHead && myPod) {
+        const myPodId = myPod.id;
+        const myPodMemberIds = new Set(
+          (myPod.users || myPod.members || []).map((m: any) => m.id || m.userId).filter(Boolean)
+        );
+        return list.filter(
+          (u: any) =>
+            u.podId === myPodId ||
+            u.pod_id === myPodId ||
+            myPodMemberIds.has(u.id) ||
+            u.id === myPod.podHeadId
+        );
+      }
+      return list;
+    }
+
     const bId = targetBranch?.id;
     const targetUnitId = job?.businessUnitId || (job as any)?.business_unit_id || targetUnit?.id;
     let list = usersList.filter((u: any) => u.isActive !== false && u.is_active !== false);
@@ -320,7 +356,11 @@ export function JobAssignModal({
       ((job as any)?.sharedBranchIds && (job as any).sharedBranchIds.length > 0);
     const isSharedBranchViewing = isCoSourcedJob && job?.branchId !== currentUserBranchId;
 
-    if (targetUnitId) {
+    // Branch Admin and Delivery Head can see all recruiters in their branch regardless of unit.
+    // Unit Admin, Pod Lead, and lower roles remain unit-scoped.
+    const canSeeAllBranchRecruiters = isSuperOrTenantAdmin || isBranchAdmin || isDeliveryHead;
+
+    if (targetUnitId && !canSeeAllBranchRecruiters) {
       const unitScoped = list.filter(
         (u: any) => (u.businessUnitId || u.business_unit_id) === targetUnitId
       );
@@ -551,6 +591,10 @@ export function JobAssignModal({
 
   const handleSaveCombinedAssignment = async (override?: { unassignAll?: boolean }) => {
     if (!job) return;
+    if (!canAssignRecruitersToJob(job, currentUser)) {
+      toast.error("You are only allowed to assign recruiters on your own created jobs.");
+      return;
+    }
     setIsAssigning(true);
     try {
       const payload: Record<string, any> = {};
@@ -889,7 +933,7 @@ export function JobAssignModal({
                     variant="outline"
                     className="text-xs h-7 text-blue-600 border-blue-200 hover:bg-blue-50"
                   >
-                    Go to Pods Manager →
+                    Go to Pods Manager â†’
                   </Button>
                 </Link>
               </div>
