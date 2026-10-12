@@ -514,6 +514,26 @@ const getInitialActiveBranchContext = () => {
   }, [watchTaxTerms, commissionType, customCommission, setValue]);
 
   const selectedJobType = watch("jobType");
+  const applyClientCommission = (client: any) => {
+    const rawCommission = client?.commissionPercentage ?? client?.commission_percentage;
+    const commission = Number(rawCommission);
+
+    if (rawCommission == null || rawCommission === "" || !Number.isFinite(commission) || commission < 0 || commission > 100) {
+      setCommissionType("8.33");
+      setCustomCommission("");
+      return;
+    }
+
+    const preset = ["8.33", "10", "12.5", "15"].find((value) => Number(value) === commission);
+    if (preset) {
+      setCommissionType(preset);
+      setCustomCommission("");
+    } else {
+      setCommissionType("custom");
+      setCustomCommission(String(commission));
+    }
+  };
+
   const selectClient = (name: string, id: string | null, endClient = false) => {
     setValue(endClient ? "endClientName" : "client", name, { shouldValidate: true, shouldDirty: true });
     if (endClient) {
@@ -2351,10 +2371,7 @@ const getInitialActiveBranchContext = () => {
                                             const found = cl;
                                             if (found) {
                                               setSelectedClientId(found.id);
-                                              if (found.commissionPercentage || found.commission_percentage) {
-                                                const pct = found.commissionPercentage || found.commission_percentage;
-                                                setCommissionType(String(pct));
-                                              }
+                                              applyClientCommission(found);
 
                                             }
                                           }}
@@ -3458,6 +3475,7 @@ const getInitialActiveBranchContext = () => {
           setClientsError("");
           if (clientModalTarget === "client") {
             selectClient(clientName, addedClient?.id || null);
+            applyClientCommission(addedClient);
             if (!getValues("endClientName")) {
               selectClient(clientName, addedClient?.id || null, true);
             }

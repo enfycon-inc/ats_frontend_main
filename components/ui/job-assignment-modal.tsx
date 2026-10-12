@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Users, ShieldAlert, User, Check, X, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import type { JobPodOption } from "@/lib/ats-api";
 
 export type AssignmentType = "unassigned" | "pod" | "recruiters";
 
@@ -14,7 +15,7 @@ interface JobAssignmentModalProps {
   selectedPodId: string | null;
   selectedRecruiterIds: string[];
   onApply: (type: AssignmentType, podId: string | null, recruiterIds: string[]) => void;
-  podsList: any[];
+  podsList: JobPodOption[];
   recruitersList: any[];
   activeBranch?: any;
   canAssignPods?: boolean;
@@ -184,7 +185,7 @@ export function JobAssignmentModal({
                           {pod.name}
                         </p>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          {pod.members?.length || 0} recruiters {"\u2022"} Lead: {pod.leadName || pod.leadEmail || "None"}
+                          {pod.memberCount} members {"\u2022"} Lead: {pod.podHeadName || "None"}
                         </p>
                       </div>
                       <div className={cn(

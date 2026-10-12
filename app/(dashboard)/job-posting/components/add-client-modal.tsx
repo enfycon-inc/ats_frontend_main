@@ -75,6 +75,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
   const cities = countryIso && watchState ? City.getCitiesOfState(countryIso, watchState) : [];
 
   const [hasDirectAddClearance, setHasDirectAddClearance] = React.useState<boolean>(true);
+  const [ownershipDisplayName, setOwnershipDisplayName] = React.useState("");
   const [existingClients, setExistingClients] = React.useState<any[]>([]);
   const [selectedExistingClient, setSelectedExistingClient] = React.useState<any | null>(null);
   const [showSuggestions, setShowSuggestions] = React.useState(false);
@@ -83,6 +84,8 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
   // Pre-fill ownership with current logged-in user details, initial client name and business unit
   useEffect(() => {
     if (open) {
+      setOwnershipDisplayName("");
+      setValue("ownership", "");
       setValue("country", market === "IN" ? "IN" : "US");
       atsApi.clients.list().then((data: any) => setExistingClients(data || [])).catch(() => {});
       if (initialClientName) {
@@ -93,6 +96,7 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
           const prof = await atsApi.auth.me();
           if (prof) {
             const onboardingUser = prof.fullName || prof.full_name || prof.name || prof.email || "";
+            setOwnershipDisplayName(onboardingUser);
             setValue("ownership", prof.id || onboardingUser);
 
             const userRoles = (prof.roles || []).map((r: string) => String(r).toUpperCase().replace(/[\s-_]+/g, ''));
@@ -156,13 +160,15 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
         website: data.website || null,
         status: data.status,
         country: data.country,
+        market: market === "IN" ? "INDIA" : "US",
+        currency: market === "IN" ? "INR" : "USD",
         state: data.state || null,
         city: data.city || null,
         ownership: data.ownership,
         aboutCompany: data.aboutCompany || null,
         about_company: data.aboutCompany || null,
-        commissionPercentage: data.commissionPercentage || null,
-        commission_percentage: data.commissionPercentage || null,
+        commissionPercentage: data.commissionPercentage ?? null,
+        commission_percentage: data.commissionPercentage ?? null,
         msaSigned: data.msaSigned,
         msa_signed: data.msaSigned,
         sowExecuted: data.sowExecuted,
@@ -332,8 +338,9 @@ export function AddClientModal({ open, onOpenChange, onClientAdded, market = "US
                 disabled
                 className="h-8 text-xs bg-neutral-100 dark:bg-slate-900 border-neutral-300 dark:border-slate-700 cursor-not-allowed opacity-90 font-medium" 
                 placeholder="Auto-detected" 
-                {...register("ownership")} 
+                value={ownershipDisplayName}
               />
+              <input type="hidden" {...register("ownership")} />
               {errors.ownership && <p className="text-[10px] text-red-500 font-bold">{errors.ownership.message}</p>}
             </div>
 

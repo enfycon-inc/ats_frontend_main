@@ -1031,6 +1031,16 @@ export interface JobStaffOption {
   canReview: boolean;
 }
 
+export interface JobPodOption {
+  id: string;
+  name: string;
+  businessUnitId: string;
+  branchId: string | null;
+  podHeadId: string | null;
+  podHeadName: string | null;
+  memberCount: number;
+}
+
 // Share concurrent lookups only. Completed results are never reused after roles or scope change.
 const staffingRequests = new Map<string, Promise<JobStaffOption[]>>();
 
@@ -1046,10 +1056,10 @@ const jobs = {
   async changeStatus(id: string, data: { status: string; expectedStatus: string; reason?: string }): Promise<{ status: string }> {
     return apiFetch('/api/jobs/' + id + '/status', { method: 'PATCH', body: JSON.stringify(data) });
   },
-  async podOptions(scope: { branchId?: string; businessUnitId: string }): Promise<any[]> {
+  async podOptions(scope: { branchId?: string; businessUnitId: string }): Promise<JobPodOption[]> {
     const query = new URLSearchParams({ businessUnitId: scope.businessUnitId });
     if (scope.branchId) query.set('branchId', scope.branchId);
-    return apiFetch(`/api/jobs/pod-options?${query}`);
+    return apiFetch<JobPodOption[]>(`/api/jobs/pod-options?${query}`);
   },
   async staffingOptions(scope?: { branchId?: string; businessUnitId?: string; jobId?: string }, fetchOptions?: { silent?: boolean }): Promise<JobStaffOption[]> {
     const query = new URLSearchParams();
