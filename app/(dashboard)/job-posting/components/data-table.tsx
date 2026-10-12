@@ -24,8 +24,8 @@ import { Job } from "../data/mock-jobs";
 import AddCandidateModal from "@/components/dashboard/AddCandidateModal";
 import { DelegateJobModal } from "@/components/shared/delegate-job-modal";
 
-// Re-export utility functions so consumers importing from this file remain unaffected
-export {
+// Import and re-export utility functions so consumers importing from this file remain unaffected
+import {
   getAssignedPersonDisplay,
   formatDateTimeDisplay,
   isJobRecent,
@@ -33,10 +33,15 @@ export {
   exportJobsToCSV,
   canAssignRecruitersToJob,
 } from "../lib/job-table-utils";
-import {
+
+export {
+  getAssignedPersonDisplay,
+  formatDateTimeDisplay,
+  isJobRecent,
+  isJobPostedToday,
   exportJobsToCSV,
   canAssignRecruitersToJob,
-} from "../lib/job-table-utils";
+};
 import { useJobTableData } from "../lib/use-job-table-data";
 import { JobTableFilters } from "./data-table/job-table-filters";
 import { JobTableRow } from "./data-table/job-table-row";

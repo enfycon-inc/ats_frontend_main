@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
@@ -51,6 +51,39 @@ export function JobAssignModal({
   const [podsList, setPodsList] = useState<any[]>([]);
   const [branchesList, setBranchesList] = useState<any[]>([]);
   const [rolesList, setRolesList] = useState<any[]>([]);
+
+  // Target branch resolution for job
+  const targetBranch = useMemo(() => {
+    if (!job) return null;
+    if (job.branchId) {
+      const b = branchesList.find((x: any) => x.id === job.branchId);
+      if (b) return b;
+    }
+    if ((job as any).businessUnit || "N/A") {
+      const b = branchesList.find(
+        (x: any) => x.name?.toLowerCase() === ((job as any).businessUnit || "N/A")?.toLowerCase()
+      );
+      if (b) return b;
+    }
+    const activeId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
+    if (activeId) {
+      const b = branchesList.find((x: any) => x.id === activeId);
+      if (b) return b;
+    }
+    return null;
+  }, [job, branchesList]);
+
+  // Target branch unit resolution for job
+  const targetUnit = useMemo(() => {
+    if (!job) return null;
+    if ((job as any).businessUnitRef) return (job as any).businessUnitRef;
+    const targetUnitId = (job as any).businessUnitId || (job as any).business_unit_id;
+    if (targetUnitId && targetBranch?.businessUnits) {
+      const u = targetBranch.businessUnits.find((x: any) => x.id === targetUnitId);
+      if (u) return u;
+    }
+    return null;
+  }, [job, targetBranch]);
 
   // Load context data when modal is open
   useEffect(() => {
@@ -154,39 +187,6 @@ export function JobAssignModal({
     },
     [rolesList]
   );
-
-  // Target branch resolution for job
-  const targetBranch = useMemo(() => {
-    if (!job) return null;
-    if (job.branchId) {
-      const b = branchesList.find((x: any) => x.id === job.branchId);
-      if (b) return b;
-    }
-    if ((job as any).businessUnit || 'N/A') {
-      const b = branchesList.find(
-        (x: any) => x.name?.toLowerCase() === ((job as any).businessUnit || "N/A")?.toLowerCase()
-      );
-      if (b) return b;
-    }
-    const activeId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
-    if (activeId) {
-      const b = branchesList.find((x: any) => x.id === activeId);
-      if (b) return b;
-    }
-    return null;
-  }, [job, branchesList]);
-
-  // Target branch unit resolution for job
-  const targetUnit = useMemo(() => {
-    if (!job) return null;
-    if ((job as any).businessUnitRef) return (job as any).businessUnitRef;
-    const targetUnitId = (job as any).businessUnitId || (job as any).business_unit_id;
-    if (targetUnitId && targetBranch?.businessUnits) {
-      const u = targetBranch.businessUnits.find((x: any) => x.id === targetUnitId);
-      if (u) return u;
-    }
-    return null;
-  }, [job, targetBranch]);
 
   // â”€â”€â”€ ROLE & PERMISSION SCOPING FOR ASSIGNMENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const userRoles = useMemo(() => {

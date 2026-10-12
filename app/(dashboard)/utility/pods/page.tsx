@@ -1227,9 +1227,6 @@ export default function PodsPage() {
                               </div>
                               <div className="text-[10px] text-neutral-400 truncate">{r.email}</div>
                             </div>
-                            <Badge className="text-[9.5px] bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-300 border-0 font-medium shrink-0">
-                              Recruiter
-                            </Badge>
                           </div>
                         );
                       })}
