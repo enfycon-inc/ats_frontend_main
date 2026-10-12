@@ -240,14 +240,17 @@ export default function PodsPage() {
     await loadData(currentUser, isTenantAdmin, isUnitScoped, selectedUnitFilter, branchId);
   };
 
-  // Helper: Fetch available recruiters for a given business unit (used when selecting unit in modal)
-  const fetchRecruitersForUnit = async (buId: string) => {
+  // Helper: Fetch available recruiters for a given business unit and branch (used when selecting unit in modal)
+  const fetchRecruitersForUnit = async (buId: string, bId?: string) => {
     if (!buId) {
       setModalRecruiters([]);
       return;
     }
     try {
-      const recs = await atsApi.pods.getAvailableRecruiters({ businessUnitId: buId });
+      const recs = await atsApi.pods.getAvailableRecruiters({
+        businessUnitId: buId,
+        branchId: bId || undefined,
+      });
       setModalRecruiters(recs || []);
     } catch (err: any) {
       console.warn("Failed to fetch unit recruiters:", err);
@@ -261,24 +264,36 @@ export default function PodsPage() {
     setRecruiterSearch("");
     setSelectedPod(null);
     setPodHeadId("");
-    setPodBranchId(selectedBranchFilter !== "all" ? selectedBranchFilter : "");
+
+    let initialBranchId = "";
+    if (isBranchAdmin && currentUser?.branchId) {
+      initialBranchId = currentUser.branchId;
+    } else if (selectedBranchFilter !== "all") {
+      initialBranchId = selectedBranchFilter;
+    } else if (branches.length === 1) {
+      initialBranchId = branches[0].id;
+    }
+    setPodBranchId(initialBranchId);
 
     let defaultUnitId = "";
     if (isUnitScoped) {
       defaultUnitId = currentUser?.businessUnitId || currentUser?.business_unit_id || "";
-    } else if (selectedUnitFilter !== "all") {
-      defaultUnitId = selectedUnitFilter;
-    } else if (businessUnits.length > 0) {
-      defaultUnitId = businessUnits[0].id;
+    } else if (initialBranchId) {
+      const unitsForBranch = businessUnits.filter((bu) => !bu.branchId || bu.branchId === initialBranchId);
+      if (selectedUnitFilter !== "all" && unitsForBranch.some((bu) => bu.id === selectedUnitFilter)) {
+        defaultUnitId = selectedUnitFilter;
+      } else if (unitsForBranch.length === 1) {
+        defaultUnitId = unitsForBranch[0].id;
+      }
     }
 
     setPodUnitId(defaultUnitId);
     setSelectedRecruiterIds([]);
 
     if (defaultUnitId) {
-      await fetchRecruitersForUnit(defaultUnitId);
+      await fetchRecruitersForUnit(defaultUnitId, initialBranchId);
     } else {
-      setModalRecruiters(availableRecruiters);
+      setModalRecruiters([]);
     }
 
     setModalMode("create");
@@ -296,9 +311,12 @@ export default function PodsPage() {
     setPodUnitId(targetUnitId);
     setSelectedRecruiterIds(pod.members.map((m) => m.id));
 
-    // Fetch unassigned recruiters in this unit
+    // Fetch unassigned recruiters in this unit and branch
     try {
-      const unassigned = await atsApi.pods.getAvailableRecruiters({ businessUnitId: targetUnitId });
+      const unassigned = await atsApi.pods.getAvailableRecruiters({
+        businessUnitId: targetUnitId,
+        branchId: pod.branchId || undefined,
+      });
       // In edit mode: current pod members + unassigned recruiters
       const existingMembers = pod.members.map((m) => ({
         id: m.id,
@@ -308,7 +326,6 @@ export default function PodsPage() {
         systemRole: m.systemRole || "RECRUITER",
       }));
 
-      const unassignedIds = new Set(unassigned.map((u: any) => u.id));
       const combined = [...existingMembers];
       unassigned.forEach((u: any) => {
         if (!existingMembers.some((m) => m.id === u.id)) {
@@ -334,6 +351,16 @@ export default function PodsPage() {
     e.preventDefault();
     if (!podName.trim()) return toast.error("Please provide a pod name.");
 
+    const effectiveBranchId = isUnitScoped
+      ? undefined
+      : isBranchAdmin && currentUser?.branchId
+      ? currentUser.branchId
+      : podBranchId;
+
+    if (!isUnitScoped && !effectiveBranchId) {
+      return toast.error("Branch selection is mandatory. Please select a branch.");
+    }
+
     const effectiveUnitId = isUnitScoped
       ? currentUser?.businessUnitId || currentUser?.business_unit_id
       : podUnitId;
@@ -346,7 +373,7 @@ export default function PodsPage() {
       setSubmitting(true);
       await atsApi.pods.create({
         name: podName.trim(),
-        branchId: isUnitScoped ? undefined : podBranchId || undefined,
+        branchId: isUnitScoped ? undefined : effectiveBranchId,
         businessUnitId: effectiveUnitId,
         podHeadId: podHeadId || undefined,
         description: podDescription.trim() || undefined,
@@ -367,6 +394,16 @@ export default function PodsPage() {
     if (!selectedPod) return;
     if (!podName.trim()) return toast.error("Please provide a pod name.");
 
+    const effectiveBranchId = isUnitScoped
+      ? undefined
+      : isBranchAdmin && currentUser?.branchId
+      ? currentUser.branchId
+      : podBranchId || selectedPod.branchId;
+
+    if (!isUnitScoped && !effectiveBranchId) {
+      return toast.error("Branch selection is mandatory. Please select a branch.");
+    }
+
     const effectiveUnitId = isUnitScoped
       ? selectedPod.businessUnitId || currentUser?.businessUnitId
       : podUnitId || selectedPod.businessUnitId;
@@ -375,7 +412,7 @@ export default function PodsPage() {
       setSubmitting(true);
       await atsApi.pods.update(selectedPod.id, {
         name: podName.trim(),
-        branchId: isUnitScoped ? undefined : podBranchId || undefined,
+        branchId: isUnitScoped ? undefined : effectiveBranchId,
         businessUnitId: effectiveUnitId || undefined,
         podHeadId: podHeadId || null,
         description: podDescription.trim() || null,
@@ -427,30 +464,25 @@ export default function PodsPage() {
   };
 
   const toggleRecruiter = (id: string) => {
-    setSelectedRecruiterIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setSelectedRecruiterIds((prev) => {
+      const isRemoving = prev.includes(id);
+      if (isRemoving && podHeadId === id) {
+        setPodHeadId("");
+      }
+      return isRemoving ? prev.filter((x) => x !== id) : [...prev, id];
+    });
   };
 
-  // Pod Lead Candidates: Users in the unit who are not already leading another pod
+  // Pod Lead Candidates: ONLY eligible recruiters in the operating unit who are not already leading another pod
   const podLeadCandidates = useMemo(() => {
-    const targetUnitId = isUnitScoped
-      ? currentUser?.businessUnitId || currentUser?.business_unit_id
-      : podUnitId;
-
-    const usersInUnit = tenantUsers.filter((u) => {
-      const uUnitId = u.businessUnitId || u.business_unit_id;
-      return uUnitId === targetUnitId;
-    });
-
-    return usersInUnit.filter((u) => {
+    return modalRecruiters.filter((u) => {
       // Exclude users already heading another pod
       const isHeadOfAnotherPod = pods.some(
         (p) => p.podHeadId === u.id && (!selectedPod || p.id !== selectedPod.id)
       );
       return !isHeadOfAnotherPod;
     });
-  }, [tenantUsers, pods, selectedPod, podUnitId, isUnitScoped, currentUser]);
+  }, [modalRecruiters, pods, selectedPod]);
 
   // Filtered recruiters checklist for modal
   const filteredModalRecruiters = useMemo(() => {
