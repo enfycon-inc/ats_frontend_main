@@ -677,16 +677,18 @@ export function JobAssignModal({
       const payload: Record<string, any> = {};
 
       if (override?.unassignAll) {
-        payload.podId = "none";
-        payload.podIds = [];
-        payload.podName = "N/A";
+        if (canAssignPods) {
+          payload.podId = "none";
+          payload.podIds = [];
+          payload.podName = "N/A";
+        }
         payload.assignedTo = "Unassigned";
         payload.recruiter = "N/A";
         payload.recruiterId = null;
-          payload.recruiterIds = [];
+        payload.recruiterIds = [];
       } else {
         // 1. Pods assignment:
-        if (selectedPodIds.length > 0) {
+        if (canAssignPods && selectedPodIds.length > 0) {
           const allPods = [...podsList, ...targetBranchPods];
           const selectedPods = selectedPodIds
             .map((id) => allPods.find((p: any) => p.id === id))
@@ -695,7 +697,7 @@ export function JobAssignModal({
           payload.podId = selectedPodIds[0];
           payload.podIds = selectedPodIds;
           payload.podName = podNames.join(", ");
-        } else {
+        } else if (canAssignPods) {
           payload.podId = "none";
           payload.podIds = [];
           payload.podName = "N/A";
@@ -1220,7 +1222,7 @@ export function JobAssignModal({
 
         {/* Footer */}
         <DialogFooter className="px-5 py-2.5 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/70 dark:bg-slate-850/70 flex flex-row items-center justify-between sm:justify-between">
-          <Button
+          {!isPodHead && <Button
             type="button"
             variant="ghost"
             size="sm"
@@ -1229,7 +1231,7 @@ export function JobAssignModal({
             className="text-xs text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 h-8 cursor-pointer font-medium"
           >
             Clear Assignment
-          </Button>
+          </Button>}
 
           <div className="flex items-center gap-2">
             <Button

@@ -3,15 +3,10 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Users, Crown, Mail, ChevronDown, ChevronUp, User } from 'lucide-react';
 import { atsApi } from '@/lib/ats-api';
-import { cn } from '@/lib/utils';
 
 // Global cache to prevent redundant API calls across multiple hover cards
 let globalPodsCache: any[] | null = null;
-let globalUsersCache: any[] | null = null;
-let isFetchingPods = false;
-let isFetchingUsers = false;
 let podsPromise: Promise<any[]> | null = null;
-let usersPromise: Promise<any[]> | null = null;
 
 const fetchPodsCached = async () => {
   if (globalPodsCache) return globalPodsCache;
@@ -26,28 +21,17 @@ const fetchPodsCached = async () => {
   return podsPromise;
 };
 
-const fetchUsersCached = async () => {
-  if (globalUsersCache) return globalUsersCache;
-  if (usersPromise) return usersPromise;
-  usersPromise = atsApi.auth.listUsers().then(res => {
-    globalUsersCache = res;
-    return res;
-  }).catch(() => {
-    usersPromise = null;
-    return [];
-  });
-  return usersPromise;
-};
-
 export function JobPodHoverCard({
   podIds,
   recruiterNames = [],
   recruiterIds = [],
+  recruiterDetails = [],
   children
 }: {
   podIds: string[];
   recruiterNames?: string[];
   recruiterIds?: string[];
+  recruiterDetails?: { id: string; fullName: string; email?: string | null; avatar?: string | null }[];
   children: React.ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -59,15 +43,12 @@ export function JobPodHoverCard({
   useEffect(() => {
     if (isOpen) {
       const needsPods = pods.length === 0 && podIds.length > 0;
-      const needsRecruiters = recruiters.length === 0 && (recruiterNames.length > 0 || recruiterIds.length > 0);
+      const needsRecruiters = recruiters.length === 0 && (recruiterDetails.length > 0 || recruiterNames.length > 0 || recruiterIds.length > 0);
 
       if (needsPods || needsRecruiters) {
         setIsLoading(true);
-        Promise.all([
-          needsPods ? fetchPodsCached() : Promise.resolve([]),
-          needsRecruiters ? fetchUsersCached() : Promise.resolve([])
-        ])
-          .then(([allPods, allUsers]) => {
+        Promise.all([needsPods ? fetchPodsCached() : Promise.resolve([])])
+          .then(([allPods]) => {
             if (needsPods) {
               const matchedPods = allPods.filter((p: any) => podIds.includes(p.id));
               setPods(matchedPods);
@@ -76,35 +57,25 @@ export function JobPodHoverCard({
               }
             }
             if (needsRecruiters) {
-              const matchedRecruiters = allUsers.filter((u: any) => 
-                recruiterIds.includes(u.id) || recruiterNames.some(n => n.toLowerCase() === (u.fullName || u.name || '').toLowerCase())
-              );
-              // if not found in db, just use the names
-              // if not found in db, just use the names, or if we have ids use matched
-              let mappedRecruiters = [];
-              if (recruiterIds.length > 0) {
-                mappedRecruiters = recruiterIds.map(id => matchedRecruiters.find(u => u.id === id) || { fullName: 'Unknown User' });
-              } else {
-                mappedRecruiters = recruiterNames.map(name => {
-                const found = matchedRecruiters.find((u: any) => (u.fullName || u.name || '').toLowerCase() === name.toLowerCase());
-                return found || { fullName: name };
-                });
-              }
-              setRecruiters(mappedRecruiters);
+              const displayRecruiters = recruiterDetails.length > 0
+                ? recruiterDetails
+                : (recruiterNames.length > 0 ? recruiterNames : recruiterIds.map(() => 'Assigned recruiter'))
+                    .map((fullName, index) => ({ id: recruiterIds[index] || `recruiter-${index}`, fullName }));
+              setRecruiters(displayRecruiters);
             }
           })
           .catch(console.error)
           .finally(() => setIsLoading(false));
       }
     }
-  }, [isOpen, podIds, pods.length, recruiters.length, recruiterNames]);
+  }, [isOpen, podIds, pods.length, recruiters.length, recruiterNames, recruiterIds, recruiterDetails]);
 
   const totalAssigned = podIds.length + Math.max(recruiterNames.length, recruiterIds.length);
 
   return (
     <HoverCard openDelay={200} closeDelay={300} onOpenChange={setIsOpen}>
       <HoverCardTrigger asChild>
-        <div className="cursor-pointer">{children}</div>
+        <div className="cursor-default">{children}</div>
       </HoverCardTrigger>
       <HoverCardContent 
         className="w-80 p-0 overflow-hidden border-slate-200/80 dark:border-slate-800 shadow-xl rounded-xl bg-white dark:bg-slate-900"
@@ -211,7 +182,7 @@ export function JobPodHoverCard({
                         const mEmail = u.email;
                         const mAvatar = u.avatar;
                         return (
-                          <div key={idx} className="flex items-center gap-2.5 p-1.5 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <div key={u.id || idx} className="flex items-center gap-2.5 p-1.5 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                             <Avatar className="h-7 w-7 border border-slate-200 dark:border-slate-700">
                               <AvatarImage src={mAvatar} />
                               <AvatarFallback className="bg-blue-50 text-blue-600 text-xs font-bold dark:bg-blue-900/40 dark:text-blue-300">

@@ -1,4 +1,11 @@
 import type { JobStatus } from '@/lib/job-status-contract';
+export interface AssignedRecruiterProfile {
+  id: string;
+  fullName: string;
+  email?: string | null;
+  avatar?: string | null;
+}
+
 export interface Job {
   id: string;
   jobCode: string;
@@ -21,6 +28,7 @@ export interface Job {
   recruiter: string;
   recruiterId?: string | null;
   recruiterIds?: string[];
+  recruiterDetails?: AssignedRecruiterProfile[];
   accountManagerId?: string;
   
   createdBy: string;
@@ -100,6 +108,7 @@ export function mapApiJobToJob(api: any): Job {
       : api.recruiterId
       ? [api.recruiterId]
       : [],
+    recruiterDetails: Array.isArray(api.recruiterDetails) ? api.recruiterDetails : [],
     
     accountManagerId: api.accountManagerId || api.account_manager_id || undefined,
     createdBy: api.createdBy || "System Admin",

@@ -326,6 +326,17 @@ export function canAssignRecruitersToJob(job: Job, currentUser: any): boolean {
   const perms: string[] = Array.isArray(currentUser.permissions) ? currentUser.permissions : [];
   const roles: string[] = (currentUser.roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
   const sysRole = (currentUser.systemRole || (currentUser as any).system_role || "").toUpperCase().replace(/[\s-_]+/g, "");
+  const podLead = roles.includes("PODLEAD") || roles.includes("PODHEAD") || ["PODLEAD", "PODHEAD"].includes(sysRole);
+  if (podLead) {
+    const ownPodId = currentUser.podId || (currentUser as any).pod_id;
+    const jobPodIds = String((job as any).podId || "").split(",").map(id => id.trim()).filter(Boolean);
+    return !!ownPodId && jobPodIds.includes(ownPodId);
+  }
+  const actorRoles = [...roles, sysRole];
+  const recruiterOnly = actorRoles.includes("RECRUITER") && !actorRoles.some(role =>
+    ["ACCOUNTMANAGER", "BDM", "DELIVERYHEAD", "BRANCHADMIN", "UNITADMIN", "TENANTADMIN", "SUPERADMIN"].includes(role)
+  );
+  if (recruiterOnly) return false;
 
   // 1. Tenant Admin clearance
   const isTenantAdmin =
