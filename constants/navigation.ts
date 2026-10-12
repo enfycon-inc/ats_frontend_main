@@ -132,7 +132,6 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
       { label: "All Clients", href: "/clients/all" },
       { label: "Contacts", href: "/clients/contacts" },
       { label: "Agreements", href: "/clients/agreements" },
-      { label: "Invoices", href: "/clients/invoices" },
     ],
   },
   {
