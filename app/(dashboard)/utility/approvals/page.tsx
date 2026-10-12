@@ -1,4 +1,5 @@
 "use client";
+import { warnIfEmailFailed } from "@/lib/email-notification";
 
 import React, { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -260,8 +261,9 @@ export default function ApprovalsPage() {
     }
     try {
       setSubmittingId(userId);
-      await atsApi.auth.approveUser(userId, selectedMarket, selectedSubdomain, selectedUserLimit, selectedMaxBranches);
+      const approval = await atsApi.auth.approveUser(userId, selectedMarket, selectedSubdomain, selectedUserLimit, selectedMaxBranches);
       toast.success(`Approved! Workspace: ${selectedSubdomain}.${baseDomain} (${selectedUserLimit} seats, ${selectedMaxBranches} max branches)`);
+      warnIfEmailFailed(approval);
       await loadData();
     } catch (err: any) {
       toast.error("Approval failed: " + err.message);
@@ -294,6 +296,8 @@ export default function ApprovalsPage() {
 
       toast.success(`Tenant "${manualCompanyName}" created and activated! Workspace: ${manualSubdomain}.${baseDomain}`);
       
+      warnIfEmailFailed(res);
+
       // Reset form & close modal
       setManualCompanyName("");
       setManualSubdomain("");

@@ -1,11 +1,12 @@
 "use client";
 
+import type { EmailDispatchMode, EmailDnsRecord, TenantEmailAccount } from "@/lib/system-email.types";
 import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { atsApi, getApiBase } from "@/lib/ats-api";
+import { atsApi } from "@/lib/ats-api";
 import { SmtpConfigModal } from "@/components/email/smtp-config-modal";
 import {
   Mail,
@@ -27,17 +28,21 @@ interface EmailDispatchCardProps {
   subdomain: string;
   companyName: string;
   userEmail?: string;
+  permissions?: string[];
 }
 
-export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail }: EmailDispatchCardProps) {
+export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail, permissions = [] }: EmailDispatchCardProps) {
+  const canManage = ['tenant:settings', 'tenant:manage', 'platform:manage', '*'].some(p => permissions.includes(p));
+  const [detailMode, setDetailMode] = useState<EmailDispatchMode>('DEFAULT_SUBDOMAIN');
+  const [configurationError, setConfigurationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingMode, setSavingMode] = useState(false);
   const [dispatchMode, setDispatchMode] = useState<'DEFAULT_SUBDOMAIN' | 'DIRECT_ACCOUNT' | 'CUSTOM_DOMAIN'>('DEFAULT_SUBDOMAIN');
   const [defaultSender, setDefaultSender] = useState("");
   const [customDomain, setCustomDomain] = useState("");
   const [customDomainVerified, setCustomDomainVerified] = useState(false);
-  const [dnsRecords, setDnsRecords] = useState<any[]>([]);
-  const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
+  const [dnsRecords, setDnsRecords] = useState<EmailDnsRecord[]>([]);
+  const [connectedAccounts, setConnectedAccounts] = useState<TenantEmailAccount[]>([]);
   
   // Custom Domain input state
   const [inputDomain, setInputDomain] = useState("");
@@ -62,8 +67,10 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
       setLoading(true);
       const data = await atsApi.email.getTenantEmailSettings();
       if (data) {
-        setDispatchMode(data.dispatchMode || 'DEFAULT_SUBDOMAIN');
-        setDefaultSender(data.defaultSubdomainSender || `no-reply@${subdomain}.enfyjobs.com`);
+        setDispatchMode(data.dispatchMode);
+        setDetailMode(current => current === 'DEFAULT_SUBDOMAIN' ? data.dispatchMode : current);
+        setDefaultSender(data.defaultSubdomainSender);
+        setConfigurationError(data.configurationError);
         setCustomDomain(data.customDomain || "");
         setInputDomain(data.customDomain || "");
         setCustomDomainVerified(!!data.customDomainVerified);
@@ -71,22 +78,24 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
         setConnectedAccounts(data.connectedAccounts || []);
       }
     } catch (err: any) {
-      console.error("Failed to load tenant email settings", err);
+      toast.error(err.message || "Could not load email settings.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadSettings();
-  }, [subdomain]);
+    if (canManage) loadSettings();
+  }, [subdomain, canManage]);
 
   const handleSelectMode = async (mode: 'DEFAULT_SUBDOMAIN' | 'DIRECT_ACCOUNT' | 'CUSTOM_DOMAIN') => {
+    if (!canManage || savingMode) return;
+    setDetailMode(mode);
     try {
       setSavingMode(true);
       await atsApi.email.setTenantEmailMode(mode);
       setDispatchMode(mode);
-      toast.success(`Email strategy switched to ${mode.replace('_', ' ')}!`);
+      toast.success("System email sender updated.");
       loadSettings();
     } catch (err: any) {
       toast.error(err.message || "Failed to update email strategy.");
@@ -103,7 +112,7 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
       setSavingDomain(true);
       await atsApi.email.setTenantCustomDomain(clean);
       setCustomDomain(clean);
-      toast.success(`Domain "${clean}" saved! Please configure the DNS records below.`);
+      toast.success(`Domain "${clean}" saved. Configure the DNS records, verify, then select Custom Domain.`);
       loadSettings();
     } catch (err: any) {
       toast.error(err.message || "Failed to save custom domain.");
@@ -119,6 +128,8 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
       if (res.verified) {
         setCustomDomainVerified(true);
         toast.success("Domain DNS verified and DKIM active!");
+      } else {
+        toast.error(res.message || "Domain verification is pending.");
       }
       loadSettings();
     } catch (err: any) {
@@ -156,9 +167,9 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
       setSendingTest(true);
       const res = await atsApi.email.sendTestTenantEmail(testEmail.trim());
       if (res.success) {
-        toast.success(`Test email dispatched via ${res.provider} to ${testEmail}!`);
+        toast.success(`Test email accepted from ${res.from}. Check your inbox.`);
       } else {
-        toast("Test email dispatched (simulated delivery).", { icon: "ℹ️" });
+        toast.error("Email provider did not accept the test email.");
       }
     } catch (err: any) {
       toast.error("Test email failed: " + (err.message || "Unknown error"));
@@ -172,10 +183,14 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
     toast.success(`${label} copied to clipboard!`);
   };
 
-  const connectMicrosoft = () => {
-    const returnTo = typeof window !== "undefined" ? window.location.href : "";
-    window.location.href = `${getApiBase()}/api/v1/auth/microsoft?returnTo=${encodeURIComponent(returnTo)}&tenantId=${tenantId || ""}`;
+  const connectMicrosoft = async () => {
+    try {
+      const { url } = await atsApi.email.connectMicrosoftMailbox(window.location.href);
+      window.location.href = url;
+    } catch (err: any) { toast.error(err.message || 'Could not start Microsoft connection.'); }
   };
+
+  if (!canManage) return <p className="text-xs text-neutral-500">Workspace email settings permission is required.</p>;
 
   return (
     <Card className="border border-neutral-200 dark:border-slate-800/80 shadow-xs bg-white dark:bg-slate-900 overflow-hidden">
@@ -183,21 +198,22 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
         <div>
           <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
             <Mail className="h-4 w-4 text-indigo-600" />
-            Workspace Email &amp; Custom Domain Dispatch Strategy
+            Workspace System Email Sender
           </CardTitle>
           <CardDescription className="text-xs text-neutral-500 mt-0.5">
-            Choose how invitations, credentials, password resets, and candidate communications are delivered.
+            Choose how account invitations, onboarding, and system notifications are sent. Authentication-provider emails are configured separately.
           </CardDescription>
         </div>
         <Badge variant="outline" className="text-xs font-semibold px-2.5 py-0.5 border-indigo-300 text-indigo-700 dark:text-indigo-400 bg-indigo-50/50">
-          Active: {dispatchMode.replace('_', ' ')}
+          Active: {dispatchMode === 'DEFAULT_SUBDOMAIN' ? 'PLATFORM DEFAULT' : dispatchMode.replace('_', ' ')}
         </Badge>
       </CardHeader>
 
       <CardContent className="pt-5 space-y-6">
+        {configurationError && <p role="status" className="text-xs text-amber-700">{configurationError}</p>}
         {/* Strategy Selector (3 Options) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* 1. Default Subdomain Strategy */}
+          {/* 1. Shared platform sender */}
           <div
             onClick={() => handleSelectMode('DEFAULT_SUBDOMAIN')}
             className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
@@ -213,7 +229,7 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
                     <Globe className="h-4 w-4" />
                   </div>
                   <span className="text-xs font-bold text-neutral-850 dark:text-neutral-150">
-                    Platform Subdomain
+                    Platform Default
                   </span>
                 </div>
                 {dispatchMode === 'DEFAULT_SUBDOMAIN' && (
@@ -221,7 +237,7 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
                 )}
               </div>
               <p className="text-[11px] text-neutral-500 leading-relaxed">
-                Zero-config delivery. Automatically sends from your dedicated workspace subdomain.
+                Uses the shared EnfySync sender when no tenant email sender is configured.
               </p>
             </div>
             <div className="mt-3 pt-3 border-t border-neutral-200/60 dark:border-slate-800 text-[10px] font-mono text-indigo-700 dark:text-indigo-300 truncate">
@@ -253,7 +269,7 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
                 )}
               </div>
               <p className="text-[11px] text-neutral-500 leading-relaxed">
-                Connect your corporate Microsoft 365 or SMTP server. Sends directly from your inbox with 100% deliverability.
+                Connect Microsoft 365 or SMTP, set a default mailbox, then select this option to send system emails from it.
               </p>
             </div>
             <div className="mt-3 pt-3 border-t border-neutral-200/60 dark:border-slate-800 text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1">
@@ -286,7 +302,7 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
                 )}
               </div>
               <p className="text-[11px] text-neutral-500 leading-relaxed">
-                Authorize EnfySync via DKIM/SPF DNS records to send as <span className="font-mono">no-reply@yourdomain.com</span>.
+                Verify domain ownership and email authentication to send as <span className="font-mono">no-reply@yourdomain.com</span>.
               </p>
             </div>
             <div className="mt-3 pt-3 border-t border-neutral-200/60 dark:border-slate-800 text-[10px] text-purple-700 dark:text-purple-300 font-semibold truncate">
@@ -298,7 +314,7 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
         {/* Dynamic Detail Panel based on Active Strategy */}
 
         {/* ── DETAIL 1: Direct Mail Connection (BYOE) ──────────────── */}
-        {dispatchMode === 'DIRECT_ACCOUNT' && (
+        {detailMode === 'DIRECT_ACCOUNT' && (
           <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 rounded-xl space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -380,7 +396,7 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
         )}
 
         {/* ── DETAIL 2: Custom Domain Delegation ───────────────────── */}
-        {dispatchMode === 'CUSTOM_DOMAIN' && (
+        {detailMode === 'CUSTOM_DOMAIN' && (
           <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 rounded-xl space-y-4">
             <div>
               <h4 className="text-xs font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
@@ -388,7 +404,7 @@ export function EmailDispatchCard({ tenantId, subdomain, companyName, userEmail 
                 Custom Domain DNS Authorization
               </h4>
               <p className="text-[11px] text-neutral-500 mt-0.5">
-                Add your custom root domain (e.g. <span className="font-mono">enfycon.com</span>) and publish the DKIM/SPF DNS records.
+                Add your custom root domain (e.g. <span className="font-mono">enfycon.com</span>) and publish the DNS records listed below.
               </p>
             </div>
 

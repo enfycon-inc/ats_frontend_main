@@ -8,6 +8,7 @@ interface EmailTabProps {
   subdomain?: string;
   companyName?: string;
   userEmail?: string;
+  permissions?: string[];
 }
 
 export function EmailTab({
@@ -15,6 +16,7 @@ export function EmailTab({
   subdomain,
   companyName,
   userEmail,
+  permissions,
 }: EmailTabProps) {
   return (
     <div className="w-full space-y-6">
@@ -23,6 +25,7 @@ export function EmailTab({
         subdomain={subdomain || ""}
         companyName={companyName || ""}
         userEmail={userEmail}
+        permissions={permissions}
       />
     </div>
   );

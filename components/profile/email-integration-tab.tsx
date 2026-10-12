@@ -1,4 +1,5 @@
 "use client";
+import toast from "react-hot-toast";
 
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
@@ -58,14 +59,20 @@ export function EmailIntegrationTab() {
     }
   };
 
-  const handleConnect = (provider: string) => {
+  const handleConnect = async (provider: string) => {
     setIsConnecting(provider);
     const user = atsApi.auth.getCurrentUser();
     const tenantId = user?.tenantId || '';
     if (provider === 'google') {
       window.location.href = `${getApiBase()}/api/v1/auth/google?tenantId=${tenantId}&userId=${user?.id || ''}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname + '?tab=email_integration')}`;
     } else if (provider === 'microsoft') {
-      window.location.href = `${getApiBase()}/api/v1/auth/microsoft?tenantId=${tenantId}&userId=${user?.id || ''}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname + '?tab=email_integration')}`;
+      try {
+        const { url } = await atsApi.email.connectMicrosoftMailbox(window.location.href);
+        window.location.href = url;
+      } catch (err: any) {
+        setIsConnecting(null);
+        toast.error(err.message || 'Could not start Microsoft connection.');
+      }
     } else if (provider === 'smtp') {
       setIsConnecting(null);
       setIsSmtpModalOpen(true);

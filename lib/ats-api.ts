@@ -1,3 +1,4 @@
+import type { TenantEmailSettings, EmailDispatchMode, EmailDispatchResult } from './system-email.types';
 export interface ClientAccessPolicy { clientsVisibleAcrossUnits: boolean; bdmClientsTenantWide: boolean; otherOwnerPocsVisible: boolean; maskOtherOwnerPocDetails: boolean; }
 import type { CandidateAssessment, SubmissionHistoryResponse, TrackerResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
 
@@ -882,18 +883,13 @@ const email = {
       body: JSON.stringify(data),
     });
   },
-  async getTenantEmailSettings(): Promise<{
-    dispatchMode: 'DEFAULT_SUBDOMAIN' | 'DIRECT_ACCOUNT' | 'CUSTOM_DOMAIN';
-    defaultSubdomainSender: string;
-    customDomain: string;
-    customDomainVerified: boolean;
-    dnsRecords: Array<{ type: string; host: string; value: string; purpose: string; status: string }>;
-    connectedAccounts: Array<{ id: string; provider: string; email: string; profileName?: string; isDefault: boolean; isActive: boolean }>;
-    defaultAccount: any;
-  }> {
+  async connectMicrosoftMailbox(returnTo: string): Promise<{ url: string }> {
+    return apiFetch('/email/accounts/microsoft/connect', { method: 'POST', body: JSON.stringify({ returnTo }) });
+  },
+  async getTenantEmailSettings(): Promise<TenantEmailSettings> {
     return apiFetch('/email/tenant-settings');
   },
-  async setTenantEmailMode(mode: string): Promise<any> {
+  async setTenantEmailMode(mode: EmailDispatchMode): Promise<{ success: boolean; mode: EmailDispatchMode }> {
     return apiFetch('/email/tenant-settings/mode', {
       method: 'POST',
       body: JSON.stringify({ mode }),
@@ -910,7 +906,7 @@ const email = {
       method: 'POST',
     });
   },
-  async sendTestTenantEmail(recipientEmail?: string): Promise<any> {
+  async sendTestTenantEmail(recipientEmail?: string): Promise<EmailDispatchResult> {
     return apiFetch('/email/tenant-settings/test-email', {
       method: 'POST',
       body: JSON.stringify({ recipientEmail }),

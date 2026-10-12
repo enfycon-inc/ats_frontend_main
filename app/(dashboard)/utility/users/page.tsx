@@ -1,4 +1,5 @@
 "use client";
+import { warnIfEmailFailed } from "@/lib/email-notification";
 
 import React, { useState, useEffect, useMemo } from "react";
 import { 
@@ -755,7 +756,7 @@ export default function UserManagementPage() {
         ? addForm.roles 
         : (rolesList.length > 0 ? [rolesList[0].name] : []);
 
-      await atsApi.auth.registerUser({
+      const createdAccount = await atsApi.auth.registerUser({
         email: fullEmail,
         fullName: trimmedName,
         password: password,
@@ -767,6 +768,8 @@ export default function UserManagementPage() {
         isApproved: true,
         sendEmailInvite: true,
       });
+
+      warnIfEmailFailed(createdAccount);
 
       // Synchronize full profile & branch roles
       try {

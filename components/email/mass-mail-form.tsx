@@ -1,4 +1,5 @@
 "use client";
+import toast from "react-hot-toast";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Papa from "papaparse";
@@ -335,7 +336,7 @@ export function MassMailForm() {
     document.body.removeChild(link);
   };
 
-  const handleConnect = (provider: string) => {
+  const handleConnect = async (provider: string) => {
     setIsConnecting(provider);
     const user = atsApi.auth.getCurrentUser();
     const tenantId = user?.tenantId || '';
@@ -343,7 +344,13 @@ export function MassMailForm() {
     if (provider === 'google') {
       window.location.href = `${getApiBase()}/api/v1/auth/google?tenantId=${tenantId}&userId=${userId}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
     } else if (provider === 'microsoft') {
-      window.location.href = `${getApiBase()}/api/v1/auth/microsoft?tenantId=${tenantId}&userId=${userId}&returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
+      try {
+        const { url } = await atsApi.email.connectMicrosoftMailbox(window.location.href);
+        window.location.href = url;
+      } catch (err: any) {
+        setIsConnecting(null);
+        toast.error(err.message || 'Could not start Microsoft connection.');
+      }
     } else if (provider === 'smtp') {
       setIsConnecting(null);
       setIsDialogOpen(false);

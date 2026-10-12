@@ -1,4 +1,5 @@
 "use client";
+import { warnIfEmailFailed } from "@/lib/email-notification";
 
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -93,6 +94,7 @@ const RegForm = () => {
         fullName: form.fullName,
         password: form.password,
       });
+      warnIfEmailFailed(res);
       setResult(res);
       setStep("success");
     } catch (err: any) {

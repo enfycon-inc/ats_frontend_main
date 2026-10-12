@@ -637,6 +637,7 @@ function TenantAdminSettingsView(props: any) {
             subdomain={props.subdomain || props.originalSubdomain}
             companyName={props.companyName}
             userEmail={props.profile?.email}
+            permissions={props.profile?.permissions || []}
           />
         )}
 

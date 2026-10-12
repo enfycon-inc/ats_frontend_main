@@ -1,4 +1,5 @@
 "use client";
+import { warnIfEmailFailed } from "@/lib/email-notification";
 
 import React, { useEffect, useState, useMemo } from "react";
 import SiteBreadcrumb from "@/components/site-breadcrumb";
@@ -79,8 +80,9 @@ function GlobalAdminDashboardView({ profile }: { profile: any }) {
     const userLimit = selectedLimit[user.id] || 5;
 
     try {
-      await atsApi.auth.approveUser(user.id, market, subdomain, userLimit);
+      const approval = await atsApi.auth.approveUser(user.id, market, subdomain, userLimit);
       toast.success(`Approved ${user.fullName} and activated company workspace!`);
+      warnIfEmailFailed(approval);
       await loadGlobalData();
     } catch (err: any) {
       toast.error(err.message || "Failed to approve workspace");
