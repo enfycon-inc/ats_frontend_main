@@ -340,7 +340,7 @@ async function apiFetch<T = any>(
     }
 
     const errMsg = body.message || `API Error: ${res.status}`;
-    if (typeof window !== 'undefined' && res.status === 403) {
+    if (typeof window !== 'undefined' && res.status === 403 && !(options as any)?.silent403) {
       const event = new CustomEvent("app_show_error_modal", {
         detail: { message: errMsg, title: "Permission Access Required" },
       });
@@ -1051,15 +1051,16 @@ const jobs = {
     if (scope.branchId) query.set('branchId', scope.branchId);
     return apiFetch(`/api/jobs/pod-options?${query}`);
   },
-  async staffingOptions(scope?: { branchId?: string; businessUnitId?: string }): Promise<JobStaffOption[]> {
+  async staffingOptions(scope?: { branchId?: string; businessUnitId?: string; jobId?: string }, fetchOptions?: { silent?: boolean }): Promise<JobStaffOption[]> {
     const query = new URLSearchParams();
     if (scope?.branchId) query.set('branchId', scope.branchId);
     if (scope?.businessUnitId) query.set('businessUnitId', scope.businessUnitId);
+    if (scope?.jobId) query.set('jobId', scope.jobId);
     const requestKey = JSON.stringify([getApiBase(), getToken(), activeRoleHeaders(), query.toString(),
       typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null]);
     let request = staffingRequests.get(requestKey);
     if (!request) {
-      request = apiFetch<JobStaffOption[]>(`/api/jobs/staffing-options?${query}`)
+      request = apiFetch<JobStaffOption[]>(`/api/jobs/staffing-options?${query}`, (fetchOptions?.silent ? { silent403: true } as any : undefined))
         .finally(() => { staffingRequests.delete(requestKey); });
       staffingRequests.set(requestKey, request);
     }

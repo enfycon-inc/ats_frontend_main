@@ -359,8 +359,8 @@ export function canAssignRecruitersToJob(job: Job, currentUser: any): boolean {
     return true;
   }
 
-  // 5. Account Manager: ONLY allowed to assign recruiters on their own created jobs
-  const hasAssignRecruiterPerm = perms.includes("job:assign_recruiter") || perms.includes("job:edit");
+  // 5. Account Manager / Other roles: ONLY allowed to assign recruiters on their own created jobs IF enabled by tenant admin
+  const hasAssignRecruiterPerm = perms.includes("job:assign_recruiter");
   if (!hasAssignRecruiterPerm) return false;
 
   return isJobCreatedByUser(job, currentUser);

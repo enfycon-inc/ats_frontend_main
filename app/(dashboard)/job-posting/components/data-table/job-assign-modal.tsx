@@ -86,19 +86,37 @@ export function JobAssignModal({
     return null;
   }, [job, targetBranch]);
 
+  const lastLoadedJobIdRef = React.useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      lastLoadedJobIdRef.current = null;
+    }
+  }, [isOpen]);
+
   // Load context data when modal is open
   useEffect(() => {
     if (!isOpen || !job) return;
+    if (lastLoadedJobIdRef.current === job.id) return;
+    lastLoadedJobIdRef.current = job.id;
+
     async function loadAssignmentData() {
       try {
-        const targetBranchId = job?.branchId || targetBranch?.id || currentUserBranchId || undefined;
-        const targetUnitId = (job as any)?.businessUnitId || (job as any)?.business_unit_id || targetUnit?.id || (currentUser as any)?.businessUnitId || undefined;
+        const canAssign = canAssignRecruitersToJob(job, currentUser);
+        const targetBranchId = job?.branchId || currentUserBranchId || undefined;
+        const targetUnitId = (job as any)?.businessUnitId || (job as any)?.business_unit_id || (currentUser as any)?.businessUnitId || undefined;
 
         const [staff, pods, branches, roles] = await Promise.all([
-          atsApi.jobs.staffingOptions({
-            branchId: targetBranchId,
-            businessUnitId: targetUnitId,
-          }).catch(() => []),
+          canAssign
+            ? atsApi.jobs.staffingOptions(
+                {
+                  branchId: targetBranchId,
+                  businessUnitId: targetUnitId,
+                  jobId: job.id,
+                },
+                { silent: true }
+              ).catch(() => [])
+            : Promise.resolve([]),
           atsApi.pods.list().catch(() => []),
           atsApi.branches.list().catch(() => []),
           atsApi.auth.listRoles(undefined, true).catch(() => []),
@@ -112,7 +130,7 @@ export function JobAssignModal({
       }
     }
     loadAssignmentData();
-  }, [isOpen, job, targetBranch, targetUnit, currentUserBranchId, currentUser]);
+  }, [isOpen, job?.id, currentUser, currentUserBranchId]);
 
   const getUserRoleLabel = useCallback(
     (u: any, branchId?: string): string => {
@@ -894,7 +912,7 @@ export function JobAssignModal({
               placeholder={
                 assignTab === "pods"
                   ? "Search pods by name or lead..."
-                  : "Search recruiters by name, role, or email..."
+                  : "Search recruiters by name or email..."
               }
               value={assignSearch}
               onChange={(e) => setAssignSearch(e.target.value)}
