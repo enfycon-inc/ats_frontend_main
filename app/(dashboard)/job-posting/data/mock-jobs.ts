@@ -20,6 +20,7 @@ export interface Job {
   recruitmentManagerId?: string;
   recruiter: string;
   recruiterId?: string | null;
+  accountManagerId?: string;
   
   createdBy: string;
   createdOn: string;
@@ -94,6 +95,7 @@ export function mapApiJobToJob(api: any): Job {
     recruiter: api.recruiter || "N/A",
     recruiterId: api.recruiterId || undefined,
     
+    accountManagerId: api.accountManagerId || api.account_manager_id || undefined,
     createdBy: api.createdBy || "System Admin",
     createdOn: api.createdAt || api.createdOn || new Date().toISOString(),
     modifiedOn: api.updatedAt || api.modifiedOn || api.createdAt || api.createdOn || new Date().toISOString(),

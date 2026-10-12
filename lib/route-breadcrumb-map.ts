@@ -338,14 +338,12 @@ export function getRouteBreadcrumbInfo(
   }
 
   if (cleanPath.startsWith("/applicants/")) {
-    const segments = cleanPath.split("/").filter(Boolean);
-    const id = segments[1];
     return {
-      pageTitle: `Candidate Profile • #${id}`,
+      pageTitle: "Candidate Profile",
       breadcrumbs: [
         { label: "ATS", href: "/dashboard" },
         { label: "Candidates", href: "/applicants" },
-        { label: `Candidate #${id}`, isCurrent: true },
+        { label: "Candidate Profile", isCurrent: true },
       ],
       showBackButton: true,
       backHref: "/applicants",

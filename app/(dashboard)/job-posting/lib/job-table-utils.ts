@@ -299,3 +299,69 @@ export function exportJobsToCSV(
   link.click();
   document.body.removeChild(link);
 }
+
+export function isJobCreatedByUser(job: Job, currentUser: any): boolean {
+  if (!job || !currentUser) return false;
+  const currentUserId = currentUser.id || currentUser.dbId || (currentUser as any).userId;
+  const currentUserEmail = (currentUser.email || "").toLowerCase().trim();
+  const currentUserName = (currentUser.fullName || currentUser.name || "").toLowerCase().trim();
+
+  const amId = job.accountManagerId || (job as any).account_manager_id;
+  if (amId && currentUserId && amId === currentUserId) return true;
+
+  const createdBy = (job.createdBy || (job as any).creator_name || (job as any).created_by || "").toLowerCase().trim();
+  if (createdBy && currentUserName && createdBy === currentUserName) return true;
+  if (createdBy && currentUserEmail && createdBy === currentUserEmail) return true;
+  if (createdBy && currentUserId && createdBy === currentUserId) return true;
+
+  const creatorEmail = (job.creatorEmail || (job as any).creator_email || "").toLowerCase().trim();
+  if (creatorEmail && currentUserEmail && creatorEmail === currentUserEmail) return true;
+
+  return false;
+}
+
+export function canAssignRecruitersToJob(job: Job, currentUser: any): boolean {
+  if (!job || !currentUser) return false;
+
+  const perms: string[] = Array.isArray(currentUser.permissions) ? currentUser.permissions : [];
+  const roles: string[] = (currentUser.roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
+  const sysRole = (currentUser.systemRole || (currentUser as any).system_role || "").toUpperCase().replace(/[\s-_]+/g, "");
+
+  // 1. Tenant Admin clearance
+  const isTenantAdmin =
+    sysRole === "TENANTADMIN" ||
+    sysRole === "SUPERADMIN" ||
+    roles.includes("TENANTADMIN") ||
+    roles.includes("SUPERADMIN") ||
+    perms.some((p: string) => ["tenant:manage", "tenant:settings", "platform:manage", "*"].includes(p));
+
+  // 2. Branch Admin clearance
+  const isBranchAdmin =
+    sysRole === "BRANCHADMIN" ||
+    roles.includes("BRANCHADMIN") ||
+    perms.includes("branch_admin:manage");
+
+  // 3. Unit Admin clearance
+  const isUnitAdmin =
+    sysRole === "UNITADMIN" ||
+    roles.includes("UNITADMIN") ||
+    perms.includes("unit_admin:manage");
+
+  // 4. Delivery Head clearance
+  const isDeliveryHead =
+    sysRole === "DELIVERYHEAD" ||
+    roles.includes("DELIVERYHEAD") ||
+    roles.includes("DELIVERY_HEAD") ||
+    (perms.includes("job:assign") && !roles.includes("ACCOUNTMANAGER") && sysRole !== "ACCOUNTMANAGER");
+
+  // Supervisory roles (Delivery Head, Branch Unit, Unit Admin, Tenant Admin) can assign on ANY job from the job board
+  if (isTenantAdmin || isBranchAdmin || isUnitAdmin || isDeliveryHead || perms.includes("job:assign")) {
+    return true;
+  }
+
+  // 5. Account Manager: ONLY allowed to assign recruiters on their own created jobs
+  const hasAssignRecruiterPerm = perms.includes("job:assign_recruiter") || perms.includes("job:edit");
+  if (!hasAssignRecruiterPerm) return false;
+
+  return isJobCreatedByUser(job, currentUser);
+}

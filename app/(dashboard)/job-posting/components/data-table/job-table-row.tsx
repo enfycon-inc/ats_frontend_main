@@ -35,6 +35,7 @@ import {
   getAssignedPersonDisplay,
   formatDateTimeDisplay,
   isJobRecent,
+  canAssignRecruitersToJob,
 } from "../../lib/job-table-utils";
 import { JobPodHoverCard } from "./job-pod-hover-card";
 
@@ -88,6 +89,7 @@ export function JobTableRow({
 }: JobTableRowProps) {
   const isTenantAdmin = Boolean(currentUser?.permissions?.some((p: string) => ["tenant:manage", "tenant:settings"].includes(p)));
   const isDelegatedView = Boolean(!isTenantAdmin && currentUserBranchId && job.branchId && currentUserBranchId !== job.branchId);
+  const canAssignRecruiters = canAssignRecruitersToJob(job, currentUser);
 
   const router = useRouter();
 
@@ -504,7 +506,7 @@ export function JobTableRow({
                     </JobPodHoverCard>
                   );
                 })()}
-                {hasEditPermission && (
+                {canAssignRecruiters && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

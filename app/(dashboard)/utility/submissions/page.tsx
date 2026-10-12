@@ -314,7 +314,16 @@ export default function SubmissionsPage() {
             setResponse(data);
           }
         }
-      } catch { if (!cancelled) setError("Unable to load submissions. Please try again."); }
+      } catch (err: any) {
+        if (!cancelled) {
+          const msg = err?.message || "";
+          if (msg.includes("permission") || msg.includes("403") || msg.includes("Forbidden")) {
+            setError("You do not have permission to view submissions. Please contact your administrator or enable 'submission:view' in Role Management.");
+          } else {
+            setError("Unable to load submissions. Please try again.");
+          }
+        }
+      }
       finally { if (!cancelled) setLoading(false); }
     };
     void load();
@@ -340,7 +349,7 @@ export default function SubmissionsPage() {
       <div className="overflow-x-auto">
         <table className={cn("w-full table-fixed text-xs [&_th]:border-r [&_th]:border-border [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border [&_td:last-child]:border-r-0 [&_td]:align-middle", groupByJob ? "min-w-[1250px]" : "min-w-[1800px]")}><colgroup>{(groupByJob ? [12, 10, 18, 9, 9, 18, 9, 6, 9] : [17, 11, 11, 14, 7, 7, 14, 8, 4, 7]).map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup><thead className="border-y border-border bg-muted/40"><tr>{(groupByJob ? [response?.accountManagerLabel || "Created by", "Recruiter", "Candidate", "Job created at", "Submission date", "Pipeline", "Current status", "Next round", "Action"] : ["Job reference", response?.accountManagerLabel || "Created by", "Recruiter", "Candidate", "Job created at", "Submission date", "Pipeline", "Current status", "Next round", "Action"]).map(label => <th scope="col" key={label} className={cn("px-2.5 py-3 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground", ["Pipeline", "Current status", "Next round", "Action"].includes(label) ? "text-center" : "text-left", label === "Action" && "sticky right-0 z-20 bg-slate-50 dark:bg-slate-900 shadow-[-1px_0_0_0_var(--border)]")}>{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-border">
-            {loading || workspaceStatus !== "ready" ? <tr><td colSpan={groupByJob ? 9 : 10} className="py-16 text-center text-muted-foreground" role="status"><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading submissions…</td></tr> : error ? <tr><td colSpan={groupByJob ? 9 : 10} className="py-12 text-center" role="alert">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></td></tr> : !response?.data.length ? <tr><td colSpan={groupByJob ? 9 : 10} className="py-16 text-center text-muted-foreground">No submissions match these filters.</td></tr> : !groupByJob ? response.data.map(sub => {
+            {loading || workspaceStatus !== "ready" ? <tr><td colSpan={groupByJob ? 9 : 10} className="py-16 text-center text-muted-foreground" role="status"><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading submissions…</td></tr> : error ? <tr><td colSpan={groupByJob ? 9 : 10} className="py-12 text-center" role="alert">{error}{!error.includes("permission") && <Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button>}</td></tr> : !response?.data.length ? <tr><td colSpan={groupByJob ? 9 : 10} className="py-16 text-center text-muted-foreground">No submissions match these filters.</td></tr> : !groupByJob ? response.data.map(sub => {
               const round = currentRound(sub);
 
               return <tr key={sub.id} className="hover:bg-muted/25">

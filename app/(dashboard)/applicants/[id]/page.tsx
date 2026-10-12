@@ -7,7 +7,6 @@ import { useSession } from "next-auth/react";
 import {
   ChevronLeft,
   Briefcase,
-  GraduationCap,
   Mail,
   Phone,
   MapPin,
@@ -19,11 +18,7 @@ import {
   Download,
   UploadCloud,
   Calendar,
-  MessageSquare,
-  Clock,
-  User,
   Plus,
-  Send,
   Sparkles,
   DollarSign,
   Shield,
@@ -47,7 +42,6 @@ export default function CandidateDetailPage() {
   // State variables
   const [candidate, setCandidate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"resume" | "submissions" | "notes">("resume");
   const [resumeUrl, setResumeUrl] = useState<string | null>(null);
   const resumeObjectUrl = useRef<string | null>(null);
   const [resumeMime, setResumeMime] = useState('');
@@ -55,8 +49,6 @@ export default function CandidateDetailPage() {
   const [profileError, setProfileError] = useState('');
   const [resumeLoading, setResumeLoading] = useState(true);
   const [submissions, setSubmissions] = useState<any[]>([]);
-  const [notes, setNotes] = useState<string[]>([]);
-  const [newNote, setNewNote] = useState("");
   
   // Submit modal state
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
@@ -136,14 +128,6 @@ export default function CandidateDetailPage() {
         servingNotice: !!details.servingNotice,
       });
 
-      // Load local storage notes for this candidate
-      const savedNotes = localStorage.getItem(`notes_candidate_${candidateId}`);
-      if (savedNotes) {
-        setNotes(JSON.parse(savedNotes));
-      } else {
-        setNotes(["Initial candidate profile imported successfully."]);
-      }
-
       // 2. Fetch submissions for this candidate
       try {
         const subsList = await atsApi.submissions.list({ candidateId });
@@ -191,14 +175,6 @@ export default function CandidateDetailPage() {
   }, [candidateId]);
 
   // Handle Note Submission
-  const handleAddNote = () => {
-    if (!newNote.trim()) return;
-    const updatedNotes = [...notes, newNote.trim()];
-    setNotes(updatedNotes);
-    localStorage.setItem(`notes_candidate_${candidateId}`, JSON.stringify(updatedNotes));
-    setNewNote("");
-    toast.success("Note added successfully!");
-  };
 
   // Open submit to job modal
   const handleOpenSubmitModal = async () => {
@@ -356,9 +332,7 @@ export default function CandidateDetailPage() {
   // Parse experience and education timeline details
   const parsedJson = candidate.parsedJson || {};
   
-  const experienceDetailed = parsedJson.experience_detailed || parsedJson.work_history || [];
 
-  const educationDetailed = parsedJson.education_detailed || parsedJson.education_history || [];
 
   const skills = candidate.skills && candidate.skills.length > 0 ? candidate.skills : (parsedJson.skills || []);
 
@@ -417,9 +391,6 @@ export default function CandidateDetailPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-2 py-0.5 rounded border border-blue-200 text-xs font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
-                    {candidate.candidateCode || `CAN-${String(candidate.dbId || candidateId).padStart(6, '0')}`}
-                  </span>
                   <h2 className="text-base font-extrabold text-neutral-900 dark:text-white truncate">
                     {candidate.fullName}
                   </h2>
@@ -522,117 +493,9 @@ export default function CandidateDetailPage() {
             </div>
           </div>
 
-          {/* Timelines and Tabs Card */}
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm flex flex-col min-h-0 overflow-hidden flex-1 shadow-none">
-            {/* Tabs Header */}
-            <div className="flex border-b border-neutral-200 dark:border-slate-800 bg-neutral-50 dark:bg-slate-900/40">
-              <button
-                onClick={() => setActiveTab("resume")}
-                className={`px-4 py-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer ${
-                  activeTab === "resume"
-                    ? "border-indigo-650 text-indigo-650 dark:text-indigo-400 dark:border-indigo-400 bg-white dark:bg-slate-900"
-                    : "border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                }`}
-              >
-                <FileText className="h-3.5 w-3.5" /> Timeline & History
-              </button>
-              <button
-                onClick={() => setActiveTab("submissions")}
-                className={`px-4 py-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer ${
-                  activeTab === "submissions"
-                    ? "border-indigo-650 text-indigo-650 dark:text-indigo-400 dark:border-indigo-400 bg-white dark:bg-slate-900"
-                    : "border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                }`}
-              >
-                <ClipboardList className="h-3.5 w-3.5" /> Submissions ({submissions.length})
-              </button>
-              <button
-                onClick={() => setActiveTab("notes")}
-                className={`px-4 py-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer ${
-                  activeTab === "notes"
-                    ? "border-indigo-650 text-indigo-650 dark:text-indigo-400 dark:border-indigo-400 bg-white dark:bg-slate-900"
-                    : "border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                }`}
-              >
-                <MessageSquare className="h-3.5 w-3.5" /> Recruiter Comments ({notes.length})
-              </button>
-            </div>
-
-            {/* Tabs Content */}
-            <div className="flex-1 overflow-auto p-4 min-h-0 bg-white dark:bg-slate-900">
-              
-              {/* TAB 1: Timeline & History */}
-              {activeTab === "resume" && (
-                <div className="space-y-6">
-                  {/* Work Experience Timeline */}
-                  <div>
-                    <h3 className="text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-500 tracking-wider mb-4 flex items-center gap-1">
-                      <Briefcase className="h-3.5 w-3.5" /> Employment Timeline
-                    </h3>
-                    {experienceDetailed.length > 0 ? (
-                      <div className="space-y-5 relative pl-4 border-l border-neutral-200 dark:border-slate-800">
-                        {experienceDetailed.map((exp: any, idx: number) => (
-                          <div key={idx} className="relative group">
-                            {/* Circle dot on timeline */}
-                            <div className="absolute -left-[20.5px] top-1.5 h-3 w-3 rounded-full bg-white dark:bg-slate-900 border-2 border-indigo-500 group-hover:bg-indigo-500 transition-colors" />
-                            <div className="flex items-center justify-between text-xs">
-                              <h4 className="font-bold text-neutral-800 dark:text-neutral-200">{exp.role || exp.title || "Role"}</h4>
-                              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 flex items-center gap-1">
-                                <Calendar className="h-3 w-3" /> {exp.start_date || "—"} to {exp.end_date || "—"}
-                              </span>
-                            </div>
-                            {exp.company && <p className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-450 mt-0.5">{exp.company}</p>}
-                            {exp.description && (
-                              <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1.5 bg-neutral-50 dark:bg-slate-950/40 p-2.5 rounded-sm border border-neutral-100 dark:border-slate-850/50 whitespace-pre-wrap leading-relaxed">
-                                {exp.description}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="py-6 px-4 bg-neutral-50/50 dark:bg-slate-900/50 border border-neutral-200/60 dark:border-slate-800 rounded-xs text-center">
-                        <Briefcase className="h-5 w-5 text-neutral-350 dark:text-slate-600 mx-auto mb-1.5" />
-                        <p className="text-xs text-neutral-400 dark:text-neutral-500 font-medium">No employment history detected</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Education Timeline */}
-                  <div>
-                    <h3 className="text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-500 tracking-wider mb-4 flex items-center gap-1">
-                      <GraduationCap className="h-3.5 w-3.5" /> Academic History
-                    </h3>
-                    {educationDetailed.length > 0 ? (
-                      <div className="space-y-4 relative pl-4 border-l border-neutral-200 dark:border-slate-800">
-                        {educationDetailed.map((edu: any, idx: number) => (
-                          <div key={idx} className="relative group">
-                            <div className="absolute -left-[20.5px] top-1.5 h-3 w-3 rounded-full bg-white dark:bg-slate-900 border-2 border-emerald-500 group-hover:bg-emerald-500 transition-colors" />
-                            <div className="flex items-center justify-between text-xs">
-                              <h4 className="font-bold text-neutral-800 dark:text-neutral-200">
-                                {edu.degree || edu.degree_name || edu.school || "Degree"}{edu.major ? ` in ${edu.major}` : ""}
-                              </h4>
-                              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 flex items-center gap-1">
-                                <Calendar className="h-3 w-3" /> {edu.start_date || "—"}{edu.end_date ? ` to ${edu.end_date}` : ""}
-                              </span>
-                            </div>
-                            {edu.school && edu.degree && <p className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-450 mt-0.5">{edu.school}</p>}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="py-6 px-4 bg-neutral-50/50 dark:bg-slate-900/50 border border-neutral-200/60 dark:border-slate-800 rounded-xs text-center">
-                        <GraduationCap className="h-5 w-5 text-neutral-350 dark:text-slate-600 mx-auto mb-1.5" />
-                        <p className="text-xs text-neutral-400 dark:text-neutral-500 font-medium">No academic history detected</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 2: Submissions */}
-              {activeTab === "submissions" && (
-                <div className="space-y-4">
+          <section aria-label="Candidate submissions" className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm overflow-hidden shadow-none">
+            <h2 className="px-4 py-3 text-xs font-bold border-b border-neutral-200 dark:border-slate-800 flex items-center gap-1.5"><ClipboardList className="h-3.5 w-3.5" /> Submissions ({submissions.length})</h2>
+            <div className="p-4">                <div className="space-y-4">
                   {submissions.length === 0 ? (
                     <div className="text-center py-10 text-neutral-400 dark:text-neutral-500">
                       <ClipboardList className="h-10 w-10 mx-auto opacity-30 mb-2" />
@@ -674,48 +537,8 @@ export default function CandidateDetailPage() {
                       </div>
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* TAB 3: Comments & Notes */}
-              {activeTab === "notes" && (
-                <div className="space-y-4 flex flex-col h-full min-h-0">
-                  <div className="flex-1 space-y-3 overflow-auto min-h-0 max-h-[300px] pr-1">
-                    {notes.map((note, idx) => (
-                      <div key={idx} className="bg-neutral-50 dark:bg-slate-900/60 p-3 rounded-sm border border-neutral-100 dark:border-slate-850 text-xs">
-                        <div className="flex items-center gap-1.5 mb-1 text-[10px] font-bold text-neutral-400 dark:text-neutral-500">
-                          <User className="h-3 w-3 text-neutral-400" />
-                          <span>Recruiter</span>
-                          <span>{"\u2022"}</span>
-                          <Clock className="h-3 w-3 text-neutral-400" />
-                          <span>Just now</span>
-                        </div>
-                        <p className="text-neutral-750 dark:text-neutral-300 leading-relaxed font-normal whitespace-pre-wrap">{note}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Add Note Input */}
-                  <div className="border-t border-neutral-100 dark:border-slate-850 pt-3 flex gap-2">
-                    <textarea
-                      value={newNote}
-                      onChange={(e) => setNewNote(e.target.value)}
-                      placeholder="Type recruiter comment, interview notes, or update logs..."
-                      className="flex-1 bg-white dark:bg-slate-950 border border-neutral-250 dark:border-slate-750 rounded p-2 text-xs outline-hidden focus:border-primary text-neutral-850 dark:text-neutral-200 min-h-16 resize-none"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleAddNote}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white self-end text-xs gap-1 shrink-0 font-medium"
-                    >
-                      <Send className="h-3.5 w-3.5" /> Save Note
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </div>
+                </div></div>
+          </section>
 
         </div>
 

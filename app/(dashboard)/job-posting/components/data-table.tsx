@@ -31,9 +31,8 @@ export {
   isJobRecent,
   isJobPostedToday,
   exportJobsToCSV,
+  canAssignRecruitersToJob,
 } from "../lib/job-table-utils";
-
-import { exportJobsToCSV } from "../lib/job-table-utils";
 import { useJobTableData } from "../lib/use-job-table-data";
 import { JobTableFilters } from "./data-table/job-table-filters";
 import { JobTableRow } from "./data-table/job-table-row";
@@ -622,6 +621,7 @@ export default function DataTable({
               job={contextJob}
               hasSubmitCandidatePermission={hasSubmitCandidatePermission}
               hasEditPermission={hasEditPermission}
+              canAssignRecruiters={canAssignRecruitersToJob(contextJob, currentUser)}
               hasDelegatePermission={hasDelegatePermission}
               currentUserBranchId={currentUserBranchId}
               onOpenSourceModal={(j) => {
