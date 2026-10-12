@@ -20,6 +20,7 @@ export interface Job {
   recruitmentManagerId?: string;
   recruiter: string;
   recruiterId?: string | null;
+  recruiterIds?: string[];
   accountManagerId?: string;
   
   createdBy: string;
@@ -93,7 +94,12 @@ export function mapApiJobToJob(api: any): Job {
     recruitmentManager: api.recruitmentManager || "N/A",
     recruitmentManagerId: api.recruitmentManagerId || undefined,
     recruiter: api.recruiter || "N/A",
-    recruiterId: api.recruiterId || undefined,
+    recruiterId: api.recruiterId || (Array.isArray(api.recruiterIds) && api.recruiterIds[0]) || undefined,
+    recruiterIds: Array.isArray(api.recruiterIds)
+      ? api.recruiterIds
+      : api.recruiterId
+      ? [api.recruiterId]
+      : [],
     
     accountManagerId: api.accountManagerId || api.account_manager_id || undefined,
     createdBy: api.createdBy || "System Admin",

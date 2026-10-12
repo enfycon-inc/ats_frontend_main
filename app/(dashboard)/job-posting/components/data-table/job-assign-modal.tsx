@@ -45,6 +45,7 @@ export function JobAssignModal({
   const [selectedPodIds, setSelectedPodIds] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
   const [recruiterFilterMode, setRecruiterFilterMode] = useState<"all" | "podMembers">("all");
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
   // Assignment Context Data
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -411,18 +412,22 @@ export function JobAssignModal({
     return list;
   }, [usersList, targetBranch, job, currentUserBranchId, isPodHead, myPod, rolesList, targetUnit]);
 
-  // Synchronize initial selections on modal open
+  // Synchronize initial selections on modal open or when target job changes
   useEffect(() => {
-    if (!isOpen || !job) return;
+    if (!isOpen || !job) {
+      setHasUserInteracted(false);
+      return;
+    }
 
     setAssignSearch("");
     setIsAssigning(false);
     setRecruiterFilterMode("all");
+    setHasUserInteracted(false);
 
-    // Initial selected pod IDs
+    // Initial selected pod IDs from job
     const initialPodIds: string[] = [];
     if (job.podId && job.podId !== "none" && job.podId !== "off") {
-      const pIds = job.podId.split(",").map((s) => s.trim()).filter(Boolean);
+      const pIds = String(job.podId).split(",").map((s) => s.trim()).filter(Boolean);
       initialPodIds.push(...pIds);
     }
     const podStr =
@@ -440,21 +445,31 @@ export function JobAssignModal({
     }
     setSelectedPodIds(initialPodIds);
 
-    // Initial selected user IDs (recruiters)
+    // Initial selected user IDs (recruiters) from job
     const initialSelected: string[] = [];
-    if (job.recruiterId) {
+    if (Array.isArray((job as any).recruiterIds)) {
+      for (const rid of (job as any).recruiterIds) {
+        if (rid && !initialSelected.includes(rid)) {
+          initialSelected.push(rid);
+        }
+      }
+    }
+    if (job.recruiterId && !initialSelected.includes(job.recruiterId)) {
       initialSelected.push(job.recruiterId);
     }
 
-    if (
-      (job as any).assignedTo || 'N/A' &&
-      (job as any).assignedTo || 'N/A' !== "Unassigned" &&
-      !((job as any).assignedTo || "N/A").toUpperCase().startsWith("ALL")
-    ) {
-      const names = ((job as any).assignedTo || "N/A").split(",").map((s) => s.trim().toLowerCase());
+    // Fallback: match by recruiter names if provided
+    const recruiterStr =
+      job.recruiter && job.recruiter !== "N/A" && job.recruiter.toLowerCase() !== "unassigned"
+        ? job.recruiter
+        : (job as any).assignedTo && (job as any).assignedTo !== "N/A" && (job as any).assignedTo !== "Unassigned"
+        ? (job as any).assignedTo
+        : "";
+    if (recruiterStr && !recruiterStr.toUpperCase().startsWith("ALL")) {
+      const names = recruiterStr.split(",").map((s: string) => s.trim().toLowerCase());
       for (const u of usersList) {
         const uName = (u.fullName || u.name || "").toLowerCase();
-        if (names.includes(uName) && !initialSelected.includes(u.id)) {
+        if (uName && names.includes(uName) && !initialSelected.includes(u.id)) {
           initialSelected.push(u.id);
         }
       }
@@ -473,7 +488,49 @@ export function JobAssignModal({
     } else {
       setAssignTab(targetBranchPods.length > 0 ? "pods" : "users");
     }
-  }, [isOpen, job, branchAllowsPods, branchAllowsDirectStaff, targetBranchPods, usersList]);
+  }, [isOpen, job?.id, branchAllowsPods, branchAllowsDirectStaff]);
+
+  // When usersList or targetBranchPods loads asynchronously after modal is open,
+  // resolve any missing name-based matches into selectedUserIds IF the user hasn't made manual edits yet
+  useEffect(() => {
+    if (!isOpen || !job || hasUserInteracted) return;
+
+    // 1. Pods fallback matching
+    if (targetBranchPods.length > 0 && job.podName && job.podName !== "N/A" && job.podName.toLowerCase() !== "unassigned") {
+      const podNames = job.podName.split(",").map((s) => s.trim().toLowerCase());
+      const matchedPodIds: string[] = [];
+      for (const p of targetBranchPods) {
+        const pName = (p.name || "").toLowerCase();
+        if (podNames.includes(pName)) {
+          matchedPodIds.push(p.id);
+        }
+      }
+      if (matchedPodIds.length > 0) {
+        setSelectedPodIds((prev) => Array.from(new Set([...prev, ...matchedPodIds])));
+      }
+    }
+
+    // 2. Recruiters fallback matching
+    const recruiterStr =
+      job.recruiter && job.recruiter !== "N/A" && job.recruiter.toLowerCase() !== "unassigned"
+        ? job.recruiter
+        : (job as any).assignedTo && (job as any).assignedTo !== "N/A" && (job as any).assignedTo !== "Unassigned"
+        ? (job as any).assignedTo
+        : "";
+    if (usersList.length > 0 && recruiterStr && !recruiterStr.toUpperCase().startsWith("ALL")) {
+      const names = recruiterStr.split(",").map((s: string) => s.trim().toLowerCase());
+      const matchedUserIds: string[] = [];
+      for (const u of usersList) {
+        const uName = (u.fullName || u.name || "").toLowerCase();
+        if (uName && names.includes(uName)) {
+          matchedUserIds.push(u.id);
+        }
+      }
+      if (matchedUserIds.length > 0) {
+        setSelectedUserIds((prev) => Array.from(new Set([...prev, ...matchedUserIds])));
+      }
+    }
+  }, [usersList, targetBranchPods, isOpen, job?.id, hasUserInteracted]);
 
   const filteredPods = useMemo(() => {
     const q = assignSearch.trim().toLowerCase();
@@ -545,6 +602,7 @@ export function JobAssignModal({
   }, [branchRecruiterUsers, isUserInSelectedPods]);
 
   const handleTogglePodSelection = (podId: string) => {
+    setHasUserInteracted(true);
     // If we are selecting a pod, we should auto-remove any independent recruiters who are in this pod
     const isSelecting = !selectedPodIds.includes(podId);
     if (isSelecting) {
@@ -557,9 +615,8 @@ export function JobAssignModal({
     );
   };
 
-
-
   const handleSelectAllFilteredPods = () => {
+    setHasUserInteracted(true);
     const filteredIds = filteredPods.map((p: any) => p.id);
     const allSelected =
       filteredIds.length > 0 && filteredIds.every((id: string) => selectedPodIds.includes(id));
@@ -571,6 +628,7 @@ export function JobAssignModal({
   };
 
   const handleSelectAllFiltered = () => {
+    setHasUserInteracted(true);
     const filteredIds = filteredUsers.filter((u: any) => !isUserInSelectedPods(u.id, u.podId || u.pod_id)).map((u: any) => u.id);
     const allSelected =
       filteredIds.length > 0 && filteredIds.every((id: string) => selectedUserIds.includes(id));
@@ -582,6 +640,7 @@ export function JobAssignModal({
   };
 
   const handleToggleUserSelection = (userId: string) => {
+    setHasUserInteracted(true);
     setSelectedUserIds((prev) =>
       prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
     );
@@ -940,12 +999,15 @@ export function JobAssignModal({
             ) : (
               filteredPods.map((pod: any) => {
                 const isSelected = selectedPodIds.includes(pod.id);
+                const currentPodIds = (job.podId && job.podId !== "none" && job.podId !== "off")
+                  ? String(job.podId).split(",").map((s) => s.trim()).filter(Boolean)
+                  : [];
+                const currentPodNames = (job.podName && job.podName !== "N/A" && job.podName.toLowerCase() !== "unassigned")
+                  ? job.podName.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
+                  : [];
                 const isCurrent =
-                  job.podId === pod.id ||
-                  ((job as any).assignedTo || "N/A")?.toLowerCase() === pod.name?.toLowerCase() ||
-                  ((job as any).assignedTo || "N/A")?.toLowerCase().includes(pod.name?.toLowerCase()) ||
-                  job.podName?.toLowerCase() === pod.name?.toLowerCase() ||
-                  job.podName?.toLowerCase().includes(pod.name?.toLowerCase());
+                  currentPodIds.includes(pod.id) ||
+                  Boolean(pod.name && currentPodNames.includes(pod.name.toLowerCase()));
 
                 return (
                   <div
@@ -1029,14 +1091,39 @@ export function JobAssignModal({
           ) : (
             filteredUsers.map((u: any) => {
               const isSelected = selectedUserIds.includes(u.id);
+              const currentRecruiterIds = Array.isArray((job as any).recruiterIds)
+                ? (job as any).recruiterIds
+                : job.recruiterId
+                ? [job.recruiterId]
+                : [];
+              const recruiterStr =
+                job.recruiter && job.recruiter !== "N/A" && job.recruiter.toLowerCase() !== "unassigned"
+                  ? job.recruiter
+                  : (job as any).assignedTo && (job as any).assignedTo !== "N/A" && (job as any).assignedTo !== "Unassigned"
+                  ? (job as any).assignedTo
+                  : "";
+              const currentRecruiterNames = recruiterStr && !recruiterStr.toUpperCase().startsWith("ALL")
+                ? recruiterStr.split(",").map((s: string) => s.trim().toLowerCase()).filter(Boolean)
+                : [];
               const isCurrent =
-                job.recruiterId === u.id ||
-                ((job as any).assignedTo || "N/A")?.toLowerCase().includes((u.fullName || u.name || "").toLowerCase()) ||
-                ((job as any).assignedTo || "N/A")?.toLowerCase().includes((u.email || "").toLowerCase());
+                currentRecruiterIds.includes(u.id) ||
+                Boolean(u.fullName && currentRecruiterNames.includes(u.fullName.toLowerCase())) ||
+                Boolean(u.name && currentRecruiterNames.includes(u.name.toLowerCase()));
               const roleLabel = getUserRoleLabel(u, targetBranch?.id);
               const isPodMember = isUserInSelectedPods(u.id, u.podId || u.pod_id);
               const userPod = [...podsList, ...targetBranchPods].find(p => p.id === (u.podId || u.pod_id));
               const userPodName = userPod?.name || "Pod Member";
+
+              // 2-letter uppercase avatar initials (e.g., SB, MR, SM)
+              const avatarInitials = (() => {
+                const name = (u.fullName || u.name || "").trim();
+                if (name) {
+                  const parts = name.split(/\s+/).filter(Boolean);
+                  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+                  return name.substring(0, 2).toUpperCase();
+                }
+                return (u.email || "U").substring(0, 2).toUpperCase();
+              })();
 
               return (
                 <div
@@ -1066,7 +1153,7 @@ export function JobAssignModal({
 
                     {/* User Avatar Initials */}
                     <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-[11px] shrink-0 uppercase border border-slate-200 dark:border-slate-700">
-                      {(u.fullName || u.name || u.email || "U").substring(0, 2)}
+                      {avatarInitials}
                     </div>
 
                     <div className="min-w-0 flex-1">
@@ -1088,15 +1175,17 @@ export function JobAssignModal({
                         {isCurrent && (
                           <Badge
                             variant="outline"
-                            className="text-[9.5px] font-semibold text-slate-500 border-slate-300 dark:border-slate-600 py-0 h-4 px-1.5"
+                            className="text-[9.5px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700 py-0 h-4 px-1.5"
                           >
                             Current
                           </Badge>
                         )}
                       </div>
-                      <p className="text-[10.5px] text-slate-400 font-mono truncate mt-0.5">
-                        {u.email}
-                      </p>
+                      {u.email && (
+                        <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-mono truncate mt-0.5">
+                          {u.email}
+                        </p>
+                      )}
                     </div>
                   </div>
 
