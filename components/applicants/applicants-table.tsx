@@ -1,4 +1,5 @@
 "use client";
+import { candidateProfileId } from "@/lib/candidate-profile-id";
 
 import React, { useState, useMemo } from "react";
 import {
@@ -215,12 +216,7 @@ export default function ApplicantsTable({
     setTimeout(() => setIsDragReordering(false), 200);
   };
 
-  const extractProfileLink = (applicant: any): string => {
-    if (applicant.candidateCode) return applicant.candidateCode;
-    if (applicant.dbId) return `CAN-${String(applicant.dbId).padStart(6, '0')}`;
-    const match = String(applicant.applicantId || "").match(/(\d+)/);
-    return match ? `CAN-${String(match[1]).padStart(6, '0')}` : String(applicant.applicantId || "");
-  };
+  const extractProfileLink = (applicant: any): string => candidateProfileId(String(applicant.dbId || applicant.id || "")) || candidateProfileId(applicant.candidateCode) || candidateProfileId(applicant.applicantId) || "";
 
   const extractDbId = (applicant: any): string => {
     if (applicant.dbId) return String(applicant.dbId);

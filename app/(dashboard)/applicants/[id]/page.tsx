@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { atsApi } from "@/lib/ats-api";
 import toast from "react-hot-toast";
+import { candidateProfileId } from "@/lib/candidate-profile-id";
 
 export default function CandidateDetailPage() {
   const params = useParams();
@@ -48,6 +49,10 @@ export default function CandidateDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"resume" | "submissions" | "notes">("resume");
   const [resumeUrl, setResumeUrl] = useState<string | null>(null);
+  const resumeObjectUrl = useRef<string | null>(null);
+  const [resumeMime, setResumeMime] = useState('');
+  const [resumeError, setResumeError] = useState('');
+  const [profileError, setProfileError] = useState('');
   const [resumeLoading, setResumeLoading] = useState(true);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [notes, setNotes] = useState<string[]>([]);
@@ -97,27 +102,21 @@ export default function CandidateDetailPage() {
     return overrideRole || (session as any)?.user?.systemRole || "RECRUITER";
   }, [session, overrideRole]);
 
-  const isRecruiter = systemRole === "RECRUITER";
+  const permissions: string[] = (session?.user as any)?.permissions || [];
+  const can = (permission: string) => permissions.includes(permission) || permissions.includes('*');
 
-  // Parse candidate integer ID
-  let candidateId = NaN;
-  if (rawId) {
-    if (rawId.includes("-")) {
-      const parts = rawId.split("-");
-      candidateId = parseInt(parts[parts.length - 1], 10);
-    } else {
-      candidateId = parseInt(rawId, 10);
-    }
-  }
+  const candidateId = candidateProfileId(rawId) || '';
 
   // Initial Data Fetch
   const loadData = async () => {
-    if (isNaN(candidateId)) {
+    if (!candidateId) {
+      setProfileError('This candidate link has an invalid identifier.');
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
+      setProfileError('');
       // 1. Fetch Candidate Profile details
       const details = await atsApi.candidates.get(candidateId);
       setCandidate(details);
@@ -148,7 +147,7 @@ export default function CandidateDetailPage() {
       // 2. Fetch submissions for this candidate
       try {
         const subsList = await atsApi.submissions.list({ candidateId });
-        const candidateSubs = subsList.data;
+        const candidateSubs = Array.isArray(subsList) ? subsList : subsList.data || [];
         setSubmissions(candidateSubs);
       } catch (subErr) {
         console.error("Failed to load submissions:", subErr);
@@ -157,18 +156,24 @@ export default function CandidateDetailPage() {
       // 3. Fetch Resume Blob
       try {
         setResumeLoading(true);
+        setResumeError('');
+        setResumeUrl(null);
+        if (resumeObjectUrl.current) URL.revokeObjectURL(resumeObjectUrl.current);
+        resumeObjectUrl.current = null;
         const blob = await atsApi.candidates.fetchResumeBlob(candidateId);
-        if (resumeUrl) {
-          URL.revokeObjectURL(resumeUrl);
-        }
+        setResumeMime(blob.type);
         const url = URL.createObjectURL(blob);
+        resumeObjectUrl.current = url;
         setResumeUrl(url);
       } catch (resErr) {
+        setResumeError(resErr instanceof Error ? resErr.message : 'Unable to load the resume.');
         console.log("No resume file found for candidate or failed to retrieve:", resErr);
       } finally {
         setResumeLoading(false);
       }
     } catch (err: any) {
+      setCandidate(null);
+      setProfileError(err.message || 'Unable to load this candidate.');
       console.error("Failed to load candidate details:", err);
       toast.error("Failed to load candidate profile: " + err.message);
     } finally {
@@ -179,8 +184,8 @@ export default function CandidateDetailPage() {
   useEffect(() => {
     loadData();
     return () => {
-      if (resumeUrl) {
-        URL.revokeObjectURL(resumeUrl);
+      if (resumeObjectUrl.current) {
+        URL.revokeObjectURL(resumeObjectUrl.current);
       }
     };
   }, [candidateId]);
@@ -336,8 +341,9 @@ export default function CandidateDetailPage() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 min-h-[400px]">
         <FileText className="h-12 w-12 text-neutral-300 dark:text-slate-700" />
-        <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200 mt-4">Candidate Not Found</h3>
-        <p className="text-xs text-neutral-500 mt-1">The candidate profile with the specified ID could not be loaded.</p>
+        <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200 mt-4">Unable to open candidate profile</h3>
+        <p role="alert" className="text-xs text-neutral-500 mt-1">{profileError || 'This profile is unavailable.'}</p>
+        {candidateId && <Button variant="outline" size="sm" onClick={loadData} className="mt-3">Retry</Button>}
         <Link href="/applicants/all">
           <Button variant="outline" size="sm" className="mt-6 text-xs gap-1">
             <ChevronLeft className="h-4 w-4" /> Back to Candidates List
@@ -370,6 +376,7 @@ export default function CandidateDetailPage() {
           <Button
             size="sm"
             onClick={() => setEditModalOpen(true)}
+            disabled={!can('candidate:edit')}
             className="bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-neutral-200 text-xs gap-1.5 border border-neutral-200 dark:border-slate-750 font-semibold"
           >
             <Edit className="h-3.5 w-3.5" /> Edit Profile
@@ -377,11 +384,12 @@ export default function CandidateDetailPage() {
           <Button
             size="sm"
             onClick={handleOpenSubmitModal}
+            disabled={!can('submission:create')}
             className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 shadow-xs font-semibold"
           >
             <ClipboardList className="h-3.5 w-3.5" /> Submit to Job
           </Button>
-          {!isRecruiter && (
+          {can('candidate:delete') && (
             <Button
               variant="outline"
               size="sm"
@@ -398,7 +406,7 @@ export default function CandidateDetailPage() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">
         
         {/* LEFT COLUMN: Profile Structured Details (62%) */}
-        <div className="lg:col-span-7 flex flex-col min-h-0 space-y-4 overflow-auto pr-1">
+        <div className="lg:col-span-5 flex flex-col min-h-0 space-y-4 overflow-auto pr-1">
           
           {/* Main Integrated Profile Summary Card */}
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm p-5 shadow-xs space-y-5">
@@ -712,12 +720,12 @@ export default function CandidateDetailPage() {
         </div>
 
         {/* RIGHT COLUMN: CV PDF Document Viewer (38%) */}
-        <div className="lg:col-span-5 flex flex-col min-h-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm overflow-hidden shadow-none">
+        <div className="lg:col-span-7 flex flex-col min-h-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm overflow-hidden shadow-none">
           
           {/* Viewer Toolbar */}
           <div className="bg-neutral-100 dark:bg-slate-800 px-4 py-2.5 border-b border-neutral-200 dark:border-slate-700 flex justify-between items-center text-xs">
             <span className="font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
-              <FileText className="h-4 w-4 text-neutral-500" /> Original CV Preview
+              <FileText className="h-4 w-4 text-neutral-500" /> Latest Resume
             </span>
             <div className="flex items-center gap-1.5">
               <input
@@ -730,7 +738,7 @@ export default function CandidateDetailPage() {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={uploadingResume}
+                disabled={uploadingResume || !can('candidate:edit')}
                 onClick={() => resumeInputRef.current?.click()}
                 className="text-neutral-600 border-neutral-250 hover:bg-neutral-200 dark:border-slate-700 dark:hover:bg-slate-700 hover:text-neutral-800 text-[10px] gap-1 h-7 font-bold cursor-pointer"
               >
@@ -738,7 +746,7 @@ export default function CandidateDetailPage() {
                 {resumeUrl ? "Update CV" : "Upload CV"}
               </Button>
               {resumeUrl && (
-                <a href={resumeUrl} download={`${candidate.fullName.replace(/\s+/g, "_")}_CV.pdf`}>
+                <a href={resumeUrl} download={candidate.resumeFilename || `${candidate.fullName.replace(/\s+/g, "_")}_CV`}>
                   <Button size="sm" variant="outline" className="text-neutral-600 border-neutral-250 hover:bg-neutral-200 dark:border-slate-700 dark:hover:bg-slate-700 hover:text-neutral-800 text-[10px] gap-1 h-7 font-bold">
                     <Download className="h-3.5 w-3.5" /> Download CV
                   </Button>
@@ -748,16 +756,20 @@ export default function CandidateDetailPage() {
           </div>
 
           {/* PDF Viewer / Raw Text Frame */}
+          <div className="px-4 py-2 text-xs border-b border-neutral-200 text-neutral-600">
+            {candidate.resumeFilename || 'Resume file'}
+            {candidate.resumeUploadedAt && <span className="block text-[10px] mt-1">Uploaded {new Date(candidate.resumeUploadedAt).toLocaleString()}</span>}
+          </div>
           <div className="flex-1 bg-neutral-200 dark:bg-slate-950 flex flex-col items-center justify-center relative min-h-[300px]">
             {resumeLoading ? (
               <div className="text-center">
                 <div className="h-6 w-6 border-2 border-t-primary border-neutral-300 dark:border-slate-800 rounded-full animate-spin mx-auto"></div>
                 <p className="text-[10px] text-neutral-550 mt-2 font-medium">Fetching CV document...</p>
               </div>
-            ) : resumeUrl ? (
+            ) : resumeUrl && resumeMime === 'application/pdf' ? (
               <iframe
                 src={resumeUrl}
-                className="w-full h-full border-none bg-white dark:bg-slate-900"
+                className="w-full min-h-[700px] h-full border-none bg-white dark:bg-slate-900"
                 title={`${candidate.fullName} Resume`}
               />
             ) : (
@@ -766,11 +778,12 @@ export default function CandidateDetailPage() {
                 <div className="text-center border-b border-neutral-100 dark:border-slate-850 pb-3 mb-3 shrink-0">
                   <FileSearch className="h-8 w-8 text-indigo-500/80 mx-auto" />
                   <p className="text-xs font-extrabold text-neutral-800 dark:text-white mt-2">Parsed CV Raw Text</p>
-                  <p className="text-[10px] text-neutral-550 mt-1">No original CV file on record. Rendering parsed text representation below.</p>
+                  <p className="text-[10px] text-neutral-550 mt-1">{resumeUrl ? 'This file format cannot be previewed here. Download the original file above; parsed text appears below.' : resumeError || 'No original resume is available. Parsed text appears below.'}</p>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => resumeInputRef.current?.click()}
+                    disabled={!can('candidate:edit')}
                     className="mt-3 text-xs gap-1.5 font-bold mx-auto cursor-pointer"
                   >
                     <UploadCloud className="h-4 w-4" /> Upload Resume PDF

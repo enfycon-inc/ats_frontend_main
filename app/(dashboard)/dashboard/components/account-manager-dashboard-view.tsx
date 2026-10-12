@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
+import { JobStatusModal } from "../../job-posting/components/data-table/job-status-modal";
+import { normalizeJobStatus, QUICK_CHANGE_JOB_STATUSES } from "@/lib/job-status-contract";
 import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -44,6 +46,35 @@ function AccountManagerDashboardView({
   const [editValue, setEditValue] = useState("");
   const [editBillRateValue, setEditBillRateValue] = useState("");
   const [editPayRateValue, setEditPayRateValue] = useState("");
+  const [statusJob, setStatusJob] = useState<any | null>(null);
+  const [statusValue, setStatusValue] = useState("");
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState("");
+  const statusInFlight = useRef(false);
+  const canEditStatus = profile?.permissions?.includes("job:edit") || profile?.permissions?.includes("*");
+  const openStatus = (job: any) => {
+    if (!canEditStatus || normalizeJobStatus(job.jobStatus || '') === 'Pending Approval' || (job.approvalStatus && job.approvalStatus !== 'APPROVED')) return;
+    const status = normalizeJobStatus(job.jobStatus || '');
+    setStatusJob({ ...job });
+    setStatusValue(status && QUICK_CHANGE_JOB_STATUSES.some(option => option === status) ? status : '');
+    setStatusError('');
+  };
+  const confirmStatus = async () => {
+    if (!statusJob || statusInFlight.current || !canEditStatus || !statusValue || normalizeJobStatus(statusValue) === normalizeJobStatus(statusJob.jobStatus || '')) return;
+    statusInFlight.current = true;
+    setStatusSaving(true); setStatusError('');
+    try {
+      const saved = await atsApi.jobs.changeStatus(statusJob.id, { status: statusValue, expectedStatus: statusJob.jobStatus });
+      await onUpdateJob(statusJob.id, { jobStatus: saved.status, _alreadySaved: true });
+      setStatusJob(null);
+      toast.success('Job status updated.');
+    } catch (error) {
+      setStatusError(error instanceof Error ? error.message : 'Unable to change status.');
+    } finally {
+      statusInFlight.current = false;
+      setStatusSaving(false);
+    }
+  };
   
   // State for AM Submissions
   const [amSubmissions, setAmSubmissions] = useState<any[]>([]);
@@ -193,9 +224,11 @@ function AccountManagerDashboardView({
                         )}
                       </td>
                       <td className="py-3 px-4">
-                        <DashboardJobStatusSelect
+                        <DashboardJobStatusBadge
                           status={job.jobStatus}
-                          onChange={(newStatus) => onUpdateJob(job.id, { jobStatus: newStatus })}
+                          disabled={!canEditStatus || normalizeJobStatus(job.jobStatus || '') === 'Pending Approval' || Boolean(job.approvalStatus && job.approvalStatus !== 'APPROVED')}
+                          jobCode={job.jobCode}
+                          onClick={() => openStatus(job)}
                         />
                       </td>
                       <td className="py-3 px-4 text-default-600">
@@ -242,6 +275,7 @@ function AccountManagerDashboardView({
       </Card>
 
       {/* AM Submissions Tracking Table */}
+      <JobStatusModal job={statusJob} statusValue={statusValue} onStatusValueChange={setStatusValue} saving={statusSaving} error={statusError} onConfirm={confirmStatus} onClose={() => { if (!statusInFlight.current) setStatusJob(null); }} />
       <Card className="border border-default-150 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
         <CardHeader className="border-b border-default-100 flex flex-row items-center justify-between bg-emerald-50/30 dark:bg-emerald-900/10">
           <div>
@@ -266,20 +300,23 @@ function AccountManagerDashboardView({
 
 // ─── POD LEAD / TEAM HEAD DASHBOARD VIEW ──────────────────────────────────────
 
-function DashboardJobStatusSelect({
+function DashboardJobStatusBadge({
   status,
-  onChange,
+  disabled, jobCode, onClick,
 }: {
   status: string;
-  onChange: (newStatus: string) => void;
+  disabled: boolean;
+  jobCode: string;
+  onClick: () => void;
 }) {
   return (
-    <select
-      value={status}
-      onChange={(e) => onChange(e.target.value)}
-      onClick={(e) => e.stopPropagation()}
+    <button
+      type="button"
+      disabled={disabled}
+      aria-label={`Edit status for ${jobCode}`}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
       className={cn(
-        "text-[10.5px] font-semibold px-2 py-0.5 rounded-sm border shadow-none bg-white dark:bg-slate-900 cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500",
+        "text-[10.5px] font-semibold px-2 py-0.5 rounded-sm border shadow-none bg-white dark:bg-slate-900 enabled:cursor-pointer disabled:cursor-default outline-none focus:ring-1 focus:ring-indigo-500",
         status === "Active"
           ? "text-green-700 border-green-200 bg-green-50 dark:text-green-400 dark:border-green-800/30"
           : status === "Close" || status === "Closed"
@@ -289,11 +326,8 @@ function DashboardJobStatusSelect({
           : "text-amber-700 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-800/30"
       )}
     >
-      <option value="Active">Active</option>
-      <option value="Hold">Hold</option>
-      <option value="Filled">Filled</option>
-      <option value="Closed">Closed</option>
-    </select>
+      {normalizeJobStatus(status || '') || status}
+    </button>
   );
 }
 

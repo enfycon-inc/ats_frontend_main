@@ -118,6 +118,12 @@ export default function DashboardPage() {
   }, [reload]);
 
   const handleUpdateJob = async (jobId: string, updatedFields: Partial<any>) => {
+    // Status changes are confirmed and persisted through the dedicated endpoint.
+    if (updatedFields._alreadySaved === true) {
+      const { _alreadySaved, ...savedFields } = updatedFields;
+      setJobs(previous => previous.map(job => job.id === jobId ? { ...job, ...savedFields } : job));
+      return;
+    }
     // 1. Optimistic update
     setJobs((prevJobs) =>
       prevJobs.map((job) => (job.id === jobId ? { ...job, ...updatedFields } : job))
