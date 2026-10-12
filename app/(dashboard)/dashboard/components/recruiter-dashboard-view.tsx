@@ -15,6 +15,7 @@ import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import AddCandidateModal from "@/components/dashboard/AddCandidateModal";
+import type { TrackerSubmission, TrackerResponse } from "@/lib/submission-contract";
 import {
   Dialog,
   DialogContent,
@@ -28,30 +29,41 @@ const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export default // ─── RECRUITER DASHBOARD VIEW ────────────────────────────────────────────────
 function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; jobs: any[]; activeJobs: any[] }) {
-  const [mySubmissions, setMySubmissions] = useState<any[]>([]);
+  const [mySubmissions, setMySubmissions] = useState<TrackerSubmission[]>([]);
+  const [metrics, setMetrics] = useState<TrackerResponse["dashboardMetrics"] | null>(null);
+  const [submissionsError, setSubmissionsError] = useState(false);
   const [loadingSubs, setLoadingSubs] = useState(true);
   const [selectedJobForCV, setSelectedJobForCV] = useState<any | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setMySubmissions([]);
+    setMetrics(null);
+    setLoadingSubs(true);
+    setSubmissionsError(false);
     async function loadSubs() {
       try {
-        const res = await atsApi.submissions.list();
-        const mine = Array.isArray(res) ? res : res?.data || [];
-        setMySubmissions(mine);
+        const res = await atsApi.submissions.list({ view: "my", limit: 10 });
+        if (!cancelled) {
+          setMySubmissions(res.data);
+          setMetrics(res.dashboardMetrics);
+        }
       } catch (err) {
         console.error("Failed to load my submissions", err);
+        if (!cancelled) setSubmissionsError(true);
       } finally {
-        setLoadingSubs(false);
+        if (!cancelled) setLoadingSubs(false);
       }
     }
     loadSubs();
-  }, [profile?.id]);
+    return () => { cancelled = true; };
+  }, [profile?.id, profile?.tenantId]);
 
   // Analytics Calculations
   const totalJobs = jobs.length;
   const activeCount = activeJobs.length;
-  const interviewsScheduled = mySubmissions.filter((s) => s.l1Status === "SCHEDULED" || s.l2Status === "SCHEDULED" || s.l3Status === "SCHEDULED" || s.l1Status === "PASSED" || s.l2Status === "PASSED" || s.l3Status === "PASSED").length;
-  const selectedCount = mySubmissions.filter((sub) => sub.finalStatus === "OFFER" || sub.finalStatus === "JOIN" || sub.finalStatus === "PLACED").length;
+  const interviewsScheduled = metrics?.interviews ?? "—";
+  const selectedCount = metrics?.selections ?? "—";
 
   return (
     <div className="space-y-6">
@@ -72,12 +84,6 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
             <Button size="sm" variant="outline" className="text-xs font-bold border-default-200 h-8 gap-1">
               <Icon icon="heroicons:magnifying-glass" className="h-3.5 w-3.5 text-indigo-600" />
               Talent Bench Search
-            </Button>
-          </Link>
-          <Link href="/email">
-            <Button size="sm" variant="outline" className="text-xs font-bold border-default-200 h-8 gap-1 text-purple-700 bg-purple-50/50 hover:bg-purple-100">
-              <Icon icon="heroicons:paper-airplane" className="h-3.5 w-3.5 text-purple-600" />
-              Mass Mail Outreach
             </Button>
           </Link>
           <Link href="/utility/submissions">
@@ -110,7 +116,7 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
             </div>
             <div>
               <p className="text-xs font-semibold text-default-400 uppercase tracking-wider">My Submissions</p>
-              <h3 className="text-2xl font-bold text-default-900 mt-0.5">{mySubmissions.length}</h3>
+              <h3 className="text-2xl font-bold text-default-900 mt-0.5">{metrics?.submissions ?? "—"}</h3>
             </div>
           </CardContent>
         </Card>
@@ -230,6 +236,8 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
             <CardContent className="p-0 flex-1">
               {loadingSubs ? (
                 <div className="p-6 text-center text-xs text-default-400">Loading submissions...</div>
+              ) : submissionsError ? (
+                <div role="alert" className="p-6 text-center text-xs text-default-500">Your submissions could not be loaded. Please refresh to retry.</div>
               ) : mySubmissions.length === 0 ? (
                 <div className="p-8 text-center text-xs text-default-400">No candidate submissions recorded yet.</div>
               ) : (

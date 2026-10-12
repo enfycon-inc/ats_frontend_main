@@ -87,6 +87,7 @@ export default function DashboardPage() {
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [jobsRequest, setJobsRequest] = useState(0);
   const canViewJobs = profile?.permissions?.includes("job:view") === true;
+  const isRecruiterDashboard = selection?.systemRole === "RECRUITER";
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -95,7 +96,7 @@ export default function DashboardPage() {
       setLoading(true);
       setJobsError(null);
       try {
-        const jobsData = canViewJobs ? await atsApi.jobs.list() : [];
+        const jobsData = canViewJobs ? await atsApi.jobs.list(isRecruiterDashboard ? { filter: "sourcing" } : undefined) : [];
         if (!Array.isArray(jobsData)) throw new Error("Invalid jobs response");
         if (!cancelled) setJobs(jobsData);
       } catch (err) {
@@ -106,7 +107,7 @@ export default function DashboardPage() {
     }
     loadData();
     return () => { cancelled = true; };
-  }, [status, profile?.id, profile?.tenantId, canViewJobs, jobsRequest]);
+  }, [status, profile?.id, profile?.tenantId, canViewJobs, isRecruiterDashboard, jobsRequest]);
 
   useEffect(() => {
     const handleAppRefresh = () => {
