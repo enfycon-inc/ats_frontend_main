@@ -500,6 +500,13 @@ export default function PodsPage() {
     return found?.name || currentUser?.businessUnitName || "My Operating Unit";
   }, [currentUser, businessUnits]);
 
+  const assignedBranchName = useMemo(() => {
+    const bId = currentUser?.branchId;
+    if (!bId) return null;
+    const found = branches.find((b) => b.id === bId);
+    return found?.name || currentUser?.branchName || "My Branch Office";
+  }, [currentUser, branches]);
+
   // ── Loading & Guard States ───────────────────────────────────────────
   if (loading) {
     return (
@@ -987,25 +994,35 @@ export default function PodsPage() {
                   {!isUnitScoped && (
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block">
-                        Branch
+                        Branch <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        value={podBranchId}
-                        onChange={(e) => {
-                          setPodBranchId(e.target.value);
-                          setPodUnitId("");
-                          setPodHeadId("");
-                          setSelectedRecruiterIds([]);
-                        }}
-                        className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
-                      >
-                        <option value="">— Select Branch (Optional) —</option>
-                        {branches.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
+                      {isBranchAdmin && currentUser?.branchId ? (
+                        <div className="w-full h-9 text-xs font-semibold border border-neutral-200 dark:border-slate-700 rounded-lg p-2 bg-neutral-100/70 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
+                          <Icon icon="heroicons:building-office-2" className="h-4 w-4 text-indigo-600 shrink-0" />
+                          <span>{assignedBranchName}</span>
+                        </div>
+                      ) : (
+                        <select
+                          value={podBranchId}
+                          onChange={(e) => {
+                            const bId = e.target.value;
+                            setPodBranchId(bId);
+                            setPodUnitId("");
+                            setPodHeadId("");
+                            setSelectedRecruiterIds([]);
+                            setModalRecruiters([]);
+                          }}
+                          required
+                          className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                        >
+                          <option value="">— Select Branch —</option>
+                          {branches.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   )}
 
@@ -1022,17 +1039,20 @@ export default function PodsPage() {
                     ) : (
                       <select
                         value={podUnitId}
+                        disabled={!podBranchId}
                         onChange={async (e) => {
                           const val = e.target.value;
                           setPodUnitId(val);
                           setPodHeadId("");
                           setSelectedRecruiterIds([]);
-                          await fetchRecruitersForUnit(val);
+                          await fetchRecruitersForUnit(val, podBranchId);
                         }}
-                        className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                        className="w-full text-xs font-semibold border border-neutral-300 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer disabled:bg-neutral-100 dark:disabled:bg-slate-800/40 disabled:cursor-not-allowed"
                         required
                       >
-                        <option value="">— Select Operating Unit —</option>
+                        <option value="">
+                          {!podBranchId ? "— Select Branch First —" : "— Select Operating Unit —"}
+                        </option>
                         {businessUnits
                           .filter((bu) => !podBranchId || bu.branchId === podBranchId)
                           .map((bu) => (
@@ -1047,16 +1067,22 @@ export default function PodsPage() {
 
                 {/* Pod Lead */}
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block">
-                    Designate Pod Lead (Team Lead)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block">
+                      Designate Pod Lead (Team Lead)
+                    </label>
+                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium">
+                      Only 1 member can be lead
+                    </span>
+                  </div>
                   <Popover open={podHeadOpen} onOpenChange={setPodHeadOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         role="combobox"
                         aria-expanded={podHeadOpen}
-                        className="w-full justify-between h-9 px-3 text-xs font-medium border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white hover:bg-neutral-50"
+                        disabled={!podUnitId || (!isUnitScoped && !podBranchId)}
+                        className="w-full justify-between h-9 px-3 text-xs font-medium border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white hover:bg-neutral-50 disabled:bg-neutral-100 dark:disabled:bg-slate-800/40 disabled:cursor-not-allowed"
                       >
                         {podHeadId && podLeadCandidates.find((u) => u.id === podHeadId) ? (
                           <span className="font-semibold text-neutral-900 dark:text-neutral-100 truncate">
@@ -1066,7 +1092,13 @@ export default function PodsPage() {
                             </span>
                           </span>
                         ) : (
-                          <span className="font-normal text-neutral-400">— None (Unassigned) —</span>
+                          <span className="font-normal text-neutral-400">
+                            {!isUnitScoped && !podBranchId
+                              ? "— Select Branch & Operating Unit First —"
+                              : !podUnitId
+                              ? "— Select Operating Unit First —"
+                              : "— None (Unassigned) —"}
+                          </span>
                         )}
                         <Icon icon="heroicons:chevron-up-down" className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
                       </Button>
@@ -1075,7 +1107,7 @@ export default function PodsPage() {
                       <Command>
                         <CommandInput placeholder="Search eligible recruiters..." className="h-8.5 text-xs" />
                         <CommandList>
-                          <CommandEmpty>No unassigned recruiters available.</CommandEmpty>
+                          <CommandEmpty>No eligible recruiters available in this operating unit.</CommandEmpty>
                           <CommandGroup>
                             <CommandItem
                               value="unassigned"
@@ -1124,7 +1156,7 @@ export default function PodsPage() {
                     </PopoverContent>
                   </Popover>
                   <p className="text-[10px] text-neutral-500">
-                    Only recruiters in this operating unit who are not leading another pod are shown.
+                    Only recruiters in this operating unit who are not leading another pod are shown. Only 1 member can be designated as Pod Lead.
                   </p>
                 </div>
 
@@ -1146,9 +1178,21 @@ export default function PodsPage() {
                     )}
                   </div>
 
-                  {modalRecruiters.length === 0 ? (
+                  {!isUnitScoped && !podBranchId ? (
                     <div className="border border-dashed border-neutral-200 dark:border-slate-800 rounded-xl p-4 text-center text-xs text-neutral-400 italic">
-                      No unassigned recruiters available in this operating unit.
+                      Please select a branch and operating unit first to load eligible recruiters.
+                    </div>
+                  ) : !podUnitId ? (
+                    <div className="border border-dashed border-neutral-200 dark:border-slate-800 rounded-xl p-4 text-center text-xs text-neutral-400 italic">
+                      Please select an operating unit first to load eligible recruiters.
+                    </div>
+                  ) : modalRecruiters.length === 0 ? (
+                    <div className="border border-dashed border-neutral-200 dark:border-slate-800 rounded-xl p-4 text-center text-xs text-neutral-500 bg-neutral-50/50 dark:bg-slate-800/20">
+                      <Icon icon="heroicons:user-group" className="h-6 w-6 mx-auto mb-1 text-neutral-400" />
+                      <div className="font-semibold text-neutral-700 dark:text-neutral-300">No Eligible Recruiters Available</div>
+                      <p className="text-[11px] text-neutral-400 mt-0.5 max-w-sm mx-auto">
+                        Only staff members with the <strong>Recruiter</strong> role can be pod members. No unassigned recruiters are currently available in this operating unit.
+                      </p>
                     </div>
                   ) : (
                     <div className="border border-neutral-200 dark:border-slate-800 rounded-xl max-h-48 overflow-y-auto divide-y divide-neutral-100 dark:divide-slate-800 shadow-2xs">
@@ -1177,7 +1221,7 @@ export default function PodsPage() {
                                 <span>{r.fullName}</span>
                                 {isHead && (
                                   <Badge className="bg-indigo-50 text-indigo-700 text-[9px] px-1 py-0 border border-indigo-200 font-semibold">
-                                    Pod Lead
+                                    Pod Lead (1 of 1)
                                   </Badge>
                                 )}
                               </div>
@@ -1250,8 +1294,13 @@ export default function PodsPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={submitting || !podName.trim()}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-4 shadow-2xs cursor-pointer"
+                  disabled={
+                    submitting ||
+                    !podName.trim() ||
+                    (!isUnitScoped && (!podBranchId || !podUnitId)) ||
+                    (isUnitScoped && !podUnitId)
+                  }
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-4 shadow-2xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting
                     ? modalMode === "create"
