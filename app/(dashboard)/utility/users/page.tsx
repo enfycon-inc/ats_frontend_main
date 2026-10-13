@@ -2,10 +2,11 @@
 import { warnIfEmailFailed } from "@/lib/email-notification";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Papa from "papaparse";
 import { 
   Users, UserPlus, Search, Edit2, Key, Shield, Building2, MapPin, Briefcase,
   CheckCircle2, XCircle, RefreshCw, Mail, Lock, Sparkles, Filter, ShieldAlert, X, ChevronRight, Loader2,
-  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check, Eye, EyeOff, Info, Clock, Send
+  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check, Eye, EyeOff, Info, Clock, Send, Upload, Download
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -562,6 +563,11 @@ export default function UserManagementPage() {
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFileName, setImportFileName] = useState("");
+  const [importValidation, setImportValidation] = useState<any[]>([]);
+  const [importResults, setImportResults] = useState<any | null>(null);
+  const [isImportBusy, setIsImportBusy] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
@@ -1260,6 +1266,82 @@ export default function UserManagementPage() {
     toast.success(`Exported ${listToExport.length} user records to CSV!`);
   };
 
+  const downloadUserImportTemplate = () => {
+    const csv = 'Full Name,Email,Branch,Unit,Roles,City\r\n';
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'user-import-template.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleUserImportFile = (file?: File) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) return toast.error('Please choose a CSV file.');
+    if (file.size > 2 * 1024 * 1024) return toast.error('CSV must be 2 MB or smaller.');
+    setIsImportBusy(true);
+    setImportFileName(file.name);
+    setImportResults(null);
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: 'greedy',
+      transformHeader: (header) => header.trim().toLowerCase().replace(/[\s_-]+/g, ''),
+      complete: async (parsed) => {
+        if (parsed.errors.length) {
+          setIsImportBusy(false);
+          return toast.error(`Could not read CSV row ${parsed.errors[0].row ?? ''}. Check the file format.`);
+        }
+        const rows = parsed.data.map((row) => ({
+          fullName: row.fullname || row.name || '',
+          email: row.email || '',
+          branch: row.branch || '',
+          unit: row.unit || row.businessunit || '',
+          roles: row.roles || row.role || '',
+          city: row.city || '',
+        }));
+        if (!rows.length) {
+          setIsImportBusy(false);
+          return toast.error('The CSV has no user rows.');
+        }
+        try {
+          const validation = await atsApi.auth.validateUserImport(rows);
+          setImportValidation(Array.isArray(validation) ? validation : []);
+        } catch (error: any) {
+          toast.error(error.message || 'Could not validate this CSV.');
+          setImportValidation([]);
+        } finally {
+          setIsImportBusy(false);
+        }
+      },
+    });
+  };
+
+  const handleCommitUserImport = async () => {
+    const readyRows = importValidation.filter((row) => row.status === 'ready').map((row) => row.input);
+    if (!readyRows.length) return toast.error('There are no valid rows to import.');
+    setIsImportBusy(true);
+    try {
+      const result = await atsApi.auth.importUsers(readyRows);
+      setImportResults(result);
+      const emailFailures = (result.results || []).filter((row: any) => row.emailNotification?.status === 'failed').length;
+      toast.success(`Created ${result.created} user(s).${emailFailures ? ` ${emailFailures} welcome email(s) need attention.` : ''}`);
+      loadData();
+    } catch (error: any) {
+      toast.error(error.message || 'User import failed.');
+    } finally {
+      setIsImportBusy(false);
+    }
+  };
+
+  const closeUserImport = () => {
+    if (isImportBusy) return;
+    setIsImportModalOpen(false);
+    setImportFileName('');
+    setImportValidation([]);
+    setImportResults(null);
+  };
+
   interface BranchRoleGroup {
     branchId?: string;
     branchName?: string;
@@ -1783,6 +1865,16 @@ export default function UserManagementPage() {
             </Button>
 
             {/* PRIMARY ACTIONS DROPDOWN BUTTON (Aittude style) */}
+            {sessionPerms.includes('user:manage') && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsImportModalOpen(true)}
+                className="h-9 text-xs font-semibold border-neutral-300 dark:border-slate-700"
+              >
+                <Upload className="h-3.5 w-3.5 mr-1.5" /> Import CSV
+              </Button>
+            )}
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -2595,6 +2687,92 @@ export default function UserManagementPage() {
                   )}
                   Approve & Activate
                 </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK USER IMPORT MODAL */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-5">
+          <div className="w-full max-w-5xl max-h-[94vh] flex flex-col overflow-hidden rounded-xl border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 px-5 py-4 bg-neutral-50 dark:bg-slate-850">
+              <div>
+                <h3 className="flex items-center gap-2 text-sm font-bold text-neutral-900 dark:text-white"><Upload className="h-4 w-4 text-indigo-600" /> Import users</h3>
+                <p className="mt-1 text-[11px] text-neutral-500">Upload a CSV to create users and assign their branch, unit, roles, and optional city.</p>
+              </div>
+              <button onClick={closeUserImport} className="text-neutral-400 hover:text-neutral-700" aria-label="Close import"><X className="h-4 w-4" /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {!importResults ? <>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 text-[11px] font-semibold text-neutral-500">
+                    <span className="rounded-full bg-indigo-600 px-2.5 py-1 text-white">1 Upload</span><span>2 Review</span><span>3 Import</span>
+                  </div>
+                  <button type="button" onClick={downloadUserImportTemplate} className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:underline"><Download className="h-3.5 w-3.5" /> Download CSV template</button>
+                </div>
+                <div className="rounded-lg border border-dashed border-neutral-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/40 p-5 text-center">
+                  <Upload className="mx-auto h-6 w-6 text-slate-500" />
+                  <label className="mt-2 inline-block cursor-pointer text-sm font-semibold text-indigo-600 hover:underline">
+                    {importFileName ? importFileName : 'Choose a CSV file'}
+                    <input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => handleUserImportFile(event.target.files?.[0])} />
+                  </label>
+                  <p className="mt-1 text-[11px] text-neutral-500">CSV format · up to 100 rows · 2 MB maximum</p>
+                  <p className="mt-2 text-[10px] text-neutral-500">Columns: Full Name, Email, Branch, Unit, Roles (separate multiple roles with semicolons), City (optional: BBSR, PUNE, BENGALURU, VIZAG, HYDERABAD).</p>
+                </div>
+
+                {isImportBusy && <div className="flex items-center gap-2 text-xs text-neutral-500"><Loader2 className="h-4 w-4 animate-spin" /> Validating rows…</div>}
+                {importValidation.length > 0 && <>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">Review {importValidation.length} rows</p>
+                    <div className="flex gap-2 text-[11px]">
+                      <span className="rounded bg-emerald-50 px-2 py-1 font-semibold text-emerald-700">{importValidation.filter((row) => row.status === 'ready').length} ready</span>
+                      <span className="rounded bg-amber-50 px-2 py-1 font-semibold text-amber-700">{importValidation.filter((row) => row.status !== 'ready').length} need changes</span>
+                    </div>
+                  </div>
+                  <div className="overflow-auto rounded-lg border border-neutral-200 dark:border-slate-700">
+                    <table className="w-full min-w-[960px] text-left text-[11px]">
+                      <thead className="bg-slate-50 dark:bg-slate-800 text-neutral-600 dark:text-neutral-300"><tr>{['Row', 'Name', 'Email', 'Branch', 'Unit', 'Roles', 'City', 'Status'].map((heading) => <th key={heading} className="px-2.5 py-2 font-bold">{heading}</th>)}</tr></thead>
+                      <tbody>
+                        {importValidation.map((row) => <tr key={row.row} className="border-t border-neutral-100 dark:border-slate-800 align-top">
+                          <td className="px-2.5 py-2 text-neutral-500">{row.row}</td>
+                          <td className="px-2.5 py-2">{row.input.fullName || row.input.name}</td>
+                          <td className="px-2.5 py-2">{row.input.email}</td>
+                          <td className="px-2.5 py-2">{row.input.branch}</td>
+                          <td className="px-2.5 py-2">{row.input.unit || row.input.businessUnit}</td>
+                          <td className="px-2.5 py-2">{row.input.roles || row.input.role}</td>
+                          <td className="px-2.5 py-2">{row.input.city || '—'}</td>
+                          <td className="px-2.5 py-2">
+                            {row.status === 'ready' ? <span className="font-semibold text-emerald-700">Ready</span> : <div className="space-y-1 text-amber-700">{row.errors.map((error: string, index: number) => <p key={index}>{error}</p>)}{Object.entries(row.suggestions || {}).map(([field, choices]) => <p key={field} className="text-neutral-500">Suggestion for {field}: {(choices as string[]).join(', ')}</p>)}</div>}
+                          </td>
+                        </tr>)}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-[11px] text-neutral-500">No accounts are created until you confirm. Rows with errors will be skipped; correct the CSV and re-upload to include them.</p>
+                </>}
+              </> : <>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                  <h4 className="text-sm font-bold text-emerald-800">Import finished</h4>
+                  <p className="mt-1 text-xs text-emerald-700">{importResults.created} created · {importResults.skipped} skipped · {importResults.failed} failed</p>
+                </div>
+                <div className="overflow-auto rounded-lg border border-neutral-200 dark:border-slate-700">
+                  <table className="w-full text-left text-xs"><thead className="bg-slate-50 dark:bg-slate-800"><tr><th className="px-3 py-2">Row</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Result</th></tr></thead>
+                    <tbody>{(importResults.results || []).map((row: any) => <tr key={`${row.row}-${row.email}`} className="border-t border-neutral-100 dark:border-slate-800"><td className="px-3 py-2">{row.row}</td><td className="px-3 py-2">{row.email}</td><td className="px-3 py-2">{row.status === 'created' && row.emailNotification?.status === 'failed' ? 'Created · welcome email failed' : row.status}{row.errors?.length ? ` · ${row.errors.join('; ')}` : ''}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              </>}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-neutral-100 dark:border-slate-800 px-5 py-3">
+              <span className="text-[11px] text-neutral-500">{importResults ? 'Check email failures in workspace email settings.' : 'Login instructions in welcome emails follow your workspace login settings.'}</span>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={closeUserImport} disabled={isImportBusy}>{importResults ? 'Done' : 'Cancel'}</Button>
+                {!importResults && <Button type="button" size="sm" onClick={handleCommitUserImport} disabled={isImportBusy || !importValidation.some((row) => row.status === 'ready')} className="bg-indigo-600 text-white hover:bg-indigo-700">
+                  {isImportBusy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null} Import {importValidation.filter((row) => row.status === 'ready').length} valid users
+                </Button>}
               </div>
             </div>
           </div>

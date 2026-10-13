@@ -543,6 +543,20 @@ const auth = {
     });
   },
 
+  async validateUserImport(rows: Array<Record<string, string>>): Promise<any> {
+    return apiFetch<any>('/api/auth/users/import/validate', {
+      method: 'POST',
+      body: JSON.stringify({ rows }),
+    });
+  },
+
+  async importUsers(rows: Array<Record<string, string>>): Promise<any> {
+    return apiFetch<any>('/api/auth/users/import', {
+      method: 'POST',
+      body: JSON.stringify({ rows }),
+    });
+  },
+
   async listUsers(tenantId?: string): Promise<any[]> {
     const headers: Record<string, string> = {};
     if (tenantId) {
