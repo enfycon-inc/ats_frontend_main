@@ -18,6 +18,7 @@ import {
   Check,
 } from "lucide-react";
 import { atsApi } from "@/lib/ats-api";
+import { USER_CITY_OPTIONS, USER_CITY_VALUES, type UserCity } from "@/lib/user-city-contract";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,8 @@ export default function PendingApprovalView({
   const [rolesList, setRolesList] = useState<any[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [selectedUnitId, setSelectedUnitId] = useState<string>("");
+  const [selectedCity, setSelectedCity] = useState<UserCity | "">("");
+  const cityInitialized = React.useRef(false);
   const [isLoadingLocations, setIsLoadingLocations] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -121,7 +124,13 @@ export default function PendingApprovalView({
       checking = true;
       try {
         const profile = await atsApi.auth.me();
-        if (!disposed) showApproval(profile);
+        if (!disposed) {
+          if (!cityInitialized.current) {
+            setSelectedCity(USER_CITY_VALUES.includes(profile?.city) ? profile.city : "");
+            cityInitialized.current = true;
+          }
+          showApproval(profile);
+        }
       } catch {
         // Keep the waiting page open during temporary connection failures.
       } finally {
@@ -230,7 +239,7 @@ export default function PendingApprovalView({
 
     try {
       setIsSubmitting(true);
-      await atsApi.auth.requestRole(effectiveRole, branchToSend, unitToSend);
+      await atsApi.auth.requestRole(effectiveRole, branchToSend, unitToSend, selectedCity || null);
       toast.success("Role request submitted successfully!");
       setRequestedRole(effectiveRole);
       setTimeout(() => {
@@ -369,6 +378,17 @@ export default function PendingApprovalView({
   }
 
   // ─── STATE 2: Select Role Screen (First-time unapproved user) ──────────────
+  const cityField = <div>
+    <label htmlFor="role-request-city" className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">
+      City <span className="font-normal text-neutral-500">(optional)</span>
+    </label>
+    <select id="role-request-city" value={selectedCity} disabled={isSubmitting}
+      onChange={event => { cityInitialized.current = true; setSelectedCity(event.target.value as UserCity | ""); }}
+      className="w-full h-11 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+      <option value="">Not specified</option>
+      {USER_CITY_OPTIONS.map(city => <option key={city.value} value={city.value}>{city.label}</option>)}
+    </select>
+  </div>;
   const isFormValid = (() => {
     if (roleCategory === "TENANT_ADMIN") return true;
     if (roleCategory === "BRANCH_ADMIN") return Boolean(selectedBranchId);
@@ -514,7 +534,7 @@ export default function PendingApprovalView({
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
                 Branch Unit Admins manage delivery for a specific branch business unit. Both branch office and branch unit are required.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">
                     Branch Office <span className="text-rose-500">*</span>
@@ -574,6 +594,7 @@ export default function PendingApprovalView({
                     </select>
                   )}
                 </div>
+                {cityField}
               </div>
             </div>
           ) : (
@@ -587,7 +608,7 @@ export default function PendingApprovalView({
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
                 Staff members operate within a branch unit. Select your branch office first, then choose your branch unit, and select your specific role.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
                 <div>
                   <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">
                     Branch Office <span className="text-rose-500">*</span>
@@ -651,6 +672,7 @@ export default function PendingApprovalView({
                     </select>
                   )}
                 </div>
+                {cityField}
               </div>
 
               {/* Dynamic Role Selection for Employee */}
@@ -707,6 +729,8 @@ export default function PendingApprovalView({
             </div>
           )}
         </div>
+
+        {(roleCategory === "BRANCH_ADMIN" || roleCategory === "TENANT_ADMIN") && <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 mb-8 shadow-sm">{cityField}</div>}
 
         {/* Bottom Actions */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

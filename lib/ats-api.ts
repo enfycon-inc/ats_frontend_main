@@ -1,4 +1,5 @@
 import type { TenantEmailSettings, EmailDispatchMode, EmailDispatchResult } from './system-email.types';
+import type { UserCity } from './user-city-contract';
 import type { StaffProfile, ProfileDetailsInput, SignatureSettings, SignatureInput, SignatureDefaultsInput } from './profile-contract';
 export interface ClientAccessPolicy { clientsVisibleAcrossUnits: boolean; bdmClientsTenantWide: boolean; otherOwnerPocsVisible: boolean; maskOtherOwnerPocDetails: boolean; }
 import type { CandidateAssessment, SubmissionHistoryResponse, TrackerResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
@@ -579,10 +580,10 @@ const auth = {
     });
   },
 
-  async requestRole(role: string, branchId?: string, businessUnitId?: string): Promise<any> {
+  async requestRole(role: string, branchId?: string, businessUnitId?: string, city?: UserCity | null): Promise<any> {
     return apiFetch<any>('/api/auth/request-role', {
       method: 'POST',
-      body: JSON.stringify({ role, branchId, businessUnitId }),
+      body: JSON.stringify({ role, branchId, businessUnitId, city }),
     });
   },
 
