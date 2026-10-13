@@ -1267,11 +1267,15 @@ export default function UserManagementPage() {
   };
 
   const downloadUserImportTemplate = () => {
-    const csv = 'Full Name,Email,Branch,Unit,Roles,City\r\n';
+    const csv = [
+      'First Name,Last Name,Email,Branch,Unit,Roles,City,Example',
+      'Priya,Sharma,priya.sharma@example.invalid,Pune,Technology Staffing,Recruiter,PUNE,YES',
+      '',
+    ].join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'user-import-template.csv';
+    link.download = 'user-import-template-with-example.csv';
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -1292,18 +1296,26 @@ export default function UserManagementPage() {
           setIsImportBusy(false);
           return toast.error(`Could not read CSV row ${parsed.errors[0].row ?? ''}. Check the file format.`);
         }
-        const rows = parsed.data.map((row) => ({
-          fullName: row.fullname || row.name || '',
-          email: row.email || '',
-          branch: row.branch || '',
-          unit: row.unit || row.businessunit || '',
-          roles: row.roles || row.role || '',
-          city: row.city || '',
-        }));
+        const exampleRows = parsed.data.filter((row) => (row.example || '').trim().toUpperCase() === 'YES').length;
+        const userRows = parsed.data.filter((row) => (row.example || '').trim().toUpperCase() !== 'YES');
+        const rows = userRows.map((row) => {
+          const legacyName = (row.fullname || row.name || '').trim().replace(/\s+/g, ' ');
+          const legacyNameParts = legacyName.split(' ');
+          return {
+            firstName: row.firstname || legacyNameParts[0] || '',
+            lastName: row.lastname || legacyNameParts.slice(1).join(' '),
+            email: row.email || '',
+            branch: row.branch || '',
+            unit: row.unit || row.businessunit || '',
+            roles: row.roles || row.role || '',
+            city: row.city || '',
+          };
+        });
         if (!rows.length) {
           setIsImportBusy(false);
-          return toast.error('The CSV has no user rows.');
+          return toast.error(exampleRows ? 'The sample row is ignored. Add at least one real user row.' : 'The CSV has no user rows.');
         }
+        if (exampleRows) toast('The sample row marked YES was ignored. Replace it or add your users below it.');
         try {
           const validation = await atsApi.auth.validateUserImport(rows);
           setImportValidation(Array.isArray(validation) ? validation : []);
@@ -2720,7 +2732,12 @@ export default function UserManagementPage() {
                     <input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => handleUserImportFile(event.target.files?.[0])} />
                   </label>
                   <p className="mt-1 text-[11px] text-neutral-500">CSV format · up to 100 rows · 2 MB maximum</p>
-                  <p className="mt-2 text-[10px] text-neutral-500">Columns: Full Name, Email, Branch, Unit, Roles (separate multiple roles with semicolons), City (optional: BBSR, PUNE, BENGALURU, VIZAG, HYDERABAD).</p>
+                  <div className="mt-3 rounded-md bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 p-3 text-left text-[11px] text-neutral-600 dark:text-neutral-300">
+                    <p className="font-semibold text-neutral-800 dark:text-neutral-100">Column guide</p>
+                    <p className="mt-1"><strong>First Name</strong> and <strong>Last Name</strong> are required and saved separately to the user profile. Email must be unique.</p>
+                    <p className="mt-1">Branch, Unit, and Roles must match names in this workspace. Separate multiple roles with semicolons. City is optional: BBSR, PUNE, BENGALURU, VIZAG, or HYDERABAD.</p>
+                    <p className="mt-1">The downloaded example uses illustrative branch and unit names. Its row is marked <strong>Example = YES</strong>, so it is ignored automatically. Delete it or add real users in new rows.</p>
+                  </div>
                 </div>
 
                 {isImportBusy && <div className="flex items-center gap-2 text-xs text-neutral-500"><Loader2 className="h-4 w-4 animate-spin" /> Validating rows…</div>}
@@ -2733,12 +2750,13 @@ export default function UserManagementPage() {
                     </div>
                   </div>
                   <div className="overflow-auto rounded-lg border border-neutral-200 dark:border-slate-700">
-                    <table className="w-full min-w-[960px] text-left text-[11px]">
-                      <thead className="bg-slate-50 dark:bg-slate-800 text-neutral-600 dark:text-neutral-300"><tr>{['Row', 'Name', 'Email', 'Branch', 'Unit', 'Roles', 'City', 'Status'].map((heading) => <th key={heading} className="px-2.5 py-2 font-bold">{heading}</th>)}</tr></thead>
+                    <table className="w-full min-w-[1040px] text-left text-[11px]">
+                      <thead className="bg-slate-50 dark:bg-slate-800 text-neutral-600 dark:text-neutral-300"><tr>{['Row', 'First Name', 'Last Name', 'Email', 'Branch', 'Unit', 'Roles', 'City', 'Status'].map((heading) => <th key={heading} className="px-2.5 py-2 font-bold">{heading}</th>)}</tr></thead>
                       <tbody>
                         {importValidation.map((row) => <tr key={row.row} className="border-t border-neutral-100 dark:border-slate-800 align-top">
                           <td className="px-2.5 py-2 text-neutral-500">{row.row}</td>
-                          <td className="px-2.5 py-2">{row.input.fullName || row.input.name}</td>
+                          <td className="px-2.5 py-2">{row.input.firstName || row.input.fullName?.split(/\s+/)[0] || row.input.name?.split(/\s+/)[0]}</td>
+                          <td className="px-2.5 py-2">{row.input.lastName || row.input.fullName?.split(/\s+/).slice(1).join(' ') || row.input.name?.split(/\s+/).slice(1).join(' ')}</td>
                           <td className="px-2.5 py-2">{row.input.email}</td>
                           <td className="px-2.5 py-2">{row.input.branch}</td>
                           <td className="px-2.5 py-2">{row.input.unit || row.input.businessUnit}</td>
