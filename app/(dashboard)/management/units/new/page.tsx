@@ -68,7 +68,7 @@ function CreateUnitContent() {
     allowNone: true,
     allowPods: true,
     allowUnassigned: false,
-    podDistributionStrategy: "AUTOMATIC",
+    podDistributionStrategy: "AUTO",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -662,7 +662,7 @@ function CreateUnitContent() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <label
                         className={`p-3 rounded-lg border text-left cursor-pointer transition-all flex items-start gap-2.5 ${
-                          formData.podDistributionStrategy === "AUTOMATIC"
+                          formData.podDistributionStrategy === "AUTO"
                             ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/40"
                             : "border-neutral-200 dark:border-slate-700 hover:bg-neutral-100/50"
                         }`}
@@ -670,8 +670,8 @@ function CreateUnitContent() {
                         <input
                           type="radio"
                           name="strategy"
-                          checked={formData.podDistributionStrategy === "AUTOMATIC"}
-                          onChange={() => setFormData({ ...formData, podDistributionStrategy: "AUTOMATIC" })}
+                          checked={formData.podDistributionStrategy === "AUTO"}
+                          onChange={() => setFormData({ ...formData, podDistributionStrategy: "AUTO" })}
                           className="mt-0.5"
                         />
                         <div className="space-y-0.5">

@@ -55,6 +55,7 @@ import toast from "react-hot-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { AddClientModal } from "../components/add-client-modal";
+import { usesAutomaticPods } from "@/lib/pod-strategy";
 import { JobAssignmentModal, AssignmentType } from "@/components/ui/job-assignment-modal";
 import { resolveActiveSystemRole, isRoleAdmin } from "@/lib/role-permissions";
 
@@ -516,22 +517,23 @@ const getInitialActiveBranchContext = () => {
 
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const assignmentPolicy = selectedUnitObj;
+  const automaticPods = usesAutomaticPods(assignmentPolicy);
   const canAssignRecruiters = !!currentUserProfile?.permissions?.includes("job:assign_recruiter");
   const canAssignPods = !!currentUserProfile?.permissions?.includes("job:assign_pod");
   const canAssignJob = canAssignRecruiters || canAssignPods;
   const assignmentRequired = assignmentPolicy?.allowUnassigned !== true;
-  const assignmentValid = (assignmentType === "pod" && branchPods.some(p => p.id === selectedPodId) && canAssignPods && assignmentPolicy?.allowPods === true) ||
+  const assignmentValid = automaticPods || (assignmentType === "pod" && branchPods.some(p => p.id === selectedPodId) && canAssignPods && assignmentPolicy?.allowPods === true) ||
     (assignmentType === "recruiters" && selectedRecruiterIds.length > 0 && selectedRecruiterIds.every(id => recruitersList.some(r => r.id === id)) && canAssignRecruiters && assignmentPolicy?.allowNone === true);
   useEffect(() => {
     let cancelled = false;
     setPodsList([]);
-    if (!canAssignPods || !selectedUnitId) return;
+    if (automaticPods || !canAssignPods || !selectedUnitId) return;
     const unit = availableUnits.find(unit => unit.id === selectedUnitId);
     atsApi.jobs.podOptions({ branchId: unit?.branchId || currentUserProfile?.branchId, businessUnitId: selectedUnitId })
       .then(pods => { if (!cancelled) { setPodsList(pods); setSelectedPodId(id => pods.some(p => p.id === id) ? id : null); } })
       .catch(error => { if (!cancelled) toast.error(error.message || "Could not load pods."); });
     return () => { cancelled = true; };
-  }, [selectedUnitId, canAssignPods, availableUnits, currentUserProfile]);
+  }, [selectedUnitId, canAssignPods, automaticPods, availableUnits, currentUserProfile]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1264,13 +1266,13 @@ const getInitialActiveBranchContext = () => {
 
       let resolvedRecruiterIds: string[] = [];
 
-      if (assignmentValid && assignmentType === "pod" && selectedPodId) {
+      if (!automaticPods && assignmentValid && assignmentType === "pod" && selectedPodId) {
         resolvedPodId = selectedPodId;
         resolvedApproverRole = "POD_LEAD";
         const pod = podsList.find((p) => p.id === resolvedPodId);
         if (pod?.podHeadId) resolvedApproverId = pod.podHeadId;
         resolvedAssignedTo = pod?.name || "Recruitment Pod";
-      } else if (assignmentValid && assignmentType === "recruiters" && selectedRecruiterIds.length > 0) {
+      } else if (!automaticPods && assignmentValid && assignmentType === "recruiters" && selectedRecruiterIds.length > 0) {
         resolvedRecruiterIds = selectedRecruiterIds;
         resolvedPrimaryRecruiterId = selectedRecruiterIds[0];
         resolvedApproverRole = "PRIMARY_RECRUITER";
@@ -3073,7 +3075,8 @@ const getInitialActiveBranchContext = () => {
                       </div>
 
                       {/* Job Assignment Custom Dropdown */}
-                      {canAssignJob && assignmentPolicy && <div className="space-y-1.5 relative">
+                      {automaticPods && <div className="space-y-1.5"><label className="font-semibold text-xs">Job Assignment</label><div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100"><strong>Automatic pod assignment</strong><p className="mt-1">The next eligible pod in this unit will be assigned when you publish. Saving a draft does not use a turn.</p></div></div>}
+                      {!automaticPods && canAssignJob && assignmentPolicy && <div className="space-y-1.5 relative">
                         <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center justify-between h-5">
                           <span className="flex items-center gap-1.5">
                             <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
