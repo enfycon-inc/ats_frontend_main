@@ -357,7 +357,7 @@ async function apiFetch<T = any>(
 
 // ─── Auth API ───────────────────────────────────────────────────────
 const auth = {
-  async login(email: string, password: string) {
+  async login(email: string, password: string, rememberMe = false) {
     const subdomain = getTenantIdentifier();
     const data = await apiFetch<{
       accessToken: string;
@@ -374,7 +374,7 @@ const auth = {
       };
     }>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password, subdomain }),
+      body: JSON.stringify({ email, password, subdomain, rememberMe }),
     });
 
     setToken(data.accessToken);

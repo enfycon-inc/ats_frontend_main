@@ -14,6 +14,7 @@ export function ssoErrorMessage(code: string): string | null {
     SSOConfiguration: 'Microsoft sign-in configuration does not match this workspace. Contact your administrator to check the directory and sign-in settings.',
     AccountInactive: 'Your account or workspace is inactive. Contact your administrator.',
     SSOServiceUnavailable: 'The sign-in service could not complete your request. Please try again or contact your administrator.',
+    SessionRenewalUnavailable: 'Your identity provider could not create a renewable session. Please try again or contact your administrator.',
     AccessDenied: 'Sign-in was denied. Contact your administrator to check workspace access and Microsoft sign-in settings.',
     Callback: 'Microsoft sign-in could not complete. Please try again or contact your administrator.',
   };

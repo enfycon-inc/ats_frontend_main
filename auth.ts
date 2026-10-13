@@ -13,6 +13,21 @@ import { getTenantIdentifier } from "./utils/subdomain-helper"
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || "d3b07384-d113-49c3-a555-9ee75c13ca33";
 const isProd = process.env.NODE_ENV === "production";
 const cookiePrefix = isProd ? "__Secure-" : "";
+const rememberMeCookieName = "ats_remember_me";
+const standardSessionMaxAgeSeconds = 24 * 60 * 60;
+const offlineSessionMaxAgeSeconds = 7 * 24 * 60 * 60;
+
+function tokenIncludesOfflineAccess(account: { scope?: unknown; access_token?: unknown }): boolean {
+  const scopes = new Set<string>();
+  if (typeof account.scope === "string") account.scope.split(/\s+/).filter(Boolean).forEach((scope) => scopes.add(scope));
+  if (typeof account.access_token === "string") {
+    try {
+      const payload = JSON.parse(Buffer.from(account.access_token.split(".")[1], "base64url").toString("utf8"));
+      if (typeof payload.scope === "string") payload.scope.split(/\s+/).filter(Boolean).forEach((scope: string) => scopes.add(scope));
+    } catch { /* A missing/unreadable scope is rejected for opt-in offline sessions. */ }
+  }
+  return scopes.has("offline_access");
+}
 
 async function fetchBackend(path: string, options: RequestInit = {}): Promise<Response> {
   const internalBase = process.env.INTERNAL_API_URL || (isProd ? "http://backend_blue:5000" : (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000"));
@@ -40,8 +55,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   session: {
     strategy: "jwt",
-    // Matches Keycloak's SSO Session Max. Set KEYCLOAK_REFRESH_TOKEN_TTL_SECONDS in .env.
-    maxAge: parseInt(process.env.KEYCLOAK_REFRESH_TOKEN_TTL_SECONDS || '86400'), // Default 24 hours (supports 12h idle timeout)
+    // The encrypted Auth.js cookie uses the maximum supported duration. The JWT
+    // callback enforces the shorter, per-login 24-hour or 7-day absolute limit.
+    maxAge: offlineSessionMaxAgeSeconds,
   },
   cookies: {
     sessionToken: {
@@ -66,6 +82,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         refreshToken: {},
         expiresIn: {},
         userJson: {},
+        rememberMe: {},
       },
       authorize: async (credentials) => {
         if (!credentials?.token) return null;
@@ -85,6 +102,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   accessToken: credentials.token as string,
                   refreshToken: typeof credentials.refreshToken === "string" ? credentials.refreshToken : null,
                   expiresIn: Number(credentials.expiresIn) || 300,
+                  rememberMe: credentials.rememberMe === true || credentials.rememberMe === "true",
                   tenantDomain: u.tenantDomain || u.tenant_domain || (u.tenant && (u.tenant.domain || u.tenant.tenantDomain)) || "",
                   systemRole: u.systemRole || "",
                   podId: u.podId || u.pod_id || null,
@@ -121,6 +139,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 accessToken: credentials.token as string,
                 refreshToken: typeof credentials.refreshToken === "string" ? credentials.refreshToken : null,
                 expiresIn: Number(credentials.expiresIn) || 300,
+                rememberMe: credentials.rememberMe === true || credentials.rememberMe === "true",
                 tenantDomain: u.tenantDomain || u.tenant_domain || (u.tenant && (u.tenant.domain || u.tenant.tenantDomain)) || "",
                 systemRole: u.systemRole || "",
                 podId: u.podId || u.pod_id || null,
@@ -213,6 +232,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       clientId: process.env.KEYCLOAK_CLIENT_ID!,
       clientSecret: process.env.KEYCLOAK_CLIENT_SECRET!,
       issuer: process.env.KEYCLOAK_ISSUER!,
+      authorization: { params: { scope: "openid profile email" } },
     }),
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID,
@@ -230,7 +250,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async signIn({ user, account, profile }) {
       if (account?.provider === "google" || account?.provider === "keycloak") {
         try {
+          const rememberMe = (await cookies()).get(rememberMeCookieName)?.value === "1";
           const provider = account.provider === "keycloak" ? "keycloak" : "google";
+          if (rememberMe && provider === "keycloak" && !tokenIncludesOfflineAccess(account)) {
+            return `/auth/login?error=SessionRenewalUnavailable`;
+          }
           const requestHeaders = await headers();
           const subdomain = getTenantIdentifier(requestHeaders.get('host') || '');
           if (provider === 'keycloak' && !account.access_token) {
@@ -248,20 +272,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               name: user.name,
               picture: user.image,
               microsoftTenantId: (profile as any)?.tid || null,
+              rememberMe,
             }),
           }).catch(() => null);
 
           if (res && res.ok) {
             const data = await res.json();
             if (data?.user) {
+              const refreshToken = account.provider === "keycloak" ? account.refresh_token : data.refreshToken;
+              if (typeof refreshToken !== "string" || !refreshToken) {
+                console.error("SSO authentication did not return a refresh token.", { provider: account.provider });
+                return `/auth/login?error=SessionRenewalUnavailable`;
+              }
               user.id = data.user.id;
               user.name = data.user.fullName;
               user.email = data.user.email;
               (user as any).permissions = data.user.permissions || [];
               (user as any).roles = data.user.roles || [];
               (user as any).accessToken = data.accessToken;
-              (user as any).refreshToken = account.provider === 'keycloak' ? account.refresh_token : data.refreshToken;
+              (user as any).refreshToken = refreshToken;
               (user as any).expiresIn = data.expiresIn;
+              (user as any).rememberMe = rememberMe;
               (user as any).tenantDomain = data.user.tenantDomain || "";
               (user as any).systemRole = data.user.systemRole || "";
               (user as any).podId = data.user.podId || null;
@@ -295,6 +326,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.roles = (user as any).roles || []
         token.accessToken = (user as any).accessToken
         token.refreshToken = (user as any).refreshToken || null
+        token.rememberMe = (user as any).rememberMe === true
+        token.sessionExpiresAt = Date.now() + ((token.rememberMe ? offlineSessionMaxAgeSeconds : standardSessionMaxAgeSeconds) * 1000)
         // Use actual Keycloak expiresIn — do not apply a local default
         token.accessTokenExpiry = Date.now() + (((user as any).expiresIn || 300) * 1000)
         token.tenantDomain = (user as any).tenantDomain
@@ -314,6 +347,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       // ── Subsequent session checks: silently refresh access token if expired ──
       const now = Date.now()
+      const sessionExpiresAt = token.sessionExpiresAt as number | undefined
+      if (sessionExpiresAt && now >= sessionExpiresAt) {
+        // Returning null tells Auth.js to clear the encrypted session cookie.
+        return null
+      }
+      if (!sessionExpiresAt) {
+        // Existing sessions created before this policy receive the standard
+        // 24-hour limit from their first post-deploy session check.
+        token.rememberMe = false
+        token.sessionExpiresAt = now + standardSessionMaxAgeSeconds * 1000
+      }
       const expiry = token.accessTokenExpiry as number | undefined
 
       // Token still valid (more than 1 min remaining) — return as-is

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   if (origin !== expectedOrigin) return new NextResponse(null, { status: 403 });
   if (!secret()) return unavailable();
   try {
-    const { accessToken, refreshToken, destination } = await req.json();
+    const { accessToken, refreshToken, destination, rememberMe } = await req.json();
     if (typeof accessToken !== 'string' || typeof refreshToken !== 'string' ||
         typeof destination !== 'string' || !/^[a-z0-9-]+$/.test(destination)) {
       return new NextResponse(null, { status: 400 });
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     if ((user.tenantDomain || user.tenant_domain || '').split('.')[0] !== destination) {
       return new NextResponse(null, { status: 403 });
     }
-    const value = await encode({ secret: secret(), salt: name, maxAge: 30, token: { refreshToken, destination, userId: user.id } });
+    const value = await encode({ secret: secret(), salt: name, maxAge: 30, token: { refreshToken, destination, userId: user.id, rememberMe: rememberMe === true } });
     if (value.length > 3800) return unavailable();
     const response = NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
     response.cookies.set(name, value, { ...options(req), maxAge: 30 });
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
     if (user.id !== token.userId || (user.tenantDomain || user.tenant_domain || '').split('.')[0] !== token.destination) {
       return new NextResponse(null, { status: 403 });
     }
-    const response = NextResponse.json({ ...data, user }, { headers: { 'Cache-Control': 'no-store' } });
+    const response = NextResponse.json({ ...data, user, rememberMe: token.rememberMe === true }, { headers: { 'Cache-Control': 'no-store' } });
     response.cookies.set(name, '', { ...options(req), maxAge: 0 });
     return response;
   } catch { return unavailable(); }
