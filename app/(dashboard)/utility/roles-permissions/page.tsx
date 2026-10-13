@@ -215,7 +215,6 @@ export default function RolesPermissionsPage() {
   const [businessUnits, setBusinessUnits] = useState<any[]>([]);
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
   const [unitFilter, setUnitFilter] = useState<string>("all");
-  const [archFilter, setArchFilter] = useState<string>("all");
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -439,7 +438,8 @@ export default function RolesPermissionsPage() {
   const loadData = async (branchFilter = selectedBranchFilter) => {
     try {
       setLoading(true);
-      const bid = branchFilter !== "all" ? branchFilter : undefined;
+      // Explicitly override any saved active branch in apiFetch when showing every branch.
+      const bid = branchFilter === "all" ? "ALL" : branchFilter;
       const [rolesData, permsData, usersData, branchesData, businessUnitsData, marketSegmentsData] = await Promise.all([
           atsApi.auth.listRoles(bid, true),
           atsApi.auth.listAllPermissions(),
@@ -569,7 +569,7 @@ export default function RolesPermissionsPage() {
       );
     }
     return list;
-  }, [customRolesList, selectedBranchFilter, unitFilter, archFilter, searchQuery]);
+  }, [customRolesList, selectedBranchFilter, unitFilter, searchQuery]);
 
   // Available staff members to assign to assignModalRole (supports multiple roles per user)
   const availableUsersToAssign = useMemo(() => {
@@ -1007,14 +1007,6 @@ export default function RolesPermissionsPage() {
           >
             <option value="all">All Branch Units</option>
             {businessUnits.filter(bu => selectedBranchFilter === "all" || bu.branchId === selectedBranchFilter).map(bu => <option key={bu.id} value={bu.id}>{bu.name}</option>)}
-          </select>
-          <select
-            value={archFilter}
-            onChange={(e) => setArchFilter(e.target.value)}
-            className="text-xs h-9 px-2 rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
-          >
-            <option value="all">All Archetypes</option>
-            {SYSTEM_ARCHETYPES.map(arch => <option key={arch.key} value={arch.key}>{arch.label}</option>)}
           </select>
         </div>
 
