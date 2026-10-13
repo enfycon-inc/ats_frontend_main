@@ -1268,8 +1268,14 @@ export default function UserManagementPage() {
 
   const downloadUserImportTemplate = () => {
     const csv = [
-      'First Name,Last Name,Email,Branch,Unit,Roles,City,Example',
-      'Priya,Sharma,priya.sharma@example.invalid,Pune,Technology Staffing,Recruiter,PUNE,YES',
+      'First Name,Last Name,Email,Branch,Unit,Roles,City,Example,Instructions',
+      'Priya,Sharma,priya.sharma@example.invalid,Pune,Technology Staffing,Recruiter,BBSR,YES,"Sample only; this row is skipped. Replace with your users or delete it."',
+      ',,,,,,,,"First Name and Last Name: required; saved separately."',
+      ',,,,,,,,"Email: required, valid, and unique across the system."',
+      ',,,,,,,,"Branch and Unit: enter the exact names used in this workspace."',
+      ',,,,,,,,"Roles: enter exact role names; separate multiple roles with semicolons, e.g. Recruiter; Interviewer."',
+      ',,,,,,,,"City: optional enum value: BBSR (Bhubaneswar), PUNE, BENGALURU, VIZAG, or HYDERABAD."',
+      ',,,,,,,,"Example: YES marks a sample row to skip. Leave blank for real users."',
       '',
     ].join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -1297,7 +1303,11 @@ export default function UserManagementPage() {
           return toast.error(`Could not read CSV row ${parsed.errors[0].row ?? ''}. Check the file format.`);
         }
         const exampleRows = parsed.data.filter((row) => (row.example || '').trim().toUpperCase() === 'YES').length;
-        const userRows = parsed.data.filter((row) => (row.example || '').trim().toUpperCase() !== 'YES');
+        const userRows = parsed.data.filter((row) => {
+          if ((row.example || '').trim().toUpperCase() === 'YES') return false;
+          return [row.firstname, row.lastname, row.fullname, row.name, row.email, row.branch, row.unit,
+            row.businessunit, row.roles, row.role, row.city].some((value) => (value || '').trim());
+        });
         const rows = userRows.map((row) => {
           const legacyName = (row.fullname || row.name || '').trim().replace(/\s+/g, ' ');
           const legacyNameParts = legacyName.split(' ');
@@ -2735,8 +2745,9 @@ export default function UserManagementPage() {
                   <div className="mt-3 rounded-md bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-700 p-3 text-left text-[11px] text-neutral-600 dark:text-neutral-300">
                     <p className="font-semibold text-neutral-800 dark:text-neutral-100">Column guide</p>
                     <p className="mt-1"><strong>First Name</strong> and <strong>Last Name</strong> are required and saved separately to the user profile. Email must be unique.</p>
-                    <p className="mt-1">Branch, Unit, and Roles must match names in this workspace. Separate multiple roles with semicolons. City is optional: BBSR, PUNE, BENGALURU, VIZAG, or HYDERABAD.</p>
-                    <p className="mt-1">The downloaded example uses illustrative branch and unit names. Its row is marked <strong>Example = YES</strong>, so it is ignored automatically. Delete it or add real users in new rows.</p>
+                    <p className="mt-1">Branch, Unit, and Roles must match names in this workspace. Separate multiple roles with semicolons, for example <strong>Recruiter; Interviewer</strong>.</p>
+                    <p className="mt-1">City is optional and must use an enum value: <strong>BBSR (Bhubaneswar)</strong>, PUNE, BENGALURU, VIZAG, or HYDERABAD.</p>
+                    <p className="mt-1">The CSV includes an Instructions column and an illustrative row. The sample is marked <strong>Example = YES</strong> and ignored automatically. Replace it or add real users in new rows.</p>
                   </div>
                 </div>
 
