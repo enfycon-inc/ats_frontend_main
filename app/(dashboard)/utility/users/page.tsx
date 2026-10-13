@@ -1055,13 +1055,19 @@ export default function UserManagementPage() {
       const finalBranchId = reviewForm.branchId === "none" ? undefined : reviewForm.branchId;
       const finalUnitId = (reviewForm.branchId === "none" || reviewForm.businessUnitId === "none") ? undefined : reviewForm.businessUnitId;
 
-      await atsApi.auth.approveUser(reviewUser.id, {
+      const approval = await atsApi.auth.approveUser(reviewUser.id, {
         roleId: reviewForm.roleId || undefined,
         roles: reviewForm.roles,
         branchId: finalBranchId,
         businessUnitId: finalUnitId,
       });
-      toast.success(`User ${reviewUser.fullName || reviewUser.email} approved and activated!`);
+      if (approval?.emailNotification?.status === "failed") {
+        toast.error(approval.emailNotification.message || "User approved, but the welcome email could not be sent.");
+      } else if (approval?.emailNotification?.status === "accepted") {
+        toast.success(`User ${reviewUser.fullName || reviewUser.email} approved. Welcome email sent.`);
+      } else {
+        toast.success(`User ${reviewUser.fullName || reviewUser.email} approved and activated!`);
+      }
       setIsReviewModalOpen(false);
       setReviewUser(null);
       await loadData();
