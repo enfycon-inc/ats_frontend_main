@@ -350,6 +350,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       const sessionExpiresAt = token.sessionExpiresAt as number | undefined
       if (sessionExpiresAt && now >= sessionExpiresAt) {
         // Returning null tells Auth.js to clear the encrypted session cookie.
+        console.warn(`[auth.ts jwt] Session ended at the application ${token.rememberMe ? '7-day' : '24-hour'} absolute limit.`)
         return null
       }
       if (!sessionExpiresAt) {
@@ -381,6 +382,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return token
           }
           if (res.status === 401) {
+            console.warn('[auth.ts jwt] Identity provider rejected the session refresh token.')
             token.error = 'RefreshAccessTokenError'
             return token
           }

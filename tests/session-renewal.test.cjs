@@ -18,6 +18,7 @@ function load(file, imports, globals = {}) {
 
 function auth(activeRole = null, activeProfile = {}) {
   let config, now = 1000000, calls = 0, failure = 0;
+  const warnings = [];
   const fetch = async url => {
     calls++;
     if (failure) return new Response('{}', { status: failure });
@@ -31,8 +32,8 @@ function auth(activeRole = null, activeProfile = {}) {
     'next-auth/providers/google': provider, 'next-auth/providers/keycloak': provider,
     zod: {}, './lib/zod': {}, 'next/headers': { cookies: async () => ({ get: () => activeRole ? { value: activeRole } : undefined }) }, './lib/sso-error': {}, './utils/subdomain-helper': {},
     './lib/dashboard-preference': { dashboardPreferenceCookie: () => activeRole ? 'role-cookie' : null },
-  }, { fetch, Date: { now: () => now }, console: { log() {}, warn() {}, error() {} } });
-  return { config, advance: ms => { now += ms; }, fail: status => { failure = status; }, get calls() { return calls; } };
+  }, { fetch, Date: { now: () => now }, console: { log() {}, warn: (...args) => warnings.push(args.join(' ')), error() {} } });
+  return { config, advance: ms => { now += ms; }, fail: status => { failure = status; }, get calls() { return calls; }, warnings };
 }
 
 async function login(app) {
@@ -73,6 +74,20 @@ test('temporary renewal outage preserves credentials and recovers after access e
   token = await app.config.callbacks.jwt({ token });
   assert.equal(token.error, undefined);
   assert.equal(token.refreshToken, 'refresh-2');
+});
+
+test('absolute session expiry is logged separately from a rejected refresh token', async () => {
+  const app = auth(); let token = await login(app);
+  app.advance(24 * 60 * 60 * 1000);
+  token = await app.config.callbacks.jwt({ token });
+  assert.equal(token, null);
+  assert.ok(app.warnings.some(message => message.includes('24-hour absolute limit')));
+
+  const rejected = auth(); let rejectedToken = await login(rejected);
+  rejected.advance(6 * 60 * 1000); rejected.fail(401);
+  rejectedToken = await rejected.config.callbacks.jwt({ token: rejectedToken });
+  assert.equal(rejectedToken.error, 'RefreshAccessTokenError');
+  assert.ok(rejected.warnings.some(message => message.includes('rejected the session refresh token')));
 });
 
 function api(respond, activeRole = null) {
