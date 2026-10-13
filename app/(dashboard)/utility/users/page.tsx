@@ -1237,7 +1237,7 @@ export default function UserManagementPage() {
       return;
     }
 
-    const headers = ["User ID", "Full Name", "Email", "Roles", "Branch Location", "Status", "Last Login"];
+    const headers = ["User ID", "Full Name", "Email", "Roles", "Branch", "Status", "Last Login"];
     const rows = listToExport.map((u) => [
       `"${u.id || ""}"`,
       `"${(u.fullName || "").replace(/"/g, '""')}"`,
@@ -1980,7 +1980,7 @@ export default function UserManagementPage() {
                   <th className="py-3 px-4">Staff Member</th>
                   <th className="py-3 px-4">Work Email</th>
                   <th className="py-3 px-4">Assigned Role(s)</th>
-                  {!isUnitAdmin && <th className="py-3 px-4">Branch Location</th>}
+                  {!isUnitAdmin && <th className="py-3 px-4">Branch Name</th>}
                   {!isUnitAdmin && <th className="py-3 px-4">Branch Unit</th>}
                   <th className="py-3 px-4">Manager</th>
                   <th className="py-3 px-4">Status</th>
@@ -2101,7 +2101,7 @@ export default function UserManagementPage() {
                         )}
                       </td>
 
-                      {/* Branch Location — Plain Comma-Separated Text */}
+                      {/* Branch Name — Plain Comma-Separated Text */}
                       {(!isUnitAdmin) && <td className="py-3 px-4 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                         {(() => {
                           const assignedIds = (user.assignedBranchIds && user.assignedBranchIds.length > 0)
