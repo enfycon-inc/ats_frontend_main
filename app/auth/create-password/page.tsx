@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import CreatePasswordComponent from "@/components/auth/create-password-component";
+import { Loader2 } from "lucide-react";
 
 export default function CreatePasswordPage() {
   return (
@@ -14,10 +16,19 @@ export default function CreatePasswordPage() {
             Create New Password
           </h2>
           <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-            Set your new credentials and gain access back
+            Set your new credentials to securely access your workspace
           </p>
         </div>
-        <CreatePasswordComponent />
+        <Suspense
+          fallback={
+            <div className="flex flex-col items-center justify-center p-8 space-y-3">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-slate-500">Loading reset session...</p>
+            </div>
+          }
+        >
+          <CreatePasswordComponent />
+        </Suspense>
       </div>
     </div>
   );

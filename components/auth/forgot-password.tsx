@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -12,20 +13,17 @@ import { Input } from '@/components/ui/input'
 import { useLoading } from '@/contexts/LoadingContext'
 import { forgotPasswordSchema } from '@/lib/zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2, Mail } from 'lucide-react'
+import { Loader2, Mail, CheckCircle2, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useRef, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 import { z } from 'zod'
-import { handleForgotPasswordAction } from './actions/forgot-password'
+import { atsApi } from '@/lib/ats-api'
 
 const ForgotPasswordComponent = () => {
-  const router = useRouter()
   const { loading, setLoading } = useLoading()
   const [isPending, startTransition] = useTransition()
-  const formRef = useRef<HTMLFormElement>(null)
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null)
 
   const form = useForm<z.infer<typeof forgotPasswordSchema>>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -39,32 +37,71 @@ const ForgotPasswordComponent = () => {
 
     startTransition(async () => {
       try {
-        if (!formRef.current) return
-
-        const formData = new FormData(formRef.current)
-        const result = await handleForgotPasswordAction(formData)
-
-        if (result?.success) {
-          toast.success('Password Reset code has been sent to your email')
-          router.push('/auth/create-password')
+        const res = await atsApi.auth.forgotPassword(values.email)
+        if (res?.success) {
+          setSubmittedEmail(values.email)
+          toast.success(res.message || 'Password reset link sent to your email.')
         } else {
-          toast.error('Please enter a valid email')
+          toast.error(res?.message || 'Failed to request password reset.')
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Forgot password error:', error)
-        toast.error('Something went wrong. Please try again.')
+        toast.error(error.message || 'Something went wrong. Please try again.')
       } finally {
-        setTimeout(() => setLoading(false), 1000)
+        setLoading(false)
       }
     })
   }
 
+  if (submittedEmail) {
+    return (
+      <div className="space-y-6 text-center py-2">
+        <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-sm">
+          <Mail className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+            Check Your Email
+          </h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed px-2">
+            If an account exists for <span className="font-semibold text-slate-900 dark:text-white">{submittedEmail}</span>,
+            we have sent a secure password reset link. Please check your inbox and spam folder.
+          </p>
+          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+            ⏱️ For security, the link will expire in 30 minutes.
+          </p>
+        </div>
+
+        <div className="space-y-3 pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full h-11 text-sm border-slate-300 dark:border-slate-700"
+            onClick={() => {
+              setSubmittedEmail(null)
+              form.reset()
+            }}
+          >
+            Send to a different email
+          </Button>
+
+          <div>
+            <Link
+              href="/auth/login"
+              className="inline-flex items-center text-sm font-semibold text-primary hover:underline gap-1.5"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back to Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
       <Form {...form}>
         <form
-          ref={formRef}
           onSubmit={form.handleSubmit(onSubmit)}
           className="space-y-5"
         >
@@ -79,10 +116,10 @@ const ForgotPasswordComponent = () => {
                     <Input
                       {...field}
                       type="email"
-                      placeholder="Email"
+                      placeholder="Enter your registered work email"
                       name="email"
                       className="ps-13 pe-12 h-14 rounded-xl bg-neutral-100 dark:bg-slate-800 border border-neutral-300 dark:border-slate-700 focus:border-primary dark:focus:border-primary focus-visible:border-primary !shadow-none !ring-0"
-                      disabled={loading}
+                      disabled={loading || isPending}
                     />
                   </div>
                 </FormControl>
@@ -99,10 +136,10 @@ const ForgotPasswordComponent = () => {
             {loading || isPending ? (
               <>
                 <Loader2 className="animate-spin h-4.5 w-4.5 mr-2" />
-                Sending...
+                Sending Link...
               </>
             ) : (
-              'Send Recovery Email'
+              'Send Password Reset Link'
             )}
           </Button>
         </form>
@@ -110,7 +147,7 @@ const ForgotPasswordComponent = () => {
 
       <div className="mt-8 text-center text-sm">
         <p>
-          Forget it. Send me back to{' '}
+          Remember your credentials?{' '}
           <Link
             href="/auth/login"
             className="text-primary font-semibold hover:underline"

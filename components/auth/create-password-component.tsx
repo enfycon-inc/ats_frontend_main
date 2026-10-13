@@ -2,8 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { z } from "zod";
@@ -19,33 +19,144 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { createPasswordSchema } from "@/lib/zod";
-import { Eye, EyeOff, Loader2, Lock } from "lucide-react";
-import { handleResetPassword } from "./actions/handleResetPassword";
+import { Eye, EyeOff, Loader2, Lock, AlertCircle, CheckCircle2, ShieldAlert } from "lucide-react";
+import { atsApi } from "@/lib/ats-api";
 
 const CreatePasswordComponent = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token") || "";
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
+
+  const [verifying, setVerifying] = useState(true);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [targetAccount, setTargetAccount] = useState<{ email?: string; fullName?: string; tenantName?: string } | null>(null);
 
   const form = useForm<z.infer<typeof createPasswordSchema>>({
     resolver: zodResolver(createPasswordSchema),
     defaultValues: {
       password: "",
       confirmPassword: "",
+      acceptTerms: true,
     },
   });
 
+  useEffect(() => {
+    if (!token) {
+      setTokenError("Missing password reset token. Please check your link or request a new one.");
+      setVerifying(false);
+      return;
+    }
+
+    atsApi.auth
+      .verifyResetToken(token)
+      .then((res) => {
+        if (res?.valid) {
+          setTargetAccount({
+            email: res.email,
+            fullName: res.fullName,
+            tenantName: res.tenantName,
+          });
+        } else {
+          setTokenError(res?.message || "This password reset link is invalid or has expired.");
+        }
+      })
+      .catch((err: any) => {
+        setTokenError(err.message || "This password reset link is invalid or has expired.");
+      })
+      .finally(() => {
+        setVerifying(false);
+      });
+  }, [token]);
+
+  const onSubmit = (values: z.infer<typeof createPasswordSchema>) => {
+    if (!token) {
+      return toast.error("Invalid or missing token.");
+    }
+
+    startTransition(async () => {
+      try {
+        const res = await atsApi.auth.resetPassword(token, values.password);
+        if (res?.success) {
+          toast.success("Password reset successfully! Please log in.");
+          router.push("/auth/login");
+        } else {
+          toast.error(res?.message || "Failed to reset password.");
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Failed to reset password. The link may have expired.");
+      }
+    });
+  };
+
+  if (verifying) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 space-y-3 text-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+          Verifying password reset link...
+        </p>
+      </div>
+    );
+  }
+
+  if (tokenError) {
+    return (
+      <div className="text-center p-4 space-y-5">
+        <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto shadow-sm">
+          <AlertCircle className="w-7 h-7" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+            Reset Link Invalid or Expired
+          </h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+            {tokenError}
+          </p>
+        </div>
+        <div className="space-y-3 pt-2">
+          <Button
+            type="button"
+            className="w-full h-11"
+            onClick={() => router.push("/auth/forgot-password")}
+          >
+            Request New Reset Link
+          </Button>
+          <div>
+            <Link
+              href="/auth/login"
+              className="text-sm font-semibold text-primary hover:underline"
+            >
+              Back to Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const passwordValue = form.watch("password") || "";
+  const hasMinLength = passwordValue.length >= 8;
+  const hasNumberOrSymbol = /[0-9!@#$%^&*(),.?":{}|<>]/.test(passwordValue);
+
   return (
     <>
+      {targetAccount?.email && (
+        <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+          <span>
+            Resetting password for: <strong className="font-semibold">{targetAccount.email}</strong>
+            {targetAccount.tenantName && ` (${targetAccount.tenantName})`}
+          </span>
+        </div>
+      )}
+
       <Form {...form}>
         <form
-          action={handleResetPassword}
-          onSubmit={form.handleSubmit((values) => {
-            startTransition(() => {
-              toast.success("Password Reset successful!");
-            });
-          })}
+          onSubmit={form.handleSubmit(onSubmit)}
           className="space-y-5"
         >
           {/* Password */}
@@ -60,7 +171,7 @@ const CreatePasswordComponent = () => {
                     <Input
                       {...field}
                       type={showPassword ? "text" : "password"}
-                      placeholder="Password"
+                      placeholder="New Password (min. 8 characters)"
                       name="password"
                       className="ps-13 pe-12 h-14 rounded-xl bg-neutral-100 dark:bg-slate-800 border border-neutral-300 dark:border-slate-700 focus:border-primary dark:focus:border-primary"
                       disabled={isPending}
@@ -83,6 +194,16 @@ const CreatePasswordComponent = () => {
             )}
           />
 
+          {/* Password Strength Checklist */}
+          <div className="flex items-center gap-4 text-xs px-1 text-slate-500">
+            <span className={`flex items-center gap-1 ${hasMinLength ? "text-emerald-600 font-medium" : ""}`}>
+              {hasMinLength ? "✓" : "○"} 8+ characters
+            </span>
+            <span className={`flex items-center gap-1 ${hasNumberOrSymbol ? "text-emerald-600 font-medium" : ""}`}>
+              {hasNumberOrSymbol ? "✓" : "○"} Number or symbol
+            </span>
+          </div>
+
           {/* Confirm Password */}
           <FormField
             control={form.control}
@@ -96,7 +217,7 @@ const CreatePasswordComponent = () => {
                       {...field}
                       type={showConfirmPassword ? "text" : "password"}
                       name="confirmPassword"
-                      placeholder="Confirm Password"
+                      placeholder="Confirm New Password"
                       className="ps-13 pe-12 h-14 rounded-xl bg-neutral-100 dark:bg-slate-800 border border-neutral-300 dark:border-slate-700 focus:border-primary dark:focus:border-primary"
                       disabled={isPending}
                     />
@@ -134,7 +255,7 @@ const CreatePasswordComponent = () => {
                       className="border border-neutral-500"
                     />
                   </FormControl>
-                  <label htmlFor="acceptTerms" className="text-sm">
+                  <label htmlFor="acceptTerms" className="text-sm cursor-pointer">
                     You accept our Terms & Conditions
                   </label>
                 </div>
@@ -152,7 +273,7 @@ const CreatePasswordComponent = () => {
             {isPending ? (
               <>
                 <Loader2 className="animate-spin h-4 w-4 mr-2" />
-                Resetting...
+                Resetting Password...
               </>
             ) : (
               "Reset Password"

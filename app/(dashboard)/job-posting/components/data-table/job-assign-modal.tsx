@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
+import { UserAvatar } from '@/components/shared/user-identity';
 import { Job } from "../../data/mock-jobs";
 import { getAssignedPersonDisplay, canAssignRecruitersToJob } from "../../lib/job-table-utils";
 
@@ -1172,9 +1173,7 @@ export function JobAssignModal({
                     </div>
 
                     {/* User Avatar Initials */}
-                    <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-[11px] shrink-0 uppercase border border-slate-200 dark:border-slate-700">
-                      {avatarInitials}
-                    </div>
+                    <UserAvatar user={u} className="h-7 w-7" />
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">

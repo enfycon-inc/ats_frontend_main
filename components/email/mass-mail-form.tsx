@@ -35,6 +35,7 @@ import Link from 'next/link';
 import { atsApi, getApiBase } from "@/lib/ats-api";
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
+import useSWR from 'swr';
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false }) as any;
 
@@ -95,9 +96,11 @@ export function MassMailForm() {
   const [ratePerHour, setRatePerHour] = useState(500);
   const [randomizeDelay, setRandomizeDelay] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [signatureId, setSignatureId] = useState('default');
 
   // User Profile & Delivery Settings Permissions
   const [userProfile, setUserProfile] = useState<any>(null);
+  const { data: signatureSettings } = useSWR(userProfile?.id ? ['staff-signatures', userProfile.tenantId, userProfile.id] : null, atsApi.profile.signatures);
 
   useEffect(() => {
     atsApi.auth.me().then((res) => {
@@ -272,6 +275,7 @@ export function MassMailForm() {
         accountId: selectedAccId,
         subject,
         body,
+        signatureId: signatureId === 'default' ? null : signatureId,
         ratePerMinute,
         ratePerHour,
         randomizeDelay,
@@ -830,6 +834,15 @@ export function MassMailForm() {
           </div>
           
           {/* Attachments Section */}
+          <div className="flex flex-wrap items-center gap-3 border-t border-neutral-100 dark:border-slate-800 p-4 text-xs">
+            <label htmlFor="campaign-signature" className="font-semibold">Signature</label>
+            <select id="campaign-signature" value={signatureId} onChange={event => setSignatureId(event.target.value)} className="h-9 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 text-xs max-w-xs">
+              <option value="default">Use new message default</option><option value="none">None</option>
+              {signatureSettings?.signatures.map(signature => <option key={signature.id} value={signature.id}>{signature.name}</option>)}
+            </select>
+            <Link href="/view-profile?tab=email_signature" className="text-blue-700 hover:underline">Manage signatures</Link>
+            <span className="text-slate-500">Added when this campaign is queued.</span>
+          </div>
           <div className="bg-white dark:bg-slate-900 p-4 border-t border-neutral-100 dark:border-slate-800 flex flex-col gap-3">
             <div className="flex items-center gap-3">
               <input type="file" multiple className="hidden" ref={attachmentsInputRef} onChange={handleAttachmentsUpload} />

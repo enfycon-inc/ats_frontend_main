@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { 
   Users, UserPlus, Search, Edit2, Key, Shield, Building2, MapPin, Briefcase,
   CheckCircle2, XCircle, RefreshCw, Mail, Lock, Sparkles, Filter, ShieldAlert, X, ChevronRight, Loader2,
-  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check, Eye, EyeOff, Info, Clock
+  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check, Eye, EyeOff, Info, Clock, Send
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -28,10 +28,16 @@ import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
+import { UserAvatar } from '@/components/shared/user-identity';
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
 import { getSelectedMemberRoleIds, getMemberRoleAssignment, hasAdministrativeRole, toggleAdministrativeRole } from "@/lib/member-role-selection";
 
+type UserCity = "BBSR" | "PUNE" | "BENGALURU" | "VIZAG" | "HYDERABAD";
+
 interface UserItem {
+  city?: UserCity | null;
+  avatar?: string | null;
+  profilePicture?: string | null;
   id: string;
   email: string;
   fullName: string;
@@ -139,9 +145,7 @@ function ReviewerSelect({
       >
         {selectedUser ? (
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="h-7 w-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
-              {selectedUser.fullName ? selectedUser.fullName.charAt(0).toUpperCase() : "U"}
-            </div>
+            <UserAvatar user={selectedUser} className="h-7 w-7" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-xs font-bold text-neutral-900 dark:text-white truncate">
@@ -270,9 +274,7 @@ function ReviewerSelect({
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className="h-7 w-7 rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0 border border-indigo-200 dark:border-indigo-800">
-                        {u.fullName ? u.fullName.charAt(0).toUpperCase() : "U"}
-                      </div>
+                      <UserAvatar user={u} className="h-7 w-7" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs font-bold text-neutral-900 dark:text-white truncate">
@@ -654,6 +656,7 @@ export default function UserManagementPage() {
     branchId: "",
       businessUnitId: "",
       jobReviewerId: "",
+    city: "" as UserCity | "",
       roles: [] as string[],
   });
 
@@ -832,6 +835,7 @@ export default function UserManagementPage() {
         branchId: assignment.branchId,
         businessUnitId: assignment.businessUnitId,
         assignedRoleIds: finalRoles,
+        ...((editForm.city || null) !== (selectedUser.city || null) ? { city: editForm.city || null } : {}),
       });
 
       setUsers((prevUsers) =>
@@ -842,6 +846,7 @@ export default function UserManagementPage() {
                 branchId: assignment.branchId || selectedUser.branchId || null,
                 businessUnitId: assignment.businessUnitId || selectedUser.businessUnitId || null,
                 roles: finalRoles,
+                city: editForm.city || null,
               }
             : u
         )
@@ -858,6 +863,24 @@ export default function UserManagementPage() {
     }
   };
 
+  const [sendingResetLink, setSendingResetLink] = useState(false);
+
+  const handleSendResetLink = async () => {
+    if (!selectedUser) return;
+    try {
+      setSendingResetLink(true);
+      const res = await atsApi.auth.sendUserResetLink(selectedUser.id);
+      toast.success(res?.message || `Password reset link sent to ${selectedUser.email}!`);
+      setIsPasswordModalOpen(false);
+      setSelectedUser(null);
+      setNewPassword("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send password reset link.");
+    } finally {
+      setSendingResetLink(false);
+    }
+  };
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
@@ -871,7 +894,7 @@ export default function UserManagementPage() {
         password: newPassword,
       });
 
-      toast.success(`Password updated for ${selectedUser.fullName}!`);
+      toast.success(`Password updated and notification email sent to ${selectedUser.email}!`);
       setIsPasswordModalOpen(false);
       setSelectedUser(null);
       setNewPassword("");
@@ -1509,6 +1532,7 @@ export default function UserManagementPage() {
       businessUnitId: user.businessUnitId || (user as any).business_unit_id || "",
       jobReviewerId: user.jobReviewerId || (user as any).job_reviewer_id || "",
       roles: [...rawRoles],
+      city: user.city || "",
     });
     setIsEditModalOpen(true);
   };
@@ -1981,9 +2005,7 @@ export default function UserManagementPage() {
                       {/* Name */}
                       <td className="py-3 px-4 font-semibold text-default-900 dark:text-white">
                         <div className="flex items-center gap-2.5">
-                          <div className="h-7 w-7 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-xs flex items-center justify-center border border-indigo-100 dark:border-indigo-900/50">
-                            {user.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
-                          </div>
+                          <UserAvatar user={user} className="h-7 w-7" />
                           <div>
                             <div className="flex items-center gap-1.5">
                               <span>{user.fullName}</span>
@@ -1995,6 +2017,12 @@ export default function UserManagementPage() {
                               {user.isApproved === false && (
                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
                                   Pending Approval
+                                </span>
+                              )}
+                              {user.city && (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300">
+                                  <MapPin className="h-3 w-3" />
+                                  {{ BBSR: "Bhubaneswar", PUNE: "Pune", BENGALURU: "Bengaluru", VIZAG: "Vizag", HYDERABAD: "Hyderabad" }[user.city]}
                                 </span>
                               )}
                             </div>
@@ -3021,6 +3049,23 @@ export default function UserManagementPage() {
                 <button type="button" onClick={() => setEditModalTab("TENANT_ADMIN")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${editModalTab === "TENANT_ADMIN" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Administrative Access</button>
               </div>
 
+              <div className="max-w-sm space-y-1.5">
+                <label htmlFor="member-city" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">User city</label>
+                <select
+                  id="member-city"
+                  value={editForm.city}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, city: event.target.value as UserCity | "" }))}
+                  className="w-full h-9 text-xs rounded-lg border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 text-neutral-900 dark:text-white outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                >
+                  <option value="">No city assigned</option>
+                  <option value="BBSR">Bhubaneswar (BBSR)</option>
+                  <option value="PUNE">Pune</option>
+                  <option value="BENGALURU">Bengaluru</option>
+                  <option value="VIZAG">Vizag</option>
+                  <option value="HYDERABAD">Hyderabad</option>
+                </select>
+              </div>
+
               {/* ADMINISTRATIVE ACCESS & STAFF ROLES LOGIC */}
               {(() => {
                 const selectedAdmin = (key: string) => hasAdministrativeRole(editForm.roles, editRolesCatalog, key);
@@ -3265,54 +3310,117 @@ export default function UserManagementPage() {
       {/* RESET PASSWORD MODAL */}
       {isPasswordModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in-0 zoom-in-95">
+          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in-0 zoom-in-95">
             <div className="flex justify-between items-center px-5 py-4 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50 dark:bg-slate-850">
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <Key className="h-4 w-4 text-amber-500" /> Reset Password
+                <Key className="h-4 w-4 text-amber-500" /> Reset User Password
               </h3>
               <button onClick={() => setIsPasswordModalOpen(false)} className="text-neutral-400 hover:text-neutral-600">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleResetPassword} className="p-5 space-y-4">
-              <p className="text-xs text-neutral-500">
-                Enter a new password for <span className="font-bold text-neutral-800 dark:text-white">{selectedUser.fullName}</span>:
-              </p>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">New Password *</label>
-                <div className="relative">
-                  <Input
-                    type={showResetPassword ? "text" : "password"}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="At least 8 characters"
-                    autoComplete="new-password"
-                    className="h-8 text-xs rounded border-neutral-300 font-mono pr-8"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowResetPassword(!showResetPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
-                    tabIndex={-1}
-                    title={showResetPassword ? "Hide password" : "Show password"}
-                  >
-                    {showResetPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                  </button>
+            <div className="p-5 space-y-4">
+              <div className="flex items-center gap-2.5 pb-2 border-b border-neutral-100 dark:border-slate-800">
+                <div className="h-8 w-8 rounded-full bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
+                  {selectedUser.fullName?.charAt(0)?.toUpperCase() || "U"}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-neutral-900 dark:text-white truncate">
+                    {selectedUser.fullName}
+                  </p>
+                  <p className="text-[11px] text-neutral-500 truncate">
+                    {selectedUser.email}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
-                <Button type="button" variant="outline" size="sm" onClick={() => setIsPasswordModalOpen(false)} className="h-8 text-xs">
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={submitting} size="sm" className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold">
-                  {submitting ? "Updating..." : "Update Password"}
+              {/* Option A: Send Reset Link via Email */}
+              <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/60 rounded-xl space-y-2.5">
+                <div className="flex items-start gap-2">
+                  <Mail className="h-4 w-4 text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0" />
+                  <div className="space-y-0.5 min-w-0">
+                    <p className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                      Send Secure Reset Link (Recommended)
+                    </p>
+                    <p className="text-[11px] text-indigo-800/80 dark:text-indigo-300/80 leading-relaxed">
+                      Sends a single-use verified reset link to <span className="font-semibold">{selectedUser.email}</span> so the member can choose their own password.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleSendResetLink}
+                  disabled={sendingResetLink}
+                  className="w-full h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  {sendingResetLink ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending Link...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5" /> Email Password Reset Link
+                    </>
+                  )}
                 </Button>
               </div>
-            </form>
+
+              {/* Divider */}
+              <div className="relative flex items-center justify-center my-1">
+                <div className="border-t border-neutral-200 dark:border-slate-800 w-full" />
+                <span className="bg-white dark:bg-slate-900 px-2 text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
+                  or set temporary password
+                </span>
+              </div>
+
+              {/* Option B: Direct Password Reset with Notification */}
+              <form onSubmit={handleResetPassword} className="space-y-3">
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                      Temporary Password *
+                    </label>
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                      📧 User will be notified
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type={showResetPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="At least 8 characters"
+                      autoComplete="new-password"
+                      className="h-8 text-xs rounded border-neutral-300 font-mono pr-8"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResetPassword(!showResetPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
+                      tabIndex={-1}
+                      title={showResetPassword ? "Hide password" : "Show password"}
+                    >
+                      {showResetPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-slate-800">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setIsPasswordModalOpen(false)} className="h-8 text-xs">
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={submitting || !newPassword}
+                    size="sm"
+                    className="h-8 text-xs bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 text-white font-medium"
+                  >
+                    {submitting ? "Updating..." : "Set Password & Notify"}
+                  </Button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
@@ -3535,9 +3643,7 @@ export default function UserManagementPage() {
               <div className="px-6 pt-4 pb-1">
                 <div className="p-3 rounded-lg border border-neutral-200/80 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-800/40 flex items-center justify-between">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-8.5 w-8.5 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
-                      {reviewerTargetUser.fullName ? reviewerTargetUser.fullName.charAt(0).toUpperCase() : "U"}
-                    </div>
+                    <UserAvatar user={reviewerTargetUser} className="h-9 w-9" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-bold text-neutral-900 dark:text-white truncate">
@@ -3626,15 +3732,7 @@ export default function UserManagementPage() {
                             }`}
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <div
-                                className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs ${
-                                  isSelected
-                                    ? "bg-indigo-600 text-white"
-                                    : "bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-slate-700"
-                                }`}
-                              >
-                                {u.fullName ? u.fullName.charAt(0).toUpperCase() : "U"}
-                              </div>
+                              <UserAvatar user={u} className="h-8 w-8" />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className={`text-xs truncate ${isSelected ? "font-bold text-indigo-950 dark:text-white" : "font-semibold text-neutral-900 dark:text-white"}`}>

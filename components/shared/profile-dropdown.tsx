@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import {
@@ -18,6 +17,8 @@ import {
 } from "lucide-react";
 import { atsApi } from "@/lib/ats-api";
 import { saveDashboardRole } from "@/lib/dashboard-preference";
+import { useStaffProfile } from '@/hooks/use-staff-profile';
+import { UserAvatar } from '@/components/shared/user-identity';
 
 export default function ProfileDropdown() {
   const [open, setOpen] = useState(false);
@@ -26,24 +27,12 @@ export default function ProfileDropdown() {
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<any[]>([]);
   const [rolesLoaded, setRolesLoaded] = useState(false);
-  const [liveUserLoaded, setLiveUserLoaded] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
-  const [liveUser, setLiveUser] = useState<any>(null);
+  const { data: liveUser, loading: profileLoading } = useStaffProfile();
+  const liveUserLoaded = !profileLoading;
   const currentUser = liveUser || (typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null);
 
-  useEffect(() => {
-    atsApi.auth.me().then(profile => {
-      if (profile && profile.id) {
-        setLiveUser(profile);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("ats_current_user", JSON.stringify(profile));
-        }
-      }
-    }).catch(() => {}).finally(() => {
-      setLiveUserLoaded(true);
-    });
-  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -78,20 +67,11 @@ export default function ProfileDropdown() {
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
-  const userName = currentUser?.fullName || (session as any)?.user?.name || "Mrutyunjay Rout";
-  const userAvatar = currentUser?.avatar || (session as any)?.user?.image || null;
+  const userName = currentUser?.fullName || (session as any)?.user?.name || "My account";
+  const userAvatar = currentUser ? (currentUser.avatar || currentUser.profilePicture || null) : ((session as any)?.user?.image || null);
   const userRoles = currentUser?.roles || (session as any)?.user?.roles || [];
   // Prefer live systemRole from /me endpoint (stays accurate after pod lead promotion without re-login)
   const systemRole = (currentUser as any)?.systemRole || (session as any)?.user?.systemRole || userRoles[0];
-
-  const userInitials = useMemo(() => {
-    if (!userName) return "U";
-    const parts = userName.trim().split(/\s+/);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return userName.slice(0, 2).toUpperCase();
-  }, [userName]);
 
   const IGNORED_KEYCLOAK_ROLES = new Set([
     "DEFAULT_ROLES_ENFYCON_ATS",
@@ -430,19 +410,7 @@ export default function ProfileDropdown() {
         `}
       >
         <div className="relative w-7 h-7 rounded-full flex-shrink-0 ring-1.5 ring-slate-300 dark:ring-white/50 bg-slate-200 dark:bg-white/20 text-slate-700 dark:text-white flex items-center justify-center font-bold text-xs shadow-xs">
-          {userAvatar ? (
-            <Image
-              src={userAvatar}
-              alt={userName}
-              width={28}
-              height={28}
-              className="w-full h-full rounded-full object-cover"
-            />
-          ) : (
-            <span className="text-[11px] font-bold tracking-tighter">
-              {userInitials}
-            </span>
-          )}
+          <UserAvatar user={{ fullName: userName, avatar: userAvatar }} className="h-7 w-7" />
           <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />
         </div>
 
@@ -483,19 +451,7 @@ export default function ProfileDropdown() {
           {/* Header Card */}
           <div className="p-3 bg-gradient-to-r from-purple-50/70 to-pink-50/40 dark:from-slate-800/90 dark:to-slate-800/60 rounded-2xl flex items-center gap-3 border border-purple-100/50 dark:border-slate-700/60">
             <div className="relative w-11 h-11 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-slate-700 shadow-xs bg-slate-200 dark:bg-slate-700">
-              {userAvatar ? (
-                <Image
-                  src={userAvatar}
-                  alt={userName}
-                  width={44}
-                  height={44}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center font-bold text-sm text-white bg-gradient-to-br from-indigo-500 to-purple-600">
-                  {userInitials}
-                </div>
-              )}
+              <UserAvatar user={{ fullName: userName, avatar: userAvatar }} className="h-11 w-11" />
             </div>
             <div className="flex-1 min-w-0 text-left">
               <h4 className="text-[14px] font-bold text-slate-900 dark:text-slate-100 leading-snug truncate">

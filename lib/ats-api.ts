@@ -1,4 +1,5 @@
 import type { TenantEmailSettings, EmailDispatchMode, EmailDispatchResult } from './system-email.types';
+import type { StaffProfile, ProfileDetailsInput, SignatureSettings, SignatureInput, SignatureDefaultsInput } from './profile-contract';
 export interface ClientAccessPolicy { clientsVisibleAcrossUnits: boolean; bdmClientsTenantWide: boolean; otherOwnerPocsVisible: boolean; maskOtherOwnerPocDetails: boolean; }
 import type { CandidateAssessment, SubmissionHistoryResponse, TrackerResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
 
@@ -126,6 +127,7 @@ function clearToken() {
 function setCurrentUser(user: any) {
   if (typeof window !== 'undefined') {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
+    window.dispatchEvent(new CustomEvent('atsProfileChanged', { detail: user }));
   }
 }
 
@@ -279,6 +281,8 @@ async function apiFetch<T = any>(
     ...(options.headers as Record<string, string> || {}),
     ...activeRoleHeaders(),
   };
+  // The browser supplies the multipart boundary for photo uploads.
+  if (typeof FormData !== 'undefined' && options.body instanceof FormData) delete headers['Content-Type'];
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -410,9 +414,7 @@ const auth = {
   },
 
   setCurrentUser(user: any) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-    }
+    setCurrentUser(user);
   },
 
   getToken,
@@ -563,7 +565,7 @@ const auth = {
 
   async updateUserDetail(userId: string, data: { fullName?: string; email?: string; password?: string; branchId?: string | null;
       businessUnitId?: string | null;
-      assignedBranchIds?: string[]; branchRoles?: Record<string, string[]>; roles?: string[]; assignedRoleIds?: string[]; jobReviewerId?: string | null }): Promise<any> {
+      assignedBranchIds?: string[]; branchRoles?: Record<string, string[]>; roles?: string[]; assignedRoleIds?: string[]; jobReviewerId?: string | null; city?: string | null }): Promise<any> {
     return apiFetch<any>(`/api/auth/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -784,6 +786,30 @@ const auth = {
     return apiFetch<any>('/api/auth/accept-invite', {
       method: 'POST',
       body: JSON.stringify({ token, password }),
+    });
+  },
+
+  async forgotPassword(email: string): Promise<any> {
+    return apiFetch<any>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async verifyResetToken(token: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/verify-reset-token?token=${encodeURIComponent(token)}`);
+  },
+
+  async resetPassword(token: string, password: string): Promise<any> {
+    return apiFetch<any>('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
+  },
+
+  async sendUserResetLink(userId: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/users/${userId}/send-reset-link`, {
+      method: 'POST',
     });
   },
 
@@ -1027,6 +1053,8 @@ export interface JobMatchesResponse {
 export interface JobStaffOption {
   id: string;
   fullName: string;
+  email?: string;
+  avatar?: string | null;
   canRecruit: boolean;
   canReview: boolean;
 }
@@ -1855,7 +1883,38 @@ const marketSegments = {
 };
 
 // ─── Export ─────────────────────────────────────────────────────────
+const profile = {
+  async get(): Promise<StaffProfile> {
+    const profile = await apiFetch<StaffProfile>('/api/auth/me');
+    setCurrentUser(profile);
+    return profile;
+  },
+  async saveDetails(input: ProfileDetailsInput) {
+    const saved = await apiFetch<StaffProfile>('/api/auth/me/details', { method: 'PATCH', body: JSON.stringify(input) });
+    setCurrentUser(saved);
+    return saved;
+  },
+  async uploadPhoto(file: File) {
+    const body = new FormData();
+    body.append('file', file);
+    const saved = await apiFetch<StaffProfile>('/api/auth/me/photo', { method: 'POST', body });
+    setCurrentUser(saved);
+    return saved;
+  },
+  async removePhoto() {
+    const saved = await apiFetch<StaffProfile>('/api/auth/me/photo', { method: 'DELETE' });
+    setCurrentUser(saved);
+    return saved;
+  },
+  signatures: () => apiFetch<SignatureSettings>('/api/auth/me/signatures'),
+  saveSignature: (input: SignatureInput) => apiFetch<SignatureSettings>('/api/auth/me/signatures', { method: 'POST', body: JSON.stringify(input) }),
+  deleteSignature: (id: string) => apiFetch<SignatureSettings>(`/api/auth/me/signatures/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  saveSignatureDefaults: (input: SignatureDefaultsInput) => apiFetch<SignatureSettings>('/api/auth/me/signatures/defaults', { method: 'PATCH', body: JSON.stringify(input) }),
+  previewSignature: (html: string) => apiFetch<{ html: string }>('/api/auth/me/signatures/preview', { method: 'POST', body: JSON.stringify({ html }) }),
+};
+
 export const atsApi = {
+  profile,
   auth,
   jobs,
   candidates,

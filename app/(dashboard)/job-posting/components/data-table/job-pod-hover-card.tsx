@@ -140,7 +140,7 @@ export function JobPodHoverCard({
                             {members.map((m: any, idx: number) => {
                               const mName = m.name || m.fullName || m.user?.fullName || m.user?.name || m.email || 'Member';
                               const mEmail = m.email || m.user?.email;
-                              const mAvatar = m.avatar || m.user?.avatar;
+                              const mAvatar = m.avatar || m.profilePicture || m.user?.avatar || m.user?.profilePicture;
                               return (
                                 <div key={idx} className="flex items-center gap-2.5 p-1.5 rounded-md hover:bg-white dark:hover:bg-slate-800 transition-colors">
                                   <Avatar className="h-7 w-7 border border-slate-200 dark:border-slate-700">
@@ -180,7 +180,7 @@ export function JobPodHoverCard({
                       {recruiters.map((u: any, idx: number) => {
                         const mName = u.fullName || u.name || 'Member';
                         const mEmail = u.email;
-                        const mAvatar = u.avatar;
+                        const mAvatar = u.avatar || u.profilePicture;
                         return (
                           <div key={u.id || idx} className="flex items-center gap-2.5 p-1.5 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                             <Avatar className="h-7 w-7 border border-slate-200 dark:border-slate-700">

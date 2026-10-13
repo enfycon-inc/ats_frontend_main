@@ -21,8 +21,11 @@ import {
 } from "@/components/ui/command";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
+import { UserAvatar } from '@/components/shared/user-identity';
 
 interface PodMember {
+  avatar?: string | null;
+  profilePicture?: string | null;
   id: string;
   fullName: string;
   email: string;
@@ -322,6 +325,7 @@ export default function PodsPage() {
         id: m.id,
         fullName: m.fullName,
         email: m.email,
+        avatar: m.avatar || m.profilePicture,
         roleName: m.systemRole || "Recruiter",
         systemRole: m.systemRole || "RECRUITER",
       }));
@@ -789,6 +793,7 @@ export default function PodsPage() {
                                 className="bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 text-[10px] px-1.5 py-0.5 border-0 font-medium"
                               >
                                 {m.fullName.split(" ")[0]}
+                                <UserAvatar user={m} className="h-5 w-5 ml-1" />
                               </Badge>
                             ))}
                             {pod.members.length > 3 && (
@@ -1136,9 +1141,7 @@ export default function PodsPage() {
                                 }}
                                 className="cursor-pointer flex items-center gap-2.5"
                               >
-                                <div className="h-6 w-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center shrink-0">
-                                  {u.fullName?.charAt(0)?.toUpperCase()}
-                                </div>
+                                <UserAvatar user={u} className="h-6 w-6" />
                                 <div className="flex flex-col flex-1 min-w-0">
                                   <span className="font-semibold text-neutral-900 dark:text-neutral-100 text-xs truncate">
                                     {u.fullName}
@@ -1218,7 +1221,7 @@ export default function PodsPage() {
                             />
                             <div className="flex-1 min-w-0">
                               <div className="text-xs font-semibold text-neutral-900 dark:text-white truncate flex items-center gap-1.5">
-                                <span>{r.fullName}</span>
+                                <UserAvatar user={r} className="h-6 w-6" /><span>{r.fullName}</span>
                                 {isHead && (
                                   <Badge className="bg-indigo-50 text-indigo-700 text-[9px] px-1 py-0 border border-indigo-200 font-semibold">
                                     Pod Lead (1 of 1)
