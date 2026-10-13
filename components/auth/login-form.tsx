@@ -378,9 +378,8 @@ const LoginForm = () => {
           <Checkbox id="sso-remember-me" checked={rememberMe} onCheckedChange={(checked) => setRememberMe(checked === true)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
           <div>
             <Label htmlFor="sso-remember-me" className="text-slate-600 cursor-pointer font-medium select-none">
-              Keep Me Signed In for 7 days
+              Keep Me Signed In
             </Label>
-            <p className="text-[11px] text-slate-500">Without this option, your session lasts up to 24 hours.</p>
           </div>
         </div>
 
@@ -466,9 +465,8 @@ const LoginForm = () => {
           <Checkbox id="checkbox" checked={rememberMe} onCheckedChange={(checked) => setRememberMe(checked === true)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
           <div>
             <Label htmlFor="checkbox" className="text-slate-600 cursor-pointer font-medium select-none">
-              Keep Me Signed In for 7 days
+              Keep Me Signed In
             </Label>
-            <p className="text-[11px] text-slate-500">Without this option, your session lasts up to 24 hours.</p>
           </div>
         </div>
         <Link
