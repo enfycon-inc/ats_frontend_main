@@ -1533,10 +1533,10 @@ function BranchSwitcher() {
   }, [session?.user?.email]);
   if (!profile || isRoleAdmin(null, [], profile)) return null;
   return (
-    <div title="Your assigned office and unit" className="flex flex-col items-center justify-center h-9 px-2.5 rounded-lg bg-white/10 text-white/90 border border-white/15">
+    <div title="Your assigned branch and unit" className="flex flex-col items-center justify-center h-9 px-2.5 rounded-lg bg-white/10 text-white/90 border border-white/15">
       <div className="flex items-center gap-1.5 text-[11px] font-bold">
         <MapPin className="w-3.5 h-3.5 text-indigo-200" />
-        <span>Office: {profile.branchName || "No office assigned"}</span>
+        <span>Branch: {profile.branchName || "No branch assigned"}</span>
       </div>
       {profile.businessUnitName && <span className="text-[10px]">Unit: {profile.businessUnitName}</span>}
     </div>
