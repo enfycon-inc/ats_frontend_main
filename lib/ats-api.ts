@@ -34,6 +34,17 @@ export interface InvitationDetails {
   isAccepted: boolean;
 }
 
+export interface PasswordResetVerification {
+  valid: boolean;
+  email?: string;
+  fullName?: string;
+  tenantId?: string;
+  tenantName?: string;
+  siteTitle?: string | null;
+  logoUrl?: string | null;
+  message?: string;
+}
+
 export function activeRoleHeaders(): Record<string, string> {
   const profile = getCurrentUser();
   const selection = getSavedDashboardRole(profile);
@@ -823,8 +834,8 @@ const auth = {
     });
   },
 
-  async verifyResetToken(token: string): Promise<any> {
-    return apiFetch<any>(`/api/auth/verify-reset-token?token=${encodeURIComponent(token)}`);
+  async verifyResetToken(token: string): Promise<PasswordResetVerification> {
+    return apiFetch<PasswordResetVerification>(`/api/auth/verify-reset-token?token=${encodeURIComponent(token)}`);
   },
 
   async resetPassword(token: string, password: string): Promise<any> {

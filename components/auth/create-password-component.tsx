@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { createPasswordSchema } from "@/lib/zod";
 import { Eye, EyeOff, Loader2, Lock, AlertCircle, CheckCircle2, ShieldAlert } from "lucide-react";
 import { atsApi } from "@/lib/ats-api";
+import { CompanyLogoImage } from "@/components/shared/company-logo-image";
 
 const CreatePasswordComponent = () => {
   const router = useRouter();
@@ -33,7 +34,14 @@ const CreatePasswordComponent = () => {
 
   const [verifying, setVerifying] = useState(true);
   const [tokenError, setTokenError] = useState<string | null>(null);
-  const [targetAccount, setTargetAccount] = useState<{ email?: string; fullName?: string; tenantName?: string } | null>(null);
+  const [targetAccount, setTargetAccount] = useState<{
+    email?: string;
+    fullName?: string;
+    tenantId?: string;
+    tenantName?: string;
+    siteTitle?: string | null;
+    logoUrl?: string | null;
+  } | null>(null);
 
   const form = useForm<z.infer<typeof createPasswordSchema>>({
     resolver: zodResolver(createPasswordSchema),
@@ -58,7 +66,10 @@ const CreatePasswordComponent = () => {
           setTargetAccount({
             email: res.email,
             fullName: res.fullName,
+            tenantId: res.tenantId,
             tenantName: res.tenantName,
+            siteTitle: res.siteTitle,
+            logoUrl: res.logoUrl,
           });
         } else {
           setTokenError(res?.message || "This password reset link is invalid or has expired.");
@@ -138,18 +149,45 @@ const CreatePasswordComponent = () => {
     );
   }
 
-  const passwordValue = form.watch("password") || "";
-  const hasMinLength = passwordValue.length >= 8;
-  const hasNumberOrSymbol = /[0-9!@#$%^&*(),.?":{}|<>]/.test(passwordValue);
+  const tenantDisplayName = targetAccount?.siteTitle?.trim() || targetAccount?.tenantName?.trim();
+  const tenantLogoMatch = targetAccount?.logoUrl?.match(/^\/public\/image\/logos\/([0-9a-f-]{36})\/([a-f0-9]{64}\.(?:png|jpg|gif|webp))$/i);
+  const tenantLogoUrl = tenantLogoMatch && targetAccount?.tenantId &&
+    tenantLogoMatch[1].toLowerCase() === targetAccount.tenantId.toLowerCase()
+    ? targetAccount.logoUrl!
+    : null;
 
   return (
     <>
+      <div className="mb-6 space-y-2 text-center">
+        {tenantLogoUrl ? (
+          <div className="flex justify-center">
+            <CompanyLogoImage
+              src={tenantLogoUrl}
+              alt={`${tenantDisplayName || "Company"} logo`}
+              className="h-10 w-auto max-w-[180px]"
+            />
+          </div>
+        ) : null}
+        {tenantDisplayName && (
+          <p className="text-sm font-semibold tracking-wide text-slate-600 dark:text-slate-300">
+            {tenantDisplayName}
+          </p>
+        )}
+        <div className="space-y-1 pt-2">
+          <h2 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
+            Create New Password
+          </h2>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            Choose a new password for your account
+          </p>
+        </div>
+      </div>
+
       {targetAccount?.email && (
         <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
           <span>
             Resetting password for: <strong className="font-semibold">{targetAccount.email}</strong>
-            {targetAccount.tenantName && ` (${targetAccount.tenantName})`}
           </span>
         </div>
       )}
@@ -171,7 +209,7 @@ const CreatePasswordComponent = () => {
                     <Input
                       {...field}
                       type={showPassword ? "text" : "password"}
-                      placeholder="New Password (min. 8 characters)"
+                      placeholder="New password"
                       name="password"
                       className="ps-13 pe-12 h-14 rounded-xl bg-neutral-100 dark:bg-slate-800 border border-neutral-300 dark:border-slate-700 focus:border-primary dark:focus:border-primary"
                       disabled={isPending}
@@ -193,16 +231,6 @@ const CreatePasswordComponent = () => {
               </FormItem>
             )}
           />
-
-          {/* Password Strength Checklist */}
-          <div className="flex items-center gap-4 text-xs px-1 text-slate-500">
-            <span className={`flex items-center gap-1 ${hasMinLength ? "text-emerald-600 font-medium" : ""}`}>
-              {hasMinLength ? "✓" : "○"} 8+ characters
-            </span>
-            <span className={`flex items-center gap-1 ${hasNumberOrSymbol ? "text-emerald-600 font-medium" : ""}`}>
-              {hasNumberOrSymbol ? "✓" : "○"} Number or symbol
-            </span>
-          </div>
 
           {/* Confirm Password */}
           <FormField

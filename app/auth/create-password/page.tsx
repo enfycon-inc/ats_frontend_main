@@ -12,12 +12,6 @@ export default function CreatePasswordPage() {
               enfysync
             </span>
           </div>
-          <h2 className="text-3xl font-extrabold text-neutral-900 dark:text-white">
-            Create New Password
-          </h2>
-          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-            Set your new credentials to securely access your workspace
-          </p>
         </div>
         <Suspense
           fallback={
