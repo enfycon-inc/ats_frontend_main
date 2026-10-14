@@ -3078,33 +3078,30 @@ const getInitialActiveBranchContext = () => {
                             Job Assignment {assignmentRequired && <span className="text-red-500 ml-0.5">*</span>}
                           </span>
                         </label>
-                        <div 
+                        <button
+                          type="button"
                           onClick={() => setIsAssignmentModalOpen(true)}
                           className={cn(
-                            "flex items-center justify-between w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors shadow-sm",
+                            "flex h-9 items-center justify-between gap-2 w-full px-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-left cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors shadow-sm",
                             (assignmentRequired && !assignmentValid) && isSubmitted ? "border-red-500 bg-red-50 dark:bg-red-900/20" : ""
                           )}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
-                              <Users className="h-4 w-4" />
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                            <div className="h-6 w-6 rounded bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                              <Users className="h-3.5 w-3.5" />
                             </div>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">
-                                {assignmentType === "pod" && selectedPodId ? selectedPodIds.length === 1 ? podsList.find(p => p.id === selectedPodId)?.name || "Recruitment Pod" : `${selectedPodIds.length} pods selected` :
-                                 assignmentType === "recruiters" && selectedRecruiterIds.length > 0 ? `${selectedRecruiterIds.length} Recruiter${selectedRecruiterIds.length > 1 ? 's' : ''} Selected` :
-                                 automaticPods && ["automatic", "unassigned"].includes(assignmentType) ? "Automatic pod assignment" : assignmentType === "unassigned" ? (assignmentRequired ? "Select Pods or Recruiters" : "No assignment (optional)") :
-                                 "Select Assignment..."}
-                              </span>
-                              <span className="text-[11px] text-slate-500 font-medium">
-                                {assignmentType === "pod" && selectedPodIds.length ? podsList.filter(p => selectedPodIds.includes(p.id)).map(p => p.name).join(", ") : "Click to configure job assignment"}
+                            <div className="min-w-0 flex-1">
+                              <span className={cn("block truncate text-xs leading-4", assignmentType === "unassigned" ? "font-medium text-slate-500" : "font-semibold text-slate-900 dark:text-white")}>
+                                {assignmentType === "pod" && selectedPodIds.length > 0 ? selectedPodIds.length === 1 ? podsList.find(p => p.id === selectedPodIds[0])?.name || "Recruitment Pod" : `${selectedPodIds.length} pods selected` :
+                                 assignmentType === "recruiters" && selectedRecruiterIds.length > 0 ? `${selectedRecruiterIds.length} recruiter${selectedRecruiterIds.length > 1 ? 's' : ''} selected` :
+                                 automaticPods && assignmentType === "automatic" ? "Automatic pod assignment" : "Select Pods or Recruiters"}
                               </span>
                             </div>
                           </div>
-                          <Button type="button" variant="outline" size="sm" className="h-7 text-[10px] px-2 font-bold uppercase tracking-wider">
-                            Change
-                          </Button>
-                        </div>
+                          <span className="shrink-0 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                            {assignmentType === "pod" && selectedPodIds.length > 0 || assignmentType === "recruiters" && selectedRecruiterIds.length > 0 || automaticPods && assignmentType === "automatic" ? "Change" : "Select"}
+                          </span>
+                        </button>
                         {isSubmitted && (assignmentRequired && !assignmentValid) && (
                           <p className="text-[11px] text-red-500 font-medium mt-1">
                             Select a pod or at least one recruiter.

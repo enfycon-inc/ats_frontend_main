@@ -182,13 +182,13 @@ export function JobAssignmentModal({
                       key={pod.id}
                       onClick={() => setPodIds(ids => ids.includes(pod.id) ? ids.filter(id => id !== pod.id) : [...ids, pod.id])}
                       className={cn(
-                        "flex w-full gap-3 text-left items-center justify-between p-3 rounded-xl cursor-pointer border transition-all",
+                        "flex w-full items-center justify-start gap-3 text-left p-3 rounded-xl cursor-pointer border transition-all",
                         podIds.includes(pod.id)
                           ? "bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-700"
                           : "bg-white border-transparent hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/80"
                       )}
                     >
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className={cn("font-semibold text-sm", podIds.includes(pod.id) ? "text-indigo-900 dark:text-indigo-100" : "text-slate-900 dark:text-slate-200")}>
                           {pod.name}
                         </p>
