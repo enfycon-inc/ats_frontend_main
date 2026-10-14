@@ -51,6 +51,11 @@ export async function proxy(req: NextRequest) {
     }
   }
 
+  const isPublic = publicRoutes.some((route) => pathname.startsWith(route));
+  if (isPublic) {
+    return response;
+  }
+
   // --- AUTH LOGIC ---
   let session = null;
   try {
@@ -59,9 +64,7 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/auth/login", req.url));
   }
 
-  const isPublic = publicRoutes.some((route) => pathname.startsWith(route));
-
-  if (!session?.user && !isPublic) {
+  if (!session?.user) {
     return NextResponse.redirect(new URL("/auth/login", req.url));
   }
 
