@@ -353,10 +353,10 @@ export function JobAssignModal({
     const targetUnitId = job?.businessUnitId || (job as any)?.business_unit_id || targetUnit?.id;
     let list = usersList.filter((u: any) => u.isActive !== false && u.is_active !== false);
 
-    // Filter to only users who act as Recruiters (RECRUITER, POD_LEAD)
+    // Filter to users whose system role is Recruiter.
     list = list.filter((u: any) => {
       const rawSystemRole = u.systemRole || u.system_role;
-      if (rawSystemRole && ["RECRUITER", "POD_LEAD"].includes(rawSystemRole.toUpperCase())) {
+      if (rawSystemRole && rawSystemRole.toUpperCase() === "RECRUITER") {
         return true;
       }
       const uRoles = u.roles || [];
@@ -366,7 +366,7 @@ export function JobAssignModal({
       });
       return userSysRoles.some((sr: any) => {
         const upper = typeof sr === "string" ? sr.toUpperCase() : "";
-        return ["RECRUITER", "POD_LEAD"].includes(upper);
+        return upper === "RECRUITER";
       });
     });
 
