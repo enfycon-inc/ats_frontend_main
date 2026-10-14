@@ -7,6 +7,7 @@ const publicRoutes = [
   "/auth/register",
   "/auth/forgot-password",
   "/auth/create-password",
+  "/auth/setup-password",
 ];
 
 const PASSTHROUGH_SUBDOMAINS = ['api', 'auth', 'db', 'www'];

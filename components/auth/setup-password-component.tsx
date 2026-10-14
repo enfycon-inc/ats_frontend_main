@@ -13,7 +13,11 @@ import { doSocialLogin } from "@/app/actions";
 export default function SetupPasswordComponent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
+  const tenantSelector = searchParams.get("subdomain");
   const router = useRouter();
+  const loginUrl = tenantSelector
+    ? `/auth/login?subdomain=${encodeURIComponent(tenantSelector)}`
+    : "/auth/login";
 
   const [loadingDetails, setLoadingDetails] = useState(true);
   const [inviteDetails, setInviteDetails] = useState<{
@@ -67,7 +71,7 @@ export default function SetupPasswordComponent() {
         const res = await atsApi.auth.acceptInvite(token, password);
         toast.success(res.message || "Password set successfully!");
         setTimeout(() => {
-          router.push("/auth/login");
+          router.push(loginUrl);
         }, 1200);
       } catch (err: any) {
         toast.error(err.message || "Failed to set password. Token may be invalid or expired.");
@@ -94,7 +98,7 @@ export default function SetupPasswordComponent() {
         <p className="text-sm text-slate-500">
           This invitation link is invalid or does not exist. Please check the link from your email or contact your administrator.
         </p>
-        <Button onClick={() => router.push("/auth/login")} className="w-full bg-slate-900 hover:bg-slate-800 text-white">
+        <Button onClick={() => router.push(loginUrl)} className="w-full bg-slate-900 hover:bg-slate-800 text-white">
           Back to Login
         </Button>
       </div>
@@ -111,7 +115,7 @@ export default function SetupPasswordComponent() {
         <p className="text-sm text-slate-500">
           This invitation token was valid for 24 hours and has now expired. Please ask your administrator to send you a new invitation link.
         </p>
-        <Button onClick={() => router.push("/auth/login")} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
+        <Button onClick={() => router.push(loginUrl)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
           Return to Sign In
         </Button>
       </div>
