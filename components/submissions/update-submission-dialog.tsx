@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
-import { Loader2, LockKeyhole } from 'lucide-react';
+import { Loader2, Pencil, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { atsApi } from '@/lib/ats-api';
 import {
@@ -19,8 +19,8 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SubmissionHistory } from './submission-history';
 
-type RoundDraft = { status: string; date: string; time: string; remarks: string; interviewer: string };
-type Draft = { rounds: Record<RoundKey, RoundDraft>; outcome: string; remarks: string; meetingLink: string };
+type RoundDraft = { status: string; date: string; time: string; remarks: string };
+type Draft = { rounds: Record<RoundKey, RoundDraft>; outcome: string; remarks: string };
 const selectClass = 'h-9 w-full rounded-md border border-input bg-background px-2 text-xs disabled:cursor-not-allowed disabled:opacity-60';
 const closed = (status: string) => ['REJECTED', 'NOT_SELECTED', 'WITHDRAWN', 'JOIN'].includes(status);
 
@@ -29,23 +29,21 @@ function initialDraft(sub: TrackerSubmission): Draft {
   return {
     rounds: Object.fromEntries(ROUNDS.map(({ key }) => [key, {
       status: sub[`${key}Status`] || 'PENDING', ...localInterviewParts(sub[`${key}Date`], zone),
-      remarks: sub[`${key}Remarks`] || '', interviewer: sub[`${key}Interviewer`] || '',
+      remarks: sub[`${key}Remarks`] || '',
     }])) as Record<RoundKey, RoundDraft>,
-    outcome: sub.finalStatus, remarks: sub.remarks || '', meetingLink: sub.meetingLink || '',
+    outcome: sub.finalStatus, remarks: sub.remarks || '',
   };
 }
 
 function Remarks({ id, value, stage, templates, disabled, onChange }: {
   id: string; value: string; stage: string; templates: StageRemark[]; disabled: boolean; onChange: (value: string) => void;
 }) {
-  const suggestions = stageRemarkSuggestions(templates, stage);
+  const [focused, setFocused] = useState(false);
+  const suggestions = value.trim() ? stageRemarkSuggestions(templates, stage).filter(item => item.remarkText.toLowerCase().includes(value.trim().toLowerCase()) && item.remarkText.trim().toLowerCase() !== value.trim().toLowerCase()).slice(0, 4) : [];
   return <div className="space-y-1.5">
     <Textarea id={id} aria-label={`${stage.toUpperCase()} remarks`} rows={2} maxLength={4000} value={value} disabled={disabled}
-      onChange={event => onChange(event.target.value)} className="text-xs" placeholder="Add remarks…" />
-    {!disabled && suggestions.length > 0 && <select aria-label={`${stage.toUpperCase()} remark suggestions`} className={selectClass} value=""
-      onChange={event => { const remark = suggestions.find(item => String(item.id) === event.target.value); if (remark) onChange(remark.remarkText); }}>
-      <option value="">Choose a configured remark…</option>{suggestions.map(remark => <option key={remark.id} value={remark.id}>{remark.remarkText}</option>)}
-    </select>}
+      onFocus={() => setFocused(true)} onBlur={event => { if (!event.relatedTarget?.closest('[data-remark-suggestions]')) setFocused(false); }} onChange={event => onChange(event.target.value)} className="text-xs" placeholder="Add remarks…" />
+    {!disabled && focused && suggestions.length > 0 && <div data-remark-suggestions onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }} aria-label={stage.toUpperCase() + ' remark suggestions'} className="rounded-md border border-border bg-popover p-1 shadow-sm">{suggestions.map(remark => <button key={remark.id} type="button" onMouseDown={event => event.preventDefault()} onClick={() => { onChange(remark.remarkText); setFocused(false); }} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-muted">{remark.remarkText}</button>)}</div>}
   </div>;
 }
 
@@ -53,6 +51,9 @@ export function UpdateSubmissionDialog({ submission, href, onClose, onSaved, onR
   submission: TrackerSubmission; href: string; onClose: () => void;
   onSaved: (submission: TrackerSubmission) => void; onReview: () => void;
 }) {
+  const [expanded, setExpanded] = useState<RoundKey | null>(null);
+  const [editorInstance] = useState(() => crypto.randomUUID());
+  const [nextRound, setNextRound] = useState<RoundKey | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [correctionReason, setCorrectionReason] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
@@ -61,7 +62,7 @@ export function UpdateSubmissionDialog({ submission, href, onClose, onSaved, onR
   const [error, setError] = useState('');
   const saveLock = useRef(false);
   const requestId = useRef<string | null>(null);
-  const { data, error: loadError, mutate, isValidating } = useSWR(['submission-editor', submission.id, submission.updatedAt], async () => {
+  const { data, error: loadError, mutate, isValidating } = useSWR(['submission-editor', submission.id, submission.updatedAt, editorInstance], async () => {
     const current = await atsApi.submissions.get(submission.id);
     let templates: StageRemark[] = [];
     let templatesUnavailable = false;
@@ -84,9 +85,11 @@ export function UpdateSubmissionDialog({ submission, href, onClose, onSaved, onR
   const resetIndex = current && draft ? ROUNDS.findIndex(({ key }, index) => current[`${key}Status`] === 'CLEARED' && draft.rounds[key].status !== 'CLEARED' &&
     ROUNDS.slice(index + 1).some(({ key: next }) => ![null, 'PENDING'].includes(current[`${next}Status`]) || current[`${next}Date`] || current[`${next}Remarks`] || current[`${next}Interviewer`])) : -1;
   const affectedRounds = resetIndex < 0 ? [] : ROUNDS.slice(resetIndex + 1);
-  const allCleared = Boolean(draft && ROUNDS.every(({ key }) => draft.rounds[key].status === 'CLEARED'));
+  const canFinish = Boolean(draft && draft.rounds.l1.status === 'CLEARED' && !ROUNDS.some(({ key }) => draft.rounds[key].status === 'REJECTED'));
+  const needsBypass = Boolean(current && draft && ['SELECTED', 'OFFER', 'JOIN'].includes(draft.outcome) && (ROUNDS.some(({key}) => ['SCHEDULED', 'AWAITING_FEEDBACK'].includes(draft.rounds[key].status)) || (draft.outcome === 'OFFER' && current.finalStatus !== 'SELECTED' && current.finalStatus !== 'OFFER') || (draft.outcome === 'JOIN' && current.finalStatus !== 'OFFER' && current.finalStatus !== 'JOIN')));
   const newlyRejected = Boolean(current && draft && ROUNDS.some(({ key }) => draft.rounds[key].status === 'REJECTED' && current[`${key}Status`] !== 'REJECTED'));
-  const outcome = newlyRejected ? 'NOT_SELECTED' : draft && !allCleared && ['SELECTED', 'OFFER', 'JOIN'].includes(draft.outcome) ? 'SUBMITTED' : draft?.outcome;
+  const invalidatesClearance = Boolean(current && draft && ROUNDS.some(({key}) => current[`${key}Status`] === 'CLEARED' && draft.rounds[key].status !== 'CLEARED'));
+  const outcome = newlyRejected ? 'NOT_SELECTED' : draft && (!canFinish || invalidatesClearance) && ['SELECTED', 'OFFER', 'JOIN'].includes(draft.outcome) ? 'SUBMITTED' : draft?.outcome;
   const progression = ['SUBMITTED', 'SELECTED', 'OFFER', 'JOIN'];
   const needsCorrection = Boolean(current && draft && (outcome !== current.finalStatus && (closed(current.finalStatus) || progression.indexOf(outcome || '') < progression.indexOf(current.finalStatus) && progression.includes(outcome || '')) ||
     ROUNDS.some(({ key }) => JSON.stringify(draft.rounds[key]) !== JSON.stringify(initialDraft(current).rounds[key]) && ['CLEARED', 'REJECTED'].includes(current[`${key}Status`] || ''))));
@@ -95,13 +98,14 @@ export function UpdateSubmissionDialog({ submission, href, onClose, onSaved, onR
     requestId.current = null; setConfirmReset(false); setError('');
     setDraft(previous => previous && ({ ...previous, rounds: { ...previous.rounds, [key]: { ...previous.rounds[key], [field]: value } } }));
   }
-  function editField(field: 'outcome' | 'remarks' | 'meetingLink', value: string) {
+  function editField(field: 'outcome' | 'remarks', value: string) {
     requestId.current = null; setError(''); setDraft(previous => previous && ({ ...previous, [field]: value }));
   }
   async function save() {
     if (!current || !draft || saveLock.current) return;
     saveLock.current = true; setSaving(true); setError('');
     try {
+      if (needsBypass && !draft.remarks.trim()) throw new Error('Add final remarks explaining the direct outcome or unfinished interview.');
       if (needsCorrection && !correctionReason.trim()) throw new Error('Enter a reason for correcting the recorded status.');
       if (affectedRounds.length && !confirmReset) throw new Error('Confirm resetting the affected later rounds before saving.');
       const payload: TrackerUpdate = { expectedUpdatedAt: current.updatedAt };
@@ -113,14 +117,13 @@ export function UpdateSubmissionDialog({ submission, href, onClose, onSaved, onR
         if (row.remarks !== original.remarks) payload[`${key}Remarks`] = row.remarks.trim() || null;
         // Rejections/cancellations require a current reason, even when the text was already saved.
         if (row.status !== original.status && ['REJECTED', 'CANCELLED'].includes(row.status)) payload[`${key}Remarks`] = row.remarks.trim();
-        if (row.interviewer !== original.interviewer) payload[`${key}Interviewer`] = row.interviewer.trim() || null;
         if (row.date !== original.date || row.time !== original.time) {
           payload[`${key}Date`] = row.date && row.time ? interviewInstant(row.date, row.time, validTimezone(current.timezone)) : null;
         }
       }
+      if (needsBypass) payload.bypassReason = draft.remarks.trim();
       if (outcome !== current.finalStatus) payload.finalStatus = outcome as TrackerUpdate['finalStatus'];
       if (draft.remarks !== (current.remarks || '') || (!newlyRejected && outcome !== current.finalStatus && ['NOT_SELECTED', 'WITHDRAWN'].includes(outcome || ''))) payload.remarks = draft.remarks.trim() || null;
-      if (draft.meetingLink !== (current.meetingLink || '')) payload.meetingLink = draft.meetingLink.trim() || null;
       if (Object.keys(payload).length === 1) throw new Error('No changes to save.');
       if (needsCorrection || affectedRounds.length) payload.correctionReason = correctionReason.trim();
       if (affectedRounds.length) payload.resetFollowingRounds = true;
@@ -132,7 +135,7 @@ export function UpdateSubmissionDialog({ submission, href, onClose, onSaved, onR
   }
 
   return <Dialog open onOpenChange={open => { if (!open && !saveLock.current) onClose(); }}>
-    <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl" onEscapeKeyDown={event => { if (saving) event.preventDefault(); }}>
+    <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl" onEscapeKeyDown={event => { if (saving) event.preventDefault(); }}>
       <DialogHeader className="border-b border-border px-6 py-4 pr-12"><DialogTitle>{current && !canMaintain ? 'Submission details' : 'Update submission'}</DialogTitle>
         <DialogDescription className="text-xs">{submission.candidateName || 'Candidate'} · {submission.jobTitle || submission.jobCode}</DialogDescription>
       </DialogHeader>
@@ -146,10 +149,11 @@ export function UpdateSubmissionDialog({ submission, href, onClose, onSaved, onR
             {internalRejected && <p className="text-xs text-muted-foreground">Internal review rejected this submission. Interview rounds are read-only.</p>}
             {closed(current.finalStatus) && !internalRejected && <p className="text-xs text-muted-foreground">To correct interview statuses, change Final outcome to In progress and provide a correction reason.</p>}
             <section aria-label="Interview rounds"><h2 className="mb-3 text-sm font-bold">Interview rounds</h2>
-              <div className="hidden grid-cols-[50px_155px_1fr_1fr] gap-3 rounded-t-lg border border-border bg-muted/40 px-3 py-2 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground md:grid"><span>Round</span><span>Status</span><span>Interview details</span><span>Remarks</span></div>
               {ROUNDS.map(({ key, label }, index) => {
                 const resetting = affectedRounds.some(round => round.key === key);
                 const unlocked = index === 0 || ROUNDS.slice(0, index).every(({ key: prior }) => draft.rounds[prior].status === 'CLEARED');
+                if (!unlocked || resetting) return null;
+                if (index > 0 && draft.rounds[key].status === 'PENDING' && nextRound !== key && !current[`${key}Date`]) return null;
                 const editable = active && unlocked && !resetting && !saving && (!['CLEARED', 'REJECTED'].includes(current[`${key}Status`] || '') || Boolean(caps?.results[key]));
                 const row = draft.rounds[key];
                 const resultPermission = Boolean(caps?.results[key]);
@@ -158,33 +162,25 @@ export function UpdateSubmissionDialog({ submission, href, onClose, onSaved, onR
                 const remarkEditable = editable && (resultPermission || (['SCHEDULED', 'CANCELLED'].includes(row.status) && Boolean(caps?.schedule)));
                 const savedStatus = current[`${key}Status`];
                 const hasSavedInterview = Boolean(current[`${key}Date`] && ['SCHEDULED', 'AWAITING_FEEDBACK', 'CLEARED', 'REJECTED'].includes(savedStatus || ''));
-                return <div key={key} className="grid gap-3 border border-border p-3 last:rounded-b-lg md:grid-cols-[50px_155px_1fr_1fr] md:border-t-0">
-                  <span className="text-xs font-semibold">{label}</span><div className="space-y-2">
+                if (row.status === 'CLEARED' && expanded !== key) return <div key={key} className="mb-2 flex items-center justify-between rounded-lg border border-border px-3 py-2"><span className="text-xs font-semibold">{label} <span className="ml-3 rounded bg-green-50 px-2 py-1 text-green-700 dark:bg-green-950 dark:text-green-300">Cleared</span></span><Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label={'Edit ' + label} onClick={() => setExpanded(key)}><Pencil className="h-3.5 w-3.5" /></Button></div>;
+                return <div key={key} className="mb-2 space-y-3 rounded-lg border border-border p-3">
+                  <span className="text-xs font-semibold">{label}</span><div className="grid gap-2 sm:grid-cols-2"><div className="space-y-1"><Label className="text-xs">Status</Label>
                     <select aria-label={`${label} status`} className={selectClass} disabled={!statusEditable} value={resetting ? 'PENDING' : row.status} onChange={event => editRound(key, 'status', event.target.value)}>
                       {Object.values(InterviewRoundStatus).map(status => <option key={status} value={status} disabled={status !== row.status &&
                         ((!resultPermission && !['SCHEDULED', 'CANCELLED', ...(['SCHEDULED', 'CANCELLED'].includes(savedStatus || '') ? ['PENDING'] : [])].includes(status)) || (['CLEARED', 'AWAITING_FEEDBACK'].includes(status) && !hasSavedInterview) ||
                           (['SELECTED', 'OFFER', 'JOIN'].includes(current.finalStatus) && status !== 'CLEARED' && !caps?.outcome))}>{ROUND_STATUS_LABELS[status]}</option>)}
                     </select>
-                    {!unlocked && <p className="flex items-center gap-1 text-[10.5px] text-muted-foreground"><LockKeyhole className="h-3 w-3" />Clear {ROUNDS[index - 1]?.label} to unlock</p>}
-                    {resetting && <p className="text-[10.5px] text-amber-700 dark:text-amber-300">Will reset to Pending</p>}
-                  </div>
-                  <div className="space-y-2"><Input aria-label={`${label} interview date`} type="date" className="h-9 text-xs" disabled={!detailsEditable || row.status === 'PENDING'} value={resetting || row.status === 'PENDING' ? '' : row.date} onChange={event => editRound(key, 'date', event.target.value)} />
-                    <Input aria-label={`${label} interview time`} type="time" className="h-9 text-xs" disabled={!detailsEditable || row.status === 'PENDING'} value={resetting || row.status === 'PENDING' ? '' : row.time} onChange={event => editRound(key, 'time', event.target.value)} />
-                    <Input aria-label={`${label} interviewer`} placeholder="Interviewer" maxLength={255} className="h-9 text-xs" disabled={!detailsEditable || row.status === 'PENDING'} value={resetting || row.status === 'PENDING' ? '' : row.interviewer} onChange={event => editRound(key, 'interviewer', event.target.value)} />
-                  </div><Remarks id={`${key}-remarks`} stage={key} templates={data.templates} value={resetting ? '' : row.remarks} disabled={!remarkEditable} onChange={value => editRound(key, 'remarks', value)} />
+                  </div>{row.status !== 'PENDING' && <div className="space-y-1"><Label className="text-xs">Date &amp; time</Label><Input aria-label={label + ' date and time'} type="datetime-local" className="h-9 text-xs" disabled={!detailsEditable || row.status === 'PENDING'} value={row.status === 'PENDING' || !row.date ? '' : row.date + 'T' + row.time} onChange={event => { const [date = '', time = ''] = event.target.value.split('T'); requestId.current = null; setDraft(previous => previous && ({...previous, rounds: {...previous.rounds, [key]: {...previous.rounds[key], date, time}}})); }} /></div>}</div><div><Label className="text-xs">Remarks</Label><Remarks id={`${key}-remarks`} stage={key} templates={data.templates} value={resetting ? '' : row.remarks} disabled={!remarkEditable} onChange={value => editRound(key, 'remarks', value)} /></div>
                 </div>;
               })}
-              <p className="mt-2 text-[10.5px] text-muted-foreground">Interview times use {validTimezone(current.timezone)}. Save a schedule before recording interview feedback or clearance.</p>
+              {active && caps?.schedule && draft.outcome === 'SUBMITTED' && ROUNDS.map(({key,label},index) => index > 0 && ROUNDS.slice(0,index).every(round => draft.rounds[round.key].status === 'CLEARED') && draft.rounds[key].status === 'PENDING' && nextRound !== key && !current[`${key}Date`] && <Button key={key} type="button" variant="outline" className="h-8 text-xs" onClick={() => { setNextRound(key); editRound(key, 'status', 'SCHEDULED'); }}><Plus className="h-3 w-3" />Schedule {label} interview</Button>)}
             </section>
-            <div className="space-y-1.5"><Label htmlFor="update-meeting-link" className="text-xs">Meeting link</Label><Input id="update-meeting-link" type="url" value={draft.meetingLink} className="h-9 text-xs" disabled={saving || !active || !(caps?.schedule || Object.values(caps?.results || {}).some(Boolean))} onChange={event => editField('meetingLink', event.target.value)} placeholder="https://…" /></div>
-            <section className="space-y-3 border-t border-border pt-4" aria-label="Final outcome"><h2 className="text-sm font-bold">Final outcome</h2>
+            <section className="space-y-3 border-t border-border pt-4" aria-label="Final outcome"><h2 className="text-sm font-bold">Final status</h2>
               <select aria-label="Final outcome" className={selectClass} value={outcome} disabled={saving || !approved || !caps?.outcome || internalRejected} onChange={event => editField('outcome', event.target.value)}>
                 {!Object.values(SubmissionOutcome).includes(current.finalStatus as SubmissionOutcome) && <option value={current.finalStatus}>{current.finalStatus === 'REJECTED' ? 'Not selected (round rejected)' : 'Awaiting internal approval'}</option>}
-                {Object.values(SubmissionOutcome).map(status => <option key={status} value={status} disabled={status !== outcome && (
-                  (['SELECTED', 'OFFER', 'JOIN'].includes(status) && !allCleared) ||
-                  (status === 'OFFER' && current.finalStatus !== 'SELECTED') || (status === 'JOIN' && current.finalStatus !== 'OFFER'))}>{OUTCOME_LABELS[status]}</option>)}
+                {Object.values(SubmissionOutcome).map(status => <option key={status} value={status} disabled={status !== outcome && ['SELECTED', 'OFFER', 'JOIN'].includes(status) && !canFinish}>{OUTCOME_LABELS[status]}</option>)}
               </select>
-              <p className="text-[10.5px] text-muted-foreground">Clear L3 before selecting the candidate. Then record Offer issued, followed by Joined. Not selected and Withdrawn are available at any stage after internal approval. Rejecting an interview round closes the submission as Not selected.</p>
+              {needsBypass && <p className="text-xs text-amber-700 dark:text-amber-300">Add remarks explaining the direct outcome or unfinished interview.</p>}
               <Remarks id="final-remarks" stage="final" templates={data.templates} value={draft.remarks} disabled={saving || !approved || !(caps?.outcome || caps?.notes) || Boolean(internalRejected)} onChange={value => editField('remarks', value)} />
             </section>
             {(needsCorrection || affectedRounds.length > 0) && <section className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-800 dark:bg-amber-950/20">
