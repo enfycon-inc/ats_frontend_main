@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import type { JobPodOption } from "@/lib/ats-api";
 
-export type AssignmentType = "unassigned" | "pod" | "recruiters";
+export type AssignmentType = "unassigned" | "automatic" | "pod" | "recruiters";
 
 interface JobAssignmentModalProps {
   isOpen: boolean;
@@ -20,6 +20,7 @@ interface JobAssignmentModalProps {
   activeBranch?: any;
   canAssignPods?: boolean;
   canAssignRecruiters?: boolean;
+  automaticPods?: boolean;
 }
 
 export function JobAssignmentModal({
@@ -34,6 +35,7 @@ export function JobAssignmentModal({
   activeBranch,
   canAssignPods = false,
   canAssignRecruiters = false,
+  automaticPods = false,
 }: JobAssignmentModalProps) {
   const [type, setType] = useState<AssignmentType>(initialType);
   const [podId, setPodId] = useState<string | null>(initialPodId);
@@ -80,7 +82,8 @@ export function JobAssignmentModal({
     }
   };
 
-  const isPodsEnabled = canAssignPods && activeBranch?.allowPods === true;
+  const isAutomaticEnabled = automaticPods && canAssignPods;
+  const isPodsEnabled = !automaticPods && canAssignPods && activeBranch?.allowPods === true;
   const isRecruitersEnabled = canAssignRecruiters && activeBranch?.allowNone === true;
   const isAssignLaterEnabled = !activeBranch || activeBranch.allowUnassigned === true || activeBranch.allow_unassigned === true;
 
@@ -88,10 +91,10 @@ export function JobAssignmentModal({
   const allFilteredSelected = recruitersList.length > 0 && recruitersList.every(r => recruiterIds.includes(r.id));
   useEffect(() => {
     if (!isOpen) return;
-    if ((type === "pod" && isPodsEnabled) || (type === "recruiters" && isRecruitersEnabled)) return;
-    setType(isPodsEnabled ? "pod" : isRecruitersEnabled ? "recruiters" : "unassigned");
-  }, [isOpen, type, isPodsEnabled, isRecruitersEnabled]);
-  const validSelection = (type === "pod" && isPodsEnabled && podsList.some(p => p.id === podId)) ||
+    if ((type === "automatic" && isAutomaticEnabled) || (type === "pod" && isPodsEnabled) || (type === "recruiters" && isRecruitersEnabled)) return;
+    setType(isAutomaticEnabled ? "automatic" : isPodsEnabled ? "pod" : isRecruitersEnabled ? "recruiters" : "unassigned");
+  }, [isOpen, type, isAutomaticEnabled, isPodsEnabled, isRecruitersEnabled]);
+  const validSelection = (type === "automatic" && isAutomaticEnabled) || (type === "pod" && isPodsEnabled && podsList.some(p => p.id === podId)) ||
     (type === "recruiters" && isRecruitersEnabled && recruiterIds.length > 0 && recruiterIds.every(id => recruitersList.some(r => r.id === id)));
 
   return (
@@ -109,6 +112,7 @@ export function JobAssignmentModal({
 
         {/* Tab Navigation */}
         <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 px-4 pt-2">
+          {isAutomaticEnabled && <button type="button" onClick={() => setType("automatic")} className={cn("px-4 py-2.5 text-sm font-semibold border-b-2", type === "automatic" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-600")}>Automatic pod assignment</button>}
           {isPodsEnabled && (
             <button
               onClick={() => { setType("pod"); setSearch(""); }}
@@ -140,12 +144,13 @@ export function JobAssignmentModal({
 
         {/* Tab Content */}
         <div className="flex-1 overflow-hidden flex flex-col bg-white dark:bg-slate-900">
-          {!isPodsEnabled && !isRecruitersEnabled && (
+          {type === "automatic" && isAutomaticEnabled && <p className="p-6 text-sm text-slate-600">The next eligible pod in this unit will be assigned when you publish. Saving a draft does not use a turn.</p>}
+          {!isAutomaticEnabled && !isPodsEnabled && !isRecruitersEnabled && (
             <p className="p-6 text-sm text-slate-500">No assignment channels are enabled for this unit and your active role.</p>
           )}
           
           {/* SEARCH BAR (For Pods & Recruiters) */}
-          {type !== "unassigned" && (
+          {type !== "unassigned" && type !== "automatic" && (
             <div className="p-4 border-b border-slate-100 dark:border-slate-800">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />

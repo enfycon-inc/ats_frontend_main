@@ -33,6 +33,7 @@ interface CustomRole {
   isExactSubstitution?: boolean;
   replacesSystemRole?: string | null;
   permissions: string[];
+  allowedPermissions?: string[];
   createdAt?: string;
   updatedAt?: string;
   createdById?: string | null;
@@ -521,15 +522,17 @@ export default function RolesPermissionsPage() {
 
     // 2. Include any active DB system role permissions
     const dbSysRole = roles.find(
+      (r) => r.systemRole?.toUpperCase() === keyUpper && Array.isArray(r.allowedPermissions)
+    ) || roles.find(
       (r) =>
         r.isSystem &&
         ((baseRoleId && r.id === baseRoleId) ||
           (r.name && keyUpper && r.name.toUpperCase() === keyUpper) ||
           (r.systemRole && keyUpper && r.systemRole.toUpperCase() === keyUpper))
     );
-    const dbPerms = dbSysRole && Array.isArray(dbSysRole.permissions) ? dbSysRole.permissions : [];
+    const dbPerms = dbSysRole?.allowedPermissions || (dbSysRole && Array.isArray(dbSysRole.permissions) ? dbSysRole.permissions : []);
 
-    return Array.from(new Set([...archPerms, ...dbPerms]));
+    return dbSysRole ? dbPerms : archPerms;
   };
 
   const matrixAllowedPerms = useMemo(() => {

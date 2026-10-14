@@ -500,7 +500,7 @@ const getInitialActiveBranchContext = () => {
   const canAssignPods = !!currentUserProfile?.permissions?.includes("job:assign_pod");
   const canAssignJob = canAssignRecruiters || canAssignPods;
   const assignmentRequired = assignmentPolicy?.allowUnassigned !== true;
-  const assignmentValid = automaticPods || (assignmentType === "pod" && branchPods.some(p => p.id === selectedPodId) && canAssignPods && assignmentPolicy?.allowPods === true) ||
+  const assignmentValid = (automaticPods && canAssignPods && ["unassigned", "automatic"].includes(assignmentType)) || (assignmentType === "pod" && branchPods.some(p => p.id === selectedPodId) && canAssignPods && assignmentPolicy?.allowPods === true) ||
     (assignmentType === "recruiters" && selectedRecruiterIds.length > 0 && selectedRecruiterIds.every(id => recruitersList.some(r => r.id === id)) && canAssignRecruiters && assignmentPolicy?.allowNone === true);
   useEffect(() => {
     let cancelled = false;
@@ -1226,7 +1226,7 @@ const getInitialActiveBranchContext = () => {
         const pod = podsList.find((p) => p.id === resolvedPodId);
         if (pod?.podHeadId) resolvedApproverId = pod.podHeadId;
         resolvedAssignedTo = pod?.name || "Recruitment Pod";
-      } else if (!automaticPods && assignmentValid && assignmentType === "recruiters" && selectedRecruiterIds.length > 0) {
+      } else if (assignmentValid && assignmentType === "recruiters" && selectedRecruiterIds.length > 0) {
         resolvedRecruiterIds = selectedRecruiterIds;
         resolvedPrimaryRecruiterId = selectedRecruiterIds[0];
         resolvedApproverRole = "PRIMARY_RECRUITER";
@@ -3028,8 +3028,8 @@ const getInitialActiveBranchContext = () => {
                       </div>
 
                       {/* Job Assignment Custom Dropdown */}
-                      {automaticPods && <div className="space-y-1.5"><label className="font-semibold text-xs">Job Assignment</label><div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100"><strong>Automatic pod assignment</strong><p className="mt-1">The next eligible pod in this unit will be assigned when you publish. Saving a draft does not use a turn.</p></div></div>}
-                      {!automaticPods && canAssignJob && assignmentPolicy && <div className="space-y-1.5 relative">
+                      {automaticPods && assignmentType !== "recruiters" && <div className="space-y-1.5"><label className="font-semibold text-xs">Job Assignment</label><div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100"><strong>Automatic pod assignment</strong><p className="mt-1">The next eligible pod in this unit will be assigned when you publish. Saving a draft does not use a turn.</p></div></div>}
+                      {canAssignJob && assignmentPolicy && <div className="space-y-1.5 relative">
                         <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center justify-between h-5">
                           <span className="flex items-center gap-1.5">
                             <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
@@ -3053,7 +3053,7 @@ const getInitialActiveBranchContext = () => {
                               <span className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">
                                 {assignmentType === "pod" && selectedPodId ? podsList.find(p => p.id === selectedPodId)?.name || "Recruitment Pod" :
                                  assignmentType === "recruiters" && selectedRecruiterIds.length > 0 ? `${selectedRecruiterIds.length} Recruiter${selectedRecruiterIds.length > 1 ? 's' : ''} Selected` :
-                                 assignmentType === "unassigned" ? (assignmentRequired ? "Select Pods or Recruiters" : "No assignment (optional)") :
+                                 automaticPods && ["automatic", "unassigned"].includes(assignmentType) ? "Automatic pod assignment" : assignmentType === "unassigned" ? (assignmentRequired ? "Select Pods or Recruiters" : "No assignment (optional)") :
                                  "Select Assignment..."}
                               </span>
                               <span className="text-[11px] text-slate-500 font-medium">
@@ -3085,6 +3085,7 @@ const getInitialActiveBranchContext = () => {
                           podsList={branchPods}
                           recruitersList={recruitersList}
                           activeBranch={assignmentPolicy}
+                          automaticPods={automaticPods}
                           canAssignPods={canAssignPods}
                           canAssignRecruiters={canAssignRecruiters}
                         />
