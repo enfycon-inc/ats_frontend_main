@@ -22,6 +22,18 @@ import type { CandidateAssessment, SubmissionHistoryResponse, TrackerResponse, T
 import { getTenantIdentifier, getBaseDomain } from '@/utils/subdomain-helper';
 import { getSavedDashboardRole } from './dashboard-preference';
 
+export interface InvitationDetails {
+  email: string;
+  fullName: string;
+  tenantName: string;
+  tenantDomain: string | null;
+  allowPasswordLogin: boolean;
+  allowMicrosoftSso: boolean;
+  allowGoogleSso: boolean;
+  isExpired: boolean;
+  isAccepted: boolean;
+}
+
 export function activeRoleHeaders(): Record<string, string> {
   const profile = getCurrentUser();
   const selection = getSavedDashboardRole(profile);
@@ -793,7 +805,7 @@ const auth = {
     });
   },
 
-  async getInvitationDetails(token: string): Promise<any> {
+  async getInvitationDetails(token: string): Promise<InvitationDetails> {
     return apiFetch<any>(`/api/auth/invitation/${encodeURIComponent(token)}`);
   },
 
