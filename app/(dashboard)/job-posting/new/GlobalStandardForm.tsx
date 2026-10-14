@@ -295,7 +295,8 @@ const getInitialActiveBranchContext = () => {
   const [branchUsers, setBranchUsers] = useState<JobStaffOption[]>([]);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
   const [assignmentType, setAssignmentType] = useState<AssignmentType>("unassigned");
-  const [selectedPodId, setSelectedPodId] = useState<string | null>(null);
+  const [selectedPodIds, setSelectedPodIds] = useState<string[]>([]);
+  const selectedPodId = selectedPodIds[0] || null;
   const [selectedRecruiterIds, setSelectedRecruiterIds] = useState<string[]>([]);
   const [selectedApproverRole, setSelectedApproverRole] = useState<string>("POD_LEAD");
   const [selectedApproverId, setSelectedApproverId] = useState<string>("");
@@ -522,7 +523,7 @@ const getInitialActiveBranchContext = () => {
   const canAssignPods = !!currentUserProfile?.permissions?.includes("job:assign_pod");
   const canAssignJob = canAssignRecruiters || canAssignPods;
   const assignmentRequired = assignmentPolicy?.allowUnassigned !== true;
-  const assignmentValid = (automaticPods && canAssignPods && ["unassigned", "automatic"].includes(assignmentType)) || (assignmentType === "pod" && branchPods.some(p => p.id === selectedPodId) && canAssignPods && assignmentPolicy?.allowPods === true) ||
+  const assignmentValid = (automaticPods && canAssignPods && ["unassigned", "automatic"].includes(assignmentType)) || (assignmentType === "pod" && selectedPodIds.length > 0 && selectedPodIds.every(id => branchPods.some(p => p.id === id)) && canAssignPods && assignmentPolicy?.allowPods === true) ||
     (assignmentType === "recruiters" && selectedRecruiterIds.length > 0 && selectedRecruiterIds.every(id => recruitersList.some(r => r.id === id)) && canAssignRecruiters && assignmentPolicy?.allowNone === true);
   useEffect(() => {
     let cancelled = false;
@@ -530,7 +531,7 @@ const getInitialActiveBranchContext = () => {
     if (automaticPods || !canAssignPods || !selectedUnitId) return;
     const unit = availableUnits.find(unit => unit.id === selectedUnitId);
     atsApi.jobs.podOptions({ branchId: unit?.branchId || currentUserProfile?.branchId, businessUnitId: selectedUnitId })
-      .then(pods => { if (!cancelled) { setPodsList(pods); setSelectedPodId(id => pods.some(p => p.id === id) ? id : null); } })
+      .then(pods => { if (!cancelled) { setPodsList(pods); setSelectedPodIds(ids => ids.filter(id => pods.some(p => p.id === id))); } })
       .catch(error => { if (!cancelled) toast.error(error.message || "Could not load pods."); });
     return () => { cancelled = true; };
   }, [selectedUnitId, canAssignPods, automaticPods, availableUnits, currentUserProfile]);
@@ -942,19 +943,11 @@ const getInitialActiveBranchContext = () => {
       setValue("expMax", jobData.expMax);
       setValue("noticePeriod", jobData.noticePeriod || "Select Notice Period");
 
-      if (jobData.podId) {
-        setSelectedPodId(`pod:${jobData.podId}`);
-      // @ts-ignore
-      } else if (jobData.recruiterId) {
-        // @ts-ignore
-        setSelectedPodId(`rec:${jobData.recruiterId}`);
-      // @ts-ignore
-      } else if (jobData.assignedTo === "ALL" || jobData.assignedTo === "All Branch Recruiters") {
-        setSelectedPodId("all");
-      // @ts-ignore
-      } else if (jobData.assignedTo === "Unassigned") {
-        setSelectedPodId("none");
-      }
+      const savedPods = jobData.podIds || (jobData.podId ? String(jobData.podId).split(',').filter(Boolean) : []);
+      const savedRecruiters = jobData.recruiterIds || (jobData.recruiterId ? [jobData.recruiterId] : []);
+      setSelectedPodIds(savedPods);
+      setSelectedRecruiterIds(savedRecruiters);
+      setAssignmentType(savedPods.length ? "pod" : savedRecruiters.length ? "recruiters" : "unassigned");
 
       if (jobData.respondBy) {
         setRespondByType("Date Option");
@@ -1271,7 +1264,7 @@ const getInitialActiveBranchContext = () => {
         resolvedApproverRole = "POD_LEAD";
         const pod = podsList.find((p) => p.id === resolvedPodId);
         if (pod?.podHeadId) resolvedApproverId = pod.podHeadId;
-        resolvedAssignedTo = pod?.name || "Recruitment Pod";
+        resolvedAssignedTo = selectedPodIds.length > 1 ? `${selectedPodIds.length} Recruitment Pods` : pod?.name || "Recruitment Pod";
       } else if (assignmentValid && assignmentType === "recruiters" && selectedRecruiterIds.length > 0) {
         resolvedRecruiterIds = selectedRecruiterIds;
         resolvedPrimaryRecruiterId = selectedRecruiterIds[0];
@@ -1343,6 +1336,7 @@ const getInitialActiveBranchContext = () => {
         respondBy: respondByType === "Date Option" ? (data.respondBy || undefined) : undefined,
         noticePeriod: data.noticePeriod || undefined,
         podId: canAssignPods ? resolvedPodId : undefined,
+        podIds: canAssignPods && assignmentType === "pod" && !automaticPods ? selectedPodIds : [],
         // @ts-ignore
         market: market,
         shiftTiming: data.shiftTiming || undefined,
@@ -3075,7 +3069,6 @@ const getInitialActiveBranchContext = () => {
                       </div>
 
                       {/* Job Assignment Custom Dropdown */}
-                      {automaticPods && assignmentType !== "recruiters" && <div className="space-y-1.5"><label className="font-semibold text-xs">Job Assignment</label><div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100"><strong>Automatic pod assignment</strong><p className="mt-1">The next eligible pod in this unit will be assigned when you publish. Saving a draft does not use a turn.</p></div></div>}
                       {canAssignJob && assignmentPolicy && <div className="space-y-1.5 relative">
                         <label className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center justify-between h-5">
                           <span className="flex items-center gap-1.5">
@@ -3098,13 +3091,13 @@ const getInitialActiveBranchContext = () => {
                             </div>
                             <div className="flex flex-col">
                               <span className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">
-                                {assignmentType === "pod" && selectedPodId ? podsList.find(p => p.id === selectedPodId)?.name || "Recruitment Pod" :
+                                {assignmentType === "pod" && selectedPodId ? selectedPodIds.length === 1 ? podsList.find(p => p.id === selectedPodId)?.name || "Recruitment Pod" : `${selectedPodIds.length} pods selected` :
                                  assignmentType === "recruiters" && selectedRecruiterIds.length > 0 ? `${selectedRecruiterIds.length} Recruiter${selectedRecruiterIds.length > 1 ? 's' : ''} Selected` :
                                  automaticPods && ["automatic", "unassigned"].includes(assignmentType) ? "Automatic pod assignment" : assignmentType === "unassigned" ? (assignmentRequired ? "Select Pods or Recruiters" : "No assignment (optional)") :
                                  "Select Assignment..."}
                               </span>
                               <span className="text-[11px] text-slate-500 font-medium">
-                                Click to configure job assignment
+                                {assignmentType === "pod" && selectedPodIds.length ? podsList.filter(p => selectedPodIds.includes(p.id)).map(p => p.name).join(", ") : "Click to configure job assignment"}
                               </span>
                             </div>
                           </div>
@@ -3122,11 +3115,11 @@ const getInitialActiveBranchContext = () => {
                           isOpen={isAssignmentModalOpen}
                           onClose={() => setIsAssignmentModalOpen(false)}
                           assignmentType={assignmentType}
-                          selectedPodId={selectedPodId}
+                          selectedPodIds={selectedPodIds}
                           selectedRecruiterIds={selectedRecruiterIds}
-                          onApply={(type, podId, recruiterIds) => {
+                          onApply={(type, podIds, recruiterIds) => {
                             setAssignmentType(type);
-                            setSelectedPodId(podId);
+                            setSelectedPodIds(podIds);
                             setSelectedRecruiterIds(recruiterIds);
                           }}
                           podsList={branchPods}

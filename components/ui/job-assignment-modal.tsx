@@ -12,9 +12,9 @@ interface JobAssignmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   assignmentType: AssignmentType;
-  selectedPodId: string | null;
+  selectedPodIds: string[];
   selectedRecruiterIds: string[];
-  onApply: (type: AssignmentType, podId: string | null, recruiterIds: string[]) => void;
+  onApply: (type: AssignmentType, podIds: string[], recruiterIds: string[]) => void;
   podsList: JobPodOption[];
   recruitersList: any[];
   activeBranch?: any;
@@ -27,7 +27,7 @@ export function JobAssignmentModal({
   isOpen,
   onClose,
   assignmentType: initialType,
-  selectedPodId: initialPodId,
+  selectedPodIds: initialPodIds,
   selectedRecruiterIds: initialRecruiterIds,
   onApply,
   podsList,
@@ -38,7 +38,7 @@ export function JobAssignmentModal({
   automaticPods = false,
 }: JobAssignmentModalProps) {
   const [type, setType] = useState<AssignmentType>(initialType);
-  const [podId, setPodId] = useState<string | null>(initialPodId);
+  const [podIds, setPodIds] = useState<string[]>(initialPodIds);
   const [recruiterIds, setRecruiterIds] = useState<string[]>(initialRecruiterIds);
   
   const [search, setSearch] = useState("");
@@ -47,11 +47,11 @@ export function JobAssignmentModal({
   useEffect(() => {
     if (isOpen) {
       setType(initialType);
-      setPodId(initialPodId);
+      setPodIds(initialPodIds);
       setRecruiterIds(initialRecruiterIds);
       setSearch("");
     }
-  }, [isOpen, initialType, initialPodId, initialRecruiterIds]);
+  }, [isOpen, initialType, initialPodIds, initialRecruiterIds]);
 
   const filteredPods = useMemo(() => {
     if (!search) return podsList;
@@ -70,7 +70,7 @@ export function JobAssignmentModal({
   }, [recruitersList, search]);
 
   const handleApply = () => {
-    onApply(validSelection ? type : "unassigned", validSelection && type === "pod" ? podId : null, validSelection && type === "recruiters" ? recruiterIds : []);
+    onApply(validSelection ? type : "unassigned", validSelection && type === "pod" ? podIds : [], validSelection && type === "recruiters" ? recruiterIds : []);
     onClose();
   };
 
@@ -94,7 +94,7 @@ export function JobAssignmentModal({
     if ((type === "automatic" && isAutomaticEnabled) || (type === "pod" && isPodsEnabled) || (type === "recruiters" && isRecruitersEnabled)) return;
     setType(isAutomaticEnabled ? "automatic" : isPodsEnabled ? "pod" : isRecruitersEnabled ? "recruiters" : "unassigned");
   }, [isOpen, type, isAutomaticEnabled, isPodsEnabled, isRecruitersEnabled]);
-  const validSelection = (type === "automatic" && isAutomaticEnabled) || (type === "pod" && isPodsEnabled && podsList.some(p => p.id === podId)) ||
+  const validSelection = (type === "automatic" && isAutomaticEnabled) || (type === "pod" && isPodsEnabled && podIds.length > 0 && podIds.every(id => podsList.some(p => p.id === id))) ||
     (type === "recruiters" && isRecruitersEnabled && recruiterIds.length > 0 && recruiterIds.every(id => recruitersList.some(r => r.id === id)));
 
   return (
@@ -106,13 +106,13 @@ export function JobAssignmentModal({
             Job Assignment
           </DialogTitle>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Choose who should work on this requirement.
+            Choose pods or recruiters for this job.
           </p>
         </DialogHeader>
 
         {/* Tab Navigation */}
         <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 px-4 pt-2">
-          {isAutomaticEnabled && <button type="button" onClick={() => setType("automatic")} className={cn("px-4 py-2.5 text-sm font-semibold border-b-2", type === "automatic" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-600")}>Automatic pod assignment</button>}
+          {isAutomaticEnabled && <button type="button" onClick={() => setType("automatic")} className={cn("px-4 py-2.5 text-sm font-semibold border-b-2", type === "automatic" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-600")}>Automatic Pods</button>}
           {isPodsEnabled && (
             <button
               onClick={() => { setType("pod"); setSearch(""); }}
@@ -175,18 +175,21 @@ export function JobAssignmentModal({
                   </div>
                 ) : (
                   filteredPods.map(pod => (
-                    <div
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={podIds.includes(pod.id)}
                       key={pod.id}
-                      onClick={() => setPodId(pod.id)}
+                      onClick={() => setPodIds(ids => ids.includes(pod.id) ? ids.filter(id => id !== pod.id) : [...ids, pod.id])}
                       className={cn(
-                        "flex items-center justify-between p-3 rounded-xl cursor-pointer border transition-all",
-                        podId === pod.id
+                        "flex w-full gap-3 text-left items-center justify-between p-3 rounded-xl cursor-pointer border transition-all",
+                        podIds.includes(pod.id)
                           ? "bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-700"
                           : "bg-white border-transparent hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/80"
                       )}
                     >
                       <div>
-                        <p className={cn("font-semibold text-sm", podId === pod.id ? "text-indigo-900 dark:text-indigo-100" : "text-slate-900 dark:text-slate-200")}>
+                        <p className={cn("font-semibold text-sm", podIds.includes(pod.id) ? "text-indigo-900 dark:text-indigo-100" : "text-slate-900 dark:text-slate-200")}>
                           {pod.name}
                         </p>
                         <p className="text-xs text-slate-500 mt-0.5">
@@ -194,12 +197,12 @@ export function JobAssignmentModal({
                         </p>
                       </div>
                       <div className={cn(
-                        "h-5 w-5 rounded-full border flex items-center justify-center shrink-0",
-                        podId === pod.id ? "border-indigo-600 bg-indigo-600" : "border-slate-300 dark:border-slate-600"
+                        "order-first h-5 w-5 rounded border flex items-center justify-center shrink-0",
+                        podIds.includes(pod.id) ? "border-indigo-600 bg-indigo-600" : "border-slate-300 dark:border-slate-600"
                       )}>
-                        {podId === pod.id && <Check className="h-3 w-3 text-white" />}
+                        {podIds.includes(pod.id) && <Check className="h-3 w-3 text-white" />}
                       </div>
-                    </div>
+                    </button>
                   ))
                 )}
               </>
@@ -272,16 +275,16 @@ export function JobAssignmentModal({
 
         {isAssignLaterEnabled && (
           <div className="px-6 py-2 flex justify-end">
-            <Button variant="ghost" onClick={() => { onApply("unassigned", null, []); onClose(); }}>Clear Assignment</Button>
+            <Button variant="ghost" onClick={() => { onApply("unassigned", [], []); onClose(); }}>Clear Assignment</Button>
           </div>
         )}
         {/* Footer */}
         <DialogFooter className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
           <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            {type === "pod" && podId && (
+            {type === "pod" && podIds.length > 0 && (
               <span className="flex items-center gap-1.5">
                 <Check className="h-4 w-4 text-emerald-500" />
-                Selected Pod: <span className="font-bold text-slate-900 dark:text-white">{podsList.find(p => p.id === podId)?.name}</span>
+                <span className="font-bold text-slate-900 dark:text-white">{podIds.length}</span> pods selected
               </span>
             )}
             {type === "recruiters" && recruiterIds.length > 0 && (
@@ -290,12 +293,13 @@ export function JobAssignmentModal({
                 <span className="font-bold text-slate-900 dark:text-white">{recruiterIds.length}</span> Recruiters Selected
               </span>
             )}
+            {type === "automatic" && <span>Automatic pod assignment</span>}
             {type === "unassigned" && (
               <span className="text-orange-600 dark:text-orange-400 font-semibold">
                 Will save as Unassigned
               </span>
             )}
-            {((type === "pod" && !podId) || (type === "recruiters" && recruiterIds.length === 0)) && (
+            {((type === "pod" && podIds.length === 0) || (type === "recruiters" && recruiterIds.length === 0)) && (
               <span className="text-slate-500 font-normal">No assignment selected</span>
             )}
           </div>

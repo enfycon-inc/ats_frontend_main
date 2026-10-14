@@ -987,6 +987,7 @@ export interface JobPayload {
   pocId?: string | null;
   endClientPocId?: string | null;
   recruiterIds?: string[];
+  recruiterId?: string;
   workMode?: string;
   id: string;
   jobCode: string;
@@ -1033,6 +1034,7 @@ export interface JobPayload {
   pipeline: { applied: number; interviewing: number; offered: number };
   podId?: string;
   podName?: string;
+  podIds?: string[];
   market?: string;
   city?: string;
   noticePeriod?: string;
