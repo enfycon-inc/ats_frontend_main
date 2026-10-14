@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { atsApi } from '@/lib/ats-api';
 import type { SubmissionHistoryEvent, SubmissionHistoryResponse, TrackerSubmission } from '@/lib/submission-contract';
+import { ROUND_STATUS_LABELS, OUTCOME_LABELS, type InterviewRoundStatus, type SubmissionOutcome } from '@/lib/submission-contract';
 import { formatInterview, validTimezone } from '@/lib/submission-tracker';
 import { Button } from '@/components/ui/button';
 import { DecisionAssessment } from './decision-assessment';
@@ -16,7 +17,7 @@ function title(event: SubmissionHistoryEvent) {
   if (event.kind === 'CREATED') return 'Submission created';
   const changes = event.details.changes || {};
   const stages = ['l1', 'l2', 'l3'].filter(stage => Object.keys(changes).some(field => field.startsWith(stage)));
-  return stages.length ? `${stages.map(stage => stage.toUpperCase()).join(', ')} decision` : changes.finalStatus ? 'Submission decision' : 'Submission updated';
+  return stages.length ? `${stages.map(stage => stage.toUpperCase()).join(', ')} ${event.details.correctionReason ? 'correction' : 'update'}` : changes.finalStatus ? 'Submission decision' : 'Submission updated';
 }
 function eventStatus(event: SubmissionHistoryEvent) {
   const changes = event.details.changes || {};
@@ -31,7 +32,7 @@ function EventDetails({ event, zone, showAssessment = true }: { event: Submissio
   const snapshots = Object.entries(event.details.snapshot || {}).filter(([, text]) => text != null);
   const seenRemarks = new Set<string>();
   const visible = [...fields, ...snapshots].filter(([field, text]) => {
-    if (/Status$/.test(field) && text === eventStatus(event)) return false;
+    if (/Status$/.test(field) && text === eventStatus(event) && !event.details.changes) return false;
     if (/remarks|feedback/i.test(field) && text?.trim()) {
       const normalized = text.trim().toLowerCase();
       if (seenRemarks.has(normalized)) return false;
@@ -40,8 +41,15 @@ function EventDetails({ event, zone, showAssessment = true }: { event: Submissio
     return true;
   });
   return <div className="min-w-0 flex-1">
-    <dl className="flex flex-wrap gap-x-6 gap-y-3 text-xs">{visible.map(([field, text]) => <div key={field} className="min-w-0 max-w-full"><dt className="mb-1 text-[10.5px] text-muted-foreground">{label(field)}</dt><dd className="whitespace-pre-wrap [overflow-wrap:anywhere]">{!text ? '—' : field.endsWith('Date') ? formatInterview(text, zone) : /Status$/.test(field) ? text.replaceAll('_', ' ') : text}</dd></div>)}</dl>
+    <dl className="flex flex-wrap gap-x-6 gap-y-3 text-xs">{visible.map(([field, text]) => {
+      const format = (value: string | null) => !value ? '—' : field.endsWith('Date') ? formatInterview(value, zone) : /Status$/.test(field) ?
+        ROUND_STATUS_LABELS[value as InterviewRoundStatus] || OUTCOME_LABELS[value as SubmissionOutcome] || value.replaceAll('_', ' ') : value;
+      const change = event.details.changes?.[field];
+      return <div key={field} className="min-w-0 max-w-full"><dt className="mb-1 text-[10.5px] text-muted-foreground">{label(field)}</dt><dd className="whitespace-pre-wrap [overflow-wrap:anywhere]">{change && <><span className="text-muted-foreground">{format(change.before)}</span><span aria-label="changed to"> → </span></>}{format(text)}</dd></div>;
+    })}</dl>
     {event.details.bypassReason && <p className="mt-3 whitespace-pre-wrap text-xs"><span className="font-semibold">Bypass reason: </span>{event.details.bypassReason}</p>}
+    {event.details.correctionReason && <p className="mt-3 whitespace-pre-wrap text-xs"><span className="font-semibold">Correction reason: </span>{event.details.correctionReason}</p>}
+    {event.details.resetFollowingRounds && <p className="mt-2 text-xs text-muted-foreground">Later rounds were reset after correcting an earlier result. Original values are recorded above.</p>}
     {showAssessment && event.details.assessment && <DecisionAssessment assessment={event.details.assessment} overrides={event.details.reviewOverrides} />}
   </div>;
 }

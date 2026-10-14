@@ -1,4 +1,5 @@
 import type { RoundKey, TrackerSubmission } from './submission-contract';
+import { ROUND_STATUS_LABELS, OUTCOME_LABELS, type InterviewRoundStatus, type SubmissionOutcome } from './submission-contract';
 
 // Labels describe workflow states, never candidate/client/role relationships.
 export const ROUNDS: { key: RoundKey; label: string }[] = [
@@ -6,13 +7,13 @@ export const ROUNDS: { key: RoundKey; label: string }[] = [
   { key: 'l2', label: 'L2' },
   { key: 'l3', label: 'L3' },
 ];
-export type TrackerAction = 'review' | 'schedule' | 'result' | 'reject' | 'outcome' | 'notes' | 'rate';
+export type TrackerAction = 'rounds' | 'review' | 'schedule' | 'result' | 'reject' | 'outcome' | 'notes' | 'rate';
 export const ACTION_LABELS: Record<TrackerAction, string> = {
-  review: 'Review submission', schedule: 'Schedule interview', result: 'Record result',
+  rounds: 'Update submission', review: 'Review submission', schedule: 'Schedule interview', result: 'Record result',
   reject: 'Reject at current stage', outcome: 'Update status', notes: 'Edit notes', rate: 'Edit rate',
 };
 export function canUpdateOutcome(sub: TrackerSubmission) {
-  return Boolean(sub.capabilities?.outcome && ['SUBMITTED', 'OFFER'].includes(sub.finalStatus));
+  return Boolean(sub.capabilities?.outcome && sub.finalStatus !== 'PENDING_APPROVAL');
 }
 export function needsOutcomeReason(sub: TrackerSubmission, outcome: string) {
   return (outcome === 'OFFER' && sub.l3Status !== 'CLEARED') ||
@@ -24,17 +25,17 @@ export function currentRound(sub: TrackerSubmission) {
 }
 export function canRecordResult(sub: TrackerSubmission) {
   const round = currentRound(sub);
-  return Boolean(sub.finalStatus === 'SUBMITTED' && round && sub[`${round.key}Status`] === 'SCHEDULED' && sub[`${round.key}Date`] && Number.isFinite(new Date(sub[`${round.key}Date`]!).getTime()) && sub.capabilities?.results[round.key]);
+  return Boolean(sub.finalStatus === 'SUBMITTED' && round && ['SCHEDULED', 'AWAITING_FEEDBACK'].includes(sub[`${round.key}Status`] || '') && sub[`${round.key}Date`] && Number.isFinite(new Date(sub[`${round.key}Date`]!).getTime()) && sub.capabilities?.results[round.key]);
 }
 export function canRejectRound(sub: TrackerSubmission) {
   const round = currentRound(sub);
-  return Boolean(sub.finalStatus === 'SUBMITTED' && round && [null, 'PENDING', 'SCHEDULED'].includes(sub[`${round.key}Status`]) && sub.capabilities?.results[round.key]);
+  return Boolean(sub.finalStatus === 'SUBMITTED' && round && [null, 'PENDING', 'SCHEDULED', 'AWAITING_FEEDBACK'].includes(sub[`${round.key}Status`]) && sub.capabilities?.results[round.key]);
 }
 export function rejectionStage(sub: TrackerSubmission): string | null {
-  if (sub.finalStatus !== 'REJECTED') return null;
+  if (!['REJECTED', 'NOT_SELECTED'].includes(sub.finalStatus)) return null;
   const rejected = ROUNDS.find(round => sub[`${round.key}Status`] === 'REJECTED');
   if (rejected) return rejected.key;
-  return sub.rejectionFromStatus === 'PENDING_APPROVAL' ? 'review' : 'final';
+  return sub.finalStatus === 'NOT_SELECTED' ? null : sub.rejectionFromStatus === 'PENDING_APPROVAL' ? 'review' : 'final';
 }
 export function stage(sub: TrackerSubmission): { label: string; tone: 'amber' | 'blue' | 'green' | 'red' | 'neutral' } {
   if (sub.finalStatus === 'PENDING_APPROVAL') return { label: 'Needs internal review', tone: 'amber' };
@@ -48,25 +49,29 @@ export function stage(sub: TrackerSubmission): { label: string; tone: 'amber' | 
   }
   if (sub.finalStatus === 'JOIN') return { label: 'Joined', tone: 'green' };
   if (sub.finalStatus === 'OFFER') return { label: 'Offer issued', tone: 'green' };
+  if (['SELECTED', 'NOT_SELECTED', 'WITHDRAWN'].includes(sub.finalStatus)) {
+    const rejected = rejectionStage(sub);
+    return { label: rejected ? `${rejected.toUpperCase()} rejected` : OUTCOME_LABELS[sub.finalStatus as SubmissionOutcome], tone: rejected ? 'red' : sub.finalStatus === 'SELECTED' ? 'green' : 'neutral' };
+  }
   if (sub.finalStatus !== 'SUBMITTED') return { label: sub.finalStatus.replaceAll('_', ' '), tone: 'neutral' };
   const round = currentRound(sub);
   if (!round) return { label: 'Final round cleared', tone: 'green' };
   const status = sub[`${round.key}Status`];
   const label = round.label;
   if (status === 'REJECTED') return { label: `${label} rejected`, tone: 'red' };
-  return { label: `${label} ${status === 'SCHEDULED' ? 'scheduled' : 'pending'}`, tone: status === 'SCHEDULED' ? 'blue' : 'amber' };
+  return { label: `${label} ${(ROUND_STATUS_LABELS[status as InterviewRoundStatus] || 'Pending').toLowerCase()}`, tone: status === 'SCHEDULED' ? 'blue' : status === 'CANCELLED' ? 'neutral' : 'amber' };
 }
 export function primaryAction(sub: TrackerSubmission): TrackerAction | null {
   const caps = sub.capabilities;
   if (!caps) return null;
   if (sub.finalStatus === 'PENDING_APPROVAL') return caps.review ? 'review' : null;
-  if (['REJECTED', 'JOIN'].includes(sub.finalStatus)) return null;
-  if (sub.finalStatus === 'OFFER') return caps.outcome ? 'outcome' : null;
+  if (['REJECTED', 'JOIN', 'NOT_SELECTED', 'WITHDRAWN'].includes(sub.finalStatus)) return null;
+  if (['OFFER', 'SELECTED'].includes(sub.finalStatus)) return caps.outcome ? 'outcome' : null;
   if (sub.finalStatus !== 'SUBMITTED') return null;
   const round = currentRound(sub);
   if (!round) return caps.outcome ? 'outcome' : null;
   if (sub[`${round.key}Status`] === 'REJECTED') return null;
-  if (sub[`${round.key}Status`] === 'SCHEDULED') return canRecordResult(sub) ? 'result' : null;
+  if (['SCHEDULED', 'AWAITING_FEEDBACK'].includes(sub[`${round.key}Status`] || '')) return canRecordResult(sub) ? 'result' : null;
   return caps.schedule ? 'schedule' : null;
 }
 export function validTimezone(value?: string | null): string {

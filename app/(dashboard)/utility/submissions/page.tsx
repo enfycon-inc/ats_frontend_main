@@ -1,5 +1,6 @@
 "use client";
 
+import { UpdateSubmissionDialog } from "@/components/submissions/update-submission-dialog";
 import { SubmissionHistory } from "@/components/submissions/submission-history";
 import { ReviewWorkspace } from "@/components/submissions/review-workspace";
 import { stageRemarkSuggestions } from "@/lib/stage-remarks";
@@ -16,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { TrackerBucket, TrackerResponse, TrackerSubmission, TrackerUpdate } from "@/lib/submission-contract";
 import { ACTION_LABELS, canRejectRound, canRecordResult, rejectionStage, canUpdateOutcome, needsOutcomeReason, currentRound, formatInterview, interviewInstant, localInterviewParts, primaryAction, stage, validTimezone, ROUNDS, type TrackerAction } from "@/lib/submission-tracker";
@@ -52,18 +52,8 @@ function TableDate({ value, timezone }: { value?: string | null; timezone?: stri
 function CandidateCell({ submission: sub, href }: { submission: TrackerSubmission; href: string }) {
   return <><Link href={href} className="font-semibold text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.candidateName || "Name unavailable"}</Link>{[sub.candidateEmail || "Email unavailable", sub.candidatePhone || "Mobile unavailable", sub.candidateCurrentLocation || "Location unavailable"].map((text, i) => <p key={i} className="mt-1 break-words text-[10.5px] text-muted-foreground">{text}</p>)}</>;
 }
-function SubmissionActions({ submission: sub, href, onAction }: { submission: TrackerSubmission; href: string; onAction: (action: TrackerAction) => void }) {
-  const action = primaryAction(sub) || (canRejectRound(sub) ? "reject" : null) || (canUpdateOutcome(sub) ? "outcome" : sub.finalStatus === "SUBMITTED" && currentRound(sub) && sub.capabilities?.schedule ? "schedule" : null);
-  return <div className="flex w-full items-center justify-center gap-1">
-    {action ? <Button className={cn("min-h-8 h-auto min-w-0 flex-1 whitespace-normal px-2 py-1.5 text-[11px] leading-tight", PRIMARY)} title={ACTION_LABELS[action]} aria-label={ACTION_LABELS[action]} onClick={() => onAction(action)}>{ACTION_LABELS[action]}</Button> : <Button variant="outline" className={cn("h-8 px-2 text-[11px] whitespace-nowrap", OUTLINE)} asChild><Link href={href}>View details</Link></Button>}
-    {action && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-7 shrink-0" aria-label={"More actions for " + (sub.candidateName || "candidate")}><MoreHorizontal className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="text-xs">
-      <DropdownMenuItem onClick={() => onAction(action)}>{ACTION_LABELS[action]}</DropdownMenuItem>
-      {canRejectRound(sub) && action !== "reject" && <DropdownMenuItem onClick={() => onAction("reject")} className="text-red-600 focus:text-red-600">Reject candidate</DropdownMenuItem>}
-      {canRecordResult(sub) && action !== "result" && <DropdownMenuItem onClick={() => onAction("result")}>Record result</DropdownMenuItem>}
-      {canUpdateOutcome(sub) && action !== "outcome" && <DropdownMenuItem onClick={() => onAction("outcome")}>Update final status</DropdownMenuItem>}
-      <DropdownMenuSeparator /><DropdownMenuItem asChild><Link href={href}>View details</Link></DropdownMenuItem>
-    </DropdownMenuContent></DropdownMenu>}
-  </div>;
+function SubmissionActions({ submission: sub, onAction }: { submission: TrackerSubmission; href: string; onAction: (action: TrackerAction) => void }) {
+  return <div className="flex justify-center"><Button variant="outline" size="icon" className="h-8 w-8" title="Update submission" aria-label={"Update submission for " + (sub.candidateName || "candidate")} onClick={() => onAction("rounds")}><MoreHorizontal className="h-4 w-4" /></Button></div>;
 }
 function StageBadge({ submission }: { submission: TrackerSubmission }) {
   const state = stage(submission);
@@ -75,13 +65,13 @@ function Pipeline({ submission }: { submission: TrackerSubmission }) {
   const rejectedKey = rejectionStage(submission);
   const approvalEvidence = ["SUBMITTED", "OFFER"].includes(submission.rejectionFromStatus || "") || ROUNDS.some(round => ["SCHEDULED", "CLEARED", "REJECTED"].includes(submission[`${round.key}Status`] || ""));
   const reviewComplete = submission.finalStatus !== "PENDING_APPROVAL" && rejectedKey !== "review" && (submission.finalStatus !== "REJECTED" || approvalEvidence);
-  const terminal = ["JOIN", "OFFER"].includes(submission.finalStatus);
+  const terminal = ["SELECTED", "JOIN", "OFFER"].includes(submission.finalStatus);
   const current = currentRound(submission)?.key;
   const stages = [{ key: "review", label: "Internal review", complete: reviewComplete }, ...ROUNDS.map(round => ({ key: round.key, label: round.label, complete: submission[`${round.key}Status`] === "CLEARED" })) , { key: "final", label: "Final", complete: terminal }];
   const activeKey = submission.finalStatus === "PENDING_APPROVAL" ? "review" : current || "final";
   return <div className="mx-auto w-full min-w-0 max-w-[300px]" aria-label={`Pipeline: ${state.label}`}><div className="grid grid-cols-5">{stages.map((item, index) => {
     const rejected = item.key === rejectedKey;
-    const active = !rejectedKey && item.key === activeKey && !item.complete;
+    const active = !["NOT_SELECTED", "WITHDRAWN", "JOIN"].includes(submission.finalStatus) && !rejectedKey && item.key === activeKey && !item.complete;
     const skipped = terminal && ROUNDS.some(round => round.key === item.key) && !item.complete;
     return <div key={item.key} className="relative flex min-w-0 flex-col items-center gap-1.5">
       {index < stages.length - 1 && <span aria-hidden="true" className={cn("absolute left-[calc(50%+14px)] top-2.5 h-px w-[calc(100%-28px)]", item.complete ? "bg-[#008000]" : "bg-slate-200 dark:bg-slate-700")} />}
@@ -187,11 +177,11 @@ function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
         payload[`${round.key}Remarks`] = notes.trim();
       } else if (action === "result" && round) {
         if (result === "REJECTED" && !notes.trim()) throw new Error("Add feedback for the rejected interview.");
-        payload[`${round.key}Status`] = result; payload[`${round.key}Remarks`] = notes.trim() || null;
+        payload[`${round.key}Status`] = result as TrackerUpdate['l1Status']; payload[`${round.key}Remarks`] = notes.trim() || null;
       } else if (action === "outcome") {
         if (needsOutcomeReason(current, outcome) && !bypassReason.trim()) throw new Error("Add a reason for bypassing remaining hiring steps.");
         if (outcome === "REJECTED" && !notes.trim()) throw new Error("Add remarks for the rejection.");
-        payload.finalStatus = outcome; payload.remarks = notes.trim() || null;
+        payload.finalStatus = outcome as TrackerUpdate['finalStatus']; payload.remarks = notes.trim() || null;
         payload.bypassReason = bypassReason.trim();
       } else if (action === "notes") {
         if ((notes.trim() || null) === (current.recruiterComment || null)) { onClose(); return; }
@@ -347,7 +337,7 @@ export default function SubmissionsPage() {
       </div>}
       {showFilters && <div className="flex flex-wrap items-end gap-3 border-t border-border bg-muted/30 px-5 py-4"><div className="space-y-1"><Label htmlFor="from-date" className="text-xs">Submitted from</Label><Input id="from-date" type="date" className="h-9 text-xs" value={startDate} max={endDate || undefined} onChange={e => { setStartDate(e.target.value); setPage(1); }} /></div><div className="space-y-1"><Label htmlFor="to-date" className="text-xs">Submitted to</Label><Input id="to-date" type="date" className="h-9 text-xs" value={endDate} min={startDate || undefined} onChange={e => { setEndDate(e.target.value); setPage(1); }} /></div><Button variant="ghost" className="text-xs" onClick={() => { setStartDate(""); setEndDate(""); setSearch(""); setPage(1); }}>Clear filters</Button></div>}
       <div className="overflow-x-auto">
-        <table className={cn("w-full table-fixed text-xs [&_th]:border-r [&_th]:border-border [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border [&_td:last-child]:border-r-0 [&_td]:align-middle", groupByJob ? "min-w-[1250px]" : "min-w-[1800px]")}><colgroup>{(groupByJob ? [12, 10, 18, 9, 9, 18, 9, 6, 9] : [17, 11, 11, 14, 7, 7, 14, 8, 4, 7]).map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup><thead className="border-y border-border bg-muted/40"><tr>{(groupByJob ? [response?.accountManagerLabel || "Created by", "Recruiter", "Candidate", "Job created at", "Submission date", "Pipeline", "Current status", "Next round", "Action"] : ["Job reference", response?.accountManagerLabel || "Created by", "Recruiter", "Candidate", "Job created at", "Submission date", "Pipeline", "Current status", "Next round", "Action"]).map(label => <th scope="col" key={label} className={cn("px-2.5 py-3 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground", ["Pipeline", "Current status", "Next round", "Action"].includes(label) ? "text-center" : "text-left", label === "Action" && "sticky right-0 z-20 bg-slate-50 dark:bg-slate-900 shadow-[-1px_0_0_0_var(--border)]")}>{label}</th>)}</tr></thead>
+        <table className={cn("w-full table-fixed text-xs [&_th]:border-r [&_th]:border-border [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border [&_td:last-child]:border-r-0 [&_td]:align-middle", groupByJob ? "min-w-[1250px]" : "min-w-[1800px]")}><colgroup>{(groupByJob ? [12, 10, 20, 9, 9, 18, 10, 7, 5] : [17, 11, 11, 16, 7, 7, 14, 9, 5, 3]).map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup><thead className="border-y border-border bg-muted/40"><tr>{(groupByJob ? [response?.accountManagerLabel || "Created by", "Recruiter", "Candidate", "Job created at", "Submission date", "Pipeline", "Current status", "Next round", "Action"] : ["Job reference", response?.accountManagerLabel || "Created by", "Recruiter", "Candidate", "Job created at", "Submission date", "Pipeline", "Current status", "Next round", "Action"]).map(label => <th scope="col" key={label} className={cn("px-2.5 py-3 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground", ["Pipeline", "Current status", "Next round", "Action"].includes(label) ? "text-center" : "text-left", label === "Action" && "sticky right-0 z-20 bg-slate-50 dark:bg-slate-900 shadow-[-1px_0_0_0_var(--border)]")}>{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-border">
             {loading || workspaceStatus !== "ready" ? <tr><td colSpan={groupByJob ? 9 : 10} className="py-16 text-center text-muted-foreground" role="status"><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading submissions…</td></tr> : error ? <tr><td colSpan={groupByJob ? 9 : 10} className="py-12 text-center" role="alert">{error}{!error.includes("permission") && <Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button>}</td></tr> : !response?.data.length ? <tr><td colSpan={groupByJob ? 9 : 10} className="py-16 text-center text-muted-foreground">No submissions match these filters.</td></tr> : !groupByJob ? response.data.map(sub => {
               const round = currentRound(sub);
@@ -360,7 +350,7 @@ export default function SubmissionsPage() {
                 <td className="px-2.5 py-3"><TableDate value={sub.jobCreatedAt} timezone={sub.timezone} /></td>
                 <td className="px-2.5 py-3"><TableDate value={sub.createdAt} timezone={sub.timezone} /></td>
                 <td className="px-2.5 py-4 text-center"><Pipeline submission={sub} /></td><td className="px-2.5 py-3 text-center"><StageBadge submission={sub} /></td>
-                <td className="px-2.5 py-3 text-center text-muted-foreground">{sub.finalStatus === "PENDING_APPROVAL" ? "Awaiting review" : ["JOIN", "REJECTED", "OFFER"].includes(sub.finalStatus) || !round ? "—" : <><p className="font-semibold">{round.label}</p><p className="mt-1 text-[10.5px]">{formatInterview(sub[`${round.key}Date`], validTimezone(sub.timezone))}</p></>}</td>
+                <td className="px-2.5 py-3 text-center text-muted-foreground">{sub.finalStatus === "PENDING_APPROVAL" ? "Awaiting review" : ["SELECTED", "JOIN", "REJECTED", "NOT_SELECTED", "WITHDRAWN", "OFFER"].includes(sub.finalStatus) || !round ? "—" : <><p className="font-semibold">{round.label}</p><p className="mt-1 text-[10.5px]">{formatInterview(sub[`${round.key}Date`], validTimezone(sub.timezone))}</p></>}</td>
                 <td className="sticky right-0 z-10 bg-white dark:bg-slate-950 px-2 py-3 text-center shadow-[-1px_0_0_0_var(--border)]"><SubmissionActions submission={sub} href={detailHref(sub.id)} onAction={action => setEditor({ submission: sub, action })} /></td>
               </tr>;
             }) : Array.from(new Set(response.data.map(sub => sub.jobId))).map(jobId => {
@@ -368,7 +358,7 @@ export default function SubmissionsPage() {
               const job = submissions[0];
               return <Fragment key={jobId}><tr className="bg-blue-50/70 dark:bg-blue-950/40"><td colSpan={9} className="px-5 py-3"><div className="flex items-center justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-x-3 gap-y-2"><button type="button" className="font-semibold text-[#1a4fa0] dark:text-blue-200" aria-expanded={!collapsedJobs[jobId]} onClick={() => setCollapsedJobs(previous => ({ ...previous, [jobId]: !previous[jobId] }))}>{collapsedJobs[jobId] ? "▸" : "▾"} {job.jobCode || "Code unavailable"}</button><span className="font-semibold text-[#1a4fa0] dark:text-blue-200">{job.jobTitle || "Title unavailable"}</span>{job.jobUrgency && <span className="rounded bg-amber-100 px-2 py-1 text-[10.5px] text-amber-900">{job.jobUrgency}</span>}{job.jobIsCoSourced && <span className="rounded bg-violet-100 px-2 py-1 text-[10.5px] text-violet-800">Co-sourced</span>}</div><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>Client: {job.clientName || "Not provided"}</span><span>End client: {job.endClientName || "Not provided"}</span></div></div><span className="shrink-0 text-xs font-medium text-muted-foreground">{job.jobSubmissionDone ?? job.matchingJobSubmissionCount ?? submissions.length} / {job.jobSubmissionRequired ?? "—"} submissions{submissions.length < (job.matchingJobSubmissionCount ?? submissions.length) && ` · ${submissions.length} on this page`}</span></div></td></tr>{!collapsedJobs[jobId] && submissions.map(sub => {
               const round = currentRound(sub);
-              const closed = ["PENDING_APPROVAL", "REJECTED", "OFFER", "JOIN"].includes(sub.finalStatus);
+              const closed = ["PENDING_APPROVAL", "REJECTED", "NOT_SELECTED", "WITHDRAWN", "SELECTED", "OFFER", "JOIN"].includes(sub.finalStatus);
               return <tr key={sub.id} className="hover:bg-muted/25 transition-colors">
                 <td className="px-2.5 py-3"><p className="font-medium break-words">{sub.accountManagerName || "Name unavailable"}</p><p className="mt-1 break-words text-[10.5px] text-muted-foreground">{sub.accountManagerEmail || "Email unavailable"}</p></td>
                 <td className="px-2.5 py-3"><p className="font-medium break-words">{sub.recruiterName || "Name unavailable"}</p><p className="mt-1 break-words text-[10.5px] text-muted-foreground">{sub.recruiterEmail || "Email unavailable"}</p></td>
@@ -390,6 +380,7 @@ export default function SubmissionsPage() {
       </div>
     </section>}
     {submissionId && (loading ? <div role="status" className="p-12 text-center text-xs">Loading submission…</div> : error ? <div role="alert" className="text-xs">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : detail && <SubmissionDetails submission={detail} onAction={action => setEditor({ submission: detail, action })} />)}
-    {editor && <UpdateDialog key={`${editor.submission.id}-${editor.action}`} submission={editor.submission} action={editor.action} onClose={() => setEditor(null)} onSaved={saved => { setEditor(null); setDetail(saved); setRevision(r => r + 1); }} />}
+    {editor && !["review", "notes", "rate"].includes(editor.action) && <UpdateSubmissionDialog key={editor.submission.id} submission={editor.submission} href={detailHref(editor.submission.id)} onReview={() => setEditor({ submission: editor.submission, action: "review" })} onClose={() => setEditor(null)} onSaved={saved => { setEditor(null); setDetail(saved); setRevision(r => r + 1); }} />}
+    {editor && ["notes", "rate"].includes(editor.action) && <UpdateDialog key={`${editor.submission.id}-${editor.action}`} submission={editor.submission} action={editor.action} onClose={() => setEditor(null)} onSaved={saved => { setEditor(null); setDetail(saved); setRevision(r => r + 1); }} />}
   </main>;
 }
