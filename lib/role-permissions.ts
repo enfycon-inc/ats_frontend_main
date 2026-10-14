@@ -154,6 +154,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
 export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [], profile?: any): NavItem[] {
   const perms = getActiveRolePermissions(input, roles, profile);
   const has = (...keys: string[]) => perms.includes('*') || keys.some(k => perms.includes(k));
+  const isAccountManager = resolveActiveSystemRole(input, roles, profile) === "ACCOUNT_MANAGER";
   if (has("platform:manage")) return GLOBAL_ADMIN_MORE_ITEMS;
   const company = has("tenant:settings", "tenant:manage");
   const allowed: Record<string, boolean> = {
@@ -161,7 +162,7 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
     database: has("database:manage", "tenant:settings"), integrations: has("integration:manage", "tenant:settings"),
     "user-management": has("user:manage", "branch:assign_user", "unit_admin:manage"),
     "role-management": has("user:manage"),
-    "pod-management": has("pod:view", "pod:manage"), dictionaries: has("tenant:settings"),
+    "pod-management": !isAccountManager && has("pod:view", "pod:manage"), dictionaries: has("tenant:settings"),
     "operations-logs": has("notification:broadcast", "notification:view_all", "audit:view", "tenant:audit_logs"),
   };
   return MORE_NAV_ITEMS.filter(item => allowed[item.id]).map(item => {

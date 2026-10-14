@@ -788,7 +788,27 @@ function QuickActionsDropdown() {
 // ─── Apps launcher dropdown ───────────────────────────────────────────────────
 function AppsLauncherDropdown() {
   const [open, setOpen] = useState(false);
+  const [rolePreferenceVersion, setRolePreferenceVersion] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+  const { data: session } = useSession();
+  const { data: profile } = useStaffProfile();
+
+  useEffect(() => {
+    const refreshRolePreference = () => setRolePreferenceVersion(version => version + 1);
+    window.addEventListener("storage", refreshRolePreference);
+    window.addEventListener("overrideRoleChanged", refreshRolePreference);
+    return () => {
+      window.removeEventListener("storage", refreshRolePreference);
+      window.removeEventListener("overrideRoleChanged", refreshRolePreference);
+    };
+  }, []);
+
+  const currentProfile = profile || (session?.user as any);
+  const activeRole = useMemo(
+    () => getDashboardRoleSelection(currentProfile, currentProfile?.assignedRoles || [], null, true),
+    [currentProfile, rolePreferenceVersion],
+  );
+  const isAccountManager = activeRole.systemRole === "ACCOUNT_MANAGER";
 
   useEffect(() => {
     const handle = (e: MouseEvent) => {
@@ -832,7 +852,7 @@ function AppsLauncherDropdown() {
 
           {/* Grid */}
           <div className="grid grid-cols-4 gap-0.5 p-2">
-            {APP_LAUNCHER_ITEMS.map((app) => (
+            {APP_LAUNCHER_ITEMS.filter(app => !(isAccountManager && app.id === "pods")).map((app) => (
               <Link
                 key={app.id}
                 href={app.href}
