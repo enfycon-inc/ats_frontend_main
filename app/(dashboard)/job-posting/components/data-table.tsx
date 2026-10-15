@@ -449,7 +449,7 @@ export default function DataTable({
         <table className="w-full border-collapse text-left table-auto border-neutral-200 dark:border-slate-800">
           <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-900 border-b border-neutral-200 dark:border-slate-800 shadow-2xs select-none backdrop-blur-xs">
             <tr>
-              <th className="sticky left-0 z-20 w-[44px] min-w-[44px] px-3.5 py-3.5 text-center bg-slate-100/95 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800">
+              <th className="sticky left-0 z-20 w-[44px] min-w-[44px] px-3.5 py-3.5 text-center bg-slate-100 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800">
                 <input
                   type="checkbox"
                   checked={
@@ -505,7 +505,7 @@ export default function DataTable({
                 );
               })}
 
-              <th className="sticky right-0 z-20 w-[64px] min-w-[64px] px-3 py-3.5 text-center bg-slate-100/95 dark:bg-slate-900 border-l border-b border-neutral-200 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold text-slate-600 dark:text-slate-300">
+              <th className="sticky right-0 z-20 w-[64px] min-w-[64px] px-3 py-3.5 text-center bg-slate-100 dark:bg-slate-900 border-l border-b border-neutral-200 dark:border-slate-800 uppercase tracking-wider text-[10px] font-bold text-slate-600 dark:text-slate-300">
                 Action
               </th>
             </tr>

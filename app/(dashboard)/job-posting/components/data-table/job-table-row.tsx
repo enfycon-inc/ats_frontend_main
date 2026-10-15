@@ -110,10 +110,10 @@ export function JobTableRow({
         className={cn(
           "sticky left-0 z-10 w-[44px] min-w-[44px] px-3.5 py-4 text-center border-r border-neutral-200 dark:border-slate-800 transition-colors duration-150",
           isSelected
-            ? "bg-blue-50/95 dark:bg-blue-950/95"
+            ? "bg-blue-100 dark:bg-blue-950 group-hover:bg-blue-100 dark:group-hover:bg-blue-950"
             : idx % 2 === 0
-            ? "bg-white dark:bg-slate-900 group-hover:bg-blue-50/40 dark:group-hover:bg-slate-800/60"
-            : "bg-slate-50 dark:bg-slate-800/40 group-hover:bg-blue-50/40 dark:group-hover:bg-slate-800/60"
+            ? "bg-white dark:bg-slate-900 group-hover:bg-[#f0f5fc] dark:group-hover:bg-slate-800"
+            : "bg-slate-50 dark:bg-slate-900 group-hover:bg-[#f0f5fc] dark:group-hover:bg-slate-800"
         )}
       >
         <input
@@ -516,10 +516,10 @@ export function JobTableRow({
         className={cn(
           "sticky right-0 z-10 w-[64px] min-w-[64px] px-3 py-4 text-center border-l border-neutral-200 dark:border-slate-800 transition-colors duration-150",
           isSelected
-            ? "bg-blue-50/95 dark:bg-blue-950/95"
+            ? "bg-blue-100 dark:bg-blue-950 group-hover:bg-blue-100 dark:group-hover:bg-blue-950"
             : idx % 2 === 0
-            ? "bg-white dark:bg-slate-900 group-hover:bg-blue-50/40 dark:group-hover:bg-slate-800/60"
-            : "bg-slate-50 dark:bg-slate-800/40 group-hover:bg-blue-50/40 dark:group-hover:bg-slate-800/60"
+            ? "bg-white dark:bg-slate-900 group-hover:bg-[#f0f5fc] dark:group-hover:bg-slate-800"
+            : "bg-slate-50 dark:bg-slate-900 group-hover:bg-[#f0f5fc] dark:group-hover:bg-slate-800"
         )}
       >
           <DropdownMenu modal={false}>
