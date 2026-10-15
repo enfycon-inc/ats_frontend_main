@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { ArrowUpRight, BellRing, Plus, RefreshCw, Search, Users } from "lucide-react";
+import { ArrowUpRight, BellRing, Users } from "lucide-react";
 import { atsApi } from "@/lib/ats-api";
 import type { DeliveryStage } from "@/lib/delivery-dashboard-contract";
 import { deliveryStageLabels, hasPendingDeliveryReview, stageShare, visibleDeliveryStage } from "@/lib/delivery-dashboard-presentation";
@@ -55,14 +55,6 @@ function ScopedDeliveryDashboard({ profile, scopeKey }: { profile: DeliveryProfi
   const maximumPodJobs = Math.max(0, ...(data.pods || []).map(pod => pod.jobs || 0));
   if (reviewId && canReview) return <ReviewWorkspace key={`${scopeKey}:${reviewId}`} submissionId={reviewId} onClose={() => { setReviewId(null); void mutate(); }} onSaved={() => { setReviewId(null); void mutate(); }} />;
   return <section aria-label="Delivery Head dashboard" className="min-w-0 space-y-4 text-slate-900 dark:text-slate-100">
-    <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 py-1">
-      <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-bold tracking-tight">Delivery Head</h1><Badge variant="outline" className="border-blue-200 bg-blue-50 text-[10.5px] text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">Current unit only</Badge></div><p className="mt-1 break-words text-xs text-slate-500 dark:text-slate-400">{data.unit.name} · {data.unit.branchName}</p></div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="outline" className="text-xs" onClick={() => void mutate()} disabled={isValidating}><RefreshCw aria-hidden="true" className={`h-3.5 w-3.5 ${isValidating ? "animate-spin motion-reduce:animate-none" : ""}`} />{isValidating ? "Refreshing…" : "Refresh"}</Button>
-        {profile.permissions?.includes("candidate:view") && <Button size="sm" variant="outline" className="text-xs" asChild><Link href="/applicants"><Search className="h-3.5 w-3.5" aria-hidden="true" />Search Candidates</Link></Button>}
-        {profile.permissions?.includes("job:create") && <Button size="sm" className="bg-indigo-600 text-xs text-white hover:bg-indigo-700" asChild><Link href="/job-posting/new"><Plus className="h-3.5 w-3.5" aria-hidden="true" />Post New Job</Link></Button>}
-      </div>
-    </div>
     {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">Could not refresh the dashboard. Showing the last loaded summary.<Button size="sm" variant="outline" onClick={() => void mutate()}>Retry</Button></div>}
     <DeliveryMetrics activeJobs={data.activeJobs} pipeline={pipeline} onSelect={chooseStage} />
     {pipeline && <>

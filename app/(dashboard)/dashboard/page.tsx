@@ -255,7 +255,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Workspace Header */}
-      {systemRole !== "DELIVERY_HEAD" && <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
@@ -284,9 +284,6 @@ export default function DashboardPage() {
           </Link>}
         </div>
       </div>
-
-
-      }
       {/* Render Dashboard Widgets based on resolved systemRole */}
       {systemRole === "SUPER_ADMIN" && profile.permissions?.includes("platform:manage") ? (
         <GlobalAdminDashboardView profile={profile} />
