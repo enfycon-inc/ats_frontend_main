@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
-import { Loader2, Pencil, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, Pencil, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { atsApi } from '@/lib/ats-api';
 import {
@@ -135,13 +135,13 @@ export function UpdateSubmissionDialog({ submission, href, onClose, onSaved, onR
   }
 
   return <Dialog open onOpenChange={open => { if (!open && !saveLock.current) onClose(); }}>
-    <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl" onEscapeKeyDown={event => { if (saving) event.preventDefault(); }}>
-      <DialogHeader className="border-b border-border px-6 py-4 pr-12"><DialogTitle>{current && !canMaintain ? 'Submission details' : 'Update submission'}</DialogTitle>
+    <DialogContent className={`flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 ${showHistory ? 'sm:w-[calc(100vw-2rem)] sm:max-w-[1280px]' : 'sm:max-w-xl'}`} onEscapeKeyDown={event => { if (saving) event.preventDefault(); }}>
+      <DialogHeader className="border-b border-border px-6 py-4 pr-12">{showHistory && <Button type="button" variant="link" className="mb-1 h-auto w-fit gap-2 p-0 text-xs" onClick={() => setShowHistory(false)}><ArrowLeft className="h-4 w-4" />Back to update</Button>}<DialogTitle>{showHistory ? 'Submission history' : current && !canMaintain ? 'Submission details' : 'Update submission'}</DialogTitle>
         <DialogDescription className="text-xs">{submission.candidateName || 'Candidate'} · {submission.jobTitle || submission.jobCode}</DialogDescription>
       </DialogHeader>
       {loadError ? <div role="alert" className="p-6 text-xs">Unable to load the latest submission.<Button variant="outline" className="ml-2 text-xs" onClick={() => void mutate()}>Retry</Button></div>
         : !current || !draft ? <p role="status" className="p-8 text-center text-xs"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading submission…</p>
-        : <form className="flex min-h-0 flex-col" onSubmit={event => { event.preventDefault(); void save(); }}>
+        : showHistory ? <div className="min-h-0 overflow-y-auto px-6 py-5"><SubmissionHistory submission={current} /></div> : <form className="flex min-h-0 flex-col" onSubmit={event => { event.preventDefault(); void save(); }}>
           <div className="space-y-5 overflow-y-auto px-6 py-5">
             {!canMaintain && <p className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">Submission statuses are maintained by the Account Manager. Your access is read-only.</p>}
             {!approved && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">Internal approval is required before updating interviews.
@@ -189,7 +189,7 @@ export function UpdateSubmissionDialog({ submission, href, onClose, onSaved, onR
             </section>}
             {data.templatesUnavailable && <p role="status" className="text-xs text-muted-foreground">Remark suggestions are unavailable. You can enter remarks manually.</p>}
             <div className="flex flex-wrap items-center gap-4 text-xs"><Button type="button" variant="link" className="h-auto p-0 text-xs" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Hide change history' : 'View change history'}</Button><Link href={href} onClick={onClose} className="text-[#1a4fa0] hover:underline dark:text-blue-300">View submission</Link></div>
-            {showHistory && <SubmissionHistory submission={current} />}
+
             {error && <div role="alert" className="text-xs text-red-700 dark:text-red-300">{error}<Button type="button" variant="link" disabled={saving || isValidating} className="ml-2 h-auto p-0 text-xs" onClick={() => void mutate()}>Reload latest values</Button></div>}
           </div>
           <DialogFooter className="border-t border-border bg-muted/20 px-6 py-4"><Button type="button" variant="outline" disabled={saving} onClick={onClose} className="text-xs">{canMaintain ? 'Cancel' : 'Close'}</Button>{canMaintain && <Button type="submit" disabled={saving || isValidating || !approved || Boolean(internalRejected) || !(caps?.outcome || caps?.schedule || caps?.notes || Object.values(caps?.results || {}).some(Boolean))} className="bg-[#1a4fa0] text-xs text-white hover:bg-[#154181]">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Save changes</Button>}</DialogFooter>

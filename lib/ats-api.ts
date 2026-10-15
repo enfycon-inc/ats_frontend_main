@@ -1,9 +1,9 @@
-import type { DeliveryDashboard, DeliveryStage } from './delivery-dashboard-contract';
 import type { TenantEmailSettings, EmailDispatchMode, EmailDispatchResult } from './system-email.types';
 import type { UserCity } from './user-city-contract';
+import type { DeliveryDashboard, DeliveryStage } from './delivery-dashboard-contract';
 import type { StaffProfile, ProfileDetailsInput, SignatureSettings, SignatureInput, SignatureDefaultsInput } from './profile-contract';
 export interface ClientAccessPolicy { clientsVisibleAcrossUnits: boolean; bdmClientsTenantWide: boolean; otherOwnerPocsVisible: boolean; maskOtherOwnerPocDetails: boolean; }
-import type { CandidateAssessment, SubmissionHistoryResponse, TrackerResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
+import type { CandidateAssessment, SubmissionHistoryResponse, TrackerListFilters, TrackerResponse, TrackerStatsResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
 
 /**
  * ats-api.ts — Typed API client for the NestJS ATS backend
@@ -1589,13 +1589,16 @@ const pods = {
 };
 
 const submissions = {
+  async getPersonProfile(id: string, kind: 'recruiter' | 'account-manager'): Promise<any> {
+    return apiFetch(`/api/recruiter-submissions/${id}/people/${kind}`);
+  },
   async assessment(id: string): Promise<{ submission: TrackerSubmission; assessment: CandidateAssessment }> {
     return apiFetch(`/api/recruiter-submissions/${id}/assessment`);
   },
   async history(id: string, page = 1, order: 'asc' | 'desc' = 'asc'): Promise<SubmissionHistoryResponse> {
     return apiFetch<SubmissionHistoryResponse>(`/api/recruiter-submissions/${id}/history?page=${page}&order=${order}`);
   },
-  async list(filters?: Record<string, any>): Promise<TrackerResponse> {
+  async list(filters?: TrackerListFilters): Promise<TrackerResponse> {
     const cleanFilters: Record<string, string> = {};
     if (filters) {
       Object.entries(filters).forEach(([key, val]) => {
@@ -1627,8 +1630,12 @@ const submissions = {
       method: 'DELETE',
     });
   },
-  async getTrackerStats(): Promise<any> {
-    return apiFetch<any>('/api/recruiter-submissions/tracker-stats');
+  async getTrackerStats(rangeDays?: 7 | 30 | 90, view?: 'my' | 'pod' | 'all'): Promise<TrackerStatsResponse> {
+    const params = new URLSearchParams();
+    if (rangeDays) params.set('rangeDays', String(rangeDays));
+    if (view) params.set('view', view);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return apiFetch<any>(`/api/recruiter-submissions/tracker-stats${query}`);
   },
   async getCustomRemarks(branchId?: string, includeGlobal?: boolean): Promise<any[]> {
     const params = new URLSearchParams();

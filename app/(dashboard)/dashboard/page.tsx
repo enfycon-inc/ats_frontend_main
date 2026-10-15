@@ -57,6 +57,23 @@ const DashboardViewSkeleton = () => (
   </div>
 );
 
+const AccountManagerDashboardSkeleton = () => (
+  <div className="space-y-6 animate-pulse" aria-label="Loading account manager dashboard">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {Array.from({ length: 4 }).map((_, index) => <div key={index} className="rounded-xl border border-default-200 bg-white p-5 dark:bg-slate-900">
+        <div className="flex items-center gap-4"><Skeleton className="h-12 w-12 rounded-xl" /><div className="flex-1 space-y-2"><Skeleton className="h-3 w-28" /><Skeleton className="h-7 w-14" /></div></div>
+      </div>)}
+    </div>
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+      {Array.from({ length: 2 }).map((_, index) => <div key={index} className="rounded-xl border border-default-200 bg-white p-5 dark:bg-slate-900">
+        <div className="mb-5 flex justify-between"><div className="space-y-2"><Skeleton className="h-5 w-40" /><Skeleton className="h-3 w-56" /></div><Skeleton className="h-8 w-28" /></div>
+        <Skeleton className="h-[260px] w-full rounded-lg" />
+      </div>)}
+    </div>
+    <div className="rounded-xl border border-default-200 bg-white p-5 dark:bg-slate-900"><Skeleton className="mb-5 h-5 w-48" /><div className="space-y-3">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-11 w-full" />)}</div></div>
+  </div>
+);
+
 const GlobalAdminDashboardView = dynamic(() => import("./components/global-admin-dashboard-view"), {
   ssr: false, loading: () => <DashboardViewSkeleton />,
 });
@@ -68,7 +85,7 @@ const AdminDashboardView = dynamic(() => import("./components/admin-dashboard-vi
   ssr: false, loading: () => <DashboardViewSkeleton />,
 });
 const AccountManagerDashboardView = dynamic(() => import("./components/account-manager-dashboard-view"), {
-  ssr: false, loading: () => <DashboardViewSkeleton />,
+  ssr: false, loading: () => <AccountManagerDashboardSkeleton />,
 });
 const PodLeadDashboardView = dynamic(() => import("./components/pod-lead-dashboard-view"), {
   ssr: false, loading: () => <DashboardViewSkeleton />,
@@ -160,7 +177,7 @@ export default function DashboardPage() {
 
 
 
-  if (status === "error" || jobsError) {
+  if (status === "error" || (jobsError && selection?.systemRole !== "ACCOUNT_MANAGER")) {
     return (
       <div role="alert" className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-center">
         <p className="text-sm text-default-600">{status === "error" ? error : jobsError}</p>
@@ -169,7 +186,7 @@ export default function DashboardPage() {
     );
   }
 
-    if (status !== "ready" || loading || !profile || !selection) {
+    if (status !== "ready" || !profile || !selection || (loading && selection.systemRole !== "ACCOUNT_MANAGER")) {
     return (
       <div className="space-y-6 animate-pulse">
         {/* Header Skeleton */}
@@ -266,9 +283,10 @@ export default function DashboardPage() {
             </Button>
           </Link>}
         </div>
-      </div>}
+      </div>
 
 
+      }
       {/* Render Dashboard Widgets based on resolved systemRole */}
       {systemRole === "SUPER_ADMIN" && profile.permissions?.includes("platform:manage") ? (
         <GlobalAdminDashboardView profile={profile} />
@@ -291,13 +309,15 @@ export default function DashboardPage() {
           jobs={jobs} 
           activeJobs={activeJobs} 
           highPriorityJobs={highPriorityJobs} 
+          jobsLoading={loading}
+          jobsError={jobsError}
+          onRetryJobs={() => setJobsRequest(value => value + 1)}
           onUpdateJob={handleUpdateJob} 
         />
       ) : systemRole === "POD_LEAD" ? (
         <PodLeadDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
-
       ) : (
-        <RecruiterDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
+        <RecruiterDashboardView profile={profile} activeJobs={activeJobs} />
       )}
     </div>
   );
