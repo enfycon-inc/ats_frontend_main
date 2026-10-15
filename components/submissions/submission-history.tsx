@@ -1,98 +1,107 @@
 "use client";
-import { useEffect, useState } from 'react';
+
+import { Fragment, useEffect, useState } from 'react';
+import { CalendarDays, CheckCircle2, ChevronDown, FileText, Pencil, XCircle } from 'lucide-react';
 import { atsApi } from '@/lib/ats-api';
 import type { SubmissionHistoryEvent, SubmissionHistoryResponse, TrackerSubmission } from '@/lib/submission-contract';
 import { ROUND_STATUS_LABELS, OUTCOME_LABELS, type InterviewRoundStatus, type SubmissionOutcome } from '@/lib/submission-contract';
-import { formatInterview, validTimezone } from '@/lib/submission-tracker';
+import { validTimezone } from '@/lib/submission-tracker';
 import { Button } from '@/components/ui/button';
 import { DecisionAssessment } from './decision-assessment';
 
-function label(field: string) {
-  if (field === 'podLeadRemarks') return 'Internal Review Remarks';
-  if (/^l[123]Date$/.test(field)) return `${field.slice(0, 2).toUpperCase()} interview time`;
-  return field.replace(/^l([123])/, 'L$1 ').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+function statusLabel(value: string) {
+  return ROUND_STATUS_LABELS[value as InterviewRoundStatus] || OUTCOME_LABELS[value as SubmissionOutcome] ||
+    ({ PENDING_APPROVAL: 'Awaiting internal approval', REJECTED: 'Rejected' } as Record<string, string>)[value] ||
+    value.replaceAll('_', ' ').toLowerCase().replace(/^./, character => character.toUpperCase());
 }
-function title(event: SubmissionHistoryEvent) {
-  if (event.kind === 'BASELINE') return 'Existing state captured — earlier updates unavailable';
+function label(field: string) {
+  const labels: Record<string, string> = { finalStatus: 'Final status', podLeadRemarks: 'Internal review remarks', reviewFeedback: 'Review feedback', recruiterComment: 'Recruiter notes', submittedRateAmount: 'Submitted rate', currentCompensationAmount: 'Current compensation', expectedCompensationAmount: 'Expected compensation' };
+  return labels[field] || field.replace(/^l([123])/, 'L$1 ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, character => character.toUpperCase());
+}
+function dateParts(value: string, zone: string) {
+  const instant = new Date(value);
+  if (!Number.isFinite(instant.getTime())) return { date: 'Date unavailable', time: '' };
+  return {
+    date: new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: zone }).format(instant),
+    time: new Intl.DateTimeFormat('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: zone }).format(instant).toUpperCase(),
+  };
+}
+function formatValue(field: string, value: string | null, zone: string) {
+  if (value == null || value === '') return 'Not recorded';
+  if (/Date$|At$/.test(field)) { const parts = dateParts(value, zone); return `${parts.date}${parts.time ? ', ' + parts.time : ''}`; }
+  if (/Status$/.test(field)) return statusLabel(value);
+  return value;
+}
+function activity(event: SubmissionHistoryEvent) {
+  if (event.kind === 'BASELINE') return 'Existing record captured';
   if (event.kind === 'CREATED') return 'Submission created';
   const changes = event.details.changes || {};
-  const stages = ['l1', 'l2', 'l3'].filter(stage => Object.keys(changes).some(field => field.startsWith(stage)));
-  return stages.length ? `${stages.map(stage => stage.toUpperCase()).join(', ')} ${event.details.correctionReason ? 'correction' : 'update'}` : changes.finalStatus ? 'Submission decision' : 'Submission updated';
+  const names: string[] = [];
+  if (changes.finalStatus) names.push(changes.finalStatus.before === 'PENDING_APPROVAL' && changes.finalStatus.after === 'SUBMITTED' ? 'Submission approved' : statusLabel(changes.finalStatus.after || '') || 'Final status updated');
+  for (const key of ['l1', 'l2', 'l3']) {
+    const status = changes[`${key}Status`];
+    const date = changes[`${key}Date`];
+    if (status) names.push(`${key.toUpperCase()} ${status.after === 'SCHEDULED' || status.after === 'CANCELLED' ? 'interview ' : ''}${statusLabel(status.after || 'PENDING').toLowerCase()}`);
+    else if (date) names.push(`${key.toUpperCase()} interview ${date.after == null ? 'appointment removed' : date.before ? 'rescheduled' : 'scheduled'}`);
+    else if (Object.keys(changes).some(field => field.startsWith(key))) names.push(`${key.toUpperCase()} details updated`);
+  }
+  if (event.details.correctionReason) return names.length ? `${names.join(' · ')} (correction)` : 'Submission corrected';
+  return names.join(' · ') || 'Submission details updated';
 }
-function eventStatus(event: SubmissionHistoryEvent) {
-  const changes = event.details.changes || {};
-  return changes.finalStatus?.after || changes.l3Status?.after || changes.l2Status?.after || changes.l1Status?.after || event.details.snapshot?.finalStatus;
+function presentation(event: SubmissionHistoryEvent) {
+  const values = Object.entries(event.details.changes || {}).filter(([field]) => field.endsWith('Status')).map(([, change]) => change.after);
+  if (event.details.correctionReason) return { Icon: Pencil, color: 'text-amber-600 dark:text-amber-400' };
+  if (values.some(value => ['REJECTED', 'NOT_SELECTED', 'WITHDRAWN'].includes(value || ''))) return { Icon: XCircle, color: 'text-red-600 dark:text-red-400' };
+  if (values.some(value => ['CLEARED', 'SELECTED', 'OFFER', 'JOIN', 'SUBMITTED'].includes(value || ''))) return { Icon: CheckCircle2, color: 'text-green-700 dark:text-green-400' };
+  if (Object.keys(event.details.changes || {}).some(field => /^l[123](Date|Status)$/.test(field))) return { Icon: CalendarDays, color: 'text-[#1a4fa0] dark:text-blue-300' };
+  return { Icon: FileText, color: 'text-muted-foreground' };
 }
-function eventTone(event: SubmissionHistoryEvent) {
-  const status = eventStatus(event);
-  return status?.includes('REJECT') ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-200' : ['JOIN', 'SELECTED', 'APPROVED'].includes(status || '') ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200' : 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200';
-}
-function EventDetails({ event, zone, showAssessment = true }: { event: SubmissionHistoryEvent; zone: string; showAssessment?: boolean }) {
-  const fields = Object.entries(event.details.changes || {}).map(([field, change]) => [field, change.after] as const);
-  const snapshots = Object.entries(event.details.snapshot || {}).filter(([, text]) => text != null);
-  const seenRemarks = new Set<string>();
-  const visible = [...fields, ...snapshots].filter(([field, text]) => {
-    if (/Status$/.test(field) && text === eventStatus(event) && !event.details.changes) return false;
-    if (/remarks|feedback/i.test(field) && text?.trim()) {
-      const normalized = text.trim().toLowerCase();
-      if (seenRemarks.has(normalized)) return false;
-      seenRemarks.add(normalized);
-    }
-    return true;
-  });
-  return <div className="min-w-0 flex-1">
-    <dl className="flex flex-wrap gap-x-6 gap-y-3 text-xs">{visible.map(([field, text]) => {
-      const format = (value: string | null) => !value ? '—' : field.endsWith('Date') ? formatInterview(value, zone) : /Status$/.test(field) ?
-        ROUND_STATUS_LABELS[value as InterviewRoundStatus] || OUTCOME_LABELS[value as SubmissionOutcome] || value.replaceAll('_', ' ') : value;
-      const change = event.details.changes?.[field];
-      return <div key={field} className="min-w-0 max-w-full"><dt className="mb-1 text-[10.5px] text-muted-foreground">{label(field)}</dt><dd className="whitespace-pre-wrap [overflow-wrap:anywhere]">{change && <><span className="text-muted-foreground">{format(change.before)}</span><span aria-label="changed to"> → </span></>}{format(text)}</dd></div>;
-    })}</dl>
-    {event.details.bypassReason && <p className="mt-3 whitespace-pre-wrap text-xs"><span className="font-semibold">Bypass reason: </span>{event.details.bypassReason}</p>}
-    {event.details.correctionReason && <p className="mt-3 whitespace-pre-wrap text-xs"><span className="font-semibold">Correction reason: </span>{event.details.correctionReason}</p>}
-    {event.details.resetFollowingRounds && <p className="mt-2 text-xs text-muted-foreground">Later rounds were reset after correcting an earlier result. Original values are recorded above.</p>}
-    {showAssessment && event.details.assessment && <DecisionAssessment assessment={event.details.assessment} overrides={event.details.reviewOverrides} />}
+function EventDetails({ event, zone }: { event: SubmissionHistoryEvent; zone: string }) {
+  const changes = Object.entries(event.details.changes || {});
+  const snapshot = Object.entries(event.details.snapshot || {}).filter(([, value]) => value != null);
+  return <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+    {event.kind === 'BASELINE' && <p className="text-xs text-muted-foreground">Earlier updates are unavailable. This captures the existing record, not when its decisions were made.</p>}
+    {changes.length > 0 && <table className="w-full table-fixed text-xs"><caption className="sr-only">All changes recorded in this save</caption><thead><tr className="text-left text-[10.5px] uppercase tracking-wider text-muted-foreground"><th className="w-1/4 pb-2 font-semibold">Field</th><th className="pb-2 font-semibold">Previous</th><th className="pb-2 font-semibold">New value</th></tr></thead><tbody>{changes.map(([field, change]) => <tr key={field} className="border-t border-border"><th scope="row" className="py-2 pr-3 text-left align-top font-medium [overflow-wrap:anywhere]">{label(field)}</th><td className="whitespace-pre-wrap py-2 pr-3 align-top text-muted-foreground [overflow-wrap:anywhere]">{formatValue(field, change.before, zone)}</td><td className="whitespace-pre-wrap py-2 align-top [overflow-wrap:anywhere]">{formatValue(field, change.after, zone)}</td></tr>)}</tbody></table>}
+    {snapshot.length > 0 && <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">{snapshot.map(([field, value]) => <div key={field} className="min-w-0 text-xs"><dt className="text-[10.5px] text-muted-foreground">{label(field)}</dt><dd className="mt-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{formatValue(field, value, zone)}</dd></div>)}</dl>}
+    {event.details.bypassReason && <p className="whitespace-pre-wrap text-xs [overflow-wrap:anywhere]"><strong>Reason: </strong>{event.details.bypassReason}</p>}
+    {event.details.correctionReason && <p className="whitespace-pre-wrap text-xs [overflow-wrap:anywhere]"><strong>Correction reason: </strong>{event.details.correctionReason}</p>}
+    {event.details.resetFollowingRounds && <p className="text-xs text-muted-foreground">Later rounds were reset. Their previous values remain recorded above.</p>}
+    {event.details.assessment && <DecisionAssessment assessment={event.details.assessment} overrides={event.details.reviewOverrides} />}
+    {!changes.length && !snapshot.length && !event.details.assessment && <p className="text-xs text-muted-foreground">No additional field details were recorded.</p>}
   </div>;
 }
-function EventHeading({ event }: { event: SubmissionHistoryEvent }) {
-  const status = eventStatus(event);
-  return <span className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
-    <span className="font-semibold">{title(event)}</span>
-    {status && <span className={`rounded-md px-2 py-1 text-[10.5px] font-semibold ${eventTone(event)}`}>{status.replaceAll('_', ' ').toLowerCase().replace(/^./, character => character.toUpperCase())}</span>}
-  </span>;
-}
-function EventRow({ event, zone, journey = false, compact = false }: { event: SubmissionHistoryEvent; zone: string; journey?: boolean; compact?: boolean }) {
-  return <><div className={`flex min-w-0 gap-4 ${journey ? 'flex-col' : 'flex-col lg:flex-row lg:items-start'}`}>
-    <time dateTime={event.createdAt} className={`shrink-0 text-xs font-medium text-muted-foreground ${journey ? '' : 'lg:w-40 lg:border-r lg:border-border lg:pr-4'}`}>{formatInterview(event.createdAt, zone)}</time>
-    <div className="min-w-0 flex-1"><div className={`flex gap-5 ${journey ? 'flex-col' : 'flex-col lg:flex-row'}`}><div className={journey ? '' : 'shrink-0 lg:w-56'}><EventHeading event={event} /></div>{!compact && <EventDetails event={event} zone={zone} showAssessment={false} />}</div></div>
-    <div className={`shrink-0 text-[10.5px] text-muted-foreground ${journey ? '' : 'lg:w-32 lg:border-l lg:border-border lg:pl-4'}`}><span className="block">By</span><span className="mt-1 block font-medium text-foreground">{event.actorName || 'Not recorded'}</span></div>
-  </div>{!compact && event.details.assessment && <div className={journey ? '' : 'lg:ml-44'}><DecisionAssessment assessment={event.details.assessment} overrides={event.details.reviewOverrides} /></div>}</>;
-}
 export function SubmissionHistory({ submission }: { submission: TrackerSubmission }) {
-  const [layout, setLayout] = useState<'A' | 'B' | 'C'>('A');
   const [response, setResponse] = useState<SubmissionHistoryResponse | null>(null);
   const [page, setPage] = useState(1);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   useEffect(() => {
     let active = true;
     void Promise.resolve().then(() => {
       if (!active) return;
       setResponse(null); setError('');
-      return atsApi.submissions.history(submission.id, page, layout === 'B' ? 'asc' : 'desc');
+      return atsApi.submissions.history(submission.id, page, 'desc');
     }).then(data => { if (active && data) setResponse(data); })
       .catch(() => { if (active) setError('Unable to load submission history.'); });
     return () => { active = false; };
-  }, [submission.id, submission.updatedAt, page, revision, layout]);
+  }, [submission.id, submission.updatedAt, page, revision]);
   const zone = validTimezone(submission.timezone);
-  return <section className="rounded-xl border border-border bg-card p-5" aria-label="Submission history">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-bold">Submission timeline</h2><p className="mt-1 text-[10.5px] text-muted-foreground">{layout === 'B' ? 'Oldest to newest' : 'Newest first'}</p></div><label className="flex items-center gap-2 text-xs"><span className="text-muted-foreground">View</span><select aria-label="Timeline layout" value={layout} onChange={event => { setLayout(event.target.value as 'A' | 'B' | 'C'); setPage(1); }} className="rounded-md border border-border bg-background px-3 py-2 text-xs"><option value="A">A · Compact rows</option><option value="B">B · Horizontal journey</option><option value="C">C · Expandable history</option></select></label></div>
-    {error ? <div role="alert" className="mt-4 text-xs">{error}<Button variant="outline" className="ml-2 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : !response ? <p role="status" className="mt-4 text-xs text-muted-foreground">Loading history…</p> : <>
-      {!response.data.length && <p className="mt-4 text-xs text-muted-foreground">No history recorded.</p>}
-      <ol className={layout === 'B' ? 'mt-5 flex snap-x gap-4 overflow-x-auto pb-3' : 'mt-5 ml-2 flex flex-col gap-3 border-l border-border pl-6'}>{response.data.map((event, index) => <li key={`${layout}-${event.id}`} className={layout === 'B' ? 'relative w-[min(85vw,24rem)] shrink-0 snap-start rounded-xl border border-border bg-card p-4' : 'relative rounded-xl border border-border bg-card p-4'}>
-        <span aria-hidden="true" className={`absolute grid h-5 w-5 place-items-center rounded-full ring-4 ring-card ${layout === 'B' ? '-left-2 top-5' : '-left-[35px] top-5'} ${eventTone(event)}`}><span className="h-2.5 w-2.5 rounded-full bg-current" /></span>
-        {layout === 'C' ? <details open={index === 0}><summary className="cursor-pointer"><span className="inline-block w-[calc(100%-1rem)] align-middle"><EventRow event={event} zone={zone} compact /></span></summary><div className="mt-4 border-t border-border pt-3 lg:ml-44"><EventDetails event={event} zone={zone} /></div></details> : <EventRow event={event} zone={zone} journey={layout === 'B'} />}
-      </li>)}</ol>
-      {response.totalPages > 1 && <div className="mt-5 flex items-center justify-between text-xs"><Button variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</Button><span>Page {response.page} of {response.totalPages}</span><Button variant="outline" disabled={page >= response.totalPages} onClick={() => setPage(p => p + 1)}>Next</Button></div>}
+  return <section className="overflow-hidden rounded-xl border border-border bg-card" aria-label="Submission history">
+    <div className="border-b border-border px-5 py-4"><h2 className="text-sm font-bold">Submission history</h2><p className="mt-1 text-[10.5px] text-muted-foreground">Newest first · All times in {zone}</p></div>
+    {error ? <div role="alert" className="p-5 text-xs">{error}<Button variant="outline" className="ml-2 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : !response ? <p role="status" className="p-5 text-xs text-muted-foreground">Loading history…</p> : <>
+      {!response.data.length ? <p className="p-5 text-xs text-muted-foreground">No history recorded.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[520px] table-fixed text-xs"><caption className="sr-only">Submission audit history, newest first. Expand a row to view all recorded changes.</caption><colgroup><col className="w-36 sm:w-44" /><col /><col className="w-28 sm:w-40" /><col className="w-12" /></colgroup><thead className="bg-muted/40"><tr className="text-left text-[10.5px] uppercase tracking-wider text-muted-foreground"><th scope="col" className="px-5 py-3">When</th><th scope="col" className="px-3 py-3">Activity</th><th scope="col" className="px-3 py-3">Changed by</th><th scope="col"><span className="sr-only">Details</span></th></tr></thead><tbody>{response.data.map(event => {
+        const {date, time} = dateParts(event.createdAt, zone);
+        const {Icon, color} = presentation(event);
+        const changes = event.details.changes || {};
+        const statusChange = Object.entries(changes).find(([field]) => field.endsWith('Status'));
+        const dateChange = Object.entries(changes).find(([field]) => /^l[123]Date$/.test(field));
+        const summary = statusChange ? `${formatValue(statusChange[0], statusChange[1].before, zone)} → ${formatValue(statusChange[0], statusChange[1].after, zone)}` : dateChange ? `${dateChange[1].before ? 'From ' + formatValue(dateChange[0], dateChange[1].before, zone) + ' → ' : 'Interview: '}${formatValue(dateChange[0], dateChange[1].after, zone)}` : event.details.correctionReason || event.details.bypassReason;
+        const open = Boolean(expanded[event.id]);
+        const detailsId = `submission-history-${submission.id}-${event.id}`;
+        return <Fragment key={event.id}><tr className="border-t border-border hover:bg-muted/20"><td className="px-5 py-4 align-top"><time dateTime={event.createdAt}><span className="block font-medium">{date}</span><span className="mt-1 block whitespace-nowrap tabular-nums text-muted-foreground">{time}</span></time></td><td className="px-3 py-4 align-top"><div className="flex items-start gap-2"><Icon aria-hidden="true" className={`mt-0.5 h-4 w-4 shrink-0 ${color}`} /><div className="min-w-0"><p className="font-semibold [overflow-wrap:anywhere]">{activity(event)}</p>{summary && <p className="mt-1 text-[10.5px] leading-4 text-muted-foreground [overflow-wrap:anywhere]">{summary}</p>}</div></div></td><td className="px-3 py-4 align-top [overflow-wrap:anywhere]">{event.actorName || 'Not recorded'}</td><td className="px-2 py-3 align-top"><Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-expanded={open} aria-controls={open ? detailsId : undefined} aria-label={`${open ? 'Hide' : 'Show'} details: ${activity(event)} at ${date}, ${time}`} onClick={() => setExpanded(previous => ({...previous, [event.id]: !open}))}><ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} /></Button></td></tr>{open && <tr id={detailsId}><td colSpan={4} className="px-5 pb-4"><EventDetails event={event} zone={zone} /></td></tr>}</Fragment>;
+      })}</tbody></table></div>}
+      {response.totalPages > 1 && <div className="flex items-center justify-between border-t border-border px-5 py-3 text-xs"><Button type="button" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</Button><span>Page {response.page} of {response.totalPages}</span><Button type="button" variant="outline" disabled={page >= response.totalPages} onClick={() => setPage(p => p + 1)}>Next</Button></div>}
     </>}
   </section>;
 }
