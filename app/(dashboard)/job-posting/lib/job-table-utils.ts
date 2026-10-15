@@ -21,6 +21,17 @@ export interface AssignedPersonDisplay {
   } | null;
 }
 
+export function getRecruiterDisplay(job: Job): AssignedPersonDisplay {
+  const excluded = new Set(['n/a', 'unassigned', 'none', 'all', 'all recruiters', ...(job.podName || '').split(',').map(name => name.trim().toLowerCase())]);
+  const details = job.recruiterDetails || [];
+  const names = [...new Set((details.length ? details.map(person => person.fullName) : (job.recruiter || '').split(','))
+    .map(name => name.trim()).filter(name => name && !excluded.has(name.toLowerCase()) && !/^pod\s*\(/i.test(name)))];
+  if (!names.length) return { label: 'Unassigned', type: 'unassigned', isUnassigned: true, names: [] };
+  const ids = details.length ? details.map(person => person.id) : job.recruiterIds || (job.recruiterId ? [job.recruiterId] : []);
+  const label = names.join(', ');
+  return { label, type: 'recruiter', names, count: names.length, isUnassigned: false, recruiters: { names, ids, count: names.length, label } };
+}
+
 export function getAssignedPersonDisplay(job: Job): AssignedPersonDisplay {
   const rawAssigned = ((job as any).assignedTo || 'N/A' || "").trim();
   const rawUpper = rawAssigned.toUpperCase();
@@ -279,7 +290,7 @@ export function exportJobsToCSV(
   );
   const rows = jobs.map((job) =>
     selectedColumns.map((colId) => {
-      const value = job[colId as keyof Job];
+      const value = colId === 'assignedTo' ? getRecruiterDisplay(job).label : job[colId as keyof Job];
       if (typeof value === "object") {
         return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
       }

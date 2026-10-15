@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
 import { Job } from "../../data/mock-jobs";
 import {
-  getAssignedPersonDisplay,
+  getRecruiterDisplay,
   formatDateTimeDisplay,
   isJobRecent,
   canAssignRecruitersToJob,
@@ -435,16 +435,7 @@ export function JobTableRow({
             ) : colId === "assignedTo" ? (
               <div className="flex items-center justify-between gap-1.5 w-full min-w-0 py-0.5">
                 {(() => {
-                  const assignInfo = getAssignedPersonDisplay(job);
-                  if (assignInfo.type === "all") {
-                    return (
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 tracking-tight shrink-0">
-                        <Users className="h-3 w-3 text-slate-500 dark:text-slate-400 shrink-0" />
-                        All recruiters
-                      </span>
-                    );
-                  }
-
+                  const assignInfo = getRecruiterDisplay(job);
                   if (assignInfo.isUnassigned || assignInfo.type === "unassigned") {
                     return (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-normal text-neutral-400 dark:text-neutral-500 italic shrink-0">
@@ -455,31 +446,12 @@ export function JobTableRow({
 
                   return (
                     <JobPodHoverCard 
-                      podIds={assignInfo.pods?.ids || []}
+                      podIds={[]}
                       recruiterNames={assignInfo.recruiters?.names || []}
                         recruiterIds={assignInfo.recruiters?.ids || []}
                       recruiterDetails={job.recruiterDetails || []}
                     >
                     <div className="flex flex-col gap-1 min-w-0 flex-1">
-                      {assignInfo.pods && (
-                        <div className="flex items-center gap-1 min-w-0">
-                          <span
-                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800 shrink-0 max-w-[155px]"
-                          >
-                            <Icon
-                              icon="heroicons:squares-plus"
-                              className="h-3 w-3 shrink-0 text-purple-600 dark:text-purple-400"
-                            />
-                            <span className="truncate">{assignInfo.pods.label}</span>
-                            {assignInfo.pods.count > 1 && (
-                              <span className="ml-0.5 px-1 py-0.2 rounded bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-200 text-[9px] font-bold">
-                                +{assignInfo.pods.count - 1}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                      )}
-
                       {assignInfo.recruiters && (
                         <div
                           className="flex items-center gap-1 flex-wrap min-w-0"

@@ -163,14 +163,14 @@ export function JobTableFilters({
         {/* 4. ASSIGNED TO */}
         <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
           <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
-            ASSIGNED TO
+            RECRUITER
           </label>
           <select
             value={selectedAssignee}
             onChange={(e) => onAssigneeChange(e.target.value)}
             className="w-full px-2.5 h-9 text-xs bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:ring-1 focus:ring-[#1a4fa0] cursor-pointer transition-colors"
           >
-            <option value="All">All Assignees</option>
+            <option value="All">All Recruiters</option>
             <option value="Unassigned">Unassigned</option>
             {availableAssignees.map((assignee) => (
               <option key={assignee} value={assignee}>

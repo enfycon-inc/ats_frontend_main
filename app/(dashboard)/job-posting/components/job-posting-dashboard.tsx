@@ -375,7 +375,7 @@ export default function JobPostingDashboard({
     const cols = [
       { id: "jobCode", label: "Job Code" },
       { id: "jobTitle", label: "Job Title" },
-      { id: "assignedTo", label: "Assigned To" },
+      { id: "assignedTo", label: "Recruiter" },
       { id: "businessUnit", label: "Business Unit" },
       { id: "jobStatus", label: "Job Status" },
       { id: "createdBy", label: "Job Created By" },

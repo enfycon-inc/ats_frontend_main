@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import { Job } from "../data/mock-jobs";
-import { getAssignedPersonDisplay } from "./job-table-utils";
+import { getAssignedPersonDisplay, getRecruiterDisplay } from "./job-table-utils";
 
 export interface UseJobTableDataOptions {
   data: Job[];
@@ -94,10 +94,8 @@ export function useJobTableData({ data, branchUsesPods }: UseJobTableDataOptions
   const availableAssignees = useMemo(() => {
     const assignees = new Set<string>();
     data.forEach((j) => {
-      const info = getAssignedPersonDisplay(j);
-      if (info.label && info.label !== "Unassigned" && info.label.trim()) {
-        assignees.add(info.label.trim());
-      }
+      const info = getRecruiterDisplay(j);
+      info.names?.forEach(name => assignees.add(name));
     });
     return Array.from(assignees).sort();
   }, [data]);
@@ -213,11 +211,11 @@ export function useJobTableData({ data, branchUsesPods }: UseJobTableDataOptions
 
     if (selectedAssignee !== "All") {
       result = result.filter((job) => {
-        const info = getAssignedPersonDisplay(job);
+        const info = getRecruiterDisplay(job);
         if (selectedAssignee === "Unassigned") {
           return info.type === "unassigned";
         }
-        return info.label.trim().toLowerCase() === selectedAssignee.trim().toLowerCase();
+        return info.names?.some(name => name.toLowerCase() === selectedAssignee.trim().toLowerCase());
       });
     }
 
@@ -267,8 +265,8 @@ export function useJobTableData({ data, branchUsesPods }: UseJobTableDataOptions
     if (sortColumn) {
       result.sort((a, b) => {
         if (sortColumn === "assignedTo") {
-          const strA = getAssignedPersonDisplay(a).label.toLowerCase();
-          const strB = getAssignedPersonDisplay(b).label.toLowerCase();
+          const strA = getRecruiterDisplay(a).label.toLowerCase();
+          const strB = getRecruiterDisplay(b).label.toLowerCase();
           if (strA < strB) return sortDirection === "asc" ? -1 : 1;
           if (strA > strB) return sortDirection === "asc" ? 1 : -1;
           return 0;

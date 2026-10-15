@@ -22,6 +22,8 @@ import { atsApi } from "@/lib/ats-api";
 import { UserAvatar } from '@/components/shared/user-identity';
 import { Job } from "../../data/mock-jobs";
 import { getAssignedPersonDisplay, canAssignRecruitersToJob } from "../../lib/job-table-utils";
+import { PodLeadAssignModal } from "./pod-lead-assign-modal";
+export { PodLeadAssignModal };
 
 export interface JobAssignModalProps {
   job: Job | null;
@@ -269,6 +271,10 @@ export function JobAssignModal({
 
   const isPodHead = useMemo(() => {
     if (isHigherRole) return false;
+    const sysRole = (currentUser?.systemRole || currentUser?.system_role || "")
+      .toUpperCase()
+      .replace(/[\s-_]+/g, "");
+    if (sysRole === "PODLEAD" || sysRole === "PODHEAD") return true;
     if (
       userRoles.includes("PODHEAD") ||
       userRoles.includes("POD_HEAD") ||
@@ -764,6 +770,19 @@ export function JobAssignModal({
   };
 
   if (!isOpen || !job) return null;
+
+  if (isPodHead) {
+    return (
+      <PodLeadAssignModal
+        job={job}
+        currentUser={currentUser}
+        currentUserBranchId={currentUserBranchId}
+        isOpen={isOpen}
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
