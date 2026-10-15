@@ -1555,6 +1555,9 @@ const pods = {
   async getMyTeam(): Promise<any> {
     return apiFetch<any>('/api/pods/my-team');
   },
+  async findMyTeam(): Promise<any> {
+    return apiFetch<any>('/api/pods/my-team');
+  },
   async create(data: Record<string, any>): Promise<any> {
     return apiFetch<any>('/api/pods', {
       method: 'POST',

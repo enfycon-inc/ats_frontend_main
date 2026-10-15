@@ -85,9 +85,12 @@ export function PodLeadAssignModal({
           (currentUser as any)?.businessUnitId ||
           undefined;
 
-        // Fetch scoped staffing options for this job (backend strictly enforces pod_id = actor's pod)
-        // and fetch the Pod Lead's team metadata
-        const [staff, myTeam] = await Promise.all([
+        // Fetch team metadata for Pod Lead and job staffing options concurrently
+        const [myTeam, staff] = await Promise.all([
+          atsApi.pods.getMyTeam().catch((err: any) => {
+            console.warn("[PodLeadAssignModal] getMyTeam error:", err);
+            return null;
+          }),
           atsApi.jobs
             .staffingOptions(
               {
@@ -98,36 +101,61 @@ export function PodLeadAssignModal({
               { silent: true }
             )
             .catch((err: any) => {
-              const msg = err?.message || "Unable to load eligible recruiters for this job.";
-              setErrorMessage(msg);
+              console.warn("[PodLeadAssignModal] staffingOptions error:", err);
               return [];
             }),
-          atsApi.pods.findMyTeam().catch(() => null),
         ]);
 
         if (isDisposed) return;
 
-        const eligibleStaff = (staff || []).filter((u: any) => u.canRecruit !== false);
-        setRecruiters(eligibleStaff);
-
-        // Resolve Pod metadata
-        if (myTeam) {
-          setPodInfo({
-            id: myTeam.id,
-            name: myTeam.name,
-            memberCount: myTeam.members?.length || eligibleStaff.length,
-          });
-        } else if (job.podName && job.podName !== "N/A" && job.podName.toLowerCase() !== "unassigned") {
-          setPodInfo({
-            name: job.podName,
-            memberCount: eligibleStaff.length,
-          });
-        } else {
-          setPodInfo({
-            name: "Recruitment Pod",
-            memberCount: eligibleStaff.length,
-          });
+        // Merge members from myTeam and staffingOptions to guarantee ALL pod members are listed
+        const staffMap = new Map<string, any>();
+        for (const s of staff || []) {
+          if (s && s.id) staffMap.set(s.id, s);
         }
+
+        const combinedMembers: any[] = [];
+        const seenMemberIds = new Set<string>();
+
+        // 1. Add all members from myTeam.members
+        if (myTeam && Array.isArray(myTeam.members)) {
+          for (const m of myTeam.members) {
+            if (m && m.id && !seenMemberIds.has(m.id)) {
+              seenMemberIds.add(m.id);
+              const staffEntry = staffMap.get(m.id);
+              combinedMembers.push({
+                id: m.id,
+                fullName: m.fullName || m.name || staffEntry?.fullName || "Recruiter",
+                name: m.fullName || m.name || staffEntry?.name || "Recruiter",
+                email: m.email || staffEntry?.email || "",
+                avatar: m.avatar || m.profilePicture || staffEntry?.avatar || null,
+                canRecruit: true,
+              });
+            }
+          }
+        }
+
+        // 2. Add any remaining eligible staff returned for this pod
+        for (const s of staff || []) {
+          if (s && s.id && !seenMemberIds.has(s.id)) {
+            seenMemberIds.add(s.id);
+            combinedMembers.push(s);
+          }
+        }
+
+        setRecruiters(combinedMembers);
+
+        // Resolve Pod actual name: prefer myTeam.name, fallback to job.podName
+        const actualPodName =
+          myTeam?.name ||
+          (job.podName && job.podName !== "N/A" && job.podName.toLowerCase() !== "unassigned" ? job.podName : null) ||
+          "Assigned Pod";
+
+        setPodInfo({
+          id: myTeam?.id || job.podId || undefined,
+          name: actualPodName,
+          memberCount: combinedMembers.length,
+        });
 
         // Fallback: match by recruiter names if IDs were not populated
         if (initialSelected.length === 0) {
@@ -142,7 +170,7 @@ export function PodLeadAssignModal({
           if (recruiterStr && !recruiterStr.toUpperCase().startsWith("ALL")) {
             const names = recruiterStr.split(",").map((s: string) => s.trim().toLowerCase());
             const matchedIds: string[] = [];
-            for (const u of eligibleStaff) {
+            for (const u of combinedMembers) {
               const uName = (u.fullName || u.name || "").toLowerCase();
               if (uName && names.includes(uName) && !matchedIds.includes(u.id)) {
                 matchedIds.push(u.id);
@@ -279,9 +307,9 @@ export function PodLeadAssignModal({
             <div className="flex items-center gap-2 text-blue-900 dark:text-blue-200 font-medium">
               <Icon icon="heroicons:user-group" className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
               <span>
-                {podInfo?.name || "Enterprise Recruitment Pod"}
+                {podInfo?.name || job.podName || "Assigned Pod"}
                 <span className="text-blue-600/80 dark:text-blue-400/80 font-normal ml-1">
-                  • {podInfo?.memberCount || recruiters.length} Member{podInfo?.memberCount !== 1 ? "s" : ""}
+                  • {podInfo?.memberCount ?? recruiters.length} Member{(podInfo?.memberCount ?? recruiters.length) !== 1 ? "s" : ""}
                 </span>
               </span>
             </div>
