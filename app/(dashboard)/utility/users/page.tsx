@@ -1,7 +1,8 @@
 "use client";
 import { warnIfEmailFailed } from "@/lib/email-notification";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import Papa from "papaparse";
 import { 
   Users, UserPlus, Search, Edit2, Key, Shield, Building2, MapPin, Briefcase,
@@ -314,6 +315,8 @@ let cachedUsersData: {
 
 
 export default function UserManagementPage() {
+  const requestId = useSearchParams().get("requestId");
+  const handledRequestId = useRef<string | null>(null);
   const [addModalTab, setAddModalTab] = useState("STAFF");
   const [editModalTab, setEditModalTab] = useState("STAFF");
   const [loading, setLoading] = useState(() => !cachedUsersData);
@@ -1024,6 +1027,19 @@ export default function UserManagementPage() {
     });
     setIsReviewModalOpen(true);
   };
+
+  useEffect(() => {
+    if (!requestId || loading || !profile || handledRequestId.current === requestId) return;
+    handledRequestId.current = requestId;
+    const request = users.find(user => user.id === requestId && user.isApproved === false && user.requestedRole);
+    const unitOnly = sessionPerms.includes('unit_admin:manage') && !sessionPerms.some(permission => ['tenant:manage', 'tenant:settings', 'platform:manage', 'branch_admin:manage'].includes(permission));
+    if (!sessionPerms.includes('user:manage') || !request || (unitOnly && (!profile.branchId || !profile.businessUnitId || request.branchId !== profile.branchId || request.businessUnitId !== profile.businessUnitId))) {
+      toast.error('This request is no longer pending or is outside your current unit.');
+      return;
+    }
+    setActiveTab('PENDING');
+    openReviewModal(request);
+  }, [requestId, loading, profile, users, sessionPerms, rolesList, branches, businessUnits]);
 
   const handleConfirmApproval = async () => {
     if (!reviewUser) return;

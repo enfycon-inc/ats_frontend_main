@@ -88,6 +88,7 @@ export default function DashboardPage() {
   const [jobsRequest, setJobsRequest] = useState(0);
   const canViewJobs = profile?.permissions?.includes("job:view") === true;
   const isRecruiterDashboard = selection?.systemRole === "RECRUITER";
+  const isDeliveryDashboard = selection?.systemRole === "DELIVERY_HEAD";
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -96,7 +97,7 @@ export default function DashboardPage() {
       setLoading(true);
       setJobsError(null);
       try {
-        const jobsData = canViewJobs ? await atsApi.jobs.list(isRecruiterDashboard ? { filter: "sourcing" } : undefined) : [];
+        const jobsData = canViewJobs && !isDeliveryDashboard ? await atsApi.jobs.list(isRecruiterDashboard ? { filter: "sourcing" } : undefined) : [];
         if (!Array.isArray(jobsData)) throw new Error("Invalid jobs response");
         if (!cancelled) setJobs(jobsData);
       } catch (err) {
@@ -107,7 +108,7 @@ export default function DashboardPage() {
     }
     loadData();
     return () => { cancelled = true; };
-  }, [status, profile?.id, profile?.tenantId, canViewJobs, isRecruiterDashboard, jobsRequest]);
+  }, [status, profile?.id, profile?.tenantId, profile?.branchId, profile?.businessUnitId, canViewJobs, isRecruiterDashboard, isDeliveryDashboard, jobsRequest]);
 
   useEffect(() => {
     const handleAppRefresh = () => {
@@ -237,7 +238,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Workspace Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
+      {systemRole !== "DELIVERY_HEAD" && <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
@@ -265,12 +266,14 @@ export default function DashboardPage() {
             </Button>
           </Link>}
         </div>
-      </div>
+      </div>}
 
 
       {/* Render Dashboard Widgets based on resolved systemRole */}
       {systemRole === "SUPER_ADMIN" && profile.permissions?.includes("platform:manage") ? (
         <GlobalAdminDashboardView profile={profile} />
+      ) : systemRole === "DELIVERY_HEAD" ? (
+        <DeliveryHeadDashboardView />
       ) : (systemRole === "UNIT_ADMIN" || profile.permissions?.includes("unit_admin:manage")) && !profile.permissions?.some((p: string) => ["tenant:settings", "tenant:manage", "platform:manage", "branch_admin:manage"].includes(p)) ? (
         <UnitAdminDashboardView profile={profile} jobs={jobs} />
       ) : systemRole === "BRANCH_ADMIN" && profile.permissions?.includes("branch_admin:manage") ? (
@@ -292,8 +295,7 @@ export default function DashboardPage() {
         />
       ) : systemRole === "POD_LEAD" ? (
         <PodLeadDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
-      ) : systemRole === "DELIVERY_HEAD" ? (
-        <DeliveryHeadDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
+
       ) : (
         <RecruiterDashboardView profile={profile} jobs={jobs} activeJobs={activeJobs} />
       )}

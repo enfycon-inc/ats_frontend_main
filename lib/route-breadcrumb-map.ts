@@ -232,10 +232,10 @@ export function getRouteBreadcrumbInfo(
     };
   }
 
-  // 4. Candidates & Talent Pool (Applicants)
+  // 4. Candidates (Applicants)
   if (cleanPath === "/applicants" || cleanPath === "/applicants/all") {
     return {
-      pageTitle: "Candidates & Talent Pool",
+      pageTitle: "Candidates",
       breadcrumbs: [
         { label: "ATS", href: "/dashboard" },
         { label: "Candidates", href: "/applicants" },

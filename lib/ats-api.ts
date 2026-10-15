@@ -1,3 +1,4 @@
+import type { DeliveryDashboard, DeliveryStage } from './delivery-dashboard-contract';
 import type { TenantEmailSettings, EmailDispatchMode, EmailDispatchResult } from './system-email.types';
 import type { UserCity } from './user-city-contract';
 import type { StaffProfile, ProfileDetailsInput, SignatureSettings, SignatureInput, SignatureDefaultsInput } from './profile-contract';
@@ -1751,6 +1752,12 @@ const branches = {
 };
 
 const businessUnits = {
+  deliveryDashboard(stage: DeliveryStage = 'review', page = 1, memberPage = 1) {
+    return apiFetch<DeliveryDashboard>(`/api/business-units/current/dashboard?stage=${stage}&page=${page}&memberPage=${memberPage}`);
+  },
+  setCurrentUnitMemberActive(id: string, isActive: boolean) {
+    return apiFetch<{ id: string; isActive: boolean }>(`/api/business-units/current/dashboard/members/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive }) });
+  },
   async onboardingOptions(): Promise<{ id: string; name: string; branchId: string | null }[]> {
     return apiFetch('/api/business-units/onboarding-options');
   },

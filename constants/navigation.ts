@@ -99,13 +99,11 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
   },
   {
     id: "applicants",
-    label: "Candidates & Talent Pool",
+    label: "Candidates",
     href: "/applicants",
     icon: Users,
     children: [
       { label: "All Candidates", href: "/applicants/all" },
-      { label: "US IT Candidate Search", href: "/applicants/resume-search/usit" },
-      { label: "Domestic Candidate Search", href: "/applicants/resume-search/domestic" },
       { label: "Upload Single CV", href: "/applicants/new" },
       { label: "Batch CV Parsing Engine", href: "/applicants/bulk" },
       { label: "Pipeline View", href: "/applicants/pipeline" },
