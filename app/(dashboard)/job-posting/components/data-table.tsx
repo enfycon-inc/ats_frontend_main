@@ -9,7 +9,6 @@ import {
   Filter,
   Settings,
   Plus,
-  Download,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
@@ -331,10 +330,6 @@ export default function DataTable({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const handleExportCSV = () => {
-    exportJobsToCSV(processedData, activeSelectedColumns, activeAllColumns);
-  };
-
   return (
     <div
       className="flex-1 flex flex-col min-h-0 min-w-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none overflow-hidden relative font-sans"
@@ -348,12 +343,6 @@ export default function DataTable({
               <span className="text-[10px] font-bold text-primary">
                 {selectedRowIds.length} Selected
               </span>
-              <button
-                onClick={handleExportCSV}
-                className="text-[10px] text-primary font-bold flex items-center gap-1 hover:underline ml-1 cursor-pointer"
-              >
-                <Download className="h-3 w-3" /> Export
-              </button>
               <button
                 onClick={() => setSelectedRowIds([])}
                 className="text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 ml-1 cursor-pointer"
@@ -372,13 +361,6 @@ export default function DataTable({
             title="Refresh Table"
           >
             <RefreshCw className="h-3 w-3" />
-          </button>
-
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1 px-2 py-1 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
-          >
-            <Download className="h-3 w-3" /> Export CSV
           </button>
 
           {hasCreatePermission && (
@@ -445,8 +427,18 @@ export default function DataTable({
       />
 
       {/* Spreadsheet Grid Table */}
-      <div className="flex-1 overflow-auto relative min-h-0 bg-neutral-50/20 dark:bg-slate-950/10">
-        <table className="w-full border-collapse text-left table-auto border-neutral-200 dark:border-slate-800">
+      <div
+        className="flex-1 overflow-auto relative min-h-0 bg-neutral-50/20 dark:bg-slate-950/10 select-none"
+        onCopy={(e) => e.preventDefault()}
+        onCut={(e) => e.preventDefault()}
+        style={{ userSelect: "none", WebkitUserSelect: "none" }}
+      >
+        <table
+          className="w-full border-collapse text-left table-auto border-neutral-200 dark:border-slate-800 select-none"
+          onCopy={(e) => e.preventDefault()}
+          onCut={(e) => e.preventDefault()}
+          style={{ userSelect: "none", WebkitUserSelect: "none" }}
+        >
           <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-900 border-b border-neutral-200 dark:border-slate-800 shadow-2xs select-none backdrop-blur-xs">
             <tr>
               <th className="sticky left-0 z-20 w-[44px] min-w-[44px] px-3.5 py-3.5 text-center bg-slate-100 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800">

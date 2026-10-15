@@ -96,8 +96,11 @@ export function JobTableRow({
   return (
     <tr
       onContextMenu={(e) => onContextMenu(e, job.id)}
+      onCopy={(e) => e.preventDefault()}
+      onCut={(e) => e.preventDefault()}
+      style={{ userSelect: "none", WebkitUserSelect: "none" }}
       className={cn(
-        "group transition-colors cursor-default border-b border-neutral-200 dark:border-slate-800/80",
+        "group transition-colors cursor-default border-b border-neutral-200 dark:border-slate-800/80 select-none",
         isSelected
           ? "bg-primary/10 hover:bg-primary/10 dark:bg-primary/15 dark:hover:bg-primary/15"
           : idx % 2 === 0
@@ -108,7 +111,7 @@ export function JobTableRow({
       {/* Checkbox (Sticky Left) */}
       <td
         className={cn(
-          "sticky left-0 z-10 w-[44px] min-w-[44px] px-3.5 py-4 text-center border-r border-neutral-200 dark:border-slate-800 transition-colors duration-150",
+          "sticky left-0 z-10 w-[44px] min-w-[44px] px-3.5 py-4 text-center border-r border-neutral-200 dark:border-slate-800 transition-colors duration-150 select-none",
           isSelected
             ? "bg-blue-100 dark:bg-blue-950 group-hover:bg-blue-100 dark:group-hover:bg-blue-950"
             : idx % 2 === 0
@@ -129,14 +132,14 @@ export function JobTableRow({
         return (
           <td
             key={colId}
-            className="py-4 px-4 border-r border-neutral-200/80 dark:border-slate-800/80 whitespace-nowrap font-normal text-slate-850 dark:text-slate-200 text-xs transition-colors relative"
+            className="py-4 px-4 border-r border-neutral-200/80 dark:border-slate-800/80 whitespace-nowrap font-normal text-slate-850 dark:text-slate-200 text-xs transition-colors relative select-none cursor-default"
           >
             {colId === "client" || colId === "endClientName" ? (
               <span className="font-medium text-slate-900 dark:text-slate-100">{String(job[colId as keyof Job] || "N/A")}</span>
             ) : colId === "jobCode" ? (
               <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <Link href={`/job-posting/${job.id}`}>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-[11px] font-mono font-semibold text-slate-850 dark:text-slate-200 hover:border-[#1a4fa0] hover:text-[#1a4fa0] dark:hover:text-blue-400 transition-colors shadow-2xs cursor-pointer">
+                <Link href={`/job-posting/${job.id}`} draggable={false}>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 text-[11px] font-mono font-semibold text-slate-850 dark:text-slate-200 hover:border-[#1a4fa0] hover:text-[#1a4fa0] dark:hover:text-blue-400 transition-colors shadow-2xs cursor-pointer select-none">
                     {job.jobCode}
                   </span>
                 </Link>
@@ -247,7 +250,7 @@ export function JobTableRow({
             ) : colId === "priority" ? (
               <Badge
                 className={cn(
-                  "text-[10px] font-medium px-2 py-0.5 rounded-md border shadow-none cursor-cell",
+                  "text-[10px] font-medium px-2 py-0.5 rounded-md border shadow-none cursor-default select-none",
                   job.priority === "Hot" || job.priority === "High" || job.priority === "Urgent"
                     ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800/40"
                     : job.priority === "Cold" || job.priority === "Low"
@@ -514,7 +517,7 @@ export function JobTableRow({
       {/* Actions Column (Sticky Right) */}
       <td
         className={cn(
-          "sticky right-0 z-10 w-[64px] min-w-[64px] px-3 py-4 text-center border-l border-neutral-200 dark:border-slate-800 transition-colors duration-150",
+          "sticky right-0 z-10 w-[64px] min-w-[64px] px-3 py-4 text-center border-l border-neutral-200 dark:border-slate-800 transition-colors duration-150 select-none cursor-default",
           isSelected
             ? "bg-blue-100 dark:bg-blue-950 group-hover:bg-blue-100 dark:group-hover:bg-blue-950"
             : idx % 2 === 0
