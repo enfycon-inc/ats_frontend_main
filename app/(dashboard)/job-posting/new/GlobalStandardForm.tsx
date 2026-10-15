@@ -540,7 +540,7 @@ const getInitialActiveBranchContext = () => {
   useEffect(() => {
     let cancelled = false;
     setBranchUsers([]);
-    if (!currentUserProfile?.permissions?.includes("job:assign_recruiter") && !!currentUserProfile?.permissions?.includes("job:override_assignment") || !selectedUnitId) return;
+    if (!canAssignRecruiters || !selectedUnitId) return;
     const unit = availableUnits.find(unit => unit.id === selectedUnitId);
     atsApi.jobs.staffingOptions({ branchId: unit?.branchId || unit?.branch_id || currentUserProfile.branchId,
       businessUnitId: selectedUnitId }).then(staff => {
@@ -552,7 +552,7 @@ const getInitialActiveBranchContext = () => {
       if (!cancelled) toast.error(error.message || "Unable to load eligible job staff.");
     });
     return () => { cancelled = true; };
-  }, [selectedUnitId, availableUnits, currentUserProfile]);
+  }, [selectedUnitId, availableUnits, currentUserProfile, canAssignRecruiters]);
 
 
   const fetchClients = useCallback(async () => {
