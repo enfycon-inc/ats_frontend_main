@@ -50,6 +50,7 @@ export function JobAssignModal({
 
   // Assignment Context Data
   const [usersList, setUsersList] = useState<any[]>([]);
+  const [staffingLoaded, setStaffingLoaded] = useState(false);
   const [podsList, setPodsList] = useState<any[]>([]);
   const [branchesList, setBranchesList] = useState<any[]>([]);
   const [rolesList, setRolesList] = useState<any[]>([]);
@@ -100,10 +101,12 @@ export function JobAssignModal({
     if (!isOpen || !job) return;
     if (lastLoadedJobIdRef.current === job.id) return;
     lastLoadedJobIdRef.current = job.id;
+    setStaffingLoaded(false);
+    setUsersList([]);
 
     async function loadAssignmentData() {
       try {
-        const canAssign = canAssignRecruitersToJob(job, currentUser);
+        const canAssign = currentUser?.permissions?.includes('job:assign_recruiter');
         const targetBranchId = job?.branchId || currentUserBranchId || undefined;
         const targetUnitId = (job as any)?.businessUnitId || (job as any)?.business_unit_id || (currentUser as any)?.businessUnitId || undefined;
 
@@ -116,14 +119,14 @@ export function JobAssignModal({
                   jobId: job.id,
                 },
                 { silent: true }
-              ).catch(() => [])
+              ).then(staff => { setStaffingLoaded(true); return staff; }).catch(error => { toast.error(error.message || 'Unable to load eligible recruiters for this job.'); return []; })
             : Promise.resolve([]),
           atsApi.pods.list().catch(() => []),
           atsApi.branches.list().catch(() => []),
           atsApi.auth.listRoles(undefined, true).catch(() => []),
         ]);
-        if (staff && staff.length > 0) setUsersList(staff);
-        if (pods && pods.length > 0) setPodsList(pods);
+        setUsersList(staff || []);
+        setPodsList(pods || []);
         if (branches && branches.length > 0) setBranchesList(branches);
         if (roles && roles.length > 0) setRolesList(roles);
       } catch (err) {
@@ -294,6 +297,10 @@ export function JobAssignModal({
 
   const branchAllowsDirectStaff = useMemo(() => {
     if (!userPerms.includes('job:assign_recruiter')) return false;
+    const actorId = currentUser?.dbId || currentUser?.id;
+    const assignedPodIds = job?.podIds || (job?.podId ? [job.podId] : []);
+    const leadsAssignedPod = !!actorId && podsList.some(pod => pod.podHeadId === actorId && assignedPodIds.includes(pod.id));
+    if (leadsAssignedPod) return true;
     const targetPolicy = targetUnit || targetBranch;
     if (!targetPolicy) return true;
     const allowDirect = targetPolicy.allowDirect ?? targetPolicy.allow_direct;
@@ -301,7 +308,7 @@ export function JobAssignModal({
     const allowDirectStaff = targetPolicy.allowDirectStaff ?? targetPolicy.allow_direct_staff;
     if (allowDirectStaff === false) return false;
     return true;
-  }, [targetUnit, targetBranch, userPerms]);
+  }, [targetUnit, targetBranch, userPerms, currentUser, job, podsList]);
 
   // â”€â”€â”€ SCOPED PODS & USERS (Role Scoping) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const targetBranchPods = useMemo(() => {
@@ -333,21 +340,7 @@ export function JobAssignModal({
   const branchRecruiterUsers = useMemo(() => {
     // When populated from atsApi.jobs.staffingOptions (capability-checked for the job):
     if (usersList.length > 0 && usersList[0].canRecruit !== undefined) {
-      let list = usersList.filter((u: any) => u.canRecruit !== false);
-      if (isPodHead && myPod) {
-        const myPodId = myPod.id;
-        const myPodMemberIds = new Set(
-          (myPod.users || myPod.members || []).map((m: any) => m.id || m.userId).filter(Boolean)
-        );
-        return list.filter(
-          (u: any) =>
-            u.podId === myPodId ||
-            u.pod_id === myPodId ||
-            myPodMemberIds.has(u.id) ||
-            u.id === myPod.podHeadId
-        );
-      }
-      return list;
+      return usersList.filter((u: any) => u.canRecruit !== false);
     }
 
     const bId = targetBranch?.id;
@@ -675,6 +668,10 @@ export function JobAssignModal({
       toast.error("You are only allowed to assign recruiters on your own created jobs.");
       return;
     }
+    if (userPerms.includes('job:assign_recruiter') && !staffingLoaded) {
+      toast.error('Eligible recruiters have not loaded. Close and reopen assignment to try again.');
+      return;
+    }
     setIsAssigning(true);
     try {
       const payload: Record<string, any> = {};
@@ -712,11 +709,11 @@ export function JobAssignModal({
 
         // 2. Recruiters assignment:
         if (selectedUserIds.length > 0) {
-          const selectedUsers = usersList.filter((u) => selectedUserIds.includes(u.id));
+          const selectedUsers = usersList.filter((u) => selectedUserIds.includes(u.id) && u.canRecruit !== false);
           const recruiterNames = selectedUsers.map((u) => u.fullName || u.name || u.email);
           payload.assignedTo = recruiterNames.join(", ");
-          payload.recruiterId = selectedUserIds[0];
-          payload.recruiterIds = selectedUserIds;
+          payload.recruiterId = selectedUsers[0]?.id || null;
+          payload.recruiterIds = selectedUsers.map(user => user.id);
           payload.recruiter = recruiterNames.join(", ");
         } else {
           payload.assignedTo = "Unassigned";
@@ -831,7 +828,7 @@ export function JobAssignModal({
               Requirements must be routed to Recruitment Pods.
             </span>
           </div>
-        ) : !branchAllowsPods ? (
+        ) : !branchAllowsPods && canAssignPods ? (
           <div className="mx-5 mt-2.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-[11.5px] text-amber-800 dark:text-amber-300">
             <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
             <span>

@@ -116,8 +116,10 @@ export function JobContextMenu({
               </div>
               <span>Edit Job</span>
             </button>
+          </>
+        )}
 
-            {(canAssignRecruiters ?? hasEditPermission) && (
+            {canAssignRecruiters && (
               <button
                 onClick={() => {
                   onOpenAssignModal(job);
@@ -131,8 +133,6 @@ export function JobContextMenu({
                 <span>Assign Recruiters / Pods</span>
               </button>
             )}
-          </>
-        )}
 
         <button
           onClick={() => {

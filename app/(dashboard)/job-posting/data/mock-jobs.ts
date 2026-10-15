@@ -47,6 +47,7 @@ export interface Job {
   agingDays: number;
   /** Recruitment pod assigned via round-robin on job creation */
   podId?: string | null;
+  podIds?: string[];
   podName?: string | null;
   branchId?: string;
   branchName?: string;
@@ -122,6 +123,7 @@ export function mapApiJobToJob(api: any): Job {
     pipeline: api.pipeline || { applied: 0, interviewing: 0, offered: 0 },
     agingDays: api.agingDays || 0,
     podId: api.podId || undefined,
+    podIds: api.podIds || (api.podId ? [api.podId] : []),
     podName: api.podName || undefined,
     branchId: api.branchId || undefined,
     branchName: api.branchName || undefined,
