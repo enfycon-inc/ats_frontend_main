@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Camera, Building2, MapPin, Mail, Save, UserRound, Loader2 } from 'lucide-react';
+import { Camera, Building2, MapPin, Mail, Save, UserRound, Loader2, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { EmailIntegrationTab } from '@/components/profile/email-integration-tab';
 import { EmailSignatureTab } from '@/components/profile/email-signature-tab';
@@ -83,7 +83,7 @@ export default function ViewProfilePage() {
           <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">{profile.fullName}</h1>
           <p className="text-xs text-slate-500 break-all">{profile.email}</p>
           <div aria-label="Assigned roles" className="flex flex-wrap gap-1.5">{roleNames.length ? roleNames.map(name => <span key={name} className="text-[10.5px] font-semibold rounded-md px-2 py-1 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">{name}</span>) : <span className="text-xs text-slate-500">No assigned roles</span>}</div>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-600 dark:text-slate-400 pt-1">{profile.branchName && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{profile.branchName}</span>}{profile.businessUnitName && <span className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" />{profile.businessUnitName}</span>}{profile.tenant?.name && <span>{profile.tenant.name}</span>}</div>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-600 dark:text-slate-400 pt-1">{profile.branchName && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{profile.branchName}</span>}{profile.businessUnitName && <span className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" />{profile.businessUnitName}</span>}{profile.podName && <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{profile.podName}</span>}{profile.tenant?.name && <span>{profile.tenant.name}</span>}</div>
         </div>
       </div>
     </section>
