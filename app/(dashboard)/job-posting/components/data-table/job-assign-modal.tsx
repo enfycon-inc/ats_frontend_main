@@ -246,7 +246,7 @@ export function JobAssignModal({
 
   const isHigherRole = isSuperOrTenantAdmin || isBranchAdmin || isUnitAdmin || isDeliveryHead || userPerms.includes("job:assign");
 
-  const canAssignPods = isHigherRole || userPerms.includes("job:assign_pod");
+  const canAssignPods = userPerms.includes("job:assign_pod");
 
   // Pod Head role & active pod detection
   const myPod = useMemo(() => {
@@ -293,6 +293,7 @@ export function JobAssignModal({
   }, [canAssignPods, targetUnit, targetBranch]);
 
   const branchAllowsDirectStaff = useMemo(() => {
+    if (!userPerms.includes('job:assign_recruiter')) return false;
     const targetPolicy = targetUnit || targetBranch;
     if (!targetPolicy) return true;
     const allowDirect = targetPolicy.allowDirect ?? targetPolicy.allow_direct;
@@ -300,7 +301,7 @@ export function JobAssignModal({
     const allowDirectStaff = targetPolicy.allowDirectStaff ?? targetPolicy.allow_direct_staff;
     if (allowDirectStaff === false) return false;
     return true;
-  }, [targetUnit, targetBranch]);
+  }, [targetUnit, targetBranch, userPerms]);
 
   // â”€â”€â”€ SCOPED PODS & USERS (Role Scoping) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const targetBranchPods = useMemo(() => {
@@ -667,6 +668,7 @@ export function JobAssignModal({
 
 
 
+  const [assignmentReason, setAssignmentReason] = useState("");
   const handleSaveCombinedAssignment = async (override?: { unassignAll?: boolean }) => {
     if (!job) return;
     if (!canAssignRecruitersToJob(job, currentUser)) {
@@ -676,6 +678,10 @@ export function JobAssignModal({
     setIsAssigning(true);
     try {
       const payload: Record<string, any> = {};
+      if (currentUser?.permissions?.includes('job:override_assignment')) {
+        if (!assignmentReason.trim()) { toast.error('Enter the emergency assignment reason.'); setIsAssigning(false); return; }
+        payload.assignmentReason = assignmentReason.trim();
+      }
 
       if (override?.unassignAll) {
         if (canAssignPods) {
@@ -719,6 +725,9 @@ export function JobAssignModal({
         }
       }
 
+      if (!userPerms.includes('job:assign_recruiter')) {
+        delete payload.recruiterId; delete payload.recruiterIds; delete payload.recruiter; delete payload.assignedTo;
+      }
       await atsApi.jobs.update(job.id, payload);
 
       onSuccess({
@@ -1220,6 +1229,7 @@ export function JobAssignModal({
         </div>
 
         {/* Footer */}
+        {currentUser?.permissions?.includes('job:override_assignment') && <div className="px-6 pb-3"><label htmlFor="assignment-reason" className="text-xs font-semibold">Emergency assignment reason</label><Input id="assignment-reason" value={assignmentReason} onChange={event => setAssignmentReason(event.target.value)} maxLength={2000} placeholder="Why is this override needed?" className="mt-1 text-xs" /></div>}
         <DialogFooter className="px-5 py-2.5 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/70 dark:bg-slate-850/70 flex flex-row items-center justify-between sm:justify-between">
           {!isPodHead && <Button
             type="button"

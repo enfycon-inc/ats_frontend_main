@@ -147,6 +147,7 @@ type FormValues = zod.infer<typeof formSchema>;
 
 export function GlobalStandardForm({ editJobId }: { editJobId?: string }) {
   const router = useRouter();
+  const [assignmentReason, setAssignmentReason] = useState('');
   const { data: session, status } = useSession();
   const [isJobLoading, setIsJobLoading] = useState(!!editJobId);
 
@@ -519,7 +520,7 @@ const getInitialActiveBranchContext = () => {
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const assignmentPolicy = selectedUnitObj;
   const automaticPods = usesAutomaticPods(assignmentPolicy);
-  const canAssignRecruiters = !!currentUserProfile?.permissions?.includes("job:assign_recruiter");
+  const canAssignRecruiters = !!currentUserProfile?.permissions?.includes("job:assign_recruiter") && !!currentUserProfile?.permissions?.includes("job:override_assignment");
   const canAssignPods = !!currentUserProfile?.permissions?.includes("job:assign_pod");
   const canAssignJob = canAssignRecruiters || canAssignPods;
   const assignmentRequired = assignmentPolicy?.allowUnassigned !== true;
@@ -539,7 +540,7 @@ const getInitialActiveBranchContext = () => {
   useEffect(() => {
     let cancelled = false;
     setBranchUsers([]);
-    if (!currentUserProfile?.permissions?.includes("job:assign_recruiter") || !selectedUnitId) return;
+    if (!currentUserProfile?.permissions?.includes("job:assign_recruiter") && !!currentUserProfile?.permissions?.includes("job:override_assignment") || !selectedUnitId) return;
     const unit = availableUnits.find(unit => unit.id === selectedUnitId);
     atsApi.jobs.staffingOptions({ branchId: unit?.branchId || unit?.branch_id || currentUserProfile.branchId,
       businessUnitId: selectedUnitId }).then(staff => {
@@ -1292,6 +1293,7 @@ const getInitialActiveBranchContext = () => {
 
       // Map frontend form fields → backend CreateJobDto
       const payload = {
+        assignmentReason: assignmentReason.trim(),
         jobCode: data.jobCode,
         branchId: selectedUnitObj?.branchId || (typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') || undefined : undefined),
         businessUnitId: selectedUnitId || undefined,
@@ -1775,6 +1777,7 @@ const getInitialActiveBranchContext = () => {
           onSubmit={handleSubmit(onSubmit)}
           className="flex-1 flex flex-col min-h-0 bg-neutral-50/20 dark:bg-slate-900/10"
         >
+          {canAssignRecruiters && <div className="border-b border-amber-200 bg-amber-50 p-3 dark:bg-slate-900"><label className="text-xs font-semibold">Emergency assignment reason<input value={assignmentReason} onChange={event => setAssignmentReason(event.target.value)} maxLength={2000} placeholder="Required when overriding recruiter or pod assignment" className="mt-1 block h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs text-slate-900" /></label></div>}
           {/* Top Sticky Action Bar */}
           <div className="p-3 border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 sticky top-0 z-20 backdrop-blur-sm shrink-0">
             <div className="flex items-center gap-2">

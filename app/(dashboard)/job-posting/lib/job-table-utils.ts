@@ -321,58 +321,6 @@ export function isJobCreatedByUser(job: Job, currentUser: any): boolean {
 }
 
 export function canAssignRecruitersToJob(job: Job, currentUser: any): boolean {
-  if (!job || !currentUser) return false;
-
-  const perms: string[] = Array.isArray(currentUser.permissions) ? currentUser.permissions : [];
-  const roles: string[] = (currentUser.roles || []).map((r: string) => r.toUpperCase().replace(/[\s-_]+/g, ""));
-  const sysRole = (currentUser.systemRole || (currentUser as any).system_role || "").toUpperCase().replace(/[\s-_]+/g, "");
-  const podLead = roles.includes("PODLEAD") || roles.includes("PODHEAD") || ["PODLEAD", "PODHEAD"].includes(sysRole);
-  if (podLead) {
-    const ownPodId = currentUser.podId || (currentUser as any).pod_id;
-    const jobPodIds = String((job as any).podId || "").split(",").map(id => id.trim()).filter(Boolean);
-    return !!ownPodId && jobPodIds.includes(ownPodId);
-  }
-  const actorRoles = [...roles, sysRole];
-  const recruiterOnly = actorRoles.includes("RECRUITER") && !actorRoles.some(role =>
-    ["ACCOUNTMANAGER", "BDM", "DELIVERYHEAD", "BRANCHADMIN", "UNITADMIN", "TENANTADMIN", "SUPERADMIN"].includes(role)
-  );
-  if (recruiterOnly) return false;
-
-  // 1. Tenant Admin clearance
-  const isTenantAdmin =
-    sysRole === "TENANTADMIN" ||
-    sysRole === "SUPERADMIN" ||
-    roles.includes("TENANTADMIN") ||
-    roles.includes("SUPERADMIN") ||
-    perms.some((p: string) => ["tenant:manage", "tenant:settings", "platform:manage", "*"].includes(p));
-
-  // 2. Branch Admin clearance
-  const isBranchAdmin =
-    sysRole === "BRANCHADMIN" ||
-    roles.includes("BRANCHADMIN") ||
-    perms.includes("branch_admin:manage");
-
-  // 3. Unit Admin clearance
-  const isUnitAdmin =
-    sysRole === "UNITADMIN" ||
-    roles.includes("UNITADMIN") ||
-    perms.includes("unit_admin:manage");
-
-  // 4. Delivery Head clearance
-  const isDeliveryHead =
-    sysRole === "DELIVERYHEAD" ||
-    roles.includes("DELIVERYHEAD") ||
-    roles.includes("DELIVERY_HEAD") ||
-    (perms.includes("job:assign") && !roles.includes("ACCOUNTMANAGER") && sysRole !== "ACCOUNTMANAGER");
-
-  // Supervisory roles (Delivery Head, Branch Unit, Unit Admin, Tenant Admin) can assign on ANY job from the job board
-  if (isTenantAdmin || isBranchAdmin || isUnitAdmin || isDeliveryHead || perms.includes("job:assign")) {
-    return true;
-  }
-
-  // 5. Account Manager / Other roles: ONLY allowed to assign recruiters on their own created jobs IF enabled by tenant admin
-  const hasAssignRecruiterPerm = perms.includes("job:assign_recruiter");
-  if (!hasAssignRecruiterPerm) return false;
-
-  return isJobCreatedByUser(job, currentUser);
+  const permissions: string[] = currentUser?.permissions || [];
+  return permissions.includes('job:assign_recruiter') || permissions.includes('job:assign_pod');
 }

@@ -21,7 +21,7 @@ const imports = {
 new Function('exports', 'require', code)(moduleValue.exports, name => imports[name]);
 function dialog(overrides = {}) {
   return renderToStaticMarkup(React.createElement(moduleValue.exports.JobAssignmentModal, {
-    isOpen: true, onClose() {}, onApply() {}, assignmentType: 'pod', selectedPodId: null,
+    isOpen: true, onClose() {}, onApply() {}, assignmentType: 'pod', selectedPodIds: [],
     selectedRecruiterIds: [], podsList: [], recruitersList: [], canAssignPods: true, canAssignRecruiters: true,
     activeBranch: { allowPods: true, allowNone: true, allowUnassigned: false }, ...overrides,
   }));
@@ -57,6 +57,6 @@ test('disabled unit channels stay hidden even if records exist', () => {
   assert.doesNotMatch(html, /Recruitment Pods|Individual Recruiters/);
 });
 test('a selected pod satisfies mandatory assignment', () => {
-  const html = dialog({ selectedPodId: 'pod', podsList: [{ id: 'pod', name: 'Unit Pod' }] });
+  const html = dialog({ selectedPodIds: ['pod'], podsList: [{ id: 'pod', name: 'Unit Pod' }] });
   assert.doesNotMatch(html, /disabled=""[^>]*>Apply Assignment/);
 });
