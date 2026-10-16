@@ -74,13 +74,9 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
   useEffect(() => {
     const element = workspace.current;
     if (!element) return;
-    const container = element.closest<HTMLElement>('[data-slot="sidebar-inset"]');
-    const previousOverflow = container?.style.overflowY;
-    const previousScroll = container?.scrollTop;
-    if (container) { container.scrollTop = 0; container.style.overflowY = 'hidden'; }
     const size = () => {
       const bottom = window.visualViewport ? window.visualViewport.height + window.visualViewport.offsetTop : window.innerHeight;
-      element.style.height = `${Math.max(0, bottom - element.getBoundingClientRect().top - 8)}px`;
+      element.style.height = `${Math.max(400, bottom - element.getBoundingClientRect().top - 8)}px`;
     };
     size();
     const observer = new ResizeObserver(size);
@@ -89,7 +85,6 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
     window.visualViewport?.addEventListener('resize', size);
     return () => {
       observer.disconnect(); window.removeEventListener('resize', size); window.visualViewport?.removeEventListener('resize', size);
-      if (container) { container.style.overflowY = previousOverflow || ''; container.scrollTop = previousScroll || 0; }
     };
   }, [submission?.id]);
   const retry = () => { setSubmission(null); setAssessment(null); setLoadError(''); setError(''); setRevision(r => r + 1); };

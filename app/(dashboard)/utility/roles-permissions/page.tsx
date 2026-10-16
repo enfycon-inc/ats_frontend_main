@@ -557,6 +557,14 @@ export default function RolesPermissionsPage() {
     return roles.filter((r) => !r.isSystem);
   }, [roles]);
 
+  // Pod Lead is a tenant singleton. Keep the existing role visible in the
+  // create flow so administrators can manage it instead of guessing why the
+  // archetype is unavailable.
+  const existingPodLeadRole = useMemo(
+    () => customRolesList.find((role) => isAutomaticPodLeadRole(role)),
+    [customRolesList],
+  );
+
   const filteredRoles = useMemo(() => {
     let list = selectedBranchFilter === "all"
       ? customRolesList
@@ -1665,12 +1673,44 @@ export default function RolesPermissionsPage() {
                   onChange={(e) => handleCreateArchetypeChange(e.target.value)}
                   className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN" && a.key !== "TENANT_ADMIN" && (a.key !== "POD_LEAD" || !roles.some(r => !r.isSystem && isAutomaticPodLeadRole(r)))).map((arch) => (
+                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN" && a.key !== "TENANT_ADMIN").map((arch) => (
                       <option key={arch.key} value={arch.key}>
-                        {arch.label.replace(" Template", "")}
+                        {arch.key === "POD_LEAD" && existingPodLeadRole
+                          ? `${arch.label.replace(" Template", "")} (already configured)`
+                          : arch.label.replace(" Template", "")}
                       </option>
                     ))}
                 </select>
+                {newRoleSystemRole === "POD_LEAD" && existingPodLeadRole && (
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3 dark:border-blue-900/60 dark:bg-blue-950/30">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-blue-900 dark:text-blue-100">
+                        A Pod Lead role is already configured: {existingPodLeadRole.name}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-blue-800/80 dark:text-blue-200/80">
+                        Only one is allowed per tenant. Edit the existing role to change its name or make it available across units.
+                      </p>
+                    </div>
+                    {canManageRole(existingPodLeadRole) ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 border-blue-300 text-blue-800 hover:bg-blue-100 dark:border-blue-800 dark:text-blue-100 dark:hover:bg-blue-900/50"
+                        onClick={() => {
+                          setShowAddRole(false);
+                          openEditRoleModal(existingPodLeadRole);
+                        }}
+                      >
+                        Edit existing role
+                      </Button>
+                    ) : (
+                      <span className="shrink-0 text-[11px] font-medium text-blue-800 dark:text-blue-200">
+                        Ask a tenant administrator to edit it.
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Overall Collapsible Permissions Matrix Section */}
@@ -1881,10 +1921,14 @@ export default function RolesPermissionsPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || (newRoleSystemRole === "POD_LEAD" && !!existingPodLeadRole)}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 shadow-xs cursor-pointer"
                 >
-                  {submitting ? "Creating Role..." : "Create Custom Role"}
+                  {submitting
+                    ? "Creating Role..."
+                    : newRoleSystemRole === "POD_LEAD" && existingPodLeadRole
+                      ? "Pod Lead Role Already Exists"
+                      : "Create Custom Role"}
                 </Button>
               </div>
             </form>

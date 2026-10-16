@@ -10,6 +10,16 @@ export function ReviewSplit({ left, right, expanded }: { left: ReactNode; right:
   const container = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(55);
   const [dragging, setDragging] = useState(false);
+  const [isLg, setIsLg] = useState(true);
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    setIsLg(media.matches);
+    const handler = (e: MediaQueryListEvent) => setIsLg(e.matches);
+    media.addEventListener('change', handler);
+    return () => media.removeEventListener('change', handler);
+  }, []);
+
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       try {
@@ -24,8 +34,8 @@ export function ReviewSplit({ left, right, expanded }: { left: ReactNode; right:
     setWidth(next);
     try { localStorage.setItem(preferenceKey, String(next)); } catch { /* Keep resizing available. */ }
   }
-  return <div ref={container} style={{ '--review-left': `${width}fr`, '--review-right': `${100 - width}fr` } as CSSProperties}
-    className={`grid min-h-0 flex-1 gap-2 ${dragging ? 'select-none' : ''} ${expanded ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,var(--review-left))_16px_minmax(0,var(--review-right))]'}`}>
+  return <div ref={container} style={{ gridTemplateColumns: expanded || !isLg ? '1fr' : `minmax(0, ${width}fr) 16px minmax(0, ${100 - width}fr)` } as CSSProperties}
+    className={`grid min-h-0 flex-1 gap-2 ${dragging ? 'select-none' : ''}`}>
     {left}
     {!expanded && <div className="hidden min-h-0 flex-col items-center justify-center gap-2 lg:flex">
       <div role="separator" aria-label="Resize comparison and resume panels" aria-orientation="vertical" aria-valuemin={35} aria-valuemax={65} aria-valuenow={Math.round(width)} tabIndex={0}
