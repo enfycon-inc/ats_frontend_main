@@ -37,6 +37,8 @@ export function useJobTableData({ data, branchUsesPods }: UseJobTableDataOptions
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("active_branch_allow_pods");
       if (stored !== null) return stored === "true";
+      const user = atsApi.auth.getCurrentUser();
+      if ((user as any)?.podSystemEnabled !== false) return true;
     }
     return false;
   }, [branchUsesPods]);

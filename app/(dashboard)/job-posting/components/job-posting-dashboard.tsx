@@ -27,20 +27,19 @@ import { getUserColumnPreferences, saveUserColumnPreferences } from "@/utils/use
 const getBaseJobColumns = (usesPods: boolean) => [
   "jobCode",
   "jobTitle",
-  "assignedTo",
   "businessUnit",
-  "jobStatus",
   "createdBy",
-  
+  "assignedTo",
+  ...(usesPods ? ["podName"] : []),
   "client",
   "endClientName",
   "location",
   "states",
   "priority",
-  ...(usesPods ? ["podName"] : []),
   "clientBillRate",
   "payRate",
   "submissionsCount",
+  "jobStatus",
 ];
 
 const matchStatus = (jobStatus: string, filter: string) => {
@@ -169,13 +168,24 @@ export default function JobPostingDashboard({
       try {
         const branches = await atsApi.branches.list();
         const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
-        const currentBranch = branches.find((b: any) => b.id === activeBranchId) || branches[0];
-        if (currentBranch) {
-          const podsAllowed = Boolean(currentBranch.allowPods ?? (currentBranch.podsCount > 0 && currentBranch.allowPods !== false));
-          setBranchUsesPods(podsAllowed);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("active_branch_allow_pods", String(podsAllowed));
-          }
+        const tenantHasPods = (currentUser as any)?.podSystemEnabled !== false;
+
+        // Find active branch, or user's assigned branch, or any branch allowing pods
+        const currentBranch =
+          branches.find((b: any) => b.id === (activeBranchId || (currentUser as any)?.branchId)) ||
+          branches.find((b: any) => b.allowPods !== false) ||
+          branches[0];
+
+        const podsAllowed =
+          tenantHasPods &&
+          Boolean(
+            currentBranch?.allowPods !== false ||
+            branches.some((b: any) => b.allowPods !== false || (b.podsCount && b.podsCount > 0))
+          );
+
+        setBranchUsesPods(podsAllowed);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("active_branch_allow_pods", String(podsAllowed));
         }
       } catch (e) {
         console.warn("Could not determine branch pod support:", e);
@@ -188,14 +198,22 @@ export default function JobPostingDashboard({
     };
     window.addEventListener("branchChanged", handleBranchChange);
     return () => window.removeEventListener("branchChanged", handleBranchChange);
-  }, []);
+  }, [currentUser]);
 
   // Sanitize user columns: remove legacy recruiter / recruitmentManager,
-  // and remove podName only if the current branch does not use pods.
+  // ensure podName is restored right after assignedTo when pods are enabled,
+  // or remove podName only if the pod system is disabled.
   const sanitizeColumns = useCallback((cols: string[], usesPods: boolean) => {
     let clean = cols.filter((c) => c !== "recruitmentManager");
     if (!usesPods) {
       clean = clean.filter((c) => c !== "podName");
+    } else if (!clean.includes("podName")) {
+      const assignedToIndex = clean.indexOf("assignedTo");
+      if (assignedToIndex !== -1) {
+        clean.splice(assignedToIndex + 1, 0, "podName");
+      } else {
+        clean.push("podName");
+      }
     }
     return clean;
   }, []);
@@ -375,17 +393,17 @@ export default function JobPostingDashboard({
     const cols = [
       { id: "jobCode", label: "Job Code" },
       { id: "jobTitle", label: "Job Title" },
-      { id: "assignedTo", label: "Recruiter" },
       { id: "businessUnit", label: "Business Unit" },
-      { id: "jobStatus", label: "Job Status" },
       { id: "createdBy", label: "Job Created By" },
+      { id: "assignedTo", label: "Recruiter" },
+      ...(branchUsesPods ? [{ id: "podName", label: "Assigned Pod" }] : []),
       { id: "client", label: "Client" },
       { id: "endClientName", label: "End Client" },
       { id: "clientJobId", label: "Client Job ID" },
       { id: "location", label: "Work Mode" },
       { id: "states", label: "States" },
       { id: "priority", label: "Priority" },
-      ...(branchUsesPods ? [{ id: "podName", label: "Assigned Pod" }] : []),
+      { id: "jobStatus", label: "Job Status" },
       {
         id: "clientBillRate",
         label: market === "IN" ? "Client Bill Rate / CTC" : "Client Bill Rate / Salary",

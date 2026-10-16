@@ -1541,8 +1541,7 @@ function BranchSwitcher() {
         const fresh = await atsApi.auth.getProfile();
         if (cancelled || !fresh) return;
         setProfile(fresh);
-        const permissions = fresh.permissions || [];
-        if (!permissions.some((p: string) => ["tenant:settings", "tenant:manage", "platform:manage"].includes(p))) {
+        if (fresh.branchId) {
           if (syncAssignedOffice(fresh, localStorage)) window.dispatchEvent(new Event("branchChanged"));
         }
       } catch { if (!cancelled) setProfile(null); }
