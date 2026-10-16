@@ -894,11 +894,10 @@ function ProfileDropdownNav() {
   const { data: session } = useSession();
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<any[]>([]);
-  const [rolesLoaded, setRolesLoaded] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
-  const { data: liveUser, loading: profileLoading } = useStaffProfile();
-  const liveUserLoaded = !profileLoading;
+  const { data: liveUser, confirmed: profileConfirmed } = useStaffProfile();
+  const roleProfile = profileConfirmed ? liveUser : null;
   const currentUser = liveUser || (typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null);
 
 
@@ -919,12 +918,10 @@ function ProfileDropdownNav() {
 
   useEffect(() => {
     atsApi.auth.listRoles(undefined, true).then(data => {
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setAvailableRoles(data);
       }
-    }).catch(() => {}).finally(() => {
-      setRolesLoaded(true);
-    });
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -937,131 +934,7 @@ function ProfileDropdownNav() {
 
   const userName = currentUser?.fullName || (session as any)?.user?.name || "My account";
   const userAvatar = currentUser ? (currentUser.avatar || currentUser.profilePicture || null) : ((session as any)?.user?.image || null);
-  const userRoles = currentUser?.roles || (session as any)?.user?.roles || [];
-  const systemRole = (currentUser as any)?.systemRole || (session as any)?.user?.systemRole || userRoles[0];
-
-  const IGNORED_KEYCLOAK_ROLES = new Set([
-    "DEFAULT_ROLES_ENFYCON_ATS",
-    "DEFAULT_ROLES_ATS",
-    "DEFAULT_ROLES",
-    "OFFLINE_ACCESS",
-    "UMA_AUTHORIZATION",
-    "MANAGE_ACCOUNT",
-    "MANAGE_ACCOUNT_LINKS",
-    "VIEW_PROFILE",
-    "ACCOUNT",
-    "ADMIN_CLI",
-    "BROKER",
-    "REALM_ADMIN",
-    "CREATE_CLIENT",
-    "MANAGE_USERS",
-    "MANAGE_REALM",
-    "MANAGE_EVENTS",
-    "MANAGE_CLIENTS",
-    "MANAGE_AUTHORIZATION",
-    "VIEW_USERS",
-    "VIEW_REALM",
-    "VIEW_EVENTS",
-    "VIEW_CLIENTS",
-    "VIEW_AUTHORIZATION",
-    "IMPERSONATION",
-    "USER",
-  ]);
-
-  const isTechnicalKeycloakRole = (r: string): boolean => {
-    if (!r || typeof r !== "string") return true;
-    const upper = r.trim().toUpperCase().replace(/[-\s]/g, "_");
-    if (upper.startsWith("DEFAULT_ROLES_") || upper.startsWith("DEFAULT_ROLES")) return true;
-    return IGNORED_KEYCLOAK_ROLES.has(upper);
-  };
-
-  const systemRoleLabels: Record<string, string> = {
-    SUPER_ADMIN: "Global Admin",
-    TENANT_ADMIN: "Tenant Admin",
-    BRANCH_ADMIN: "Branch Admin",
-    ACCOUNT_MANAGER: "Account Manager",
-    POD_LEAD: "Pod Lead",
-    DELIVERY_HEAD: "Delivery Head",
-    RECRUITER: "Recruiter",
-    SENSE: "Sense",
-    FINANCE_ADMIN: "Finance Admin",
-  };
-
-  // Dynamically resolve display label for any system role or tenant custom role alias
-  const getDynamicRoleLabel = (roleStr: string): string => {
-    if (!roleStr) return "User";
-    if (isTechnicalKeycloakRole(roleStr)) return "Recruiter";
-
-    const found = availableRoles.find(
-      (r: any) => r.id === roleStr || r.name?.toUpperCase() === roleStr.toUpperCase()
-    );
-    if (found) {
-      return found.name;
-    }
-
-    const upper = roleStr.toUpperCase();
-    if (systemRoleLabels[upper]) {
-      return systemRoleLabels[upper];
-    }
-    return roleStr.replace(/_/g, " ");
-  };
-
-  // Single branch architecture: collect all assigned role UUIDs
-  const assignedRoleIds: string[] = useMemo(() => {
-    const ids = new Set<string>();
-    if (currentUser?.roleId) ids.add(currentUser.roleId);
-    if (Array.isArray(currentUser?.assignedRoleIds)) {
-      currentUser.assignedRoleIds.forEach((id: string) => {
-        if (id && typeof id === "string") ids.add(id);
-      });
-    }
-    return Array.from(ids);
-  }, [currentUser]);
-
-  // Resolve assigned role objects directly by UUID from availableRoles
-  const userAssignedRoleObjs = useMemo(() => {
-    if (!availableRoles || availableRoles.length === 0) return [];
-
-    // 1. Primary: match by exact role UUID
-    const matchedByUuid = assignedRoleIds
-      .map((id) => availableRoles.find((r: any) => r.id === id))
-      .filter((r: any): r is any => Boolean(r));
-
-    if (matchedByUuid.length > 0) return matchedByUuid;
-
-    // 2. Fallback: match by role names (for legacy token sessions)
-    const legacyNames = currentUser?.roles || (session as any)?.user?.roles || [];
-    const matchedByName = legacyNames
-      .map((name: string) => {
-        const u = typeof name === "string" ? name.trim().toUpperCase() : "";
-        return availableRoles.find(
-          (r: any) => r.name?.toUpperCase() === u || r.systemRole?.toUpperCase() === u
-        );
-      })
-      .filter((r: any): r is any => Boolean(r));
-
-    if (matchedByName.length > 0) return matchedByName;
-
-    // 3. Fallback: single live system role
-    if (currentUser?.systemRole) {
-      const sys = currentUser.systemRole.toUpperCase();
-      const matchedSys = availableRoles.find(
-        (r: any) => r.systemRole?.toUpperCase() === sys || r.name?.toUpperCase() === sys
-      );
-      if (matchedSys) return [matchedSys];
-    }
-
-    return [];
-  }, [assignedRoleIds, availableRoles, currentUser, session]);
-
-  const isUserAdmin = useMemo(() => {
-    const sRole = (currentUser?.systemRole || systemRole || "").toUpperCase();
-    if (sRole === "TENANT_ADMIN" || sRole === "SUPER_ADMIN") return true;
-    return userAssignedRoleObjs.some((r: any) => {
-      const u = (r.systemRole || r.name || "").toUpperCase();
-      return u.includes("TENANT_ADMIN");
-    });
-  }, [currentUser, systemRole, userAssignedRoleObjs]);
+  const userEmail = liveUser?.email || (session as any)?.user?.email || currentUser?.email || "";
 
   // Role icon and color styling resolver based on canonical system archetype
   const getRoleIconAndColor = (roleObjOrStr?: any) => {
@@ -1126,7 +999,7 @@ function ProfileDropdownNav() {
     };
   };
 
-  // Build the list of dashboard perspectives showing actual assigned roles
+  // Dashboard roles are exposed only after the current /me response is confirmed.
   const dashboardRoleOptions = useMemo(() => {
     const seen = new Set<string>();
     const options: {
@@ -1138,7 +1011,7 @@ function ProfileDropdownNav() {
       replacesSystemRole?: string;
     }[] = [];
 
-    for (const role of getDashboardRoleSelection(currentUser, availableRoles, overrideRole).options) {
+    for (const role of getDashboardRoleSelection(roleProfile, availableRoles, overrideRole).options) {
       if (!role || seen.has(role.id)) continue;
       seen.add(role.id);
 
@@ -1153,43 +1026,24 @@ function ProfileDropdownNav() {
       });
     }
 
-    // If options could not be resolved from availableRoles yet, fallback to live user data
-    if (options.length === 0) {
-      const fallback = getDashboardRoleSelection(currentUser, availableRoles, overrideRole).active;
-      const fallbackRole = fallback.name;
-      if (!isTechnicalKeycloakRole(fallbackRole)) {
-        const name = getDynamicRoleLabel(fallbackRole);
-        const { Icon, colorClass } = getRoleIconAndColor(fallbackRole);
-        options.push({
-          id: fallback.id || fallbackRole,
-          key: fallbackRole,
-          name,
-          Icon,
-          colorClass,
-        });
-      }
-    }
-
     return options;
-  }, [currentUser, availableRoles, overrideRole]);
+  }, [roleProfile, availableRoles, overrideRole]);
 
   const activeRoleOption = useMemo(() => {
-    return getDashboardRoleSelection(currentUser, availableRoles, overrideRole).active;
-  }, [overrideRole, availableRoles, currentUser]);
+    return getDashboardRoleSelection(roleProfile, availableRoles, overrideRole).active;
+  }, [overrideRole, availableRoles, roleProfile]);
 
-  const displayRole = rolesLoaded && liveUserLoaded ? activeRoleOption.name : "Loading…";
+  const displayRole = roleProfile && activeRoleOption.name ? activeRoleOption.name : "Loading…";
 
-  // Format subtitle showing ONLY the active / switched role, as requested by user
-  const rolesSubtitle = useMemo(() => {
-    return displayRole || "User";
-  }, [displayRole]);
+  const rolesSubtitle = displayRole;
 
   const isItemActive = (key: string, id?: string) => {
     return id ? activeRoleOption.id === id : activeRoleOption.name === key;
   };
 
   const handleSwitchRole = (roleName: string | null) => {
-    saveDashboardRole(currentUser, roleName);
+    if (!roleProfile) return;
+    saveDashboardRole(roleProfile, roleName);
     if (typeof window !== "undefined") {
       if (roleName) {
         localStorage.setItem("override_role", roleName);
@@ -1266,7 +1120,7 @@ function ProfileDropdownNav() {
           </span>
           <span className="text-[10px] font-semibold text-fuchsia-300 dark:text-fuchsia-300 flex items-center gap-1 leading-none mt-0.5">
             <Sparkles className="w-2.5 h-2.5 text-fuchsia-300 flex-shrink-0" />
-            <span className="truncate max-w-[95px]">{displayRole || "Admin"}</span>
+            <span className="truncate max-w-[95px]">{displayRole}</span>
           </span>
         </div>
 
@@ -1304,6 +1158,14 @@ function ProfileDropdownNav() {
               <h4 className="text-[14px] font-bold text-slate-900 dark:text-slate-100 leading-snug truncate">
                 {userName}
               </h4>
+              {userEmail && (
+                <p
+                  className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate leading-tight mt-0.5"
+                  title={userEmail}
+                >
+                  {userEmail}
+                </p>
+              )}
               <p
                 className="text-[11px] font-medium text-slate-400 dark:text-slate-400 truncate leading-tight mt-0.5"
                 title={rolesSubtitle}
@@ -1319,7 +1181,11 @@ function ProfileDropdownNav() {
           </div>
 
           <div className="max-h-[220px] overflow-y-auto space-y-0.5 pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
-            {dashboardRoleOptions.map((opt) => {
+            {!roleProfile || !activeRoleOption.name || dashboardRoleOptions.length === 0 ? (
+              <div role="status" className="px-2.5 py-2 text-[12px] text-slate-500 dark:text-slate-400">
+                Loading assigned roles…
+              </div>
+            ) : dashboardRoleOptions.map((opt) => {
               const isActive = isItemActive(opt.key, opt.id);
               const OptionIcon = opt.Icon;
               return (

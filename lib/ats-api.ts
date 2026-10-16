@@ -149,10 +149,10 @@ function clearToken() {
   }
 }
 
-function setCurrentUser(user: any) {
+function setCurrentUser(user: any, notifyProfileChange = true) {
   if (typeof window !== 'undefined') {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
-    window.dispatchEvent(new CustomEvent('atsProfileChanged', { detail: user }));
+    if (notifyProfileChange) window.dispatchEvent(new CustomEvent('atsProfileChanged', { detail: user }));
   }
 }
 
@@ -175,20 +175,31 @@ async function fetchSessionToken(): Promise<string | null> {
         const token = session.user.accessToken;
         setToken(token);
         if (session.user) {
+          const cachedUser = getCurrentUser();
+          const sameIdentity = cachedUser?.id === session.user.id && cachedUser?.tenantId === session.user.tenantId;
+          const previousUser = sameIdentity ? cachedUser : {};
+          // Session data is intentionally sparse. Cache it for identity display without
+          // broadcasting it as a complete /me profile to SWR subscribers.
           setCurrentUser({
+            ...previousUser,
             id: session.user.id,
-            email: session.user.email,
-            fullName: session.user.name,
-            roles: session.user.roles,
+            email: session.user.email || previousUser.email,
+            fullName: session.user.name || previousUser.fullName,
+            roles: session.user.roles || previousUser.roles,
             tenantId: session.user.tenantId,
-            defaultMarket: session.user.defaultMarket,
-            permissions: session.user.permissions || [],
-            systemRole: session.user.systemRole || 'RECRUITER',
-            podId: session.user.podId || null,
-            branchId: session.user.branchId || (session.user as any).branch_id || null,
-            businessUnitId: (session.user as any).businessUnitId || null,
-            assignedBranchIds: (session.user as any).assignedBranchIds || (session.user as any).assigned_branch_ids || [],
-          });
+            defaultMarket: session.user.defaultMarket || previousUser.defaultMarket,
+            permissions: session.user.permissions || previousUser.permissions || [],
+            systemRole: session.user.systemRole || previousUser.systemRole,
+            roleId: (session.user as any).roleId || previousUser.roleId,
+            roleName: (session.user as any).roleName || previousUser.roleName,
+            assignedRoleIds: (session.user as any).assignedRoleIds || previousUser.assignedRoleIds,
+            assignedRoles: (session.user as any).assignedRoles || previousUser.assignedRoles,
+            activeRoleId: (session.user as any).activeRoleId || previousUser.activeRoleId,
+            podId: session.user.podId || previousUser.podId || null,
+            branchId: session.user.branchId || (session.user as any).branch_id || previousUser.branchId || null,
+            businessUnitId: (session.user as any).businessUnitId || previousUser.businessUnitId || null,
+            assignedBranchIds: (session.user as any).assignedBranchIds || (session.user as any).assigned_branch_ids || previousUser.assignedBranchIds || [],
+          }, false);
         }
         return token;
       }

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { atsApi } from "@/lib/ats-api";
 import { saveDashboardRole } from "@/lib/dashboard-preference";
+import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 import { useStaffProfile } from '@/hooks/use-staff-profile';
 import { UserAvatar } from '@/components/shared/user-identity';
 
@@ -26,11 +27,10 @@ export default function ProfileDropdown() {
   const { data: session } = useSession();
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<any[]>([]);
-  const [rolesLoaded, setRolesLoaded] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
-  const { data: liveUser, loading: profileLoading } = useStaffProfile();
-  const liveUserLoaded = !profileLoading;
+  const { data: liveUser, confirmed: profileConfirmed } = useStaffProfile();
+  const roleProfile = profileConfirmed ? liveUser : null;
   const currentUser = liveUser || (typeof window !== "undefined" ? atsApi.auth.getCurrentUser() : null);
 
 
@@ -51,12 +51,10 @@ export default function ProfileDropdown() {
 
   useEffect(() => {
     atsApi.auth.listRoles(undefined, true).then(data => {
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setAvailableRoles(data);
       }
-    }).catch(() => {}).finally(() => {
-      setRolesLoaded(true);
-    });
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -69,134 +67,7 @@ export default function ProfileDropdown() {
 
   const userName = currentUser?.fullName || (session as any)?.user?.name || "My account";
   const userAvatar = currentUser ? (currentUser.avatar || currentUser.profilePicture || null) : ((session as any)?.user?.image || null);
-  const userRoles = currentUser?.roles || (session as any)?.user?.roles || [];
-  // Prefer live systemRole from /me endpoint (stays accurate after pod lead promotion without re-login)
-  const systemRole = (currentUser as any)?.systemRole || (session as any)?.user?.systemRole || userRoles[0];
-
-  const IGNORED_KEYCLOAK_ROLES = new Set([
-    "DEFAULT_ROLES_ENFYCON_ATS",
-    "DEFAULT_ROLES_ATS",
-    "DEFAULT_ROLES",
-    "OFFLINE_ACCESS",
-    "UMA_AUTHORIZATION",
-    "MANAGE_ACCOUNT",
-    "MANAGE_ACCOUNT_LINKS",
-    "VIEW_PROFILE",
-    "ACCOUNT",
-    "ADMIN_CLI",
-    "BROKER",
-    "REALM_ADMIN",
-    "CREATE_CLIENT",
-    "MANAGE_USERS",
-    "MANAGE_REALM",
-    "MANAGE_EVENTS",
-    "MANAGE_CLIENTS",
-    "MANAGE_AUTHORIZATION",
-    "VIEW_USERS",
-    "VIEW_REALM",
-    "VIEW_EVENTS",
-    "VIEW_CLIENTS",
-    "VIEW_AUTHORIZATION",
-    "IMPERSONATION",
-    "USER",
-  ]);
-
-  const isTechnicalKeycloakRole = (r: string): boolean => {
-    if (!r || typeof r !== "string") return true;
-    const upper = r.trim().toUpperCase().replace(/[-\s]/g, "_");
-    if (upper.startsWith("DEFAULT_ROLES_") || upper.startsWith("DEFAULT_ROLES")) return true;
-    return IGNORED_KEYCLOAK_ROLES.has(upper);
-  };
-
-  const systemRoleLabels: Record<string, string> = {
-    SUPER_ADMIN: "Global Admin",
-    TENANT_ADMIN: "Tenant Admin",
-    BRANCH_ADMIN: "Branch Admin",
-    ACCOUNT_MANAGER: "Account Manager",
-    POD_LEAD: "Pod Lead",
-    DELIVERY_HEAD: "Delivery Head",
-    RECRUITER: "Recruiter",
-    SENSE: "Sense",
-    FINANCE_ADMIN: "Finance Admin",
-  };
-
-  const getDynamicRoleLabel = (roleStr: string): string => {
-    if (!roleStr) return "User";
-    if (isTechnicalKeycloakRole(roleStr)) return "Recruiter";
-
-    // Lookup in availableRoles by role UUID or name
-    const found = availableRoles.find(
-      (r) => r.id === roleStr || r.name?.toUpperCase() === roleStr.toUpperCase()
-    );
-    if (found) {
-      return found.name;
-    }
-
-    const upper = roleStr.toUpperCase();
-    if (systemRoleLabels[upper]) {
-      return systemRoleLabels[upper];
-    }
-    return roleStr.replace(/_/g, " ");
-  };
-
-  // Single branch architecture: collect all assigned role UUIDs
-  const assignedRoleIds: string[] = useMemo(() => {
-    const ids = new Set<string>();
-    if (currentUser?.roleId) ids.add(currentUser.roleId);
-    if (Array.isArray(currentUser?.assignedRoleIds)) {
-      currentUser.assignedRoleIds.forEach((id: string) => {
-        if (id && typeof id === "string") ids.add(id);
-      });
-    }
-    return Array.from(ids);
-  }, [currentUser]);
-
-  // Resolve assigned role objects directly by UUID from availableRoles
-  const userAssignedRoleObjs = useMemo(() => {
-    const exactAssigned = (currentUser as any)?.assignedRoles;
-    if (Array.isArray(exactAssigned) && exactAssigned.length > 0) return exactAssigned;
-    if (!availableRoles || availableRoles.length === 0) return [];
-
-    // 1. Primary: match by exact role UUID
-    const matchedByUuid = assignedRoleIds
-      .map((id) => availableRoles.find((r) => r.id === id))
-      .filter((r: any): r is any => Boolean(r));
-
-    if (matchedByUuid.length > 0) return matchedByUuid;
-
-    // 2. Fallback: match by role names (for legacy token sessions)
-    const legacyNames = currentUser?.roles || (session as any)?.user?.roles || [];
-    const matchedByName = legacyNames
-      .map((name: string) => {
-        const u = typeof name === "string" ? name.trim().toUpperCase() : "";
-        return availableRoles.find(
-          (r) => r.name?.toUpperCase() === u || r.systemRole?.toUpperCase() === u
-        );
-      })
-      .filter((r: any): r is any => Boolean(r));
-
-    if (matchedByName.length > 0) return matchedByName;
-
-    // 3. Fallback: single live system role
-    if (currentUser?.systemRole) {
-      const sys = currentUser.systemRole.toUpperCase();
-      const matchedSys = availableRoles.find(
-        (r) => r.systemRole?.toUpperCase() === sys || r.name?.toUpperCase() === sys
-      );
-      if (matchedSys) return [matchedSys];
-    }
-
-    return [];
-  }, [assignedRoleIds, availableRoles, currentUser, session]);
-
-  const isUserAdmin = useMemo(() => {
-    const sRole = (currentUser?.systemRole || systemRole || "").toUpperCase();
-    if (sRole === "TENANT_ADMIN" || sRole === "SUPER_ADMIN") return true;
-    return userAssignedRoleObjs.some((r: any) => {
-      const u = (r.systemRole || r.name || "").toUpperCase();
-      return u.includes("TENANT_ADMIN");
-    });
-  }, [currentUser, systemRole, userAssignedRoleObjs]);
+  const userEmail = liveUser?.email || (session as any)?.user?.email || currentUser?.email || "";
 
   // Role icon and color styling resolver based on canonical system archetype
   const getRoleIconAndColor = (roleObjOrStr?: any) => {
@@ -261,7 +132,7 @@ export default function ProfileDropdown() {
     };
   };
 
-  // Build the list of dashboard perspectives showing actual assigned roles
+  // Dashboard roles are exposed only after the current /me response is confirmed.
   const dashboardRoleOptions = useMemo(() => {
     const seen = new Set<string>();
     const options: {
@@ -273,14 +144,14 @@ export default function ProfileDropdown() {
       replacesSystemRole?: string;
     }[] = [];
 
-    for (const role of userAssignedRoleObjs) {
+    for (const role of getDashboardRoleSelection(roleProfile, availableRoles, overrideRole).options) {
       if (!role || seen.has(role.id)) continue;
       seen.add(role.id);
 
       const { Icon, colorClass } = getRoleIconAndColor(role);
       options.push({
         id: role.id,
-        key: role.name || role.systemRole,
+        key: role.name || role.systemRole || role.id,
         name: role.name,
         Icon,
         colorClass,
@@ -288,53 +159,16 @@ export default function ProfileDropdown() {
       });
     }
 
-    // If options could not be resolved from availableRoles yet, fallback to live user data
-    if (options.length === 0) {
-      const fallbackRole = (currentUser as any)?.systemRole || currentUser?.roleName || "RECRUITER";
-      if (!isTechnicalKeycloakRole(fallbackRole)) {
-        const name = getDynamicRoleLabel(fallbackRole);
-        const { Icon, colorClass } = getRoleIconAndColor(fallbackRole);
-        options.push({
-          id: currentUser?.roleId || fallbackRole,
-          key: fallbackRole,
-          name,
-          Icon,
-          colorClass,
-        });
-      }
-    }
-
     return options;
-  }, [userAssignedRoleObjs, currentUser, availableRoles]);
+  }, [roleProfile, overrideRole, availableRoles]);
 
   const activeRoleOption = useMemo(() => {
-    if (overrideRole) {
-      return (
-        dashboardRoleOptions.find(
-          (opt) =>
-            opt.id === overrideRole ||
-            opt.key === overrideRole ||
-            opt.name.toUpperCase() === overrideRole.toUpperCase()
-        ) || null
-      );
-    }
-    return (
-      dashboardRoleOptions.find((opt) => opt.id === currentUser?.roleId) ||
-      dashboardRoleOptions[0] ||
-      null
-    );
-  }, [overrideRole, dashboardRoleOptions, currentUser]);
+    const selection = getDashboardRoleSelection(roleProfile, availableRoles, overrideRole);
+    return dashboardRoleOptions.find((opt) => opt.id === selection.active.id) || null;
+  }, [overrideRole, dashboardRoleOptions, availableRoles, roleProfile]);
 
-  const displayRole = activeRoleOption?.name || (currentUser?.roleName ? getDynamicRoleLabel(currentUser.roleName) : "Admin");
-
-  // Show combined titles if multiple roles assigned (e.g. "Account Manager + Pod Lead")
-  const rolesSubtitle = useMemo(() => {
-    if (userAssignedRoleObjs.length > 0) {
-      const uniqueNames = Array.from(new Set(userAssignedRoleObjs.map((r: any) => r.name)));
-      return uniqueNames.join(" + ");
-    }
-    return displayRole || "User";
-  }, [userAssignedRoleObjs, displayRole]);
+  const displayRole = roleProfile && activeRoleOption?.name ? activeRoleOption.name : "Loading…";
+  const rolesSubtitle = displayRole;
 
   const isItemActive = (key: string, id?: string) => {
     if (overrideRole) {
@@ -343,14 +177,15 @@ export default function ProfileDropdown() {
       if (overrideRole === id || overrideRole === key || oNorm === kNorm) return true;
       return false;
     }
-    if (id && currentUser?.roleId && id === currentUser.roleId) return true;
+    if (id && roleProfile?.roleId && id === roleProfile.roleId) return true;
     if (activeRoleOption && (activeRoleOption.id === id || activeRoleOption.key === key)) return true;
     return false;
   };
 
   const handleSwitchRole = (roleName: string | null) => {
     if (typeof window !== "undefined") {
-      saveDashboardRole(currentUser, roleName);
+      if (!roleProfile) return;
+      saveDashboardRole(roleProfile, roleName);
       if (roleName) {
         localStorage.setItem("override_role", roleName);
       } else {
@@ -420,7 +255,7 @@ export default function ProfileDropdown() {
           </span>
           <span className="text-[10px] font-semibold text-purple-600 dark:text-fuchsia-300 flex items-center gap-1 leading-none mt-0.5">
             <Sparkles className="w-2.5 h-2.5 flex-shrink-0" />
-            <span className="truncate max-w-[95px]">{displayRole || "Admin"}</span>
+            <span className="truncate max-w-[95px]">{displayRole}</span>
           </span>
         </div>
 
@@ -457,6 +292,14 @@ export default function ProfileDropdown() {
               <h4 className="text-[14px] font-bold text-slate-900 dark:text-slate-100 leading-snug truncate">
                 {userName}
               </h4>
+              {userEmail && (
+                <p
+                  className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate leading-tight mt-0.5"
+                  title={userEmail}
+                >
+                  {userEmail}
+                </p>
+              )}
               <p
                 className="text-[11px] font-medium text-slate-400 dark:text-slate-400 truncate leading-tight mt-0.5"
                 title={rolesSubtitle}
@@ -472,7 +315,11 @@ export default function ProfileDropdown() {
           </div>
 
           <div className="max-h-[220px] overflow-y-auto space-y-0.5 pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
-            {dashboardRoleOptions.map((opt) => {
+            {!roleProfile || !activeRoleOption || dashboardRoleOptions.length === 0 ? (
+              <div role="status" className="px-2.5 py-2 text-[12px] text-slate-500 dark:text-slate-400">
+                Loading assigned roles…
+              </div>
+            ) : dashboardRoleOptions.map((opt) => {
               const isActive = isItemActive(opt.key, opt.id);
               const OptionIcon = opt.Icon;
               return (
