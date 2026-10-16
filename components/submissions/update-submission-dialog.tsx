@@ -145,7 +145,14 @@ export function UpdateSubmissionDialog({ submission, href, onClose, onSaved, onR
           <div className="space-y-5 overflow-y-auto px-6 py-5">
             {!canMaintain && <p className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">Submission statuses are maintained by the Account Manager. Your access is read-only.</p>}
             {!approved && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">Internal approval is required before updating interviews.
-              {caps?.review && <Button type="button" variant="outline" className="ml-3 text-xs" onClick={onReview}>Review submission</Button>}</div>}
+              {caps?.review && <Button type="button" variant="outline" className="ml-3 text-xs" onClick={() => {
+                if (typeof document !== 'undefined') {
+                  document.body.style.pointerEvents = '';
+                  document.body.style.overflow = '';
+                  document.body.removeAttribute('data-scroll-locked');
+                }
+                onReview();
+              }}>Review submission</Button>}</div>}
             {internalRejected && <p className="text-xs text-muted-foreground">Internal review rejected this submission. Interview rounds are read-only.</p>}
             {closed(current.finalStatus) && !internalRejected && <p className="text-xs text-muted-foreground">To correct interview statuses, change Final outcome to In progress and provide a correction reason.</p>}
             <section aria-label="Interview rounds"><h2 className="mb-3 text-sm font-bold">Interview rounds</h2>

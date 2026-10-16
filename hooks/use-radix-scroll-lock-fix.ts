@@ -34,6 +34,27 @@ export function useRadixScrollLockFix() {
     html.style.setProperty("--removed-body-scroll-bar-size", "0px");
 
     // Strategy B: MutationObserver safety net
+    const hasActiveModal = () => {
+      return Boolean(
+        document.querySelector('[role="dialog"], [data-slot="dialog-content"], [data-slot="dialog-overlay"], [data-radix-portal]')
+      );
+    };
+
+    const cleanupBodyLocks = () => {
+      // If there is no active modal in the DOM, body should NEVER be locked or blocking pointer events
+      if (!hasActiveModal()) {
+        if (body.style.pointerEvents === "none") {
+          body.style.pointerEvents = "";
+        }
+        if (body.style.overflow === "hidden") {
+          body.style.overflow = "";
+        }
+        if (body.hasAttribute("data-scroll-locked")) {
+          body.removeAttribute("data-scroll-locked");
+        }
+      }
+    };
+
     const zeroScrollbarPadding = (el: HTMLElement) => {
       let changed = false;
       if (el.style.paddingRight && el.style.paddingRight !== "0px") {
@@ -48,12 +69,15 @@ export function useRadixScrollLockFix() {
       if (changed) {
         html.style.setProperty("--removed-body-scroll-bar-size", "0px");
       }
+      cleanupBodyLocks();
     };
 
     const observer = new MutationObserver((mutations) => {
       for (const m of mutations) {
-        if (m.type === "attributes" && m.attributeName === "style") {
+        if (m.type === "attributes") {
           zeroScrollbarPadding(m.target as HTMLElement);
+        } else if (m.type === "childList") {
+          cleanupBodyLocks();
         }
       }
     });
@@ -64,10 +88,18 @@ export function useRadixScrollLockFix() {
     };
 
     observer.observe(html, opts);
-    observer.observe(body, opts);
+    observer.observe(body, {
+      attributes: true,
+      attributeFilter: ["style", "data-scroll-locked"],
+      childList: true,
+    });
+
+    const handleFocus = () => cleanupBodyLocks();
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       observer.disconnect();
+      window.removeEventListener("focus", handleFocus);
     };
   }, []);
 }

@@ -441,7 +441,13 @@ export default function SubmissionsPage() {
       </div>
     </section>}
     {submissionId && (loading ? <div role="status" className="p-12 text-center text-xs">Loading submission…</div> : error ? <div role="alert" className="text-xs">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : detail && <SubmissionDetails submission={detail} />)}
-    {editor && !["review", "notes", "rate"].includes(editor.action) && <UpdateSubmissionDialog key={editor.submission.id} submission={editor.submission} href={detailHref(editor.submission.id)} onReview={() => setEditor({ submission: editor.submission, action: "review" })} onClose={() => setEditor(null)} onSaved={saved => { setEditor(null); setDetail(saved); setRevision(r => r + 1); }} />}
+    {editor && !["review", "notes", "rate"].includes(editor.action) && <UpdateSubmissionDialog key={editor.submission.id} submission={editor.submission} href={detailHref(editor.submission.id)} onReview={() => {
+      const targetSub = editor.submission;
+      setEditor(null);
+      setTimeout(() => {
+        setEditor({ submission: targetSub, action: "review" });
+      }, 50);
+    }} onClose={() => setEditor(null)} onSaved={saved => { setEditor(null); setDetail(saved); setRevision(r => r + 1); }} />}
     {editor && ["notes", "rate"].includes(editor.action) && <UpdateDialog key={`${editor.submission.id}-${editor.action}`} submission={editor.submission} action={editor.action} onClose={() => setEditor(null)} onSaved={saved => { setEditor(null); setDetail(saved); setRevision(r => r + 1); }} />}
     {profileTarget && <PersonProfileDialog key={`${profileTarget.kind}-${profileTarget.submission.id}`} target={profileTarget} onClose={() => setProfileTarget(null)} />}
   </main>;

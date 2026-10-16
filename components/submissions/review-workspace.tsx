@@ -72,21 +72,13 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
     return () => { active = false; };
   }, [submissionId, revision]);
   useEffect(() => {
-    const element = workspace.current;
-    if (!element) return;
-    const size = () => {
-      const bottom = window.visualViewport ? window.visualViewport.height + window.visualViewport.offsetTop : window.innerHeight;
-      element.style.height = `${Math.max(400, bottom - element.getBoundingClientRect().top - 8)}px`;
-    };
-    size();
-    const observer = new ResizeObserver(size);
-    if (element.parentElement) observer.observe(element.parentElement);
-    window.addEventListener('resize', size);
-    window.visualViewport?.addEventListener('resize', size);
-    return () => {
-      observer.disconnect(); window.removeEventListener('resize', size); window.visualViewport?.removeEventListener('resize', size);
-    };
-  }, [submission?.id]);
+    // Safety cleanup: Ensure no lingering pointer-events or scroll locks from previous modals
+    if (typeof document !== 'undefined') {
+      document.body.style.pointerEvents = '';
+      document.body.style.overflow = '';
+      document.body.removeAttribute('data-scroll-locked');
+    }
+  }, []);
   const retry = () => { setSubmission(null); setAssessment(null); setLoadError(''); setError(''); setRevision(r => r + 1); };
   const permitted = submission?.capabilities?.review && submission.finalStatus === 'PENDING_APPROVAL';
   const criteria = assessment?.criteria || [];
@@ -105,7 +97,7 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
     finally { lock.current = false; setSaving(false); }
   }
   if (!submission) return <main className="space-y-4"><Button variant="ghost" className="text-xs" onClick={onClose}><ArrowLeft className="h-4 w-4" />Back to submissions</Button>{loadError ? <div role="alert" className="text-xs">{loadError}<Button variant="outline" onClick={retry}>Retry</Button></div> : <p role="status" className="p-12 text-center text-xs">Loading review workspace…</p>}</main>;
-  return <main ref={workspace} className="flex h-[calc(100dvh-94px)] min-h-0 min-w-0 flex-col gap-2 overflow-hidden relative text-foreground">
+  return <main ref={workspace} className="flex flex-1 min-h-[calc(100dvh-130px)] min-w-0 flex-col gap-2 relative text-foreground">
     <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border pb-2"><div className="flex min-w-0 flex-wrap items-center gap-3"><Button variant="ghost" size="sm" disabled={saving} className="shrink-0 text-xs -ml-2" onClick={onClose}><ArrowLeft className="h-4 w-4" />Back to submissions</Button><div className="min-w-0 border-l border-border pl-3"><div className="flex flex-wrap items-center gap-2"><h1 className="text-sm font-bold">{submission.candidateName || 'Name unavailable'}</h1><span className="rounded-md bg-amber-50 px-2 py-1 text-[10.5px] text-amber-800">{permitted ? 'Needs internal review' : 'Review unavailable'}</span></div><p className="mt-0.5 text-xs text-muted-foreground">{[submission.jobCode, submission.jobTitle, submission.clientName].filter(Boolean).join(' · ')}</p></div>{permitted && <div aria-label="Header review decision" className="flex shrink-0 flex-wrap items-center gap-2 sm:-translate-y-1"><Button disabled={saving} className="h-8 bg-[#1a4fa0] text-xs text-white hover:bg-[#154181]" onClick={() => { setError(''); setDecision('SUBMITTED'); }}>Approve submission</Button><Button variant="outline" disabled={saving} className="h-8 border-red-500 text-xs text-red-700" onClick={() => { setError(''); setDecision('REJECTED'); }}>Reject</Button></div>}</div><nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1 text-[10.5px] text-muted-foreground"><Link href="/dashboard" aria-label="Home"><Home className="h-3.5 w-3.5" /></Link><ChevronRight aria-hidden className="h-3 w-3" /><span>Recruitment</span><ChevronRight aria-hidden className="h-3 w-3" /><button type="button" disabled={saving} onClick={onClose} className="hover:underline">All Submissions</button><ChevronRight aria-hidden className="h-3 w-3" /><span aria-current="page" className="font-semibold text-foreground">Review submission</span></nav></header>
     <div className={`shrink-0 gap-2 lg:hidden ${expandedResume ? 'hidden' : 'flex'}`} aria-label="Review panels"><Button variant={panel === 'screening' ? 'default' : 'outline'} aria-pressed={panel === 'screening'} className="text-xs" onClick={() => setPanel('screening')}>Screening</Button><Button variant={panel === 'resume' ? 'default' : 'outline'} aria-pressed={panel === 'resume'} className="text-xs" onClick={() => setPanel('resume')}>Resume</Button></div><ReviewSplit expanded={expandedResume} left={<>
       <div aria-label="Screening details" tabIndex={0} className={`min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain space-y-4 pr-1 pb-20 ${expandedResume ? 'hidden' : `lg:block ${panel === 'screening' ? '' : 'hidden'}`}`}><SubmittedCandidateDetails submission={submission} /><section className="rounded-xl border border-border bg-card min-w-0 p-4 lg:p-5"><div className="flex flex-wrap justify-between gap-3"><h2 className="text-sm font-bold">Job requirements</h2><span className="text-[10.5px] text-muted-foreground">{submission.jobCode}</span></div><p className="mt-3 text-sm font-semibold">{submission.jobTitle}</p><details className="mt-3"><summary className="cursor-pointer text-xs font-semibold text-[#1a4fa0] dark:text-blue-300">Job description</summary><ReviewJobDescription content={submission.jobDescription || ''} /></details>

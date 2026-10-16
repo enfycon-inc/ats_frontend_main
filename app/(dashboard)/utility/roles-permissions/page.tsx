@@ -557,12 +557,13 @@ export default function RolesPermissionsPage() {
     return roles.filter((r) => !r.isSystem);
   }, [roles]);
 
-  // Pod Lead is a tenant singleton. Keep the existing role visible in the
-  // create flow so administrators can manage it instead of guessing why the
-  // archetype is unavailable.
+  // Each branch unit can have one Pod Lead role. Also surface an older
+  // tenant-wide role so an administrator can assign it to its first unit.
   const existingPodLeadRole = useMemo(
-    () => customRolesList.find((role) => isAutomaticPodLeadRole(role)),
-    [customRolesList],
+    () =>
+      customRolesList.find((role) => isAutomaticPodLeadRole(role) && newRoleBusinessUnitId && role.businessUnitId === newRoleBusinessUnitId) ||
+      customRolesList.find((role) => isAutomaticPodLeadRole(role) && !role.businessUnitId),
+    [customRolesList, newRoleBusinessUnitId],
   );
 
   const filteredRoles = useMemo(() => {
@@ -580,6 +581,9 @@ export default function RolesPermissionsPage() {
         (r.createdByName && r.createdByName.toLowerCase().includes(query)) ||
         (r.description && r.description.toLowerCase().includes(query))
       );
+    }
+    if (unitFilter !== "all") {
+      list = list.filter((role) => !role.businessUnitId || role.businessUnitId === unitFilter);
     }
     return list;
   }, [customRolesList, selectedBranchFilter, unitFilter, searchQuery]);
@@ -748,8 +752,8 @@ export default function RolesPermissionsPage() {
         description: editRoleDesc.trim(),
         systemRole: editRoleSystemRole,
         baseRoleId: editRoleSystemRole === "POD_LEAD" ? undefined : baseSystemRoleObj?.id,
-        branchId: editRoleSystemRole === "POD_LEAD" ? undefined : editRoleBranchId || undefined,
-        businessUnitId: editRoleSystemRole === "POD_LEAD" ? undefined : editRoleBusinessUnitId || undefined,
+        branchId: editRoleBranchId || undefined,
+        businessUnitId: editRoleBusinessUnitId || undefined,
         permissions: sanitizedPerms,
       });
 
@@ -1685,10 +1689,12 @@ export default function RolesPermissionsPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3 dark:border-blue-900/60 dark:bg-blue-950/30">
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-blue-900 dark:text-blue-100">
-                        A Pod Lead role is already configured: {existingPodLeadRole.name}
+                        {existingPodLeadRole.businessUnitId
+                          ? `A Pod Lead role is already configured for this branch unit: ${existingPodLeadRole.name}`
+                          : `An existing Pod Lead role has no branch unit assigned: ${existingPodLeadRole.name}. Assign it to a branch unit before creating more.`}
                       </p>
                       <p className="mt-0.5 text-[11px] text-blue-800/80 dark:text-blue-200/80">
-                        Only one is allowed per tenant. Edit the existing role to change its name or make it available across units.
+                        Each branch unit can have one Pod Lead role. Edit this role to update its name or unit assignment.
                       </p>
                     </div>
                     {canManageRole(existingPodLeadRole) ? (
