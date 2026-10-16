@@ -13,6 +13,7 @@ import Link from "next/link";
 import { ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, X, Download, Filter, Loader2, RefreshCw, Search, XCircle, MoreHorizontal, Pencil, Eye, Mail, Phone, MapPin, BriefcaseBusiness, Building2, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
+import { resolveActiveSystemRole } from "@/lib/role-permissions";
 import { useDashboardContext } from "@/contexts/DashboardContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -117,7 +118,8 @@ function CandidateCell({ submission: sub, onOpen }: { submission: TrackerSubmiss
   return <><button type="button" onClick={onOpen} className="text-left font-semibold text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.candidateName || "Name unavailable"}</button>{[sub.candidateEmail || "Email unavailable", sub.candidatePhone || "Mobile unavailable", sub.candidateCurrentLocation || "Location unavailable"].map((text, i) => <p key={i} className="mt-1 break-words text-[10.5px] text-muted-foreground">{text}</p>)}</>;
 }
 function SubmissionActions({ submission: sub, href, onAction }: { submission: TrackerSubmission; href: string; onAction: (action: TrackerAction) => void }) {
-  return <div className="flex justify-center"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" title="Submission actions" aria-label={"Actions for " + (sub.candidateName || "candidate")}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuItem onSelect={event => { event.preventDefault(); setTimeout(() => onAction("rounds"), 50); }}><Pencil className="h-4 w-4" />Edit status</DropdownMenuItem><DropdownMenuItem asChild><Link href={href}><Eye className="h-4 w-4" />View details</Link></DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>;
+  const canEdit = Boolean(sub.capabilities && (sub.capabilities.review || sub.capabilities.schedule || sub.capabilities.results.l1 || sub.capabilities.results.l2 || sub.capabilities.results.l3 || sub.capabilities.outcome || sub.capabilities.notes || sub.capabilities.rate));
+  return <div className="flex justify-center"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" title="Submission actions" aria-label={"Actions for " + (sub.candidateName || "candidate")}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44">{canEdit && <DropdownMenuItem onSelect={event => { event.preventDefault(); setTimeout(() => onAction("rounds"), 50); }}><Pencil className="h-4 w-4" />Edit status</DropdownMenuItem>}<DropdownMenuItem asChild><Link href={href}><Eye className="h-4 w-4" />View details</Link></DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>;
 }
 function StageBadge({ submission }: { submission: TrackerSubmission }) {
   const state = stage(submission);
@@ -324,9 +326,10 @@ function SubmissionDetails({ submission }: { submission: TrackerSubmission }) {
 export default function SubmissionsPage() {
   const router = useRouter();
   const params = useSearchParams();
-  const view = params.get("view") || "all";
+  const { status: workspaceStatus, selection, profile, roles } = useDashboardContext();
+  const isAccountManager = resolveActiveSystemRole(selection.active.id, roles, profile) === "ACCOUNT_MANAGER";
+  const view = params.get("view") || (isAccountManager ? "my" : "all");
   const submissionId = params.get("submission");
-  const { status: workspaceStatus, selection, profile } = useDashboardContext();
   const [bucket, setBucket] = useState<TrackerBucket>("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");

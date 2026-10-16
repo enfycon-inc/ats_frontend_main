@@ -13,7 +13,6 @@ export function SubmittedCandidateDetails({ submission }: { submission: TrackerS
   const amount = (value: string | null | undefined, currency?: string | null, term?: string | null) => value != null && value !== '' ? [formatCandidateAmount(value), currency, term].filter(Boolean).join(' / ') : 'Not provided';
   const years = (value: number | null | undefined) => value != null ? `${value} years` : 'Not provided';
   const groups = [
-    { title: 'Verified primary skills', fields: [['Primary skills', s.candidateSkills?.join(', ')]] },
     { title: 'Contact', fields: [['First name', s.candidateFirstName], ['Last name', s.candidateLastName], ['Email', s.candidateEmail], ['Mobile', s.candidatePhone]] },
     { title: 'Experience & availability', fields: [['Current company', s.candidateCurrentCompany], ['Total experience', years(s.candidateExperience)], ['Relevant experience', years(s.candidateRelevantExperience)], ['Current location', s.candidateCurrentLocation], ['Preferred locations', s.candidatePreferredLocations?.join(', ')], ['Notice period', s.candidateNoticePeriod === 0 ? "Immediate" : s.candidateNoticePeriod != null ? `${s.candidateNoticePeriod} days` : null]] },
     { title: 'Compensation', fields: [[contract ? 'Current pay' : 'Current CTC', amount(currentPay.amount, currentPay.currency, currentPay.unit)], [contract ? 'Expected pay' : 'Expected CTC', amount(expectedPay.amount, expectedPay.currency, expectedPay.unit)]] },

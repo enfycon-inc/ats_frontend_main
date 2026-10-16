@@ -62,8 +62,10 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
   const perms = getActiveRolePermissions(input, roles, profile);
   const has = (...keys: string[]) => perms.includes('*') || keys.some(k => perms.includes(k));
   if (has("platform:manage")) return GLOBAL_ADMIN_NAV_ITEMS;
-  const canViewAllSubmissions = has("submission:view", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:internal_screening", "submission:schedule_interview", "submission:final_status", "submission:approve_client", "tenant:manage", "tenant:settings");
-  const canAccessSubmissions = canViewAllSubmissions || has("submission:create");
+  const activeRole = resolveActiveSystemRole(input, roles, profile);
+  const isAccountManagerRole = activeRole === "ACCOUNT_MANAGER";
+  const canViewAllSubmissions = has("submission:view_all", "tenant:manage", "tenant:settings") || (!isAccountManagerRole && has("submission:view", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:internal_screening", "submission:schedule_interview", "submission:final_status", "submission:approve_client"));
+  const canAccessSubmissions = canViewAllSubmissions || has("submission:view", "submission:create");
   const allowed: Record<string, boolean> = {
     dashboard: true,
     "job-posting": has("job:view"), "applicants": has("candidate:view", "candidate:create"),
@@ -79,12 +81,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
       if (child.href === "/utility/submissions?view=my" && !canAccessSubmissions) return false;
       if (child.href === "/utility/submissions?view=pod" && !(canAccessSubmissions && has("pod:view"))) return false;
       const isGlobalOrBranchAdmin = has('tenant:manage', 'tenant:settings', 'branch_admin:manage', 'job:view_all', 'platform:manage', 'unit_admin:manage', 'job:view_all_branches');
-      const isAccountManager = !isGlobalOrBranchAdmin && (
-        resolveActiveSystemRole(input, roles, profile) === "ACCOUNT_MANAGER" || 
-        profile?.roles?.includes('AM') || 
-        profile?.roles?.includes('ACCOUNT_MANAGER') || 
-        has("job:create")
-      );
+      const isAccountManager = !isGlobalOrBranchAdmin && isAccountManagerRole;
 
       
       // Specific Removals for Managers (Unit Admin, Branch Admin, Tenant Admin)
@@ -121,7 +118,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
         if (child.href === "/utility/submissions?view=pod") return false;
         if (child.href === "/applicants/resume-search/usit") return false;
         
-        if (child.href === "/utility/submissions?view=my" && !has("submission:create")) return false;
+        if (child.href === "/utility/submissions?view=my" && !has("submission:view", "submission:create")) return false;
       }
 
       // ── Specific Removals for Recruiters ──
