@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { changePodLead, podMembersWithoutLead } from "@/lib/pod-team-selection";
 import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
@@ -127,6 +129,7 @@ export default function PodsPage() {
   const [podBranchId, setPodBranchId] = useState("");
   const [podHeadId, setPodHeadId] = useState("");
   const [podHeadOpen, setPodHeadOpen] = useState(false);
+  const [draftPodHeadId, setDraftPodHeadId] = useState("");
   const [podDescription, setPodDescription] = useState("");
   const [selectedRecruiterIds, setSelectedRecruiterIds] = useState<string[]>([]);
   const [recruiterSearch, setRecruiterSearch] = useState<string>("");
@@ -347,6 +350,8 @@ export default function PodsPage() {
 
   const closeModal = () => {
     setModalMode(null);
+    setPodHeadOpen(false);
+    setDraftPodHeadId("");
     setSelectedPod(null);
     setRecruiterSearch("");
   };
@@ -468,11 +473,9 @@ export default function PodsPage() {
   };
 
   const toggleRecruiter = (id: string) => {
+    if (id === podHeadId) return;
     setSelectedRecruiterIds((prev) => {
       const isRemoving = prev.includes(id);
-      if (isRemoving && podHeadId === id) {
-        setPodHeadId("");
-      }
       return isRemoving ? prev.filter((x) => x !== id) : [...prev, id];
     });
   };
@@ -488,14 +491,14 @@ export default function PodsPage() {
     });
   }, [modalRecruiters, pods, selectedPod]);
 
-  // Filtered recruiters checklist for modal
-  const filteredModalRecruiters = useMemo(() => {
-    if (!recruiterSearch.trim()) return modalRecruiters;
-    const q = recruiterSearch.toLowerCase().trim();
-    return modalRecruiters.filter(
-      (r) => r.fullName?.toLowerCase().includes(q) || r.email?.toLowerCase().includes(q)
-    );
-  }, [modalRecruiters, recruiterSearch]);
+  const selectedLead = modalRecruiters.find(user => user.id === podHeadId)
+    || (podHeadId && selectedPod?.podHeadId === podHeadId ? { id: podHeadId, fullName: selectedPod.podHeadName || 'Assigned lead', email: '' } : null);
+  const memberIds = selectedRecruiterIds.filter(id => id !== podHeadId);
+  const filteredModalRecruiters = useMemo(() => podMembersWithoutLead(modalRecruiters, podHeadId, recruiterSearch), [modalRecruiters, podHeadId, recruiterSearch]);
+  const assignLead = (id: string) => {
+    setSelectedRecruiterIds(previous => changePodLead(previous, podHeadId, id));
+    setPodHeadId(id); setPodHeadOpen(false);
+  };
 
   const assignedUnitName = useMemo(() => {
     const uId = currentUser?.businessUnitId || currentUser?.business_unit_id;
@@ -945,9 +948,9 @@ export default function PodsPage() {
       {/* ═══════════════════════════════════════════════════
           CENTERED MODAL POP-UP — Create / Edit Pod
           ═══════════════════════════════════════════════════ */}
-      {modalMode && (
+      {modalMode && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col">
+          <div role="dialog" aria-modal="true" aria-label={modalMode === 'create' ? 'Create Recruitment Pod' : 'Edit Recruitment Pod'} className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden my-auto max-h-[calc(100dvh-2rem)] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-3.5 border-b border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850 shrink-0">
               <div className="flex items-center gap-2.5">
@@ -962,11 +965,13 @@ export default function PodsPage() {
                     {modalMode === "create" ? "Create Recruitment Pod" : `Edit Pod: ${selectedPod?.name}`}
                   </h3>
                   <p className="text-[11px] text-neutral-500">
-                    Unit-scoped pod configuration and recruiter round-robin routing
+                    Choose a lead and build your recruiting team
                   </p>
                 </div>
               </div>
               <button
+                type="button"
+                aria-label="Close pod dialog"
                 onClick={closeModal}
                 className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg cursor-pointer"
               >
@@ -977,7 +982,7 @@ export default function PodsPage() {
             {/* Modal Form Body */}
             <form
               onSubmit={modalMode === "create" ? handleCreatePod : handleUpdatePod}
-              className="flex flex-col flex-1 overflow-hidden"
+              className="flex min-h-0 flex-col flex-1 overflow-hidden"
             >
               <div className="flex-1 overflow-y-auto p-5 space-y-4">
                 <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -1070,116 +1075,51 @@ export default function PodsPage() {
                   </div>
                 </div>
 
-                {/* Pod Lead */}
-                <div className="space-y-1">
+                <section className="space-y-3 border-t border-slate-200 dark:border-slate-800 pt-4" aria-label="Pod Lead">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block">
-                      Designate Pod Lead (Team Lead)
-                    </label>
-                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium">
-                      Only 1 member can be lead
-                    </span>
+                    <h4 className="text-sm font-semibold">Pod Lead</h4>
+                    <Popover open={podHeadOpen} onOpenChange={open => { setPodHeadOpen(open); if (open) setDraftPodHeadId(podHeadId); }}>
+                      <PopoverTrigger asChild>
+                        <Button type="button" disabled={!podUnitId || (!isUnitScoped && !podBranchId) || submitting} className="h-8 text-xs bg-[#1a4fa0] hover:bg-[#163f80] text-white">+ Assign</Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-[min(350px,calc(100vw-2rem))] p-0 z-[60]">
+                        <div className="px-3 pt-3 text-sm font-semibold">Assign Pod Lead</div>
+                        <Command>
+                          <CommandInput placeholder="Search by name or email…" className="h-9 text-xs" />
+                          <CommandList className="max-h-56">
+                            <CommandEmpty>No eligible users match your search.</CommandEmpty>
+                            <CommandGroup>
+                              {podLeadCandidates.map(user => <CommandItem key={user.id} value={`${user.fullName} ${user.email}`} onSelect={() => setDraftPodHeadId(user.id)} className="gap-2 cursor-pointer">
+                                <span aria-hidden="true" className={`h-4 w-4 rounded-full border ${draftPodHeadId === user.id ? 'border-[#1a4fa0] bg-blue-100' : 'border-slate-300'}`}>{draftPodHeadId === user.id ? '•' : ''}</span>
+                                <UserAvatar user={user} className="h-7 w-7" />
+                                <div className="min-w-0"><p className="text-xs font-semibold truncate">{user.fullName}</p><p className="text-[10.5px] text-slate-500 truncate">{user.email}</p></div>
+                                {draftPodHeadId === user.id && <span className="sr-only">Selected</span>}
+                              </CommandItem>)}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                        <div className="flex justify-end gap-2 border-t p-3">
+                          <Button type="button" variant="outline" size="sm" onClick={() => setPodHeadOpen(false)}>Cancel</Button>
+                          <Button type="button" size="sm" disabled={!draftPodHeadId || !podLeadCandidates.some(user => user.id === draftPodHeadId)} onClick={() => assignLead(draftPodHeadId)} className="bg-[#1a4fa0] hover:bg-[#163f80] text-white">Assign Lead</Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
-                  <Popover open={podHeadOpen} onOpenChange={setPodHeadOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={podHeadOpen}
-                        disabled={!podUnitId || (!isUnitScoped && !podBranchId)}
-                        className="w-full justify-between h-9 px-3 text-xs font-medium border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-900 dark:text-white hover:bg-neutral-50 disabled:bg-neutral-100 dark:disabled:bg-slate-800/40 disabled:cursor-not-allowed"
-                      >
-                        {podHeadId && podLeadCandidates.find((u) => u.id === podHeadId) ? (
-                          <span className="font-semibold text-neutral-900 dark:text-neutral-100 truncate">
-                            {podLeadCandidates.find((u) => u.id === podHeadId)?.fullName}{" "}
-                            <span className="font-normal text-neutral-500 text-[10px]">
-                              ({podLeadCandidates.find((u) => u.id === podHeadId)?.email})
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="font-normal text-neutral-400">
-                            {!isUnitScoped && !podBranchId
-                              ? "— Select Branch & Operating Unit First —"
-                              : !podUnitId
-                              ? "— Select Operating Unit First —"
-                              : "— None (Unassigned) —"}
-                          </span>
-                        )}
-                        <Icon icon="heroicons:chevron-up-down" className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search eligible recruiters..." className="h-8.5 text-xs" />
-                        <CommandList>
-                          <CommandEmpty>No eligible recruiters available in this operating unit.</CommandEmpty>
-                          <CommandGroup>
-                            <CommandItem
-                              value="unassigned"
-                              onSelect={() => {
-                                setPodHeadId("");
-                                setPodHeadOpen(false);
-                              }}
-                              className="text-xs italic text-neutral-500 cursor-pointer"
-                            >
-                              — None (Unassigned) —
-                              {podHeadId === "" && (
-                                <Icon icon="heroicons:check" className="ml-auto h-3.5 w-3.5 text-indigo-600" />
-                              )}
-                            </CommandItem>
-                            {podLeadCandidates.map((u) => (
-                              <CommandItem
-                                key={u.id}
-                                value={`${u.fullName} ${u.email}`}
-                                onSelect={() => {
-                                  setPodHeadId(u.id);
-                                  // Auto-include pod head into members list
-                                  if (!selectedRecruiterIds.includes(u.id)) {
-                                    setSelectedRecruiterIds((prev) => [...prev, u.id]);
-                                  }
-                                  setPodHeadOpen(false);
-                                }}
-                                className="cursor-pointer flex items-center gap-2.5"
-                              >
-                                <UserAvatar user={u} className="h-6 w-6" />
-                                <div className="flex flex-col flex-1 min-w-0">
-                                  <span className="font-semibold text-neutral-900 dark:text-neutral-100 text-xs truncate">
-                                    {u.fullName}
-                                  </span>
-                                  <span className="text-[10px] text-neutral-400 truncate">{u.email}</span>
-                                </div>
-                                {podHeadId === u.id && (
-                                  <Icon icon="heroicons:check" className="ml-auto h-3.5 w-3.5 text-indigo-600 shrink-0" />
-                                )}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                  <p className="text-[10px] text-neutral-500">
-                    Only recruiters in this operating unit who are not leading another pod are shown. Only 1 member can be designated as Pod Lead.
-                  </p>
-                </div>
+                  {selectedLead ? <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+                    <UserAvatar user={selectedLead} className="h-9 w-9" /><div className="flex-1 min-w-0"><p className="text-xs font-semibold truncate">{selectedLead.fullName}</p><p className="text-[10.5px] text-slate-500 truncate">{selectedLead.email}</p></div>
+                    <Badge className="bg-blue-50 text-blue-800 border-blue-200">Pod Lead</Badge>
+                    <Button type="button" variant="ghost" size="sm" disabled={submitting} aria-label="Remove pod lead" onClick={() => assignLead('')}>×</Button>
+                  </div> : <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 p-4 text-xs"><p className="font-semibold">No pod lead assigned</p><p className="mt-1 text-slate-500">Assign one eligible user to lead this pod.</p></div>}
+                </section>
 
                 {/* Recruiters Multi-Select */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-                      Assign Pod Members ({selectedRecruiterIds.length} selected)
-                    </label>
-                    {modalRecruiters.length > 4 && (
-                      <div className="relative w-44">
-                        <Input
-                          placeholder="Filter available..."
-                          value={recruiterSearch}
-                          onChange={(e) => setRecruiterSearch(e.target.value)}
-                          className="text-[11px] h-7 pl-2"
-                        />
-                      </div>
-                    )}
-                  </div>
+                  <div className="flex items-center justify-between"><h4 className="text-sm font-semibold">Pod Members</h4><span className="text-xs text-slate-500">{memberIds.length} selected</span></div>
+                  <Input aria-label="Search pod members" placeholder="Search members by name or email…" value={recruiterSearch} onChange={event => setRecruiterSearch(event.target.value)} disabled={!podUnitId} className="text-xs h-9" />
+                  {memberIds.length > 0 && <div className="flex flex-wrap gap-2 py-1">{memberIds.map(id => {
+                    const member = modalRecruiters.find(user => user.id === id);
+                    return <span key={id} className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-800 px-2 py-1 text-xs">{member?.fullName || 'Selected member'}<button type="button" disabled={submitting} onClick={() => toggleRecruiter(id)} aria-label={`Remove ${member?.fullName || 'member'}`} className="px-1">×</button></span>;
+                  })}</div>}
 
                   {!isUnitScoped && !podBranchId ? (
                     <div className="border border-dashed border-neutral-200 dark:border-slate-800 rounded-xl p-4 text-center text-xs text-neutral-400 italic">
@@ -1197,11 +1137,12 @@ export default function PodsPage() {
                         Only staff members with the <strong>Recruiter</strong> role can be pod members. No unassigned recruiters are currently available in this operating unit.
                       </p>
                     </div>
+                  ) : filteredModalRecruiters.length === 0 ? (
+                    <p role="status" className="p-4 border rounded-lg text-xs text-slate-500">{recruiterSearch.trim() ? 'No members match your search.' : 'No additional eligible members are available.'}</p>
                   ) : (
                     <div className="border border-neutral-200 dark:border-slate-800 rounded-xl max-h-48 overflow-y-auto divide-y divide-neutral-100 dark:divide-slate-800 shadow-2xs">
                       {filteredModalRecruiters.map((r) => {
                         const isChecked = selectedRecruiterIds.includes(r.id);
-                        const isHead = podHeadId === r.id;
 
                         return (
                           <div
@@ -1216,17 +1157,15 @@ export default function PodsPage() {
                             <input
                               type="checkbox"
                               checked={isChecked}
-                              onChange={() => {}}
+                              onChange={() => toggleRecruiter(r.id)}
+                              onClick={event => event.stopPropagation()}
+                              aria-label={`Select ${r.fullName}`}
                               className="h-3.5 w-3.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                             />
                             <div className="flex-1 min-w-0">
                               <div className="text-xs font-semibold text-neutral-900 dark:text-white truncate flex items-center gap-1.5">
                                 <UserAvatar user={r} className="h-6 w-6" /><span>{r.fullName}</span>
-                                {isHead && (
-                                  <Badge className="bg-indigo-50 text-indigo-700 text-[9px] px-1 py-0 border border-indigo-200 font-semibold">
-                                    Pod Lead (1 of 1)
-                                  </Badge>
-                                )}
+
                               </div>
                               <div className="text-[10px] text-neutral-400 truncate">{r.email}</div>
                             </div>
@@ -1281,7 +1220,8 @@ export default function PodsPage() {
               </div>
 
               {/* Modal Footer */}
-              <div className="shrink-0 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850 px-6 py-3 flex items-center justify-end gap-2">
+              <div className="shrink-0 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-850 px-6 py-3 flex flex-wrap items-center justify-end gap-2">
+                <p className="mr-auto text-xs text-slate-500">{podHeadId ? "1 lead" : "No lead"} · {memberIds.length} members</p>
                 <Button
                   type="button"
                   variant="outline"
@@ -1300,7 +1240,7 @@ export default function PodsPage() {
                     (!isUnitScoped && (!podBranchId || !podUnitId)) ||
                     (isUnitScoped && !podUnitId)
                   }
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-4 shadow-2xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-[#1a4fa0] hover:bg-[#163f80] text-white font-semibold text-xs h-8 px-4 shadow-2xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting
                     ? modalMode === "create"
@@ -1314,7 +1254,7 @@ export default function PodsPage() {
             </form>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }
