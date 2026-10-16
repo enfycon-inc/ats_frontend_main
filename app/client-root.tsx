@@ -15,7 +15,7 @@ import { useSession } from "next-auth/react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopNavbar } from "@/components/layout/top-navbar";
-import { PageHeaderProvider } from "@/components/layout/page-header-context";
+import { PageHeaderProvider, usePageHeader } from "@/components/layout/page-header-context";
 import { SitePageHeader } from "@/components/layout/site-page-header";
 import { SocketProvider } from "@/contexts/SocketContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
@@ -38,6 +38,29 @@ const GlobalErrorModal = dynamic(
   () => import("@/components/shared/global-error-modal").then(m => ({ default: m.GlobalErrorModal })),
   { ssr: false }
 );
+
+function MainContentLayout({ children, isViewportLocked }: { children: ReactNode; isViewportLocked: boolean }) {
+  const { hidden: pageHeaderHidden } = usePageHeader();
+  const lockToViewport = isViewportLocked || pageHeaderHidden;
+
+  return lockToViewport ? (
+    <div
+      className="flex min-w-0 max-w-full flex-col overflow-hidden"
+      style={{ height: pageHeaderHidden ? 'calc(100dvh - 46px)' : 'calc(100vh - 96px)', maxHeight: pageHeaderHidden ? 'calc(100dvh - 46px)' : 'calc(100vh - 96px)' }}
+    >
+      <div className="dashboard-body flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-neutral-50 p-2 dark:bg-[#1e2734] md:p-3">
+        {children}
+      </div>
+    </div>
+  ) : (
+    <div className="flex min-h-[calc(100vh-96px)] min-w-0 max-w-full flex-col overflow-x-hidden bg-neutral-50 dark:bg-[#1e2734]">
+      <div className="dashboard-body flex min-w-0 flex-1 flex-col p-4 md:p-6">
+        {children}
+      </div>
+      <Footer />
+    </div>
+  );
+}
 
 /** Immediately redirects to a given path on mount — used for client-side imperative navigation. */
 function AutoRedirect({ to }: { to: string }) {
@@ -135,26 +158,6 @@ export function ClientRoot({
 
   // Main content block used by both layouts
   // Height offset: 46px (TopNavbar) + 50px (SitePageHeader) = 96px
-  const MainContent = (
-    <>
-      {isViewportLocked ? (
-        <div className="flex flex-col h-[calc(100vh-96px)] max-h-[calc(100vh-96px)] overflow-hidden min-w-0 max-w-full">
-          <div className="dashboard-body bg-neutral-50 dark:bg-[#1e2734] md:p-3 p-2 flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
-            {children}
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col min-w-0 max-w-full overflow-x-hidden min-h-[calc(100vh-96px)] bg-neutral-50 dark:bg-[#1e2734]">
-          <div className="dashboard-body md:p-6 p-4 flex-1 min-w-0 flex flex-col">
-            {children}
-          </div>
-          <Footer />
-        </div>
-      )}
-    </>
-  );
-
-
   if (!isApproved) {
     return (
       <div className="min-h-screen w-full bg-neutral-50 dark:bg-[#121820] flex items-center justify-center">
@@ -196,7 +199,7 @@ export function ClientRoot({
                 <Suspense fallback={<div className="h-[50px] min-h-[50px] bg-white dark:bg-[#151c24] border-b border-slate-200/70 dark:border-slate-800/70 shrink-0" />}>
                   <SitePageHeader />
                 </Suspense>
-                {MainContent}
+                <MainContentLayout isViewportLocked={isViewportLocked}>{children}</MainContentLayout>
               </SidebarInset>
             </SidebarProvider></PageHeaderProvider>
 
