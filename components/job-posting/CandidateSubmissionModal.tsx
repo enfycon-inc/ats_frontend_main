@@ -10,13 +10,12 @@ import { atsApi } from "@/lib/ats-api";
 import { candidateAmountSchema, candidatePhoneSchema, normalizeCandidateLocation } from "@/lib/candidate-submission-input";
 import { ContractCandidateSubmissionForm } from '@/components/candidates/contract-candidate-submission-form';
 import { CandidateForm } from "@/components/candidates/candidate-form";
+import { ResumePages } from '@/components/candidates/resume-pages';
 import { existingCandidateForm } from '@/lib/existing-candidate-submission';
 
 export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, job, onSuccess, existingCandidateId }: { open: boolean; onOpenChange: (open: boolean) => void; job: any; onSuccess?: () => void; existingCandidateId?: string | number }) {
   const [candidateLoading, setCandidateLoading] = useState(false);
   const [candidateError, setCandidateError] = useState('');
-  const [resumeUrl, setResumeUrl] = useState<string | null>(null);
-  const [resumeError, setResumeError] = useState('');
   const [updateProfile, setUpdateProfile] = useState(false);
   const canUpdateProfile = atsApi.auth.getCurrentUser()?.permissions?.includes('candidate:edit') === true;
   const [file, setFile] = useState<File | null>(null);
@@ -61,8 +60,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   useEffect(() => {
     if (!isOpen || !existingCandidateId) return;
     let cancelled = false;
-    let objectUrl: string | null = null;
-    setCandidateLoading(true); setCandidateError(''); setResumeError(''); setResumeUrl(null); setUpdateProfile(false);
+    setCandidateLoading(true); setCandidateError(''); setUpdateProfile(false);
     atsApi.candidates.get(existingCandidateId).then(candidate => {
       if (!cancelled) {
         const prefilled = existingCandidateForm(candidate);
@@ -74,11 +72,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
       }
     }).catch(error => { if (!cancelled) setCandidateError(error.message || 'Could not load candidate.'); })
       .finally(() => { if (!cancelled) setCandidateLoading(false); });
-    atsApi.candidates.fetchResumeBlob(existingCandidateId).then(blob => {
-      if (cancelled) return;
-      objectUrl = URL.createObjectURL(blob); setResumeUrl(objectUrl);
-    }).catch(error => { if (!cancelled) setResumeError(error.message || 'Resume preview unavailable.'); });
-    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+    return () => { cancelled = true; };
   }, [isOpen, existingCandidateId, isContractual]);
 
   const handleFileSelect = async (selectedFile: File | null) => {
@@ -316,7 +310,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
             <div className="w-full lg:w-1/2 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 flex flex-col gap-3 min-h-48">
               <h3 className="text-sm font-semibold">Existing resume</h3>
               <p className="text-xs text-slate-500">Review the stored resume and verify the candidate details. No new upload required.</p>
-              {resumeUrl ? <><a href={resumeUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-700 underline">Open stored resume</a><iframe src={resumeUrl} title="Existing candidate resume" className="flex-1 w-full min-h-40 bg-white border rounded" /></> : <p className="text-sm text-slate-500">{resumeError || 'Loading resume…'}</p>}
+              <ResumePages candidateId={existingCandidateId} />
             </div>
           ) : file ? (
             <div className="w-full lg:w-1/2 border-r border-slate-200 dark:border-slate-800 bg-slate-200/50 dark:bg-slate-900/50 p-4 shrink-0 overflow-hidden flex flex-col">

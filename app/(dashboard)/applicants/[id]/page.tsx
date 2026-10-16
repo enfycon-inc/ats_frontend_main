@@ -1,4 +1,5 @@
 "use client";
+import { ResumePages } from "@/components/candidates/resume-pages";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -42,12 +43,7 @@ export default function CandidateDetailPage() {
   // State variables
   const [candidate, setCandidate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [resumeUrl, setResumeUrl] = useState<string | null>(null);
-  const resumeObjectUrl = useRef<string | null>(null);
-  const [resumeMime, setResumeMime] = useState('');
-  const [resumeError, setResumeError] = useState('');
   const [profileError, setProfileError] = useState('');
-  const [resumeLoading, setResumeLoading] = useState(true);
   const [submissions, setSubmissions] = useState<any[]>([]);
   
   // Submit modal state
@@ -137,24 +133,7 @@ export default function CandidateDetailPage() {
         console.error("Failed to load submissions:", subErr);
       }
 
-      // 3. Fetch Resume Blob
-      try {
-        setResumeLoading(true);
-        setResumeError('');
-        setResumeUrl(null);
-        if (resumeObjectUrl.current) URL.revokeObjectURL(resumeObjectUrl.current);
-        resumeObjectUrl.current = null;
-        const blob = await atsApi.candidates.fetchResumeBlob(candidateId);
-        setResumeMime(blob.type);
-        const url = URL.createObjectURL(blob);
-        resumeObjectUrl.current = url;
-        setResumeUrl(url);
-      } catch (resErr) {
-        setResumeError(resErr instanceof Error ? resErr.message : 'Unable to load the resume.');
-        console.log("No resume file found for candidate or failed to retrieve:", resErr);
-      } finally {
-        setResumeLoading(false);
-      }
+
     } catch (err: any) {
       setCandidate(null);
       setProfileError(err.message || 'Unable to load this candidate.');
@@ -167,11 +146,6 @@ export default function CandidateDetailPage() {
 
   useEffect(() => {
     loadData();
-    return () => {
-      if (resumeObjectUrl.current) {
-        URL.revokeObjectURL(resumeObjectUrl.current);
-      }
-    };
   }, [candidateId]);
 
   // Handle Note Submission
@@ -566,15 +540,9 @@ export default function CandidateDetailPage() {
                 className="text-neutral-600 border-neutral-250 hover:bg-neutral-200 dark:border-slate-700 dark:hover:bg-slate-700 hover:text-neutral-800 text-[10px] gap-1 h-7 font-bold cursor-pointer"
               >
                 <UploadCloud className="h-3.5 w-3.5" /> 
-                {resumeUrl ? "Update CV" : "Upload CV"}
+                {candidate.resumeFilename ? "Update CV" : "Upload CV"}
               </Button>
-              {resumeUrl && (
-                <a href={resumeUrl} download={candidate.resumeFilename || `${candidate.fullName.replace(/\s+/g, "_")}_CV`}>
-                  <Button size="sm" variant="outline" className="text-neutral-600 border-neutral-250 hover:bg-neutral-200 dark:border-slate-700 dark:hover:bg-slate-700 hover:text-neutral-800 text-[10px] gap-1 h-7 font-bold">
-                    <Download className="h-3.5 w-3.5" /> Download CV
-                  </Button>
-                </a>
-              )}
+
             </div>
           </div>
 
@@ -584,45 +552,7 @@ export default function CandidateDetailPage() {
             {candidate.resumeUploadedAt && <span className="block text-[10px] mt-1">Uploaded {new Date(candidate.resumeUploadedAt).toLocaleString()}</span>}
           </div>
           <div className="flex-1 bg-neutral-200 dark:bg-slate-950 flex flex-col items-center justify-center relative min-h-[300px]">
-            {resumeLoading ? (
-              <div className="text-center">
-                <div className="h-6 w-6 border-2 border-t-primary border-neutral-300 dark:border-slate-800 rounded-full animate-spin mx-auto"></div>
-                <p className="text-[10px] text-neutral-550 mt-2 font-medium">Fetching CV document...</p>
-              </div>
-            ) : resumeUrl && resumeMime === 'application/pdf' ? (
-              <iframe
-                src={resumeUrl}
-                className="w-full min-h-[700px] h-full border-none bg-white dark:bg-slate-900"
-                title={`${candidate.fullName} Resume`}
-              />
-            ) : (
-              /* Fallback to parsed raw text inside scrollable pre */
-              <div className="w-full h-full flex flex-col p-4 bg-white dark:bg-slate-900 overflow-auto">
-                <div className="text-center border-b border-neutral-100 dark:border-slate-850 pb-3 mb-3 shrink-0">
-                  <FileSearch className="h-8 w-8 text-indigo-500/80 mx-auto" />
-                  <p className="text-xs font-extrabold text-neutral-800 dark:text-white mt-2">Parsed CV Raw Text</p>
-                  <p className="text-[10px] text-neutral-550 mt-1">{resumeUrl ? 'This file format cannot be previewed here. Download the original file above; parsed text appears below.' : resumeError || 'No original resume is available. Parsed text appears below.'}</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => resumeInputRef.current?.click()}
-                    disabled={!can('candidate:edit')}
-                    className="mt-3 text-xs gap-1.5 font-bold mx-auto cursor-pointer"
-                  >
-                    <UploadCloud className="h-4 w-4" /> Upload Resume PDF
-                  </Button>
-                </div>
-                {candidate.rawText ? (
-                  <pre className="text-[11px] leading-relaxed text-neutral-750 dark:text-neutral-300 font-mono whitespace-pre-wrap flex-1 select-text bg-neutral-50 dark:bg-slate-955 p-3 rounded border border-neutral-100 dark:border-slate-850/50 selection:bg-indigo-500/10">
-                    {candidate.rawText}
-                  </pre>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-neutral-450 dark:text-neutral-550 text-xs italic">
-                    No raw text extracted for this profile.
-                  </div>
-                )}
-              </div>
-            )}
+            <ResumePages key={candidate.resumeUploadedAt || candidateId} candidateId={candidate.dbId || candidateId} />
           </div>
         </div>
       </div>

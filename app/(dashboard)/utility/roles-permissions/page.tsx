@@ -532,7 +532,7 @@ export default function RolesPermissionsPage() {
     );
     const dbPerms = dbSysRole?.allowedPermissions || (dbSysRole && Array.isArray(dbSysRole.permissions) ? dbSysRole.permissions : []);
 
-    return [...new Set([...(dbSysRole ? dbPerms : archPerms), 'job:view_pod_jobs', 'job:submit_pod_jobs', ...(keyUpper === 'POD_LEAD' ? ['job:assign_recruiter'] : []), ...(['DELIVERY_HEAD', 'UNIT_ADMIN', 'BRANCH_ADMIN', 'TENANT_ADMIN'].includes(keyUpper) ? ['job:override_assignment'] : [])])];
+    return [...new Set([...(dbSysRole ? dbPerms : archPerms), ...(['TENANT_ADMIN', 'BRANCH_ADMIN', 'UNIT_ADMIN'].includes(keyUpper) ? ['candidate:download_resume'] : []), 'job:view_pod_jobs', 'job:submit_pod_jobs', ...(keyUpper === 'POD_LEAD' ? ['job:assign_recruiter'] : []), ...(['DELIVERY_HEAD', 'UNIT_ADMIN', 'BRANCH_ADMIN', 'TENANT_ADMIN'].includes(keyUpper) ? ['job:override_assignment'] : [])])];
   };
 
   const matrixAllowedPerms = useMemo(() => {

@@ -1,4 +1,5 @@
 "use client";
+import { ResumePages } from '@/components/candidates/resume-pages';
 import { SubmittedCandidateDetails } from './submitted-candidate-details';
 
 import { useEffect, useRef, useState } from 'react';
@@ -48,8 +49,6 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [notes, setNotes] = useState('');
   const [checks, setChecks] = useState<NonNullable<TrackerUpdate['reviewOverrides']>>({});
-  const [resume, setResume] = useState<{ url: string; pdf: boolean; extension: string } | null>(null);
-  const [resumeError, setResumeError] = useState('');
   const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
   const [decision, setDecision] = useState<'SUBMITTED' | 'REJECTED' | null>(null);
@@ -59,7 +58,6 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
   const request = useRef<{ id: string; content: string } | null>(null);
   useEffect(() => {
     let active = true;
-    let objectUrl: string | undefined;
     void atsApi.submissions.assessment(submissionId).then(async response => {
       if (!active) return;
       const fresh = response.submission;
@@ -69,16 +67,9 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
       document.querySelectorAll('p, div, li, h1, h2, h3, h4, br').forEach(node => node.append('\n'));
       setSubmission({ ...fresh, jobDescription: document.body.textContent || null }); setLoadError(''); setNotes(fresh.reviewFeedback || ''); setChecks({});
       void atsApi.submissions.getCustomRemarks(fresh.branchId || undefined).then(data => { if (active) setTemplates(data); }).catch(() => { if (active) setTemplates([]); });
-      try {
-        const blob = await atsApi.candidates.fetchResumeBlob(fresh.candidateId);
-        if (!active) return;
-        const pdf = blob.type.split(';')[0] === 'application/pdf';
-        objectUrl = URL.createObjectURL(blob);
-        setResume({ url: objectUrl, pdf, extension: pdf ? '.pdf' : blob.type.includes('wordprocessingml') ? '.docx' : blob.type === 'application/msword' ? '.doc' : '' });
-        setResumeError('');
-      } catch (cause) { if (active) setResumeError(cause instanceof Error && cause.message.includes('No CV') ? 'No resume is on file for this candidate.' : 'Unable to load the resume. Retry or check your candidate access.'); }
+
     }).catch(() => { if (active) setLoadError('Unable to load the submission. Retry to check your access and the latest state.'); });
-    return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+    return () => { active = false; };
   }, [submissionId, revision]);
   useEffect(() => {
     const element = workspace.current;
@@ -101,7 +92,7 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
       if (container) { container.style.overflowY = previousOverflow || ''; container.scrollTop = previousScroll || 0; }
     };
   }, [submission?.id]);
-  const retry = () => { setSubmission(null); setAssessment(null); setResume(null); setResumeError(''); setLoadError(''); setError(''); setRevision(r => r + 1); };
+  const retry = () => { setSubmission(null); setAssessment(null); setLoadError(''); setError(''); setRevision(r => r + 1); };
   const permitted = submission?.capabilities?.review && submission.finalStatus === 'PENDING_APPROVAL';
   const criteria = assessment?.criteria || [];
   async function save(decision: 'SUBMITTED' | 'REJECTED') {
@@ -126,7 +117,7 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
         {assessment && <AssessmentMeters assessment={assessment} />}
         </section><RequirementsComparison submission={submission} assessment={assessment} />
       </div></>} right={<>
-      <section aria-label="Resume viewer" className={`min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card ${expandedResume || panel === 'resume' ? 'flex' : 'hidden lg:flex'}`}><div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5"><h2 className="text-xs font-bold">Resume</h2><div className="flex items-center gap-2"><Button variant="ghost" size="sm" className="h-7 text-xs" aria-pressed={expandedResume} onClick={() => setExpandedResume(value => !value)}>{expandedResume ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}{expandedResume ? 'Split view' : 'Expand resume'}</Button>{resume && <Button variant="outline" className="h-7 text-xs" asChild><a href={resume.url} download={`${submission.candidateName || submission.candidateId}-resume${resume.extension}`}><Download className="h-3.5 w-3.5" />Download</a></Button>}</div></div>{resumeError ? <div role="alert" className="p-6 text-xs">{resumeError}<Button variant="outline" className="mt-3 block text-xs" onClick={retry} disabled={saving}>Retry</Button></div> : !resume ? <p role="status" className="p-8 text-xs">Loading resume…</p> : resume.pdf ? <iframe title="Candidate resume preview" src={`${resume.url}#toolbar=0&navpanes=0&view=FitH`} className="min-h-0 w-full flex-1 border-0" /> : <div className="p-8 text-xs">This file format cannot be previewed here. Download the original resume to review it.</div>}</section>
+      <section aria-label="Resume viewer" className={`min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card ${expandedResume || panel === 'resume' ? 'flex' : 'hidden lg:flex'}`}><div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5"><h2 className="text-xs font-bold">Resume</h2><div className="flex items-center gap-2"><Button variant="ghost" size="sm" className="h-7 text-xs" aria-pressed={expandedResume} onClick={() => setExpandedResume(value => !value)}>{expandedResume ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}{expandedResume ? 'Split view' : 'Expand resume'}</Button></div></div><ResumePages candidateId={submission.candidateId} /></section>
     </>} />
     {permitted ? <div aria-label="Review decision" className="absolute bottom-3 right-3 z-20 flex gap-2 rounded-lg border border-border bg-background p-2 shadow-lg"><Button disabled={saving} className="h-8 bg-[#1a4fa0] text-xs text-white hover:bg-[#154181]" onClick={() => { setError(''); setDecision('SUBMITTED'); }}>Approve submission</Button><Button variant="outline" disabled={saving} className="h-8 border-red-500 text-xs text-red-700" onClick={() => { setError(''); setDecision('REJECTED'); }}>Reject</Button></div> : <p role="alert" className="shrink-0 text-xs">This submission is no longer pending review, or your review permission is unavailable.</p>}
     <Dialog open={decision !== null} onOpenChange={open => { if (!open && !saving) setDecision(null); }}><DialogContent className="sm:max-w-[480px]" onEscapeKeyDown={event => { if (saving) event.preventDefault(); }} onInteractOutside={event => { if (saving) event.preventDefault(); }}><DialogHeader><DialogTitle className="text-sm">{decision === 'REJECTED' ? 'Reject submission' : 'Approve submission'}</DialogTitle><DialogDescription className="text-xs">{submission.candidateName} · {submission.jobTitle}. Your decision and remarks are recorded in the timeline.</DialogDescription></DialogHeader><div className="space-y-2"><label htmlFor="review-notes" className="text-xs font-semibold">Remarks {decision === 'REJECTED' ? '(required)' : '(optional)'}</label><Textarea id="review-notes" maxLength={4000} rows={3} value={notes} disabled={saving} onChange={event => setNotes(event.target.value)} placeholder="Type remarks to see suggestions…" className="text-xs" />{notes.trim() && <div aria-label="Remark suggestions" className="max-h-40 space-y-1 overflow-y-auto">{stageRemarkSuggestions(templates, 'review').filter(template => template.remarkText.toLowerCase().includes(notes.trim().toLowerCase()) && template.remarkText.trim().toLowerCase() !== notes.trim().toLowerCase()).slice(0, 5).map(template => <button key={template.id} type="button" disabled={saving} className="block w-full rounded border border-border px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => setNotes(template.remarkText)}>{template.remarkText}</button>)}</div>}{error && <div role="alert" className="text-xs text-red-700">{error}<Button variant="outline" className="ml-2 text-xs" disabled={saving} onClick={() => { setDecision(null); retry(); }}>Reload latest submission</Button></div>}</div><DialogFooter><Button variant="outline" disabled={saving} className="text-xs" onClick={() => setDecision(null)}>Cancel</Button><Button disabled={saving || !permitted || (decision === 'REJECTED' && !notes.trim())} className={decision === 'REJECTED' ? 'bg-red-600 text-xs text-white hover:bg-red-700' : 'bg-[#1a4fa0] text-xs text-white hover:bg-[#154181]'} onClick={() => { if (decision) void save(decision); }}>{saving && <Loader2 className="h-3 w-3 animate-spin" />}{decision === 'REJECTED' ? 'Confirm rejection' : 'Confirm approval'}</Button></DialogFooter></DialogContent></Dialog>

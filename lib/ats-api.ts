@@ -1414,7 +1414,19 @@ const candidates = {
   },
 
   /** Fetch the stored CV as a blob (auth-aware) so it can be opened or downloaded. */
+  async resumePreview(candidateId: string | number): Promise<{ pages: number }> {
+    return apiFetch(`/api/candidates/${candidateId}/resume-preview`);
+  },
+  async resumePage(candidateId: string | number, page: number, signal?: AbortSignal): Promise<Blob> {
+    const token = getToken();
+    const headers: Record<string, string> = activeRoleHeaders();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${getApiBase()}/api/candidates/${candidateId}/resume-preview?page=${page}`, { headers, signal, cache: 'no-store' });
+    if (!res.ok) throw new Error('Unable to display resume page.');
+    return res.blob();
+  },
   async fetchResumeBlob(candidateId: string | number): Promise<Blob> {
+    if (!auth.getCurrentUser()?.permissions?.includes('candidate:download_resume')) throw new Error('Original resume download permission is required.');
     const token = getToken();
     const headers: Record<string, string> = activeRoleHeaders();
     if (token) headers['Authorization'] = `Bearer ${token}`;

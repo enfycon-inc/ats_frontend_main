@@ -1282,7 +1282,7 @@ export default function JobDetailPage() {
                           {/* Actions & CV Download */}
                           <td className="py-3 px-4 align-middle text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1.5">
-                              <Button
+                              {effectivePerms.includes("candidate:download_resume") && (<Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate")}
@@ -1290,7 +1290,7 @@ export default function JobDetailPage() {
                                 title="Download candidate CV PDF"
                               >
                                 <FileDown className="h-3 w-3" /> Download CV
-                              </Button>
+                              </Button>)}
 
                               <Button
                                 size="sm"
@@ -1642,7 +1642,7 @@ export default function JobDetailPage() {
                             {/* 8. Action */}
                             <td className="h-[52px] py-1 px-2.5 text-center whitespace-nowrap align-middle" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-center gap-1">
-                                <Button
+                                {effectivePerms.includes("candidate:download_resume") && (<Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate")}
@@ -1650,7 +1650,7 @@ export default function JobDetailPage() {
                                   title="Download candidate CV PDF"
                                 >
                                   <FileDown className="h-3 w-3" /> CV
-                                </Button>
+                                </Button>)}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <button className="p-1 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer">
@@ -1676,13 +1676,13 @@ export default function JobDetailPage() {
                                       Schedule Interview
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem
+                                    {effectivePerms.includes("candidate:download_resume") && (<DropdownMenuItem
                                       onClick={() => handleDownloadResume(sub.candidateId, sub.candidateName || "Candidate")}
                                       className="text-xs cursor-pointer gap-2 font-medium py-1.5"
                                     >
                                       <FileDown className="h-3.5 w-3.5 text-indigo-500" />
                                       Download Resume PDF
-                                    </DropdownMenuItem>
+                                    </DropdownMenuItem>)}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </div>
@@ -1828,14 +1828,14 @@ export default function JobDetailPage() {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-                        <Button
+                        {effectivePerms.includes("candidate:download_resume") && (<Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleDownloadResume(match.candidateId, match.fullName || "Candidate")}
                           className="h-8 border-neutral-255 text-xs font-bold"
                         >
                           CV
-                        </Button>
+                        </Button>)}
                         {alreadySubmitted ? (
                           <Button size="sm" disabled className="h-8 bg-neutral-100 text-neutral-400 text-xs font-bold border-none">
                             Submitted
