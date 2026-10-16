@@ -358,6 +358,11 @@ export default function UserManagementPage() {
     return [];
   }, [profile, currentUser]);
 
+  // Match the DELETE endpoint's tenant:settings requirement and guard bypasses.
+  const canDeleteUsers = sessionPerms.some(permission =>
+    ['tenant:settings', 'platform:manage', '*'].includes(permission)
+  );
+
   // Branch Admin: has branch_admin:manage but NOT tenant:settings (tenant-level admin)
   const isBranchAdmin = useMemo(() => {
     if (overrideRole) {
@@ -932,6 +937,7 @@ export default function UserManagementPage() {
   };
 
   const handleDeleteUser = async (user: UserItem) => {
+    if (!canDeleteUsers) return;
     if (profile?.id === user.id) {
       return toast.error("You cannot delete your own account.");
     }
@@ -1182,6 +1188,7 @@ export default function UserManagementPage() {
   };
 
   const handleBulkDelete = async () => {
+    if (!canDeleteUsers) return;
     if (selectedUserIds.length === 0) return;
     const confirmDelete = window.confirm(
       `Are you sure you want to permanently delete ${selectedUserIds.length} selected team member(s)? This action cannot be undone.`
@@ -2386,15 +2393,16 @@ export default function UserManagementPage() {
                                 </DropdownMenuItem>
                               )}
 
-                              <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
-
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteUser(user)}
-                                disabled={isCurrent}
-                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/50 text-rose-600 dark:text-rose-400 font-medium"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" /> Delete Team Member
-                              </DropdownMenuItem>
+                              {canDeleteUsers && <>
+                                <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteUser(user)}
+                                  disabled={isCurrent}
+                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/50 text-rose-600 dark:text-rose-400 font-medium"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" /> Delete Team Member
+                                </DropdownMenuItem>
+                              </>}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         ) : (
