@@ -1,5 +1,6 @@
 "use client";
 
+import { isAutomaticPodLeadRole } from "@/lib/pod-lead-role-policy";
 import React, { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -247,6 +248,7 @@ export default function RolesPermissionsPage() {
 
   // Helper: can the current user edit/delete a role?
   const canManageRole = (role: CustomRole): boolean => {
+    if (isAutomaticPodLeadRole(role)) return sessionPerms.some(p => ["tenant:settings", "tenant:manage", "platform:manage"].includes(p));
     if (!isBranchAdmin) return true; // tenant admin: yes
     if (!role.branchId) return false; // no-branch role: no
     return assignedBranches.some((b) => b.id === role.branchId);
@@ -558,7 +560,7 @@ export default function RolesPermissionsPage() {
   const filteredRoles = useMemo(() => {
     let list = selectedBranchFilter === "all"
       ? customRolesList
-      : customRolesList.filter((r) => r.branchId === selectedBranchFilter);
+      : customRolesList.filter((r) => r.branchId === selectedBranchFilter || isAutomaticPodLeadRole(r));
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
@@ -682,8 +684,8 @@ export default function RolesPermissionsPage() {
         description: newRoleDesc.trim(),
         systemRole: newRoleSystemRole,
         baseRoleId: baseSystemRoleObj?.id,
-        branchId: newRoleBranchId || undefined,
-        businessUnitId: newRoleBusinessUnitId || undefined,
+        branchId: newRoleSystemRole === "POD_LEAD" ? undefined : newRoleBranchId || undefined,
+        businessUnitId: newRoleSystemRole === "POD_LEAD" ? undefined : newRoleBusinessUnitId || undefined,
         permissions: sanitizedPerms,
       });
 
@@ -713,6 +715,7 @@ export default function RolesPermissionsPage() {
   };
 
   const handleEditArchetypeChange = (archKey: string) => {
+    if (isAutomaticPodLeadRole(editingRole || {}) || archKey === "POD_LEAD") return;
     setEditRoleSystemRole(archKey);
     const archetype = SYSTEM_ARCHETYPES.find((a) => a.key === archKey);
     if (archetype) {
@@ -736,9 +739,9 @@ export default function RolesPermissionsPage() {
         name: editRoleName.trim(),
         description: editRoleDesc.trim(),
         systemRole: editRoleSystemRole,
-        baseRoleId: baseSystemRoleObj?.id,
-        branchId: editRoleBranchId || undefined,
-          businessUnitId: editRoleBusinessUnitId || undefined,
+        baseRoleId: editRoleSystemRole === "POD_LEAD" ? undefined : baseSystemRoleObj?.id,
+        branchId: editRoleSystemRole === "POD_LEAD" ? undefined : editRoleBranchId || undefined,
+        businessUnitId: editRoleSystemRole === "POD_LEAD" ? undefined : editRoleBusinessUnitId || undefined,
         permissions: sanitizedPerms,
       });
 
@@ -796,6 +799,7 @@ export default function RolesPermissionsPage() {
 
   // ─── ASSIGN USER TO ROLE HANDLERS (DEDICATED POP-UP MODAL) ───
   const openAssignStaffPopup = (role: CustomRole) => {
+    if (isAutomaticPodLeadRole(role)) return toast.error("Assign this role by choosing a lead in Recruitment Pods.");
     setAssignModalRole(role);
     setSelectedUserIdsToAssign([]);
     setAssignUserSearchQuery("");
@@ -822,6 +826,7 @@ export default function RolesPermissionsPage() {
   };
 
   const handleBatchAssignUsersSubmit = async (targetRole: CustomRole) => {
+    if (isAutomaticPodLeadRole(targetRole)) return toast.error("Assign pod leadership through Recruitment Pods.");
     if (selectedUserIdsToAssign.length === 0) {
       toast.error("Please select at least one staff member to assign.");
       return;
@@ -844,6 +849,7 @@ export default function RolesPermissionsPage() {
   };
 
   const handleUnassignUser = async (userToUnassign: TenantUser, targetRole: CustomRole) => {
+    if (isAutomaticPodLeadRole(targetRole)) return toast.error("Change the lead in Recruitment Pods.");
     if (!confirm(`Are you sure you want to remove ${userToUnassign.fullName} from the role "${targetRole.name}"?`)) return;
     try {
       setSubmitting(true);
@@ -861,7 +867,7 @@ export default function RolesPermissionsPage() {
   const handleInitiateDeleteRole = (role: CustomRole) => {
     if (role.isSystem) return;
     const assigned = getAssignedUsers(role);
-    const availableTargets = roles.filter((r) => r.id !== role.id && !r.isSystem);
+    const availableTargets = roles.filter((r) => r.id !== role.id && !r.isSystem && !isAutomaticPodLeadRole(r));
     const defaultTarget = availableTargets[0]?.id || "";
 
     setRoleToDelete({ role, staffCount: assigned.length });
@@ -1390,7 +1396,7 @@ export default function RolesPermissionsPage() {
                           )}
 
                           {/* Delete Role Button — hidden if branch admin doesn't own this role's branch */}
-                          {canManageRole(role) && (
+                          {canManageRole(role) && !isAutomaticPodLeadRole(role) && (
                             <button
                               onClick={() => handleInitiateDeleteRole(role)}
                               className="p-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-950/40 text-neutral-400 hover:text-red-600 transition cursor-pointer"
@@ -1659,7 +1665,7 @@ export default function RolesPermissionsPage() {
                   onChange={(e) => handleCreateArchetypeChange(e.target.value)}
                   className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN" && a.key !== "TENANT_ADMIN").map((arch) => (
+                  {SYSTEM_ARCHETYPES.filter(a => a.key !== "BRANCH_ADMIN" && a.key !== "SUPER_ADMIN" && a.key !== "TENANT_ADMIN" && (a.key !== "POD_LEAD" || !roles.some(r => !r.isSystem && isAutomaticPodLeadRole(r)))).map((arch) => (
                       <option key={arch.key} value={arch.key}>
                         {arch.label.replace(" Template", "")}
                       </option>
@@ -2025,6 +2031,7 @@ export default function RolesPermissionsPage() {
                 </div>
                 <select
                   value={editRoleSystemRole}
+                  disabled={isAutomaticPodLeadRole(editingRole)}
                   onChange={(e) => handleEditArchetypeChange(e.target.value)}
                   className="w-full text-xs font-medium border border-neutral-300 dark:border-slate-700 rounded-lg p-2.5 bg-neutral-50/50 dark:bg-slate-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
@@ -2277,6 +2284,7 @@ export default function RolesPermissionsPage() {
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
+                  disabled={isAutomaticPodLeadRole(viewUsersRole)}
                   onClick={() => openAssignStaffPopup(viewUsersRole)}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-8 px-3 font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
@@ -2316,7 +2324,8 @@ export default function RolesPermissionsPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => openAssignStaffPopup(viewUsersRole)}
+                              disabled={isAutomaticPodLeadRole(viewUsersRole)}
+                  onClick={() => openAssignStaffPopup(viewUsersRole)}
                               className="mt-1 text-xs h-7 text-indigo-600 border-indigo-300 hover:bg-indigo-50 cursor-pointer"
                             >
                               + Assign Staff
@@ -2365,6 +2374,7 @@ export default function RolesPermissionsPage() {
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button
+                                disabled={isAutomaticPodLeadRole(viewUsersRole)}
                                 onClick={() => handleUnassignUser(u, viewUsersRole)}
                                 className="text-xs text-red-500 hover:text-red-700 hover:underline cursor-pointer font-medium"
                                 title="Remove user from this role"
@@ -2942,7 +2952,7 @@ export default function RolesPermissionsPage() {
                           >
                             <option value="" disabled>-- Select a custom role --</option>
                             {roles
-                              .filter(r => r.id !== roleToDelete.role.id && !r.isSystem)
+                              .filter(r => r.id !== roleToDelete.role.id && !r.isSystem && !isAutomaticPodLeadRole(r))
                               .filter(r => r.branchId === deleteModalBranchId)
                               .filter(r => r.businessUnitId === deleteModalUnitId)
                               .map((r) => (

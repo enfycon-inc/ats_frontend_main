@@ -1,5 +1,6 @@
 "use client";
 
+import { isAutomaticPodLeadRole } from "@/lib/pod-lead-role-policy";
 import React, { useState, useMemo } from "react";
 import { 
   UserCircle, 
@@ -182,7 +183,7 @@ export default function PendingApprovalView({
     if (!selectedBranchId || !selectedUnitId) return [];
 
     const customRolesForUnit = rolesList.filter(r => {
-      if (r.isSystem) return false;
+      if (r.isSystem || isAutomaticPodLeadRole(r)) return false;
       const bId = r.branchId || r.branch_id;
       const uId = r.businessUnitId || r.business_unit_id;
       return bId === selectedBranchId && uId === selectedUnitId;

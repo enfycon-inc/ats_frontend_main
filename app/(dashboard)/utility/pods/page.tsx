@@ -104,6 +104,7 @@ export default function PodsPage() {
   const [isUnitScoped, setIsUnitScoped] = useState<boolean>(false);
   const [isBranchAdmin, setIsBranchAdmin] = useState<boolean>(false);
 
+  const [podLeadRoleName, setPodLeadRoleName] = useState("Pod Lead");
   const [pods, setPods] = useState<Pod[]>([]);
   const [availableRecruiters, setAvailableRecruiters] = useState<any[]>([]);
   const [modalRecruiters, setModalRecruiters] = useState<any[]>([]);
@@ -216,14 +217,16 @@ export default function PodsPage() {
       if (effectiveUnitId) scopeParams.businessUnitId = effectiveUnitId;
       if (effectiveBranchId) scopeParams.branchId = effectiveBranchId;
 
-      const [podsData, availRecruitersData, unitsData, branchesData, usersData] = await Promise.all([
+      const [podsData, availRecruitersData, unitsData, branchesData, usersData, rolesData] = await Promise.all([
         atsApi.pods.list(scopeParams).catch(() => []),
         atsApi.pods.getAvailableRecruiters(scopeParams).catch(() => []),
         atsApi.businessUnits.list().catch(() => []),
         atsApi.branches.list().catch(() => []),
         atsApi.auth.listUsers().catch(() => []),
+        atsApi.auth.listRoles("ALL", true).catch(() => []),
       ]);
 
+      setPodLeadRoleName(rolesData.find((role: any) => !role.isSystem && role.systemRole === "POD_LEAD")?.name || "Pod Lead");
       setPods(podsData || []);
       setAvailableRecruiters(availRecruitersData || []);
       setBusinessUnits(unitsData || []);
@@ -686,7 +689,7 @@ export default function PodsPage() {
                     Operating Unit
                   </th>
                   <th className="py-3 px-4 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
-                    Pod Lead
+                    {podLeadRoleName}
                   </th>
                   <th className="py-3 px-4 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
                     Recruiters
@@ -925,7 +928,7 @@ export default function PodsPage() {
                     </div>
                     <div className="space-y-1 text-xs text-neutral-600 dark:text-neutral-400">
                       <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-slate-800">
-                        <span>Pod Lead</span>
+                        <span>{podLeadRoleName}</span>
                         <span className="font-semibold text-neutral-900 dark:text-white">{pod.podHeadName || "—"}</span>
                       </div>
                       <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-slate-800">
@@ -1075,15 +1078,15 @@ export default function PodsPage() {
                   </div>
                 </div>
 
-                <section className="space-y-3 border-t border-slate-200 dark:border-slate-800 pt-4" aria-label="Pod Lead">
+                <section className="space-y-3 border-t border-slate-200 dark:border-slate-800 pt-4" aria-label={podLeadRoleName}>
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold">Pod Lead</h4>
+                    <h4 className="text-sm font-semibold">{podLeadRoleName}</h4>
                     <Popover open={podHeadOpen} onOpenChange={open => { setPodHeadOpen(open); if (open) setDraftPodHeadId(podHeadId); }}>
                       <PopoverTrigger asChild>
                         <Button type="button" disabled={!podUnitId || (!isUnitScoped && !podBranchId) || submitting} className="h-8 text-xs bg-[#1a4fa0] hover:bg-[#163f80] text-white">+ Assign</Button>
                       </PopoverTrigger>
                       <PopoverContent align="end" className="w-[min(350px,calc(100vw-2rem))] p-0 z-[60]">
-                        <div className="px-3 pt-3 text-sm font-semibold">Assign Pod Lead</div>
+                        <div className="px-3 pt-3 text-sm font-semibold">Assign {podLeadRoleName}</div>
                         <Command>
                           <CommandInput placeholder="Search by name or email…" className="h-9 text-xs" />
                           <CommandList className="max-h-56">
@@ -1107,7 +1110,7 @@ export default function PodsPage() {
                   </div>
                   {selectedLead ? <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
                     <UserAvatar user={selectedLead} className="h-9 w-9" /><div className="flex-1 min-w-0"><p className="text-xs font-semibold truncate">{selectedLead.fullName}</p><p className="text-[10.5px] text-slate-500 truncate">{selectedLead.email}</p></div>
-                    <Badge className="bg-blue-50 text-blue-800 border-blue-200">Pod Lead</Badge>
+                    <Badge className="bg-blue-50 text-blue-800 border-blue-200">{podLeadRoleName}</Badge>
                     <Button type="button" variant="ghost" size="sm" disabled={submitting} aria-label="Remove pod lead" onClick={() => assignLead('')}>×</Button>
                   </div> : <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 p-4 text-xs"><p className="font-semibold">No pod lead assigned</p><p className="mt-1 text-slate-500">Assign one eligible user to lead this pod.</p></div>}
                 </section>

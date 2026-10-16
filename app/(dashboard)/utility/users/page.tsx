@@ -1,4 +1,5 @@
 "use client";
+import { isAutomaticPodLeadRole } from "@/lib/pod-lead-role-policy";
 import { warnIfEmailFailed } from "@/lib/email-notification";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
@@ -769,9 +770,11 @@ export default function UserManagementPage() {
       setSubmitting(true);
       const tenantId = profile?.tenantId || currentUser?.tenantId || "";
       const primaryBranchId = addForm.branchId || (branches.length > 0 ? branches[0].id : "");
-      const selectedRoles = Array.isArray(addForm.roles) && addForm.roles.length > 0 
-        ? addForm.roles 
-        : (rolesList.length > 0 ? [rolesList[0].name] : []);
+      const selectedRoles = Array.isArray(addForm.roles) ? addForm.roles : [];
+      if (!selectedRoles.length) return toast.error('Select a role for this member.');
+      if (selectedRoles.some(id => rolesList.some(r => (r.id === id || r.name === id) && isAutomaticPodLeadRole(r)))) {
+        return toast.error('Assign pod leadership through Recruitment Pods.');
+      }
 
       const createdAccount = await atsApi.auth.registerUser({
         email: fullEmail,
@@ -842,7 +845,7 @@ export default function UserManagementPage() {
     try {
       setSubmitting(true);
       const assignment = getMemberRoleAssignment(editForm, editRolesCatalog);
-      const finalRoles = assignment.assignedRoleIds;
+      const finalRoles = assignment.assignedRoleIds.filter(id => !editRolesCatalog.some(r => r.id === id && isAutomaticPodLeadRole(r)));
 
 
       await atsApi.auth.updateUserDetail(selectedUser.id, {
@@ -973,7 +976,7 @@ export default function UserManagementPage() {
     // 2. Branch Admin (Branch selected, No Unit)
     if (reviewForm.businessUnitId === "none") {
       const branchAdminRole = rolesList.find(r => (r.name?.toUpperCase() === 'BRANCH ADMIN' || r.systemRole === 'BRANCH_ADMIN'));
-      const branchWideCustom = rolesList.filter(r => !r.isSystem && (r.branchId === reviewForm.branchId || r.branch_id === reviewForm.branchId) && (!r.businessUnitId && !r.business_unit_id));
+      const branchWideCustom = rolesList.filter(r => !r.isSystem && !isAutomaticPodLeadRole(r) && (r.branchId === reviewForm.branchId || r.branch_id === reviewForm.branchId) && (!r.businessUnitId && !r.business_unit_id));
       const list: any[] = [];
       list.push(branchAdminRole ? { id: branchAdminRole.id, name: 'Branch Admin', systemRole: 'BRANCH_ADMIN' } : { id: 'BRANCH_ADMIN', name: 'Branch Admin', systemRole: 'BRANCH_ADMIN' });
       branchWideCustom.forEach(r => list.push({ id: r.id, name: r.name, systemRole: r.systemRole }));
@@ -989,7 +992,7 @@ export default function UserManagementPage() {
     const unitHeadOption = unitAdminRole ? { id: unitAdminRole.id, name: 'Branch Unit Admin', systemRole: 'UNIT_ADMIN' } : { id: 'UNIT_ADMIN', name: 'Branch Unit Admin', systemRole: 'UNIT_ADMIN' };
 
     const unitCustomRoles = rolesList.filter(r => {
-      if (r.isSystem) return false;
+      if (r.isSystem || isAutomaticPodLeadRole(r)) return false;
       const bId = r.branchId || r.branch_id;
       const uId = r.businessUnitId || r.business_unit_id;
       return bId === reviewForm.branchId && uId === reviewForm.businessUnitId;
@@ -2980,7 +2983,7 @@ export default function UserManagementPage() {
                 };
 
                 const branchRolesForAdd = (rolesList || []).filter((r) => {
-                  if (r.isSystem) return false;
+                  if (r.isSystem || isAutomaticPodLeadRole(r)) return false;
                   if (!addForm.businessUnitId) return false;
                   const rBUId = r.businessUnitId || (r as any).business_unit_id;
                   if (!rBUId) return false;
@@ -3317,7 +3320,7 @@ export default function UserManagementPage() {
                 };
 
                 const branchRolesForEdit = (rolesList || []).filter((r) => {
-                  if (r.isSystem) return false;
+                  if (r.isSystem || isAutomaticPodLeadRole(r)) return false;
                   if (!editForm.businessUnitId) return false;
                   const rBUId = r.businessUnitId || (r as any).business_unit_id;
                   if (!rBUId) return false;
@@ -3680,7 +3683,7 @@ export default function UserManagementPage() {
                 Select roles to assign to the <strong>{selectedUserIds.length} selected team members</strong>:
               </p>
 
-              {rolesList.map((r) => {
+              {rolesList.filter(r => !isAutomaticPodLeadRole(r)).map((r) => {
                 const roleKey = r.id;
                 const isChecked = bulkSelectedRoleIds.includes(roleKey);
                 return (
