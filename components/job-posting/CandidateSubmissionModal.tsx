@@ -10,8 +10,15 @@ import { atsApi } from "@/lib/ats-api";
 import { candidateAmountSchema, candidatePhoneSchema, normalizeCandidateLocation } from "@/lib/candidate-submission-input";
 import { ContractCandidateSubmissionForm } from '@/components/candidates/contract-candidate-submission-form';
 import { CandidateForm } from "@/components/candidates/candidate-form";
+import { existingCandidateForm } from '@/lib/existing-candidate-submission';
 
-export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, job, onSuccess }: { open: boolean; onOpenChange: (open: boolean) => void; job: any; onSuccess?: () => void }) {
+export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, job, onSuccess, existingCandidateId }: { open: boolean; onOpenChange: (open: boolean) => void; job: any; onSuccess?: () => void; existingCandidateId?: string | number }) {
+  const [candidateLoading, setCandidateLoading] = useState(false);
+  const [candidateError, setCandidateError] = useState('');
+  const [resumeUrl, setResumeUrl] = useState<string | null>(null);
+  const [resumeError, setResumeError] = useState('');
+  const [updateProfile, setUpdateProfile] = useState(false);
+  const canUpdateProfile = atsApi.auth.getCurrentUser()?.permissions?.includes('candidate:edit') === true;
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
   const [autoFilled, setAutoFilled] = useState(false);
@@ -49,8 +56,30 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
 
   const savedJobType = job?.type?.trim() || job?.jobType?.trim() || job?.job_type?.trim() || '';
   const isContractual = /^(contract|contractual|contract to hire|contract-to-hire|c2h|freelance)$/i.test(savedJobType.trim());
-  const isIndia = !job?.market || /^(IN|IND|INDIA)$/i.test(job.market);
+  const isIndia = !job?.market || /^(IN|IND|INDIA|DOMESTIC)$/i.test(job.market);
   const SubmissionForm = isContractual ? ContractCandidateSubmissionForm : CandidateForm;
+  useEffect(() => {
+    if (!isOpen || !existingCandidateId) return;
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setCandidateLoading(true); setCandidateError(''); setResumeError(''); setResumeUrl(null); setUpdateProfile(false);
+    atsApi.candidates.get(existingCandidateId).then(candidate => {
+      if (!cancelled) {
+        const prefilled = existingCandidateForm(candidate);
+        // Existing annual CTC must never be presented as monthly contract pay.
+        if (isContractual && !/^(MONTH|MONTHLY)$/i.test(candidate.ctcTerm || candidate.compensationPeriod || '')) {
+          prefilled.currentCtc = ''; prefilled.expectedCtc = '';
+        }
+        setFormData(prefilled);
+      }
+    }).catch(error => { if (!cancelled) setCandidateError(error.message || 'Could not load candidate.'); })
+      .finally(() => { if (!cancelled) setCandidateLoading(false); });
+    atsApi.candidates.fetchResumeBlob(existingCandidateId).then(blob => {
+      if (cancelled) return;
+      objectUrl = URL.createObjectURL(blob); setResumeUrl(objectUrl);
+    }).catch(error => { if (!cancelled) setResumeError(error.message || 'Resume preview unavailable.'); });
+    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [isOpen, existingCandidateId, isContractual]);
 
   const handleFileSelect = async (selectedFile: File | null) => {
     if (!selectedFile) return;
@@ -178,7 +207,8 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
 
   const handleSubmit = async () => {
     if (!savedJobType) { toast.error('Job type is unavailable. Reload the job before submitting.'); return; }
-    if (!file) {
+    if (candidateLoading || candidateError) return;
+    if (!file && !existingCandidateId) {
       toast.error("Please upload candidate resume (CV).");
       return;
     }
@@ -186,6 +216,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
       toast.error("Please fill in first name, last name, and email address.");
       return;
     }
+    if (!formData.skills.trim() || !/^\d+(?:\.\d+)?$/.test(formData.relevantExperienceYears) || !formData.currentCompany.trim()) { toast.error('Complete primary skills, relevant experience and current company.'); return; }
 
     const phoneCheck = candidatePhoneSchema.safeParse(formData.phone);
     if (!phoneCheck.success) { toast.error(phoneCheck.error.issues[0].message); return; }
@@ -198,7 +229,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
     setLoading(true);
     try {
       const fullName = `${formData.firstName} ${formData.lastName}`.trim();
-      const uploadResponse = await atsApi.candidates.uploadCv(file, formData.source, {
+      const uploadResponse = existingCandidateId ? { candidate: { id: existingCandidateId } } : await atsApi.candidates.uploadCv(file!, formData.source, {
         fullName,
         totalExperienceYears: formData.totalExperienceYears,
         firstName: formData.firstName.trim(),
@@ -214,7 +245,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
         preferredLocations: formData.preferredLocations,
       });
 
-      const candidate = uploadResponse.candidate;
+      const candidate = uploadResponse.candidate as { id: string | number; dbId?: string };
 
       const currentUser = atsApi.auth.getCurrentUser();
       if (!currentUser?.id) {
@@ -235,7 +266,9 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
         sourceChannel: formData.source === 'Market' ? formData.sourceChannel : undefined,
         sourceDetail: formData.source === 'Market' ? formData.sourceDetail : undefined,
         availabilityToStart,
-        candidateRelevantExperience: formData.relevantExperienceYears ? Number(formData.relevantExperienceYears) : undefined
+        candidateRelevantExperience: formData.relevantExperienceYears ? Number(formData.relevantExperienceYears) : undefined,
+        candidateNoticePeriod: Number(formData.noticePeriodDays),
+        ...(existingCandidateId ? { verifiedCandidate: { ...formData, skills: formData.skills.split(',').map(skill => skill.trim()).filter(Boolean) }, updateCandidateSkills: updateProfile } : {})
       });
 
       resetForm();
@@ -279,7 +312,13 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
         <div className="flex flex-col lg:flex-row flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
           
           {/* LEFT: Preview Pane (50%) */}
-          {file ? (
+          {existingCandidateId ? (
+            <div className="w-full lg:w-1/2 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 flex flex-col gap-3 min-h-48">
+              <h3 className="text-sm font-semibold">Existing resume</h3>
+              <p className="text-xs text-slate-500">Review the stored resume and verify the candidate details. No new upload required.</p>
+              {resumeUrl ? <><a href={resumeUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-700 underline">Open stored resume</a><iframe src={resumeUrl} title="Existing candidate resume" className="flex-1 w-full min-h-40 bg-white border rounded" /></> : <p className="text-sm text-slate-500">{resumeError || 'Loading resume…'}</p>}
+            </div>
+          ) : file ? (
             <div className="w-full lg:w-1/2 border-r border-slate-200 dark:border-slate-800 bg-slate-200/50 dark:bg-slate-900/50 p-4 shrink-0 overflow-hidden flex flex-col">
               <div className="flex-1 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-300 dark:border-slate-700 overflow-hidden flex flex-col relative">
                 <iframe src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} className="w-full h-full border-0 absolute inset-0" title="Resume Preview" />
@@ -338,6 +377,8 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
 
           {/* RIGHT: Componentized Form Pane (50%) */}
           <div className="w-full lg:w-1/2 p-0 bg-white dark:bg-slate-900 relative">
+            {candidateLoading && <p role="status" className="p-4">Loading candidate details…</p>}
+            {candidateError && <p role="alert" className="p-4 text-red-700">{candidateError}. Close and reopen to retry.</p>}
             <SubmissionForm
               formData={formData} 
               setFormData={setFormData} 
@@ -352,13 +393,14 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
         {/* Footer Actions */}
         <div className="px-8 py-5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] z-10">
           <div className="text-sm text-slate-500 dark:text-slate-400">
+            {existingCandidateId && <label className="block text-xs mb-2"><input type="checkbox" checked={updateProfile} disabled={!canUpdateProfile || loading} onChange={event => setUpdateProfile(event.target.checked)} className="mr-2" />Also update candidate profile skills{!canUpdateProfile && ' (requires candidate edit permission)'}</label>}
             Please ensure all <span className="text-red-500 font-bold">*</span> required fields are filled.
           </div>
           <div className="flex items-center gap-3">
             <Button variant="outline" onClick={handleClose} className="h-10 px-6 font-semibold text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={loading || parsing || !file} className="h-10 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md disabled:opacity-50 transition-all">
+            <Button onClick={handleSubmit} disabled={loading || parsing || candidateLoading || !!candidateError || (!file && !existingCandidateId)} className="h-10 px-8 bg-[#1a4fa0] hover:bg-[#163f80] text-white font-bold text-sm shadow-md disabled:opacity-50 transition-all">
               {loading ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
               ) : parsing ? (

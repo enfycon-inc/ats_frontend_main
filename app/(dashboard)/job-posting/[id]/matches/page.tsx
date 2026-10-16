@@ -14,10 +14,9 @@ import {
   Mail, Phone, Check, X, Zap, ZapOff, Users, AlertCircle, UserPlus,
 } from "lucide-react";
 import { atsApi, type JobMatchesResponse, type CandidateMatch } from "@/lib/ats-api";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import toast from "react-hot-toast";
+import { CandidateSubmissionModal } from "@/components/job-posting/CandidateSubmissionModal";
 
 const TIER_STYLES: Record<CandidateMatch["matchTier"], { ring: string; text: string; chip: string; label: string }> = {
   Strong: { ring: "#10b981", text: "text-emerald-600 dark:text-emerald-400", chip: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900", label: "Strong match" },
@@ -73,10 +72,6 @@ export default function JobMatchesPage() {
   // Submit Modal States
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateMatch | null>(null);
-  const [submittedRate, setSubmittedRate] = useState("");
-  const [recruiterComment, setRecruiterComment] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
   // Existing submissions Set to prevent double submission
   const [submittedIds, setSubmittedIds] = useState<Set<number>>(new Set());
 
@@ -136,45 +131,14 @@ export default function JobMatchesPage() {
     { Strong: 0, Good: 0, Fair: 0, Low: 0 } as Record<CandidateMatch["matchTier"], number>,
   );
 
-  const handleOpenSubmitModal = (m: CandidateMatch) => {
+  const [submissionJob, setSubmissionJob] = useState<any>(null);
+  const handleOpenSubmitModal = async (m: CandidateMatch) => {
+    try { setSubmissionJob(await atsApi.jobs.get(jobId)); }
+    catch (error: any) { toast.error(error.message || 'Could not load job details.'); return; }
     setSelectedCandidate(m);
-    setSubmittedRate("");
-    setRecruiterComment("");
+
     setSubmitModalOpen(true);
   };
-
-  const handleConfirmSubmit = async () => {
-    if (!selectedCandidate || !jobId) return;
-    setSubmitting(true);
-    try {
-      const currentUser = atsApi.auth.getCurrentUser();
-      if (!currentUser?.id) {
-        toast.error("You must be logged in to submit a candidate to this job.");
-        return;
-      }
-      await atsApi.submissions.create({
-        candidateId: selectedCandidate.candidateId,
-        jobId: jobId,
-        recruiterId: currentUser.id,
-        finalStatus: "PENDING_APPROVAL",
-        submittedRate: submittedRate.trim() || null,
-        recruiterComment: recruiterComment.trim() || null
-      });
-
-      toast.success(`Successfully submitted ${selectedCandidate.fullName || "candidate"} to ${job?.jobTitle}!`);
-      setSubmittedIds(prev => new Set([...prev, selectedCandidate.candidateId]));
-      setSubmitModalOpen(false);
-      setSelectedCandidate(null);
-    } catch (err: any) {
-      toast.error(`Failed to submit candidate: ${err.message}`);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const isDomestic = job?.market === "IN" || job?.market === "DOMESTIC" || (job?.country && job.country.toLowerCase() !== "united states");
-  const rateLabel = isDomestic ? "Expected Salary (Lakhs)" : "Submitted Pay Rate ($/hr or $/yr)";
-  const ratePlaceholder = isDomestic ? "e.g. 12.5" : "e.g. $70/hr";
 
   return (
     <div className="min-h-full bg-neutral-50 dark:bg-slate-950 [--meter-track:#e5e7eb] dark:[--meter-track:#334155]">
@@ -366,54 +330,11 @@ export default function JobMatchesPage() {
       </div>
 
       {/* Candidate Submit Modal */}
-      <Dialog open={submitModalOpen} onOpenChange={setSubmitModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Submit Candidate to Job</DialogTitle>
-            <DialogDescription>
-              Submit <strong>{selectedCandidate?.fullName}</strong> to the job order <strong>{job?.jobTitle} ({job?.jobCode})</strong>.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-4 py-4">
-            <div className="flex flex-col gap-2">
-              <label htmlFor="modal-submitted-rate" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{rateLabel}</label>
-              <Input
-                id="modal-submitted-rate"
-                placeholder={ratePlaceholder}
-                value={submittedRate}
-                onChange={(e) => setSubmittedRate(e.target.value)}
-                className="h-9 text-xs"
-              />
-            </div>
-            
-            <div className="flex flex-col gap-2">
-              <label htmlFor="modal-recruiter-comment" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Comments</label>
-              <textarea
-                id="modal-recruiter-comment"
-                placeholder="Recruiter comments or notes..."
-                value={recruiterComment}
-                onChange={(e) => setRecruiterComment(e.target.value)}
-                className="min-h-16 text-xs bg-transparent border border-neutral-300 dark:border-slate-700 rounded-md p-2 outline-hidden focus:ring-1 focus:ring-violet-500"
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setSubmitModalOpen(false)} className="text-xs cursor-pointer">
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleConfirmSubmit}
-              disabled={submitting}
-              className="bg-violet-600 hover:bg-violet-700 text-white text-xs cursor-pointer"
-            >
-              {submitting ? "Submitting..." : "Submit Candidate"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {submitModalOpen && selectedCandidate && <CandidateSubmissionModal
+        open={submitModalOpen} onOpenChange={setSubmitModalOpen} job={submissionJob}
+        existingCandidateId={selectedCandidate.candidateId}
+        onSuccess={() => { setSubmittedIds(prev => new Set([...prev, selectedCandidate.candidateId])); load(); }}
+      />}
     </div>
   );
 }
@@ -598,7 +519,7 @@ function MatchCard({ rank, m, job, submittedIds, onSubmitClick }: { rank: number
                 onSubmitClick && (
                   <button
                     onClick={onSubmitClick}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800 text-white px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-[#1a4fa0] hover:bg-[#163f80] text-white px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer"
                   >
                     <UserPlus className="h-3 w-3" /> Submit
                   </button>
