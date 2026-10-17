@@ -98,6 +98,15 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
     ],
   },
   {
+    id: "interviews",
+    label: "Interviews",
+    href: "/calendar",
+    icon: Calendar,
+    children: [
+      { label: "Calendar", href: "/calendar" },
+    ],
+  },
+  {
     id: "applicants",
     label: "Candidates",
     href: "/applicants",
@@ -198,7 +207,6 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
 
 export const MORE_NAV_ITEMS: NavItem[] = [
   { id: "email", label: "Mass Mail", href: "/email", icon: Mail },
-  { id: "calendar", label: "Calendar", href: "/calendar", icon: Calendar },
   { id: "documents", label: "Documents", href: "/documents", icon: FileText },
   { id: "database", label: "Database", href: "/database", icon: Database },
   { id: "integrations", label: "Integrations", href: "/integrations", icon: Globe },
@@ -246,6 +254,15 @@ export const GLOBAL_ADMIN_NAV_ITEMS: NavItem[] = [
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    id: "interviews",
+    label: "Interviews",
+    href: "/calendar",
+    icon: Calendar,
+    children: [
+      { label: "Calendar", href: "/calendar" },
+    ],
   },
   {
     id: "tenant-management",
