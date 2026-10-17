@@ -105,7 +105,9 @@ export default function DashboardPage() {
   const [jobsRequest, setJobsRequest] = useState(0);
   const canViewJobs = profile?.permissions?.includes("job:view") === true;
   const isRecruiterDashboard = selection?.systemRole === "RECRUITER";
+  const isAccountManagerDashboard = selection?.systemRole === "ACCOUNT_MANAGER";
   const isDeliveryDashboard = selection?.systemRole === "DELIVERY_HEAD";
+  const dashboardJobFilter = isAccountManagerDashboard ? "dashboard" : isRecruiterDashboard ? "sourcing" : undefined;
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -114,7 +116,7 @@ export default function DashboardPage() {
       setLoading(true);
       setJobsError(null);
       try {
-        const jobsData = canViewJobs && !isDeliveryDashboard ? await atsApi.jobs.list(isRecruiterDashboard ? { filter: "sourcing" } : undefined) : [];
+        const jobsData = canViewJobs && !isDeliveryDashboard ? await atsApi.jobs.list(dashboardJobFilter ? { filter: dashboardJobFilter } : undefined) : [];
         if (!Array.isArray(jobsData)) throw new Error("Invalid jobs response");
         if (!cancelled) setJobs(jobsData);
       } catch (err) {
@@ -125,7 +127,7 @@ export default function DashboardPage() {
     }
     loadData();
     return () => { cancelled = true; };
-  }, [status, profile?.id, profile?.tenantId, profile?.branchId, profile?.businessUnitId, canViewJobs, isRecruiterDashboard, isDeliveryDashboard, jobsRequest]);
+  }, [status, profile?.id, profile?.tenantId, profile?.branchId, profile?.businessUnitId, canViewJobs, dashboardJobFilter, isDeliveryDashboard, jobsRequest]);
 
   useEffect(() => {
     const handleAppRefresh = () => {
@@ -167,7 +169,7 @@ export default function DashboardPage() {
       toast.error("Failed to update job: " + err.message);
       // Reload on failure
       try {
-        const jobsData = await atsApi.jobs.list().catch(() => []);
+        const jobsData = await atsApi.jobs.list(dashboardJobFilter ? { filter: dashboardJobFilter } : undefined).catch(() => []);
         setJobs(jobsData);
       } catch (reloadErr) {
         console.error("Failed to reload jobs:", reloadErr);
