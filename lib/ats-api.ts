@@ -1636,6 +1636,14 @@ const submissions = {
     const query = new URLSearchParams(cleanFilters).toString();
     return apiFetch<TrackerResponse>(`/api/recruiter-submissions${query ? `?${query}` : ''}`);
   },
+  async calendarEvents(start: string, end: string): Promise<Array<{
+    id: string; submissionId: string; title: string; start: string; status: string; round: string;
+    candidateName: string; jobId: string; jobCode: string; jobTitle: string; recruiterName: string;
+    interviewer: string | null; meetingLink: string | null; timezone: string | null; updatedAt: string; canManage: boolean;
+  }>> {
+    const params = new URLSearchParams({ start, end });
+    return apiFetch(`/api/recruiter-submissions/calendar-events?${params.toString()}`);
+  },
   async get(id: string | number): Promise<TrackerSubmission> {
     return apiFetch<TrackerSubmission>(`/api/recruiter-submissions/${id}`);
   },

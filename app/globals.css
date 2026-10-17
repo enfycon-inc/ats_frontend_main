@@ -653,3 +653,26 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   background-color: #7f1d1d !important;
 }
 
+.interview-calendar .fc {
+  --fc-border-color: hsl(var(--border));
+  --fc-page-bg-color: hsl(var(--card));
+  --fc-neutral-bg-color: hsl(var(--muted));
+  --fc-today-bg-color: rgb(26 79 160 / 7%);
+  color: hsl(var(--foreground));
+  font-size: 12px;
+}
+.interview-calendar .fc .fc-toolbar-title { font-size: 15px; font-weight: 700; }
+.interview-calendar .fc .fc-button { background: #1a4fa0; border-color: #1a4fa0; box-shadow: none; font-size: 11px; }
+.interview-calendar .fc .fc-button:hover,
+.interview-calendar .fc .fc-button:focus { background: #154181; border-color: #154181; }
+.interview-calendar .fc .fc-button-primary:not(:disabled).fc-button-active { background: #12396f; border-color: #12396f; }
+.interview-calendar .fc .fc-daygrid-day-number,
+.interview-calendar .fc .fc-col-header-cell-cushion { color: hsl(var(--foreground)); }
+.interview-calendar .fc .fc-event { cursor: pointer; border-radius: 4px; padding: 2px 3px; }
+.interview-calendar .fc .fc-daygrid-event { white-space: normal; }
+@media (max-width: 640px) {
+  .interview-calendar .fc .fc-toolbar { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .interview-calendar .fc .fc-toolbar-chunk { display: flex; justify-content: space-between; width: 100%; }
+  .interview-calendar .fc .fc-toolbar-title { font-size: 14px; }
+}
+

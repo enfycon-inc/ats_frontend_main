@@ -64,7 +64,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
   if (has("platform:manage")) return GLOBAL_ADMIN_NAV_ITEMS;
   const activeRole = resolveActiveSystemRole(input, roles, profile);
   const isAccountManagerRole = activeRole === "ACCOUNT_MANAGER";
-  const canViewAllSubmissions = has("submission:view_all", "tenant:manage", "tenant:settings") || (!isAccountManagerRole && has("submission:view", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:internal_screening", "submission:schedule_interview", "submission:final_status", "submission:approve_client"));
+  const canViewAllSubmissions = has("submission:view_all", "tenant:manage", "tenant:settings", "platform:manage", "branch_admin:manage", "unit_admin:manage");
   const canAccessSubmissions = canViewAllSubmissions || has("submission:view", "submission:create");
   const allowed: Record<string, boolean> = {
     dashboard: true,
@@ -155,7 +155,7 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
   if (has("platform:manage")) return GLOBAL_ADMIN_MORE_ITEMS;
   const company = has("tenant:settings", "tenant:manage");
   const allowed: Record<string, boolean> = {
-    email: true, calendar: true, documents: true, settings: true, help: true,
+    email: true, calendar: has("submission:view", "submission:view_all", "tenant:manage", "tenant:settings", "platform:manage"), documents: true, settings: true, help: true,
     database: has("database:manage", "tenant:settings"), integrations: has("integration:manage", "tenant:settings"),
     "user-management": has("user:manage", "branch:assign_user", "unit_admin:manage"),
     "role-management": has("user:manage"),
