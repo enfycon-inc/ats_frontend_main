@@ -2,7 +2,6 @@
 
 import React, { useState, useTransition, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
@@ -29,7 +28,6 @@ const LoginForm = () => {
   const [isPending, startTransition] = useTransition();
   const [isNavigating, setIsNavigating] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [passwordType, setPasswordType] = useState("password");
   const formRef = useRef<HTMLFormElement>(null);
   const handoffStarted = useRef(false);
@@ -137,7 +135,7 @@ const LoginForm = () => {
           const data = await response.json();
           const result = await signIn('token-handoff', {
             token: data.accessToken, refreshToken: data.refreshToken,
-            expiresIn: data.expiresIn, userJson: JSON.stringify(data.user), rememberMe: data.rememberMe === true, redirect: false,
+            expiresIn: data.expiresIn, userJson: JSON.stringify(data.user), redirect: false,
           });
           if (!result?.ok) throw new Error('Workspace sign-in failed.');
           localStorage.removeItem('ats_refresh_token');
@@ -229,7 +227,7 @@ const LoginForm = () => {
         // 1. Authenticate with the backend and request the selected session policy.
         let syncRes;
         try {
-          syncRes = await atsApi.auth.login(data.email, data.password, rememberMe);
+          syncRes = await atsApi.auth.login(data.email, data.password);
         } catch (apiErr: any) {
           toast.error(apiErr.message || "Backend authentication failed.");
           return;
@@ -253,7 +251,7 @@ const LoginForm = () => {
           const callbackUrlParam = searchParams.get("callbackUrl");
           const handoff = await fetch('/api/auth/handoff', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ accessToken: syncRes.accessToken, refreshToken: syncRes.refreshToken, destination: userTenantDomain, rememberMe }),
+            body: JSON.stringify({ accessToken: syncRes.accessToken, refreshToken: syncRes.refreshToken, destination: userTenantDomain }),
           });
           if (!handoff.ok) throw new Error('Unable to transfer your workspace session. Please try again.');
           localStorage.removeItem('ats_refresh_token');
@@ -267,7 +265,6 @@ const LoginForm = () => {
           token: syncRes.accessToken,
           refreshToken: syncRes.refreshToken,
           expiresIn: syncRes.expiresIn,
-          rememberMe,
           userJson: JSON.stringify(syncRes.user),
           callbackUrl: "/dashboard",
         });
@@ -338,7 +335,6 @@ const LoginForm = () => {
         <Social
           showGoogle={showGoogle}
           showMicrosoft={showMicrosoft}
-          rememberMe={rememberMe}
           tenantId={authPolicy.tenantId}
           microsoftReady={authPolicyStatus === "ready" && showMicrosoft && microsoftConfigured}
         />
@@ -371,15 +367,6 @@ const LoginForm = () => {
             <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
               Password login is disabled by your workspace administrator. Please authenticate using your authorized identity provider.
             </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs">
-          <Checkbox id="sso-remember-me" checked={rememberMe} onCheckedChange={(checked) => setRememberMe(checked === true)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-          <div>
-            <Label htmlFor="sso-remember-me" className="text-slate-600 cursor-pointer font-medium select-none">
-              Keep Me Signed In
-            </Label>
           </div>
         </div>
 
@@ -459,16 +446,9 @@ const LoginForm = () => {
         )}
       </div>
 
-      {/* Remember Me & Forgot Password */}
+      {/* Session policy & password recovery */}
       <div className="flex justify-between items-center pt-2 text-xs">
-        <div className="flex items-center gap-2">
-          <Checkbox id="checkbox" checked={rememberMe} onCheckedChange={(checked) => setRememberMe(checked === true)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-          <div>
-            <Label htmlFor="checkbox" className="text-slate-600 cursor-pointer font-medium select-none">
-              Keep Me Signed In
-            </Label>
-          </div>
-        </div>
+        <p className="text-slate-500">Session renews while this workspace is in use.</p>
         <Link
           href="/auth/forgot-password"
           className="text-indigo-600 font-semibold hover:text-indigo-700 hover:underline transition-colors"

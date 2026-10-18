@@ -10,12 +10,6 @@ interface SocialProps {
   className?: string;
   tenantId?: string;
   microsoftReady?: boolean;
-  rememberMe?: boolean;
-}
-
-function storeRememberPreference(rememberMe: boolean) {
-  const secure = window.location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `ats_remember_me=${rememberMe ? "1" : "0"}; Path=/; SameSite=Lax; Max-Age=300${secure}`;
 }
 
 // Full-page loading overlay shown while SSO redirect is in progress
@@ -81,7 +75,7 @@ function SsoLoadingOverlay({ provider }: { provider: "google" | "microsoft" }) {
   );
 }
 
-const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, microsoftReady = false, rememberMe = false }: SocialProps) => {
+const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, microsoftReady = false }: SocialProps) => {
   const [loadingProvider, setLoadingProvider] = useState<"google" | "microsoft" | null>(null);
 
   if (!showGoogle && !showMicrosoft) {
@@ -93,7 +87,6 @@ const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, 
 
   const handleGoogleSignIn = async () => {
     setLoadingProvider("google");
-    storeRememberPreference(rememberMe);
     try {
       await signIn("google", { callbackUrl: "/dashboard" });
     } catch {
@@ -104,9 +97,8 @@ const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, 
   const handleMicrosoftSignIn = async () => {
     if (!canSignInWithMicrosoft) return;
     setLoadingProvider("microsoft");
-    storeRememberPreference(rememberMe);
     try {
-      const scope = rememberMe ? "openid profile email offline_access" : "openid profile email";
+      const scope = "openid profile email";
       await signIn("keycloak", { callbackUrl: "/dashboard" }, { kc_idp_hint: `microsoft-${tenantId}`, scope });
     } catch {
       setLoadingProvider(null);

@@ -8,7 +8,7 @@ import Papa from "papaparse";
 import { 
   Users, UserPlus, Search, Edit2, Key, Shield, Building2, MapPin, Briefcase,
   CheckCircle2, XCircle, RefreshCw, Mail, Lock, Sparkles, Filter, ShieldAlert, X, ChevronRight, Loader2,
-  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check, Eye, EyeOff, Info, Clock, Send, Upload, Download
+  MoreVertical, Trash2, UserCheck, UserX, ChevronDown, Check, Eye, EyeOff, Info, Clock, Send, Upload, Download, LogOut
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -956,6 +956,20 @@ export default function UserManagementPage() {
       loadData();
     } catch (err: any) {
       toast.error(err.message || "Failed to delete user.");
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  const handleLogoutUserSessions = async (user: UserItem) => {
+    if (!canManageUser(user)) return;
+    if (!window.confirm(`End all active sessions for ${user.fullName} (${user.email})? They will need to sign in again.`)) return;
+    try {
+      setSubmittingId(user.id);
+      await atsApi.auth.logoutUserSessions(user.id);
+      toast.success(`All sessions for ${user.fullName} have been ended.`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to end user sessions.');
     } finally {
       setSubmittingId(null);
     }
@@ -2376,6 +2390,14 @@ export default function UserManagementPage() {
                               >
                                 <Key className="h-3.5 w-3.5 text-amber-500" /> Reset Password
                               </DropdownMenuItem>
+
+                              {sessionPerms.includes('user:manage') && <DropdownMenuItem
+                                onClick={() => handleLogoutUserSessions(user)}
+                                disabled={isCurrent || submittingId === user.id}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-300 font-medium"
+                              >
+                                <LogOut className="h-3.5 w-3.5" /> End All User Sessions
+                              </DropdownMenuItem>}
 
                               <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
 

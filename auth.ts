@@ -13,21 +13,8 @@ import { getTenantIdentifier } from "./utils/subdomain-helper"
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || "d3b07384-d113-49c3-a555-9ee75c13ca33";
 const isProd = process.env.NODE_ENV === "production";
 const cookiePrefix = isProd ? "__Secure-" : "";
-const rememberMeCookieName = "ats_remember_me";
-const standardSessionMaxAgeSeconds = 24 * 60 * 60;
-const offlineSessionMaxAgeSeconds = 7 * 24 * 60 * 60;
-
-function tokenIncludesOfflineAccess(account: { scope?: unknown; access_token?: unknown }): boolean {
-  const scopes = new Set<string>();
-  if (typeof account.scope === "string") account.scope.split(/\s+/).filter(Boolean).forEach((scope) => scopes.add(scope));
-  if (typeof account.access_token === "string") {
-    try {
-      const payload = JSON.parse(Buffer.from(account.access_token.split(".")[1], "base64url").toString("utf8"));
-      if (typeof payload.scope === "string") payload.scope.split(/\s+/).filter(Boolean).forEach((scope: string) => scopes.add(scope));
-    } catch { /* A missing/unreadable scope is rejected for opt-in offline sessions. */ }
-  }
-  return scopes.has("offline_access");
-}
+const sessionIdleTimeoutSeconds = 12 * 60 * 60;
+const accessTokenMaxAgeSeconds = 5 * 60;
 
 async function fetchBackend(path: string, options: RequestInit = {}): Promise<Response> {
   const internalBase = process.env.INTERNAL_API_URL || (isProd ? "http://backend_blue:5000" : (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000"));
@@ -55,9 +42,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   session: {
     strategy: "jwt",
-    // The encrypted Auth.js cookie uses the maximum supported duration. The JWT
-    // callback enforces the shorter, per-login 24-hour or 7-day absolute limit.
-    maxAge: offlineSessionMaxAgeSeconds,
+    // Auth.js reissues the JWT cookie as the session is accessed. The JWT
+    // callback applies the same rolling idle window as Keycloak's offline token.
+    maxAge: sessionIdleTimeoutSeconds,
   },
   cookies: {
     sessionToken: {
@@ -101,7 +88,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   roles: u.roles || [],
                   accessToken: credentials.token as string,
                   refreshToken: typeof credentials.refreshToken === "string" ? credentials.refreshToken : null,
-                  expiresIn: Number(credentials.expiresIn) || 300,
+                  expiresIn: Math.min(Number(credentials.expiresIn) || 300, 300),
                   rememberMe: credentials.rememberMe === true || credentials.rememberMe === "true",
                   tenantDomain: u.tenantDomain || u.tenant_domain || (u.tenant && (u.tenant.domain || u.tenant.tenantDomain)) || "",
                   systemRole: u.systemRole || "",
@@ -138,7 +125,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 roles: u.roles || [],
                 accessToken: credentials.token as string,
                 refreshToken: typeof credentials.refreshToken === "string" ? credentials.refreshToken : null,
-                expiresIn: Number(credentials.expiresIn) || 300,
+                expiresIn: Math.min(Number(credentials.expiresIn) || 300, 300),
                 rememberMe: credentials.rememberMe === true || credentials.rememberMe === "true",
                 tenantDomain: u.tenantDomain || u.tenant_domain || (u.tenant && (u.tenant.domain || u.tenant.tenantDomain)) || "",
                 systemRole: u.systemRole || "",
@@ -193,7 +180,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 roles: u.roles || [],
                 accessToken: data.accessToken,
                 refreshToken: data.refreshToken || null,
-                expiresIn: data.expiresIn || 36000,
+                expiresIn: Math.min(data.expiresIn || 300, 300),
                 tenantDomain: u.tenantDomain || u.tenant_domain || "",
                 systemRole: u.systemRole || "RECRUITER",
                 podId: u.podId || u.pod_id || null,
@@ -250,11 +237,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async signIn({ user, account, profile }) {
       if (account?.provider === "google" || account?.provider === "keycloak") {
         try {
-          const rememberMe = (await cookies()).get(rememberMeCookieName)?.value === "1";
           const provider = account.provider === "keycloak" ? "keycloak" : "google";
-          if (rememberMe && provider === "keycloak" && !tokenIncludesOfflineAccess(account)) {
-            return `/auth/login?error=SessionRenewalUnavailable`;
-          }
           const requestHeaders = await headers();
           const subdomain = getTenantIdentifier(requestHeaders.get('host') || '');
           if (provider === 'keycloak' && !account.access_token) {
@@ -272,14 +255,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               name: user.name,
               picture: user.image,
               microsoftTenantId: (profile as any)?.tid || null,
-              rememberMe,
             }),
           }).catch(() => null);
 
           if (res && res.ok) {
             const data = await res.json();
             if (data?.user) {
-              const refreshToken = account.provider === "keycloak" ? account.refresh_token : data.refreshToken;
+              // Keep the access token and refresh token from the same grant.
+              const refreshToken = data.refreshToken;
               if (typeof refreshToken !== "string" || !refreshToken) {
                 console.error("SSO authentication did not return a refresh token.", { provider: account.provider });
                 return `/auth/login?error=SessionRenewalUnavailable`;
@@ -292,7 +275,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               (user as any).accessToken = data.accessToken;
               (user as any).refreshToken = refreshToken;
               (user as any).expiresIn = data.expiresIn;
-              (user as any).rememberMe = rememberMe;
               (user as any).tenantDomain = data.user.tenantDomain || "";
               (user as any).systemRole = data.user.systemRole || "";
               (user as any).podId = data.user.podId || null;
@@ -326,10 +308,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.roles = (user as any).roles || []
         token.accessToken = (user as any).accessToken
         token.refreshToken = (user as any).refreshToken || null
-        token.rememberMe = (user as any).rememberMe === true
-        token.sessionExpiresAt = Date.now() + ((token.rememberMe ? offlineSessionMaxAgeSeconds : standardSessionMaxAgeSeconds) * 1000)
+        token.sessionExpiresAt = Date.now() + sessionIdleTimeoutSeconds * 1000
         // Use actual Keycloak expiresIn — do not apply a local default
-        token.accessTokenExpiry = Date.now() + (((user as any).expiresIn || 300) * 1000)
+        token.accessTokenExpiry = Date.now() + (Math.min((user as any).expiresIn || accessTokenMaxAgeSeconds, accessTokenMaxAgeSeconds) * 1000)
         token.tenantDomain = (user as any).tenantDomain
         token.systemRole = (user as any).systemRole
         token.podId = (user as any).podId
@@ -350,14 +331,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       const sessionExpiresAt = token.sessionExpiresAt as number | undefined
       if (sessionExpiresAt && now >= sessionExpiresAt) {
         // Returning null tells Auth.js to clear the encrypted session cookie.
-        console.warn(`[auth.ts jwt] Session ended at the application ${token.rememberMe ? '7-day' : '24-hour'} absolute limit.`)
+        console.warn('[auth.ts jwt] Session ended after 12 hours without a successful token refresh.')
         return null
       }
       if (!sessionExpiresAt) {
-        // Existing sessions created before this policy receive the standard
-        // 24-hour limit from their first post-deploy session check.
-        token.rememberMe = false
-        token.sessionExpiresAt = now + standardSessionMaxAgeSeconds * 1000
+        // Migrate existing Auth.js sessions to a rolling 12-hour refresh window.
+        token.sessionExpiresAt = now + sessionIdleTimeoutSeconds * 1000
       }
       const expiry = token.accessTokenExpiry as number | undefined
 
@@ -390,7 +369,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             const data = await res.json()
             token.accessToken = data.accessToken
             if (data.refreshToken) token.refreshToken = data.refreshToken
-            token.accessTokenExpiry = Date.now() + ((data.expiresIn || 300) * 1000)
+            token.accessTokenExpiry = Date.now() + (Math.min(data.expiresIn || accessTokenMaxAgeSeconds, accessTokenMaxAgeSeconds) * 1000)
+            token.sessionExpiresAt = Date.now() + sessionIdleTimeoutSeconds * 1000
             delete token.error
             console.log('[auth.ts jwt] Access token silently refreshed.')
             return token

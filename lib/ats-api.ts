@@ -613,6 +613,10 @@ const auth = {
     });
   },
 
+  async logoutUserSessions(userId: string): Promise<any> {
+    return apiFetch<any>(`/api/auth/users/${userId}/logout-sessions`, { method: 'POST' });
+  },
+
   async updateUserDetail(userId: string, data: { fullName?: string; email?: string; password?: string; branchId?: string | null;
       businessUnitId?: string | null;
       assignedBranchIds?: string[]; branchRoles?: Record<string, string[]>; roles?: string[]; assignedRoleIds?: string[]; jobReviewerId?: string | null; city?: string | null }): Promise<any> {
