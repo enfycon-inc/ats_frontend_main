@@ -219,7 +219,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       clientId: process.env.KEYCLOAK_CLIENT_ID!,
       clientSecret: process.env.KEYCLOAK_CLIENT_SECRET!,
       issuer: process.env.KEYCLOAK_ISSUER!,
-      authorization: { params: { scope: "openid profile email" } },
+      authorization: { params: { scope: "openid profile email offline_access" } },
     }),
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID,
@@ -250,7 +250,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             body: JSON.stringify({
               provider,
               subdomain,
-              ...(provider === 'keycloak' ? { accessToken: account.access_token } : { idToken: account.id_token }),
+              ...(provider === 'keycloak' ? {
+                accessToken: account.access_token,
+                brokerRefreshToken: account.refresh_token,
+              } : { idToken: account.id_token }),
               email: user.email,
               name: user.name,
               picture: user.image,
