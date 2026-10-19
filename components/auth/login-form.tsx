@@ -446,9 +446,8 @@ const LoginForm = () => {
         )}
       </div>
 
-      {/* Session policy & password recovery */}
-      <div className="flex justify-between items-center pt-2 text-xs">
-        <p className="text-slate-500">Session renews while this workspace is in use.</p>
+      {/* Password recovery */}
+      <div className="flex justify-end items-center pt-2 text-xs">
         <Link
           href="/auth/forgot-password"
           className="text-indigo-600 font-semibold hover:text-indigo-700 hover:underline transition-colors"
