@@ -42,7 +42,8 @@ function activity(event: SubmissionHistoryEvent) {
   for (const key of ['l1', 'l2', 'l3']) {
     const status = changes[`${key}Status`];
     const date = changes[`${key}Date`];
-    if (status) names.push(`${key.toUpperCase()} ${status.after === 'SCHEDULED' || status.after === 'CANCELLED' ? 'interview ' : ''}${statusLabel(status.after || 'PENDING').toLowerCase()}`);
+    if (date?.before && date.after && date.before !== date.after) names.push(`${key.toUpperCase()} interview rescheduled`);
+    else if (status) names.push(`${key.toUpperCase()} ${status.after === 'SCHEDULED' || status.after === 'CANCELLED' ? 'interview ' : ''}${statusLabel(status.after || 'PENDING').toLowerCase()}`);
     else if (date) names.push(`${key.toUpperCase()} interview ${date.after == null ? 'appointment removed' : date.before ? 'rescheduled' : 'scheduled'}`);
     else if (Object.keys(changes).some(field => field.startsWith(key))) names.push(`${key.toUpperCase()} details updated`);
   }

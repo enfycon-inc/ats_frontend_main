@@ -106,9 +106,7 @@ export function CalendarInterviewDialog({
   const existingStatus = submission[`${round}Status`];
   const existingInterview = Boolean(submission[`${round}Date`] && ["SCHEDULED", "AWAITING_FEEDBACK"].includes(existingStatus || ""));
   const canEditInterview = Boolean(allowEdit && submission.capabilities?.schedule && existingInterview);
-  const roundLabel = round.toUpperCase() + (round === "l1" ? " · Screening" : round === "l2" ? " · Technical" : " · Final");
-  const savedColor = (submission[`${round}Color`] || (existingStatus === "AWAITING_FEEDBACK" ? "violet" : round === "l2" ? "violet" : round === "l3" ? "rose" : "blue")) as InterviewColor;
-  const colorDetails = COLORS.find(item => item.key === savedColor) || COLORS[0];
+  const roundLabel = round.toUpperCase();
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -117,18 +115,22 @@ export function CalendarInterviewDialog({
     setError("");
     try {
       if (cancelMode && !cancelReason.trim()) throw new Error("Enter a cancellation reason.");
+      const nextDate = cancelMode ? submission[`${round}Date`] : interviewInstant(date, time, timezone);
+      const previousDate = submission[`${round}Date`];
+      const rescheduled = existingInterview && !cancelMode && Boolean(previousDate && nextDate) &&
+        new Date(previousDate!).getTime() !== new Date(nextDate!).getTime();
       const payload: TrackerUpdate = {
         expectedUpdatedAt: submission.updatedAt,
         requestId: crypto.randomUUID(),
         [`${round}Status`]: cancelMode ? "CANCELLED" : "SCHEDULED",
-        [`${round}Date`]: cancelMode ? submission[`${round}Date`] : interviewInstant(date, time, timezone),
+        [`${round}Date`]: nextDate,
         [`${round}Interviewer`]: interviewer.trim() || null,
         [`${round}Remarks`]: (cancelMode ? cancelReason : notes).trim() || null,
         [`${round}Color`]: cancelMode ? submission[`${round}Color`] || null : color,
         meetingLink: meetingLink.trim() || null,
       };
       await atsApi.submissions.update(submission.id, payload);
-      toast.success(cancelMode ? "Interview cancelled" : "Interview saved");
+      toast.success(cancelMode ? "Interview cancelled" : rescheduled ? "Interview rescheduled" : "Interview saved");
       onSaved();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Interview could not be saved. Reload and try again.");
@@ -141,7 +143,7 @@ export function CalendarInterviewDialog({
     <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto p-0">
       <DialogHeader className="border-b border-border px-5 py-4 pr-12">
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-[#1a4fa0]" /><DialogTitle className="text-sm">{!editMode ? "Interview details" : cancelMode ? "Cancel interview" : existingInterview ? "Edit interview" : "Schedule interview"}</DialogTitle></div>
-        <DialogDescription className="text-xs">{!editMode ? "Review the interview schedule and details." : "Link a submission and interview round to manage the schedule."}</DialogDescription>
+        <DialogDescription className="text-xs">{!editMode ? "Review the interview schedule and details." : existingInterview && !cancelMode ? "Changing the date or time will record this interview as rescheduled." : "Link a submission and interview round to manage the schedule."}</DialogDescription>
       </DialogHeader>
       <form onSubmit={event => void save(event)}>
         <div className="space-y-4 px-5 py-4">
@@ -153,9 +155,8 @@ export function CalendarInterviewDialog({
             <dt className="text-muted-foreground">Interviewer</dt><dd className="font-medium">{submission[`${round}Interviewer`] || "Not assigned"}</dd>
             <dt className="text-muted-foreground">Meeting link</dt><dd className="min-w-0 break-all">{submission.meetingLink ? <a className="text-[#1a4fa0] underline" href={submission.meetingLink} target="_blank" rel="noreferrer">{submission.meetingLink}</a> : "Not provided"}</dd>
             <dt className="text-muted-foreground">Notes</dt><dd className="whitespace-pre-wrap">{submission[`${round}Remarks`] || "No notes"}</dd>
-            <dt className="text-muted-foreground">Calendar color</dt><dd className="flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{ backgroundColor: colorDetails.value }} />{colorDetails.label}</dd>
           </dl> : <>
-            <div className="space-y-1"><label className="text-xs font-medium">Interview round <span className="text-red-500">*</span></label><select aria-label="Interview round" value={round} disabled={Boolean(requestedRound)} onChange={event => setRound(event.target.value as RoundKey)} className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs">{allowed.map(item => <option value={item.key} key={item.key}>{item.label} · {item.label === "L1" ? "Screening" : item.label === "L2" ? "Technical" : "Final"}</option>)}</select></div>
+            <div className="space-y-1"><label className="text-xs font-medium">Interview round <span className="text-red-500">*</span></label><select aria-label="Interview round" value={round} disabled={Boolean(requestedRound)} onChange={event => setRound(event.target.value as RoundKey)} className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs">{allowed.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}</select></div>
             <div className="grid grid-cols-2 gap-3"><div className="space-y-1"><label className="text-xs font-medium">Date <span className="text-red-500">*</span></label><Input type="date" required value={date} disabled={cancelMode || saving} onChange={event => setDate(event.target.value)} className="h-9 text-xs" /></div><div className="space-y-1"><label className="text-xs font-medium">Start time <span className="text-red-500">*</span></label><Input type="time" required value={time} disabled={cancelMode || saving} onChange={event => setTime(event.target.value)} className="h-9 text-xs" /></div></div>
             <div className="space-y-1"><label className="text-xs font-medium">Time zone <span className="text-red-500">*</span></label><select value={timezone} disabled={cancelMode || saving} onChange={event => setTimezone(event.target.value)} className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs">{timezones.map(zone => <option key={zone} value={zone}>{zone.replaceAll("_", " ")}</option>)}</select></div>
             <div className="space-y-1"><label className="text-xs font-medium">Interviewer</label><Input list="calendar-interviewer-options" value={interviewer} disabled={cancelMode || saving} onChange={event => setInterviewer(event.target.value)} className="h-9 text-xs" placeholder="Search or enter interviewer" /><datalist id="calendar-interviewer-options">{interviewerOptions.map(name => <option key={name} value={name} />)}</datalist></div>
