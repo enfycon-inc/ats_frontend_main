@@ -30,6 +30,8 @@ export interface Job {
   recruiterIds?: string[];
   recruiterDetails?: AssignedRecruiterProfile[];
   accountManagerId?: string;
+  accountManagerName?: string | null;
+  accountManagerEmail?: string | null;
   
   createdBy: string;
   createdOn: string;
@@ -37,6 +39,7 @@ export interface Job {
   createdAt?: string;
   updatedAt?: string;
   creatorEmail?: string | null;
+  createdByUserId?: string | null;
   jobTimezone?: string;
   submissionsCount: number;
   pipeline: {
@@ -112,6 +115,9 @@ export function mapApiJobToJob(api: any): Job {
     recruiterDetails: Array.isArray(api.recruiterDetails) ? api.recruiterDetails : [],
     
     accountManagerId: api.accountManagerId || api.account_manager_id || undefined,
+    accountManagerName: api.accountManagerName || api.account_manager_name || null,
+    accountManagerEmail: api.accountManagerEmail || api.account_manager_email || null,
+    createdByUserId: api.createdByUserId || api.created_by_user_id || null,
     createdBy: api.createdBy || "System Admin",
     createdOn: api.createdAt || api.createdOn || new Date().toISOString(),
     modifiedOn: api.updatedAt || api.modifiedOn || api.createdAt || api.createdOn || new Date().toISOString(),

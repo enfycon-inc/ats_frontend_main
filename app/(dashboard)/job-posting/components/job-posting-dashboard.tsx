@@ -394,7 +394,7 @@ export default function JobPostingDashboard({
       { id: "jobCode", label: "Job Code" },
       { id: "jobTitle", label: "Job Title" },
       { id: "businessUnit", label: "Business Unit" },
-      { id: "createdBy", label: "Job Created By" },
+      { id: "createdBy", label: "Created By" },
       { id: "assignedTo", label: "Recruiter" },
       ...(branchUsesPods ? [{ id: "podName", label: "Assigned Pod" }] : []),
       { id: "client", label: "Client" },

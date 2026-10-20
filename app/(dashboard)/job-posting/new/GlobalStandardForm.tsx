@@ -145,7 +145,7 @@ type FormValues = zod.infer<typeof formSchema>;
 
 
 
-export function GlobalStandardForm({ editJobId }: { editJobId?: string }) {
+export function GlobalStandardForm({ editJobId, onBehalfOfUserId }: { editJobId?: string; onBehalfOfUserId?: string }) {
   const router = useRouter();
   const [assignmentReason, setAssignmentReason] = useState('');
   const { data: session, status } = useSession();
@@ -722,13 +722,14 @@ const getInitialActiveBranchContext = () => {
           }
 
           const posterName = (session as any)?.user?.name || prof?.name || prof?.email || "Account Manager";
+          setValue("accountManager", onBehalfOfUserId || prof.dbId || prof.id || posterName);
 
           setMarket(targetMarket);
           if (targetMarket === "IN") {
             setValue("jobType", "Full Time");
             setValue("shiftTiming", "General Shift (Day)");
             setValue("taxTerms", "Permanent");
-            setValue("accountManager", posterName);
+            setValue("accountManager", onBehalfOfUserId || prof.dbId || prof.id || posterName);
             setBillCurrency("INR");
             setBillUnit("LPA");
             setBillTerm("Permanent");

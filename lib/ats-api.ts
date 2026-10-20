@@ -1165,6 +1165,26 @@ const jobs = {
     return apiFetch<JobPayload[]>(`/api/jobs${qs}`);
   },
 
+  async creationTargets(): Promise<Array<{ id: string; name: string; email: string; branchId?: string; businessUnitId?: string }>> {
+    return apiFetch('/api/jobs/creation-access/targets');
+  },
+  async creationGrantPeople(): Promise<Array<{ id: string; fullName: string; email: string; branchId?: string; businessUnitId?: string }>> {
+    return apiFetch('/api/jobs/creation-access/people');
+  },
+  async creationGrantOwners(): Promise<Array<{ id: string; fullName: string; email: string; branchId?: string; businessUnitId?: string }>> {
+    return apiFetch('/api/jobs/creation-access/owners');
+  },
+  async creationGrants(accountManagerId?: string): Promise<any[]> {
+    const query = accountManagerId ? `?accountManagerId=${encodeURIComponent(accountManagerId)}` : '';
+    return apiFetch(`/api/jobs/creation-access/grants${query}`);
+  },
+  async grantJobCreation(payload: { accountManagerId: string; delegateUserId: string }): Promise<any> {
+    return apiFetch('/api/jobs/creation-access/grants', { method: 'POST', body: JSON.stringify(payload) });
+  },
+  async revokeJobCreation(grantId: string): Promise<void> {
+    return apiFetch(`/api/jobs/creation-access/grants/${encodeURIComponent(grantId)}`, { method: 'DELETE' });
+  },
+
   async get(id: string): Promise<JobPayload> {
     return apiFetch<JobPayload>(`/api/jobs/${id}`);
   },

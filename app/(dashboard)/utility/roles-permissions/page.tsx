@@ -78,7 +78,7 @@ const SYSTEM_ARCHETYPES = [
     badge: "Business Development",
     desc: "Client relations, direct client creation (no approval needed), job requisition authoring, interview scheduling, and placements.",
     perms: [
-      "job:create", "job:edit", "job:view", "job:publish_direct", "job:approve", "job:reject",
+      "job:create", "job:grant_creation_delegate", "job:edit", "job:view", "job:publish_direct", "job:approve", "job:reject",
       "job:assign_recruiter",
       "candidate:view", "candidate:create",
       "submission:view", "submission:create", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:schedule_interview", "submission:edit_rate", "submission:edit",

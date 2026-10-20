@@ -83,6 +83,7 @@ export default function DataTable({
 
   // User details & permission controls
   const [currentUser, setCurrentUser] = useState(() => atsApi.auth.getCurrentUser());
+  const [hasOnBehalfTargets, setHasOnBehalfTargets] = useState(false);
   const [activeBranchId, setActiveBranchId] = useState<string | null>(() =>
     typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null
   );
@@ -107,6 +108,14 @@ export default function DataTable({
       window.removeEventListener("branchChanged", refreshAccess);
     };
   }, []);
+
+  useEffect(() => {
+    let disposed = false;
+    atsApi.jobs.creationTargets().then((targets) => {
+      if (!disposed) setHasOnBehalfTargets(Array.isArray(targets) && targets.length > 0);
+    }).catch(() => { if (!disposed) setHasOnBehalfTargets(false); });
+    return () => { disposed = true; };
+  }, [currentUser]);
 
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
@@ -369,6 +378,23 @@ export default function DataTable({
               className="flex items-center gap-1 px-2.5 py-1 rounded bg-primary hover:bg-primary/95 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
             >
               <Plus className="h-3 w-3" /> New Job
+            </button>
+          )}
+
+          {hasOnBehalfTargets && (
+            <button
+              onClick={() => router.push("/job-posting/new?onBehalf=true")}
+              className="flex items-center gap-1 px-2.5 py-1 rounded border border-primary/40 bg-white hover:bg-primary/5 text-primary text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Create for colleague
+            </button>
+          )}
+          {(currentUser?.permissions || []).some((permission: string) => ["job:grant_creation_delegate", "user:manage", "tenant:settings", "tenant:manage"].includes(permission)) && (
+            <button
+              onClick={() => router.push("/job-posting/access")}
+              className="px-2.5 py-1 rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-xs font-semibold text-neutral-700 dark:text-neutral-200 transition-colors cursor-pointer"
+            >
+              Manage access
             </button>
           )}
 

@@ -145,7 +145,7 @@ type FormValues = zod.infer<typeof formSchema>;
 
 
 
-export function UsStaffingForm({ editJobId }: { editJobId?: string }) {
+export function UsStaffingForm({ editJobId, onBehalfOfUserId }: { editJobId?: string; onBehalfOfUserId?: string }) {
   const router = useRouter();
   const [assignmentReason, setAssignmentReason] = useState('');
   const { data: session, status } = useSession();
@@ -672,6 +672,7 @@ const getInitialActiveBranchContext = () => {
           }
 
           const posterName = (session as any)?.user?.name || prof?.name || prof?.email || "Account Manager";
+          setValue("accountManager", onBehalfOfUserId || prof.dbId || prof.id || posterName);
 
           
           // @ts-ignore
@@ -679,7 +680,7 @@ const getInitialActiveBranchContext = () => {
             setValue("jobType", "Full Time");
             setValue("shiftTiming", "General Shift (Day)");
             setValue("taxTerms", "Permanent");
-            setValue("accountManager", posterName);
+            setValue("accountManager", onBehalfOfUserId || prof.dbId || prof.id || posterName);
             setBillCurrency("INR");
             setBillUnit("LPA");
             setBillTerm("Permanent");

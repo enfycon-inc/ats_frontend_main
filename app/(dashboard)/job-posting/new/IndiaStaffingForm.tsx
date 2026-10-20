@@ -147,7 +147,7 @@ type FormValues = zod.infer<typeof formSchema>;
 
 
 
-export function IndiaStaffingForm({ editJobId }: { editJobId?: string }) {
+export function IndiaStaffingForm({ editJobId, onBehalfOfUserId }: { editJobId?: string; onBehalfOfUserId?: string }) {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [isJobLoading, setIsJobLoading] = useState(!!editJobId);
@@ -732,7 +732,7 @@ const getInitialActiveBranchContext = () => {
           
           if (!editJobId) {
             if (!getValues("shiftTiming")) setValue("shiftTiming", "General Shift (Day)");
-            if (!getValues("accountManager")) setValue("accountManager", prof.id || prof.dbId || posterName);
+            if (!getValues("accountManager")) setValue("accountManager", onBehalfOfUserId || prof.dbId || prof.id || posterName);
           }
 
         }

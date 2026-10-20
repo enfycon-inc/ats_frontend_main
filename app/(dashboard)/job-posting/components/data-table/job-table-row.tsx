@@ -352,6 +352,11 @@ export function JobTableRow({
                       "Account Manager"
                   )}
                 </span>
+                {job.createdByUserId && job.accountManagerId && job.accountManagerId !== job.createdByUserId && job.accountManagerName && (
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[180px]">
+                    For {job.accountManagerName}
+                  </span>
+                )}
                 {((job as any).creatorEmail || (job as any).creator_email) && (
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[160px]">
                     {(job as any).creatorEmail || (job as any).creator_email}
