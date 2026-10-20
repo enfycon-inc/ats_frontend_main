@@ -13,7 +13,7 @@ export default function JobCreationAccessPage() {
   const router = useRouter();
   const currentUser = useMemo(() => atsApi.auth.getCurrentUser(), []);
   const permissions: string[] = currentUser?.permissions || [];
-  const isAdmin = permissions.some((permission) => ["user:manage", "tenant:settings", "tenant:manage", "platform:manage", "*"].includes(permission));
+  const isAdmin = permissions.some((permission) => ["job:manage_creation_access", "tenant:settings", "tenant:manage", "platform:manage", "*"].includes(permission));
   const [people, setPeople] = useState<Person[]>([]);
   const [ownerPeople, setOwnerPeople] = useState<Person[]>([]);
   const [ownerId, setOwnerId] = useState(isAdmin ? "" : currentUser?.dbId || currentUser?.id || "");
@@ -26,7 +26,7 @@ export default function JobCreationAccessPage() {
     setLoading(true);
     try {
       const [staff, access, owners] = await Promise.all([
-        atsApi.jobs.creationGrantPeople(),
+        atsApi.jobs.creationGrantPeople(ownerId || undefined),
         ownerId ? atsApi.jobs.creationGrants(ownerId) : Promise.resolve([]),
         isAdmin ? atsApi.jobs.creationGrantOwners() : Promise.resolve([]),
       ]);

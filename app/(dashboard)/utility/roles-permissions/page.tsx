@@ -106,6 +106,7 @@ const SYSTEM_ARCHETYPES = [
     // perms = full ceiling (all permissions visible/grantable in the matrix)
     perms: [
       "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:view", "candidate:create",
       "submission:view", "submission:create", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
@@ -119,6 +120,7 @@ const SYSTEM_ARCHETYPES = [
     // defaultPerms = pre-selected when creating a new role (submission enabled for delivery oversight)
     defaultPerms: [
       "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:view", "candidate:create",
       "submission:view", "submission:create", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
@@ -138,6 +140,7 @@ const SYSTEM_ARCHETYPES = [
     // perms = full ceiling (submission perms visible/grantable for Branch Admin to enable)
     perms: [
       "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
       "submission:create", "submission:view", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
@@ -150,6 +153,7 @@ const SYSTEM_ARCHETYPES = [
     // defaultPerms = pre-selected when creating a new role (submission disabled by default)
     defaultPerms: [
       "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
       "client:view", "client:create", "client:direct_add", "client:edit",
@@ -167,6 +171,7 @@ const SYSTEM_ARCHETYPES = [
     // perms = full ceiling (submission perms visible/grantable for Tenant Admin to enable)
     perms: [
       "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
       "submission:create", "submission:view", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
@@ -178,6 +183,7 @@ const SYSTEM_ARCHETYPES = [
     // defaultPerms = pre-selected when creating a new role (submission disabled by default)
     defaultPerms: [
       "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
       "client:view", "client:create", "client:direct_add", "client:edit", "client:approve", "client:reject",
@@ -193,6 +199,7 @@ const SYSTEM_ARCHETYPES = [
     desc: "Full company administration privileges across jobs, clients (create, direct add, approve, reject, delete), candidates, pods, users, and branch offices.",
     perms: [
       "job:create", "job:edit", "job:view", "job:publish_direct", "job:approve", "job:reject",
+      "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
       "submission:view", "submission:create", "submission:internal_screening", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:approve_client", "submission:schedule_interview", "submission:edit_rate", "submission:edit",

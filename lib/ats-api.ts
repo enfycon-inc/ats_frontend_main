@@ -1168,8 +1168,9 @@ const jobs = {
   async creationTargets(): Promise<Array<{ id: string; name: string; email: string; branchId?: string; businessUnitId?: string }>> {
     return apiFetch('/api/jobs/creation-access/targets');
   },
-  async creationGrantPeople(): Promise<Array<{ id: string; fullName: string; email: string; branchId?: string; businessUnitId?: string }>> {
-    return apiFetch('/api/jobs/creation-access/people');
+  async creationGrantPeople(accountManagerId?: string): Promise<Array<{ id: string; fullName: string; email: string; branchId?: string; businessUnitId?: string }>> {
+    const query = accountManagerId ? `?accountManagerId=${encodeURIComponent(accountManagerId)}` : '';
+    return apiFetch(`/api/jobs/creation-access/people${query}`);
   },
   async creationGrantOwners(): Promise<Array<{ id: string; fullName: string; email: string; branchId?: string; businessUnitId?: string }>> {
     return apiFetch('/api/jobs/creation-access/owners');

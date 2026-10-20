@@ -389,7 +389,7 @@ export default function DataTable({
               Create for colleague
             </button>
           )}
-          {(currentUser?.permissions || []).some((permission: string) => ["job:grant_creation_delegate", "user:manage", "tenant:settings", "tenant:manage"].includes(permission)) && (
+          {(currentUser?.permissions || []).some((permission: string) => ["job:grant_creation_delegate", "job:manage_creation_access", "tenant:settings", "tenant:manage", "platform:manage", "*"].includes(permission)) && (
             <button
               onClick={() => router.push("/job-posting/access")}
               className="px-2.5 py-1 rounded border border-neutral-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-xs font-semibold text-neutral-700 dark:text-neutral-200 transition-colors cursor-pointer"
