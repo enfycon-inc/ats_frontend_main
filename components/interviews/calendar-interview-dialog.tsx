@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { CalendarDays, Loader2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import type { InterviewColor, RoundKey, TrackerSubmission, TrackerUpdate } from "@/lib/submission-contract";
 import { interviewInstant, localInterviewParts, ROUNDS, validTimezone } from "@/lib/submission-tracker";
+import { stageRemarkSuggestions, type StageRemark } from "@/lib/stage-remarks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,7 +37,7 @@ function initialScheduleState(submission: TrackerSubmission | null, requestedRou
     timezone: zone,
     interviewer: submission?.[`${key}Interviewer`] || "",
     meetingLink: submission?.meetingLink || "",
-    notes: wasCancelled ? "" : submission?.[`${key}Remarks`] || "",
+    remarks: wasCancelled ? "" : submission?.[`${key}Remarks`] || "",
     color: (submission?.[`${key}Color`] || (submission?.[`${key}Status`] === "AWAITING_FEEDBACK" ? "violet" : key === "l2" ? "violet" : key === "l3" ? "rose" : "blue")) as InterviewColor,
   };
 }
@@ -80,7 +82,8 @@ export function CalendarInterviewDialog({
   const [timezone, setTimezone] = useState(initial.timezone);
   const [interviewer, setInterviewer] = useState(initial.interviewer);
   const [meetingLink, setMeetingLink] = useState(initial.meetingLink);
-  const [notes, setNotes] = useState(initial.notes);
+  const [remarks, setRemarks] = useState(initial.remarks);
+  const [remarksFocused, setRemarksFocused] = useState(false);
   const [color, setColor] = useState<InterviewColor>(initial.color);
   const [editMode, setEditMode] = useState(!readOnly);
   const [cancelReason, setCancelReason] = useState("");
@@ -88,11 +91,17 @@ export function CalendarInterviewDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const timezones = useMemo(() => Array.from(new Set([
+  const { data: remarkTemplates = [] } = useSWR<StageRemark[]>(
+    submission?.branchId ? ["calendar-interview-remarks", submission.branchId] : null,
+    () => atsApi.submissions.getCustomRemarks(submission!.branchId!, false),
+    { revalidateOnFocus: false, revalidateOnReconnect: false },
+  );
+
+  const timezones = Array.from(new Set([
     validTimezone(submission?.timezone),
     validTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone),
     "Asia/Kolkata", "America/New_York", "UTC",
-  ])).filter(Boolean), [submission?.timezone]);
+  ])).filter(Boolean);
 
   if (!submission) return null;
   const allowed = ROUNDS.filter(({ key }, index) => {
@@ -107,6 +116,11 @@ export function CalendarInterviewDialog({
   const existingInterview = Boolean(submission[`${round}Date`] && ["SCHEDULED", "AWAITING_FEEDBACK"].includes(existingStatus || ""));
   const canEditInterview = Boolean(allowEdit && submission.capabilities?.schedule && existingInterview);
   const roundLabel = round.toUpperCase();
+  const remarkSuggestions = remarks.trim()
+    ? stageRemarkSuggestions(remarkTemplates, round)
+      .filter(item => item.remarkText.toLowerCase().includes(remarks.trim().toLowerCase()) && item.remarkText.trim().toLowerCase() !== remarks.trim().toLowerCase())
+      .slice(0, 4)
+    : [];
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -125,7 +139,7 @@ export function CalendarInterviewDialog({
         [`${round}Status`]: cancelMode ? "CANCELLED" : "SCHEDULED",
         [`${round}Date`]: nextDate,
         [`${round}Interviewer`]: interviewer.trim() || null,
-        [`${round}Remarks`]: (cancelMode ? cancelReason : notes).trim() || null,
+        [`${round}Remarks`]: (cancelMode ? cancelReason : remarks).trim() || null,
         [`${round}Color`]: cancelMode ? submission[`${round}Color`] || null : color,
         meetingLink: meetingLink.trim() || null,
       };
@@ -154,14 +168,14 @@ export function CalendarInterviewDialog({
             <dt className="text-muted-foreground">Time zone</dt><dd className="font-medium">{timezone}</dd>
             <dt className="text-muted-foreground">Interviewer</dt><dd className="font-medium">{submission[`${round}Interviewer`] || "Not assigned"}</dd>
             <dt className="text-muted-foreground">Meeting link</dt><dd className="min-w-0 break-all">{submission.meetingLink ? <a className="text-[#1a4fa0] underline" href={submission.meetingLink} target="_blank" rel="noreferrer">{submission.meetingLink}</a> : "Not provided"}</dd>
-            <dt className="text-muted-foreground">Notes</dt><dd className="whitespace-pre-wrap">{submission[`${round}Remarks`] || "No notes"}</dd>
+            <dt className="text-muted-foreground">Remarks</dt><dd className="whitespace-pre-wrap">{submission[`${round}Remarks`] || "No remarks"}</dd>
           </dl> : <>
             <div className="space-y-1"><label className="text-xs font-medium">Interview round <span className="text-red-500">*</span></label><select aria-label="Interview round" value={round} disabled={Boolean(requestedRound)} onChange={event => setRound(event.target.value as RoundKey)} className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs">{allowed.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}</select></div>
             <div className="grid grid-cols-2 gap-3"><div className="space-y-1"><label className="text-xs font-medium">Date <span className="text-red-500">*</span></label><Input type="date" required value={date} disabled={cancelMode || saving} onChange={event => setDate(event.target.value)} className="h-9 text-xs" /></div><div className="space-y-1"><label className="text-xs font-medium">Start time <span className="text-red-500">*</span></label><Input type="time" required value={time} disabled={cancelMode || saving} onChange={event => setTime(event.target.value)} className="h-9 text-xs" /></div></div>
             <div className="space-y-1"><label className="text-xs font-medium">Time zone <span className="text-red-500">*</span></label><select value={timezone} disabled={cancelMode || saving} onChange={event => setTimezone(event.target.value)} className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs">{timezones.map(zone => <option key={zone} value={zone}>{zone.replaceAll("_", " ")}</option>)}</select></div>
             <div className="space-y-1"><label className="text-xs font-medium">Interviewer</label><Input list="calendar-interviewer-options" value={interviewer} disabled={cancelMode || saving} onChange={event => setInterviewer(event.target.value)} className="h-9 text-xs" placeholder="Search or enter interviewer" /><datalist id="calendar-interviewer-options">{interviewerOptions.map(name => <option key={name} value={name} />)}</datalist></div>
             <div className="space-y-1"><label className="text-xs font-medium">Meeting link</label><Input type="url" value={meetingLink} disabled={cancelMode || saving} onChange={event => setMeetingLink(event.target.value)} className="h-9 text-xs" placeholder="https://…" /></div>
-            <div className="space-y-1"><label className="text-xs font-medium">{cancelMode ? <>Cancellation reason <span className="text-red-500">*</span></> : "Notes"}</label><Textarea value={cancelMode ? cancelReason : notes} required={cancelMode} maxLength={500} rows={3} disabled={saving} onChange={event => cancelMode ? setCancelReason(event.target.value) : setNotes(event.target.value)} className="text-xs" placeholder={cancelMode ? "Why is this interview being cancelled?" : "Add any notes for this interview…"} /><div className="text-right text-[10px] text-muted-foreground">{(cancelMode ? cancelReason : notes).length}/500</div></div>
+            <div className="space-y-1"><label className="text-xs font-medium">{cancelMode ? <>Cancellation reason <span className="text-red-500">*</span></> : "Remarks"}</label><Textarea value={cancelMode ? cancelReason : remarks} required={cancelMode} maxLength={500} rows={3} disabled={saving} onFocus={() => !cancelMode && setRemarksFocused(true)} onBlur={event => { if (!event.relatedTarget?.closest("[data-remark-suggestions]")) setRemarksFocused(false); }} onChange={event => cancelMode ? setCancelReason(event.target.value) : setRemarks(event.target.value)} className="text-xs" placeholder={cancelMode ? "Why is this interview being cancelled?" : "Add remarks for this interview…"} /><div className="text-right text-[10px] text-muted-foreground">{(cancelMode ? cancelReason : remarks).length}/500</div>{!cancelMode && !saving && remarksFocused && remarkSuggestions.length > 0 && <div data-remark-suggestions aria-label={`${roundLabel} remark suggestions`} className="rounded-md border border-border bg-popover p-1 shadow-sm">{remarkSuggestions.map(item => <button key={item.id} type="button" onMouseDown={event => event.preventDefault()} onClick={() => { setRemarks(item.remarkText); setRemarksFocused(false); }} className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-muted">{item.remarkText}</button>)}</div>}</div>
             {!cancelMode && <fieldset className="space-y-2"><legend className="text-xs font-medium">Calendar color</legend><div className="flex flex-wrap gap-2">{COLORS.map(item => <button key={item.key} type="button" aria-label={`${item.label} calendar color`} aria-pressed={color === item.key} disabled={saving} onClick={() => setColor(item.key)} className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${color === item.key ? "border-[#1a4fa0] bg-blue-50 font-semibold text-[#1a4fa0]" : "border-border"}`}><span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.value }} />{item.label}</button>)}</div></fieldset>}
           </>}
           {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
