@@ -24,6 +24,7 @@ export interface TrackerListFilters {
   sortDirection?: TrackerSortDirection;
 }
 export type RoundKey = 'l1' | 'l2' | 'l3';
+export type InterviewColor = 'blue' | 'violet' | 'rose' | 'green' | 'amber';
 export enum InterviewRoundStatus {
   PENDING = 'PENDING',
   SCHEDULED = 'SCHEDULED',
@@ -112,6 +113,9 @@ export interface TrackerSubmission {
   l1Interviewer?: string | null;
   l2Interviewer?: string | null;
   l3Interviewer?: string | null;
+  l1Color?: InterviewColor | null;
+  l2Color?: InterviewColor | null;
+  l3Color?: InterviewColor | null;
   finalStatus: string;
   remarks: string | null;
   recruiterComment: string | null;
@@ -158,6 +162,21 @@ export interface TrackerResponse {
   totalPages: number;
   counts: Record<TrackerBucket, number>;
 }
+export interface EligibleInterviewCandidate {
+  id: string;
+  candidateName: string;
+  jobCode: string;
+  jobTitle: string;
+  finalStatus: string;
+  eligibleRound: RoundKey;
+}
+export interface EligibleInterviewResponse {
+  data: EligibleInterviewCandidate[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 export interface TrackerDashboardSummary {
   rangeDays: 7 | 30 | 90;
   activity: Array<{ date: string; submissions: number; interviews: number }>;
@@ -191,6 +210,9 @@ export interface TrackerUpdate {
   l1Interviewer?: string | null;
   l2Interviewer?: string | null;
   l3Interviewer?: string | null;
+  l1Color?: InterviewColor | null;
+  l2Color?: InterviewColor | null;
+  l3Color?: InterviewColor | null;
   finalStatus?: `${SubmissionOutcome}` | 'PENDING_APPROVAL' | 'REJECTED';
   remarks?: string | null;
   reviewFeedback?: string | null;

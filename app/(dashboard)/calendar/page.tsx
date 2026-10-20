@@ -6,12 +6,11 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import type { DatesSetArg, EventClickArg, EventContentArg, EventInput } from "@fullcalendar/core";
-import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Loader2, Plus, Search, X } from "lucide-react";
 import { atsApi } from "@/lib/ats-api";
 import { resolveActiveSystemRole } from "@/lib/role-permissions";
 import { useDashboardContext } from "@/contexts/DashboardContext";
-import type { RoundKey, TrackerSubmission, TrackerResponse } from "@/lib/submission-contract";
+import type { EligibleInterviewCandidate, RoundKey, TrackerSubmission } from "@/lib/submission-contract";
 import { CalendarInterviewDialog } from "@/components/interviews/calendar-interview-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +20,7 @@ type CalendarEvent = Awaited<ReturnType<typeof atsApi.submissions.calendarEvents
 type CalendarView = "month" | "week" | "agenda";
 
 function eventColor(event: CalendarEvent) {
+  if (event.color) return ({ blue: "#2563eb", violet: "#7c3aed", rose: "#e11d48", green: "#15803d", amber: "#b45309" } as Record<string, string>)[event.color] || "#2383e2";
   if (event.status === "AWAITING_FEEDBACK") return "#7c3aed";
   if (event.round === "L1") return "#2383e2";
   if (event.round === "L2") return "#7c3aed";
@@ -31,8 +31,19 @@ function dateLabel(value: string, options: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat(undefined, options).format(new Date(value));
 }
 
+function eligibleRound(submission: TrackerSubmission): RoundKey | null {
+  if (submission.finalStatus !== "SUBMITTED") return null;
+  const rounds: RoundKey[] = ["l1", "l2", "l3"];
+  const index = rounds.findIndex(round => submission[`${round}Status`] !== "CLEARED");
+  if (index < 0) return null;
+  const current = rounds[index];
+  if (![null, undefined, "PENDING", "CANCELLED"].includes(submission[`${current}Status`])) return null;
+  if (submission[`${current}Status`] !== "CANCELLED" && submission[`${current}Date`]) return null;
+  if (rounds.slice(index + 1).some(round => ![null, undefined, "PENDING"].includes(submission[`${round}Status`]) || Boolean(submission[`${round}Date`]))) return null;
+  return current;
+}
+
 export default function CalendarPage() {
-  const router = useRouter();
   const calendarRef = useRef<FullCalendar>(null);
   const loadedRangeRef = useRef("");
   const eventRequestRef = useRef(0);
@@ -43,10 +54,14 @@ export default function CalendarPage() {
   const [selectedStart, setSelectedStart] = useState<string | undefined>();
   const [chooseOpen, setChooseOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [submissions, setSubmissions] = useState<TrackerSubmission[]>([]);
+  const [submissions, setSubmissions] = useState<EligibleInterviewCandidate[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [loadingSelection, setLoadingSelection] = useState(false);
   const [selectionError, setSelectionError] = useState("");
+  const [submissionPage, setSubmissionPage] = useState(1);
+  const [submissionTotalPages, setSubmissionTotalPages] = useState(1);
+  const [openedReadOnly, setOpenedReadOnly] = useState(false);
+  const [openedCanEdit, setOpenedCanEdit] = useState(false);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [now, setNow] = useState(0);
@@ -132,26 +147,20 @@ export default function CalendarPage() {
   }, []);
 
   const openEvent = useCallback(async (event: CalendarEvent) => {
-    if (!event.canManage) {
-      router.push(`/utility/submissions?submission=${encodeURIComponent(event.submissionId)}`);
-      return;
-    }
     setLoadingSelection(true);
     try {
       const submission = await atsApi.submissions.get(event.submissionId);
-      if (!submission.capabilities?.schedule) {
-        setError("You can view this interview but do not have permission to change it.");
-        return;
-      }
       setSelectedRound(event.round.toLowerCase() as RoundKey);
       setSelectedStart(event.start);
+      setOpenedReadOnly(true);
+      setOpenedCanEdit(event.canManage);
       setSelectedSubmission(submission);
     } catch {
       setError("This submission is no longer available in your access scope.");
     } finally {
       setLoadingSelection(false);
     }
-  }, [router]);
+  }, []);
 
   const handleEventClick = useCallback((info: EventClickArg) => {
     void openEvent(info.event.extendedProps as CalendarEvent);
@@ -161,11 +170,16 @@ export default function CalendarPage() {
     if (!hasSchedulePermission) return;
     setChooseOpen(true);
     setSelectionError("");
+    setSubmissions([]);
+    setSubmissionPage(1);
+    setSubmissionTotalPages(1);
     setLoadingSubmissions(true);
     try {
       const view = isAccountManager ? "my" : "all";
-      const result: TrackerResponse = await atsApi.submissions.list({ view, bucket: "all", page: 1, limit: 25, search });
+      const result = await atsApi.submissions.eligibleForInterview({ view, page: 1, limit: 25, search });
       setSubmissions(result.data);
+      setSubmissionPage(result.page);
+      setSubmissionTotalPages(result.totalPages);
     } catch {
       setSelectionError("Submissions could not be loaded for your access scope.");
     } finally {
@@ -173,7 +187,23 @@ export default function CalendarPage() {
     }
   }, [hasSchedulePermission, isAccountManager, search]);
 
-  const chooseSubmission = useCallback(async (item: TrackerSubmission) => {
+  const loadMoreEligible = useCallback(async () => {
+    if (submissionPage >= submissionTotalPages || loadingSubmissions) return;
+    setLoadingSubmissions(true);
+    try {
+      const view = isAccountManager ? "my" : "all";
+      const result = await atsApi.submissions.eligibleForInterview({ view, page: submissionPage + 1, limit: 25, search });
+      setSubmissions(current => [...current, ...result.data]);
+      setSubmissionPage(result.page);
+      setSubmissionTotalPages(result.totalPages);
+    } catch {
+      setSelectionError("More eligible candidates could not be loaded.");
+    } finally {
+      setLoadingSubmissions(false);
+    }
+  }, [isAccountManager, loadingSubmissions, search, submissionPage, submissionTotalPages]);
+
+  const chooseSubmission = useCallback(async (item: EligibleInterviewCandidate) => {
     setLoadingSelection(true);
     setSelectionError("");
     try {
@@ -182,8 +212,15 @@ export default function CalendarPage() {
         setSelectionError("You can view this submission but do not have permission to schedule an interview.");
         return;
       }
+      const currentEligibleRound = eligibleRound(submission);
+      if (!currentEligibleRound || currentEligibleRound !== item.eligibleRound) {
+        setSelectionError("This candidate is no longer eligible. Refresh the eligible candidate list.");
+        return;
+      }
+      setOpenedReadOnly(false);
+      setOpenedCanEdit(true);
       setChooseOpen(false);
-      setSelectedRound(undefined);
+      setSelectedRound(currentEligibleRound);
       setSelectedStart(undefined);
       setSelectedSubmission(submission);
     } catch {
@@ -228,15 +265,16 @@ export default function CalendarPage() {
 
     <Dialog open={chooseOpen} onOpenChange={setChooseOpen}>
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-hidden p-0">
-        <DialogHeader className="border-b border-border px-5 py-4"><DialogTitle className="text-sm">Choose a submission</DialogTitle><DialogDescription className="text-xs">Only submissions visible in your permitted scope are listed. Interview stage rules are checked when you open the editor.</DialogDescription></DialogHeader>
+        <DialogHeader className="border-b border-border px-5 py-4"><DialogTitle className="text-sm">Eligible candidates</DialogTitle><DialogDescription className="text-xs">Candidates with completed internal review and a pending next interview round are shown.</DialogDescription></DialogHeader>
         <div className="px-5 py-3"><div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Search candidate or job" placeholder="Search candidate, job title, or code…" className="h-9 pl-9 text-xs" value={search} onChange={event => setSearch(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void openSubmissionPicker(); }} /></div></div>
         {selectionError && <p role="alert" className="px-5 pb-2 text-xs text-red-700">{selectionError}</p>}
-        <div className="max-h-[52vh] overflow-y-auto border-t border-border">{loadingSubmissions ? <div role="status" className="flex items-center justify-center gap-2 p-10 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading submissions…</div> : submissions.length ? <ul className="divide-y divide-border">{submissions.map(item => <li key={item.id}><button type="button" disabled={loadingSelection} onClick={() => void chooseSubmission(item)} className="flex w-full items-center justify-between gap-4 px-5 py-3 text-left hover:bg-muted/50 disabled:opacity-50"><span className="min-w-0"><span className="block truncate text-xs font-semibold">{item.candidateName || "Candidate"}</span><span className="mt-1 block truncate text-[10.5px] text-muted-foreground">{item.jobCode} · {item.jobTitle} · {item.finalStatus.replaceAll("_", " ")}</span></span><span className="shrink-0 text-[10.5px] text-[#1a4fa0]">Schedule interview →</span></button></li>)}</ul> : <div className="p-10 text-center text-xs text-muted-foreground">No visible submissions found. Use search or check the submission table access.</div>}</div>
+        <div className="max-h-[52vh] overflow-y-auto border-t border-border">{loadingSubmissions && !submissions.length ? <div role="status" className="flex items-center justify-center gap-2 p-10 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading eligible candidates…</div> : submissions.length ? <ul className="divide-y divide-border">{submissions.map(item => <li key={item.id}><button type="button" disabled={loadingSelection} onClick={() => void chooseSubmission(item)} className="flex w-full items-center justify-between gap-4 px-5 py-3 text-left hover:bg-muted/50 disabled:opacity-50"><span className="min-w-0"><span className="block truncate text-xs font-semibold">{item.candidateName || "Candidate"}</span><span className="mt-1 block truncate text-[10.5px] text-muted-foreground">{item.jobCode} · {item.jobTitle} · Next round: {item.eligibleRound?.toUpperCase()}</span></span><span className="shrink-0 text-[10.5px] text-[#1a4fa0]">Schedule interview →</span></button></li>)}</ul> : <div className="p-10 text-center text-xs text-muted-foreground">No candidates are currently eligible for an interview. Complete internal review and clear each previous round to make the next round available.</div>}</div>
+        {submissionPage < submissionTotalPages && <div className="flex justify-center border-t border-border px-5 py-2"><Button variant="outline" size="sm" className="text-xs" disabled={loadingSubmissions} onClick={() => void loadMoreEligible()}>{loadingSubmissions ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}Load more candidates</Button></div>}
         <div className="flex justify-end border-t border-border px-5 py-3"><Button variant="outline" size="sm" className="text-xs" onClick={() => setChooseOpen(false)}>Close</Button></div>
       </DialogContent>
     </Dialog>
 
-    <CalendarInterviewDialog key={`${selectedSubmission?.id || "none"}-${selectedRound || "new"}-${selectedStart || "new"}`} submission={selectedSubmission} round={selectedRound} start={selectedStart} interviewerOptions={interviewers.filter(name => name !== "Unassigned")} onClose={() => { setSelectedSubmission(null); setSelectedRound(undefined); setSelectedStart(undefined); }} onSaved={() => { setSelectedSubmission(null); setSelectedRound(undefined); setSelectedStart(undefined); refreshCalendar(); }} />
+    <CalendarInterviewDialog key={`${selectedSubmission?.id || "none"}-${selectedRound || "new"}-${selectedStart || "new"}`} submission={selectedSubmission} round={selectedRound} start={selectedStart} readOnly={openedReadOnly} allowEdit={openedCanEdit} interviewerOptions={interviewers.filter(name => name !== "Unassigned")} onClose={() => { setSelectedSubmission(null); setSelectedRound(undefined); setSelectedStart(undefined); }} onSaved={() => { setSelectedSubmission(null); setSelectedRound(undefined); setSelectedStart(undefined); refreshCalendar(); }} />
     {loadingSelection && <div role="status" className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg"><Loader2 className="h-3.5 w-3.5 animate-spin" />Opening submission…</div>}
   </main>;
 }

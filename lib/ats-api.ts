@@ -3,7 +3,7 @@ import type { UserCity } from './user-city-contract';
 import type { DeliveryDashboard, DeliveryStage } from './delivery-dashboard-contract';
 import type { StaffProfile, ProfileDetailsInput, SignatureSettings, SignatureInput, SignatureDefaultsInput } from './profile-contract';
 export interface ClientAccessPolicy { clientsVisibleAcrossUnits: boolean; bdmClientsTenantWide: boolean; otherOwnerPocsVisible: boolean; maskOtherOwnerPocDetails: boolean; }
-import type { CandidateAssessment, SubmissionHistoryResponse, TrackerListFilters, TrackerResponse, TrackerStatsResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
+import type { CandidateAssessment, EligibleInterviewResponse, SubmissionHistoryResponse, TrackerListFilters, TrackerResponse, TrackerStatsResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
 
 /**
  * ats-api.ts — Typed API client for the NestJS ATS backend
@@ -1643,10 +1643,15 @@ const submissions = {
   async calendarEvents(start: string, end: string): Promise<Array<{
     id: string; submissionId: string; title: string; start: string; status: string; round: string;
     candidateName: string; jobId: string; jobCode: string; jobTitle: string; recruiterName: string;
-    interviewer: string | null; meetingLink: string | null; timezone: string | null; updatedAt: string; canManage: boolean;
+    interviewer: string | null; meetingLink: string | null; timezone: string | null; updatedAt: string; canManage: boolean; color: string | null;
   }>> {
     const params = new URLSearchParams({ start, end });
     return apiFetch(`/api/recruiter-submissions/calendar-events?${params.toString()}`);
+  },
+  async eligibleForInterview(filters: { page?: number; limit?: number; view?: string; search?: string } = {}): Promise<EligibleInterviewResponse> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== null && value !== '') params.set(key, String(value)); });
+    return apiFetch<EligibleInterviewResponse>(`/api/recruiter-submissions/eligible-for-interview?${params.toString()}`);
   },
   async get(id: string | number): Promise<TrackerSubmission> {
     return apiFetch<TrackerSubmission>(`/api/recruiter-submissions/${id}`);
