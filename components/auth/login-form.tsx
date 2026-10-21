@@ -27,7 +27,7 @@ const schema = z.object({
   password: z.string().min(4, { message: "Password must be at least 4 characters." }),
 });
 
-const LoginForm = () => {
+const LoginForm = ({ heading, afterForm, footer }: { heading?: React.ReactNode; afterForm?: React.ReactNode; footer?: React.ReactNode }) => {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [isNavigating, setIsNavigating] = useState(false);
@@ -367,22 +367,23 @@ const LoginForm = () => {
     </div>
   );
 
-  const accessHelp = <p className="text-center text-xs leading-relaxed text-slate-500">Need access? Contact your workspace administrator.</p>;
+  const accessHelp = <p className="text-center text-xs leading-relaxed text-slate-500">Need help? Contact <a className="font-medium text-blue-700 underline underline-offset-2" href="mailto:helpdesk@enfycon.com">helpdesk@enfycon.com</a></p>;
   const developerAccess = <DeveloperAccess pending={isPending} error={credentialError?.mode === "developer" ? credentialError.message : undefined} enabled={authPolicyStatus === "ready" && signInOptions(authPolicy).developer && !isGlobalPortal} onSignIn={data => onSubmit(data, true)} />;
   if (authPolicyStatus !== "ready") return <div className="space-y-3 text-sm text-slate-500" role="status">
     {authPolicyStatus === "loading" ? "Loading sign-in options…" : <>Unable to load sign-in options. <button type="button" className="underline" onClick={() => void reloadPolicy()}>Retry</button></>}
   </div>;
-  if (!showPassword) return <div className="space-y-5 text-left">
-    <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4 sm:p-5">
-      <p className="mb-5 text-center text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500">Secure sign-in</p>
-      {hasSocial ? socialLogin : <p className="text-sm text-slate-500">Sign-in is currently unavailable. Contact your workspace administrator.</p>}
+  if (!showPassword) return <div className="flex flex-1 flex-col text-left">
+    <div className="my-auto space-y-5 py-10">
+      {heading}
+      {hasSocial ? socialLogin : <p className="text-center text-sm text-slate-500">Sign-in is currently unavailable. Contact your workspace administrator.</p>}
+      {accessHelp}
+      {afterForm}
     </div>
-    {accessHelp}
-    {developerAccess}
+    <div className="mt-auto pt-12 text-center">{footer}<div className="mt-5">{developerAccess}</div></div>
   </div>;
 
   return (
-    <div className="space-y-5"><div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4 sm:p-5"><p className="mb-5 text-center text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500">Secure sign-in</p><form ref={formRef} method="POST" onSubmit={handleSubmit(data => onSubmit(data))} className="space-y-4 text-left">
+    <div className="flex flex-1 flex-col"><div className="my-auto space-y-5 py-10">{heading}<form ref={formRef} method="POST" onSubmit={handleSubmit(data => onSubmit(data))} className="space-y-4 text-left">
       
       {/* Email Field */}
       <div className="space-y-1.5">
@@ -494,7 +495,7 @@ const LoginForm = () => {
         </div>
       )}
 
-    </form></div>{accessHelp}{developerAccess}</div>
+    </form>{accessHelp}{afterForm}</div><div className="mt-auto pb-1 pt-10 text-center">{footer}<div className="mt-4">{developerAccess}</div></div></div>
   );
 };
 
