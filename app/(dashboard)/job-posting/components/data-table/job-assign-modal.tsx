@@ -27,6 +27,7 @@ export { PodLeadAssignModal };
 
 export interface JobAssignModalProps {
   job: Job | null;
+  initialTab?: "pods" | "users";
   currentUser: any;
   currentUserBranchId: string | null | undefined;
   isOpen: boolean;
@@ -36,6 +37,7 @@ export interface JobAssignModalProps {
 
 export function JobAssignModal({
   job,
+  initialTab = "pods",
   currentUser,
   currentUserBranchId,
   isOpen,
@@ -252,6 +254,7 @@ export function JobAssignModal({
   const isHigherRole = isSuperOrTenantAdmin || isBranchAdmin || isUnitAdmin || isDeliveryHead || userPerms.includes("job:assign");
 
   const canAssignPods = userPerms.includes("job:assign_pod");
+  const requiresAssignmentReason = userPerms.includes("job:override_assignment") && !userPerms.includes("job:assignment_reason_optional");
 
   // Pod Head role & active pod detection
   const myPod = useMemo(() => {
@@ -442,6 +445,8 @@ export function JobAssignModal({
     setIsAssigning(false);
     setRecruiterFilterMode("all");
     setHasUserInteracted(false);
+    setAssignmentReason("");
+    setAssignTab(initialTab === "pods" && branchAllowsPods ? "pods" : initialTab === "users" && branchAllowsDirectStaff ? "users" : branchAllowsPods ? "pods" : "users");
 
     // Initial selected pod IDs from job
     const initialPodIds: string[] = [];
@@ -507,7 +512,7 @@ export function JobAssignModal({
     } else {
       setAssignTab(targetBranchPods.length > 0 ? "pods" : "users");
     }
-  }, [isOpen, job?.id, branchAllowsPods, branchAllowsDirectStaff]);
+  }, [isOpen, job?.id, branchAllowsPods, branchAllowsDirectStaff, initialTab]);
 
   // When usersList or targetBranchPods loads asynchronously after modal is open,
   // resolve any missing name-based matches into selectedUserIds IF the user hasn't made manual edits yet
@@ -681,7 +686,7 @@ export function JobAssignModal({
     setIsAssigning(true);
     try {
       const payload: Record<string, any> = {};
-      if (currentUser?.permissions?.includes('job:override_assignment')) {
+      if (requiresAssignmentReason) {
         if (!assignmentReason.trim()) { toast.error('Enter the emergency assignment reason.'); setIsAssigning(false); return; }
         payload.assignmentReason = assignmentReason.trim();
       }
@@ -696,9 +701,9 @@ export function JobAssignModal({
         payload.recruiter = "N/A";
         payload.recruiterId = null;
         payload.recruiterIds = [];
-      } else {
-        // 1. Pods assignment:
-        if (canAssignPods && selectedPodIds.length > 0) {
+      } else if (assignTab === "pods") {
+        if (!canAssignPods) throw new Error("You do not have permission to assign pods.");
+        if (selectedPodIds.length > 0) {
           const allPods = [...podsList, ...targetBranchPods];
           const selectedPods = selectedPodIds
             .map((id) => allPods.find((p: any) => p.id === id))
@@ -707,13 +712,13 @@ export function JobAssignModal({
           payload.podId = selectedPodIds[0];
           payload.podIds = selectedPodIds;
           payload.podName = podNames.join(", ");
-        } else if (canAssignPods) {
+        } else {
           payload.podId = "none";
           payload.podIds = [];
           payload.podName = "N/A";
         }
-
-        // 2. Recruiters assignment:
+      } else {
+        if (!userPerms.includes("job:assign_recruiter")) throw new Error("You do not have permission to assign recruiters.");
         if (selectedUserIds.length > 0) {
           const selectedUsers = usersList.filter((u) => selectedUserIds.includes(u.id) && u.canRecruit !== false);
           const recruiterNames = selectedUsers.map((u) => u.fullName || u.name || u.email);
@@ -725,6 +730,7 @@ export function JobAssignModal({
           payload.assignedTo = "Unassigned";
           payload.recruiter = "N/A";
           payload.recruiterId = null;
+          payload.recruiterIds = [];
         }
       }
 
@@ -733,29 +739,22 @@ export function JobAssignModal({
       }
       await atsApi.jobs.update(job.id, payload);
 
-      onSuccess({
-        podId: payload.podId,
-        podIds: payload.podIds,
-        podName: payload.podName,
-        assignedTo: payload.assignedTo,
-        recruiter: payload.recruiter,
-        recruiterId: payload.recruiterId,
-        recruiterIds: payload.recruiterIds,
-        _alreadySaved: true,
-      } as any);
+      onSuccess({ ...payload, _alreadySaved: true } as any);
 
       const summaryParts: string[] = [];
-      if (selectedPodIds.length > 0 && !override?.unassignAll) {
+      if (assignTab === "pods" && selectedPodIds.length > 0 && !override?.unassignAll) {
         summaryParts.push(`${selectedPodIds.length} Pod${selectedPodIds.length > 1 ? "s" : ""}`);
       }
-      if (selectedUserIds.length > 0 && !override?.unassignAll) {
+      if (assignTab === "users" && selectedUserIds.length > 0 && !override?.unassignAll) {
         summaryParts.push(
           `${selectedUserIds.length} Recruiter${selectedUserIds.length > 1 ? "s" : ""}`
         );
       }
 
-      if (override?.unassignAll || summaryParts.length === 0) {
+      if (override?.unassignAll) {
         toast.success("Job marked as Unassigned.");
+      } else if (summaryParts.length === 0) {
+        toast.success(assignTab === "pods" ? "Pod assignment cleared." : "Recruiter assignment cleared.");
       } else {
         toast.success(`Job successfully assigned to ${summaryParts.join(" & ")}.`);
       }
@@ -794,10 +793,10 @@ export function JobAssignModal({
             </div>
             <div>
               <DialogTitle className="text-sm font-bold text-slate-900 dark:text-white">
-                Assign Recruiters
+                {assignTab === "pods" ? "Assign to pod" : "Assign recruiters"}
               </DialogTitle>
               <DialogDescription className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Assign requirement to pods or individual recruiters
+              {assignTab === "pods" ? "Choose a pod for this job" : "Choose recruiters for this job"}
               </DialogDescription>
             </div>
           </div>
@@ -1245,7 +1244,7 @@ export function JobAssignModal({
         </div>
 
         {/* Footer */}
-        {currentUser?.permissions?.includes('job:override_assignment') && <div className="px-6 pb-3"><label htmlFor="assignment-reason" className="text-xs font-semibold">Emergency assignment reason</label><Input id="assignment-reason" value={assignmentReason} onChange={event => setAssignmentReason(event.target.value)} maxLength={2000} placeholder="Why is this override needed?" className="mt-1 text-xs" /></div>}
+        {requiresAssignmentReason && <div className="px-6 pb-3"><label htmlFor="assignment-reason" className="text-xs font-semibold">Emergency assignment reason</label><Input id="assignment-reason" value={assignmentReason} onChange={event => setAssignmentReason(event.target.value)} maxLength={2000} placeholder="Why is this override needed?" className="mt-1 text-xs" /></div>}
         <DialogFooter className="px-5 py-2.5 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/70 dark:bg-slate-850/70 flex flex-row items-center justify-between sm:justify-between">
           {!isPodHead && <Button
             type="button"

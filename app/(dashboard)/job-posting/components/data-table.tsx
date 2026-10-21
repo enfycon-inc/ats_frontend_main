@@ -299,6 +299,11 @@ export default function DataTable({
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState("");
   const [assignModalJob, setAssignModalJob] = useState<Job | null>(null);
+  const [assignModalTab, setAssignModalTab] = useState<"pods" | "users">("pods");
+  const openAssignModal = (job: Job, tab: "pods" | "users" = "pods") => {
+    setAssignModalTab(tab);
+    setAssignModalJob(job);
+  };
 
   // Sourcing & Delegation Modals
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
@@ -552,7 +557,7 @@ export default function DataTable({
                   }}
                   onOpenApproveModal={setApproveModalJob}
                   onOpenRejectModal={setRejectModalJob}
-                  onOpenAssignModal={setAssignModalJob}
+                  onOpenAssignModal={openAssignModal}
                   onOpenSourceModal={(j) => {
                     setSelectedJobForSourcing(j);
                     setSourceModalOpen(true);
@@ -649,7 +654,7 @@ export default function DataTable({
               onFindMatches={(j) => router.push(`/job-posting/${j.id}/matches`)}
               onDelegateJob={setDelegateModalJob}
               onEditJob={(j) => router.push(`/job-posting/${j.id}/edit`)}
-              onOpenAssignModal={setAssignModalJob}
+              onOpenAssignModal={openAssignModal}
               onArchiveJob={(j) => onUpdateJob?.(j.id, { jobStatus: "Archived" })}
               onClose={() => setContextMenu(null)}
             />
@@ -680,6 +685,7 @@ export default function DataTable({
       {/* Assign Recruiters Modal Dialog */}
       <JobAssignModal
         job={assignModalJob}
+        initialTab={assignModalTab}
         currentUser={currentUser}
         currentUserBranchId={currentUserBranchId}
         isOpen={!!assignModalJob}

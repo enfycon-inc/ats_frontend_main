@@ -56,7 +56,7 @@ export interface JobTableRowProps {
   onContextMenu: (e: React.MouseEvent, jobId: string) => void;
   onOpenApproveModal: (job: Job) => void;
   onOpenRejectModal: (job: Job) => void;
-  onOpenAssignModal: (job: Job) => void;
+  onOpenAssignModal: (job: Job, tab?: "pods" | "users") => void;
   onOpenSourceModal: (job: Job) => void;
   onOpenDelegateModal: (job: Job) => void;
   onOpenStatusModal: (job: Job, status?: string) => void;
@@ -90,6 +90,9 @@ export function JobTableRow({
   const isTenantAdmin = Boolean(currentUser?.permissions?.some((p: string) => ["tenant:manage", "tenant:settings"].includes(p)));
   const isDelegatedView = Boolean(!isTenantAdmin && currentUserBranchId && job.branchId && currentUserBranchId !== job.branchId);
   const canAssignRecruiters = canAssignRecruitersToJob(job, currentUser);
+  const userPermissions: string[] = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+  const canAssignDirectRecruiters = userPermissions.includes("job:assign_recruiter");
+  const canAssignPods = userPermissions.includes("job:assign_pod");
 
   const router = useRouter();
 
@@ -267,17 +270,30 @@ export function JobTableRow({
             ) : colId === "podName" ? (
               isDelegatedView ? (
                  <span className="text-neutral-400 italic text-[11px]">Hidden</span>
-              ) : job.podName ? (
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-800/40 rounded-md px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap">
-                    <Users className="h-2.5 w-2.5 shrink-0 text-purple-600 dark:text-purple-400" />
-                    {job.podName}
-                  </span>
-                </div>
               ) : (
-                <span className="text-neutral-400 dark:text-neutral-600 italic text-[10px]">
-                  Unassigned
-                </span>
+                <div className="flex items-center justify-between gap-1.5 w-full min-w-0 py-0.5">
+                  {job.podName && job.podName !== "N/A" && job.podName.toLowerCase() !== "unassigned" ? (
+                    <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-800/40 rounded-md px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap min-w-0 truncate">
+                      <Users className="h-2.5 w-2.5 shrink-0 text-purple-600 dark:text-purple-400" />
+                      {job.podName}
+                    </span>
+                  ) : (
+                    <span className="text-neutral-400 dark:text-neutral-600 italic text-[10px]">Unassigned</span>
+                  )}
+                  {canAssignPods && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenAssignModal(job, "pods");
+                      }}
+                      className="h-5 w-5 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800 rounded transition-colors cursor-pointer shrink-0 ml-auto"
+                      title="Assign pod"
+                      aria-label={`Assign pod to ${job.jobTitle}`}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               )
             ) : colId === "jobTitle" ? (
               (() => {
@@ -487,14 +503,15 @@ export function JobTableRow({
                     </JobPodHoverCard>
                   );
                 })()}
-                {canAssignRecruiters && (
+                {canAssignDirectRecruiters && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onOpenAssignModal(job);
+                      onOpenAssignModal(job, "users");
                     }}
                     className="h-5 w-5 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800 rounded transition-colors cursor-pointer shrink-0 ml-auto"
-                    title="Assign Pod / Recruiters (+)"
+                    title="Assign recruiter"
+                    aria-label={`Assign recruiter to ${job.jobTitle}`}
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </button>
