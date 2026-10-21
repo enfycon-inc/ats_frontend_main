@@ -31,6 +31,8 @@ import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
+import { userManagementActions } from "@/lib/user-management-policy";
+import { getActiveRolePermissions, resolveActiveSystemRole } from "@/lib/role-permissions";
 import { UserAvatar } from '@/components/shared/user-identity';
 import { getTenantIdentifier } from "@/utils/subdomain-helper";
 import { getSelectedMemberRoleIds, getMemberRoleAssignment, hasAdministrativeRole, toggleAdministrativeRole } from "@/lib/member-role-selection";
@@ -352,103 +354,55 @@ export default function UserManagementPage() {
 
   // Granular permission-based access flags for the logged-in user
   const sessionPerms: string[] = useMemo(() => {
-    if (Array.isArray(profile?.permissions) && profile.permissions.length > 0) {
-      return profile.permissions;
-    }
-    if (Array.isArray(currentUser?.permissions) && currentUser.permissions.length > 0) {
-      return currentUser.permissions;
-    }
-    return [];
-  }, [profile, currentUser]);
+    const actor = profile || currentUser;
+    if (!actor) return [];
+    return getActiveRolePermissions(overrideRole || actor.activeRoleId || undefined, rolesList, actor);
+  }, [profile, currentUser, overrideRole, rolesList]);
 
-  // Match the DELETE endpoint's tenant:settings requirement and guard bypasses.
-  const canDeleteUsers = sessionPerms.some(permission =>
-    ['tenant:settings', 'platform:manage', '*'].includes(permission)
-  );
-
-  // Branch Admin: has branch_admin:manage but NOT tenant:settings (tenant-level admin)
-  const isBranchAdmin = useMemo(() => {
-    if (overrideRole) {
-      const norm = overrideRole.toUpperCase().replace(/[\s-_]/g, "");
-      if (norm === "BRANCHADMIN") return true;
-      if (norm === "TENANT_ADMIN" || norm === "SUPERADMIN" || norm === "TENANTADMIN") return false;
-    }
-    if (sessionPerms.length > 0) {
-      return sessionPerms.includes('branch_admin:manage') && !sessionPerms.includes('tenant:settings');
-    }
-    const userRole = (currentUser?.systemRole || currentUser?.roles?.[0] || "").toUpperCase().replace(/[\s-_]/g, "");
-    return userRole === "BRANCHADMIN";
-  }, [overrideRole, sessionPerms, currentUser]);
-
-  const isTenantAdmin = sessionPerms.includes('tenant:settings') || (!isBranchAdmin && (overrideRole === 'TENANT_ADMIN' || overrideRole === 'Tenant Admin'));
-  const activeSystemRole = String(profile?.systemRole || currentUser?.systemRole || currentUser?.roles?.[0] || '').toUpperCase().replace(/[\s-]/g, '_');
-  const isDeliveryHead = activeSystemRole === 'DELIVERY_HEAD'
-    || (sessionPerms.includes('user:manage') && sessionPerms.includes('unit_admin:manage')
-      && sessionPerms.includes('job:approve')
-      && !sessionPerms.some(permission => ['tenant:settings', 'tenant:manage', 'platform:manage', 'branch_admin:manage'].includes(permission)));
+  const canDeleteUsers = sessionPerms.some(permission => ['tenant:settings', 'platform:manage', '*'].includes(permission));
+  const isTenantAdmin = sessionPerms.some(permission => ['tenant:settings', 'tenant:manage', 'platform:manage', '*'].includes(permission));
+  const isBranchAdmin = sessionPerms.includes('branch_admin:manage') && !isTenantAdmin;
+  const activeProfile = profile || currentUser;
+  const activeSystemRole = resolveActiveSystemRole(overrideRole || activeProfile?.activeRoleId || activeProfile?.systemRole,
+    [...(activeProfile?.assignedRoles || []), ...rolesList], activeProfile);
+  const isDeliveryHead = activeSystemRole === 'DELIVERY_HEAD';
+  const isUnitScoped = !isTenantAdmin && !isBranchAdmin;
 
   // The branches the current user is assigned to (for filtering dropdowns)
   const assignedBranches = useMemo(() => {
-    if (!isBranchAdmin) return branches;
-    const ids: string[] = Array.isArray(currentUser?.assignedBranchIds) && currentUser.assignedBranchIds.length > 0
-      ? currentUser.assignedBranchIds
-      : (currentUser?.branchId ? [currentUser.branchId] : []);
-    if (ids.length === 0) return branches;
-    return branches.filter((b) => ids.includes(b.id));
-  }, [isBranchAdmin, branches, currentUser]);
+    if (isTenantAdmin) return branches;
+    const branchId = (profile || currentUser)?.branchId;
+    return branches.filter(branch => branch.id === branchId);
+  }, [isTenantAdmin, branches, profile, currentUser]);
 
   const assignedBusinessUnits = useMemo(() => {
-    if (sessionPerms.includes('tenant:settings') || sessionPerms.includes('branch_admin:manage')) return businessUnits;
-    if (currentUser?.businessUnitId) {
-      return businessUnits.filter((bu) => bu.id === currentUser.businessUnitId);
-    }
-    return businessUnits;
-  }, [businessUnits, sessionPerms, currentUser]);
+    if (isTenantAdmin || isBranchAdmin) return businessUnits;
+    const actor = profile || currentUser;
+    return businessUnits.filter(unit => unit.id === actor?.businessUnitId);
+  }, [isTenantAdmin, isBranchAdmin, businessUnits, profile, currentUser]);
 
-  const isUnitAdmin = useMemo(() => {
-    if (overrideRole || isDeliveryHead) return false;
-    // Check profile (async me() response) first, then localStorage currentUser as fallback
-    const resolvedBusinessUnitId = profile?.businessUnitId || currentUser?.businessUnitId;
-    return sessionPerms.includes('unit_admin:manage')
-      && !sessionPerms.includes('tenant:settings')
-      && !sessionPerms.includes('branch_admin:manage')
-      && !!resolvedBusinessUnitId;
-  }, [overrideRole, sessionPerms, currentUser, profile, isDeliveryHead]);
-
+  const isUnitAdmin = !isDeliveryHead && isUnitScoped && sessionPerms.includes('unit_admin:manage')
+    && !!(profile?.businessUnitId || currentUser?.businessUnitId);
   const canAssignAdministrativeRoles = isTenantAdmin || isBranchAdmin || isUnitAdmin;
-
-  // Can the current user manage (edit/delete/status) a given target user?
-  const canManageUser = (targetUser: any): boolean => {
-    const isTenantAdminLocal = sessionPerms.includes('tenant:settings');
-    if (isTenantAdminLocal) return true;
-
-    const targetBranchId = targetUser?.branchId || targetUser?.branch_id;
-    const targetBusinessUnitId = targetUser?.businessUnitId || targetUser?.business_unit_id;
-    const targetPerms: string[] = Array.isArray(targetUser?.permissions) ? targetUser.permissions : [];
-
-    // Delivery Head: branch-level management (cannot manage Tenant Admin or Branch Admin peers)
-    const isDeliveryHead = sessionPerms.includes('job:approve')
-      && !sessionPerms.includes('tenant:settings')
-      && !sessionPerms.includes('branch_admin:manage');
-
-    if (isDeliveryHead) {
-      if (!targetBranchId) return false;
-      if (targetPerms.some(permission => ['tenant:settings', 'tenant:manage', 'platform:manage', 'branch_admin:manage', 'unit_admin:manage'].includes(permission))) return false;
-      return assignedBranches.some((b) => b.id === targetBranchId);
-    }
-
-    if (isBranchAdmin) {
-      if (!targetBranchId) return false;
-      return assignedBranches.some((b) => b.id === targetBranchId);
-    }
-
+  const managementActor = { ...(profile || currentUser), permissions: sessionPerms };
+  const actionsForUser = (user: UserItem) => userManagementActions(managementActor, {
+    ...user, tenantId: (user as any).tenantId || managementActor.tenantId,
+  });
+  const canManageUser = (user: UserItem) => Object.values(actionsForUser(user)).some(Boolean);
+  const canEditUserRoles = (user: UserItem) => {
+    if (!actionsForUser(user).assignRoles) return false;
+    const administrative = ['*', 'tenant:settings', 'tenant:manage', 'platform:manage', 'branch_admin:manage', 'unit_admin:manage'];
+    if (isDeliveryHead && user.permissions?.some(p => administrative.includes(p))) return false;
     if (isUnitAdmin) {
-      if (!targetBusinessUnitId) return false;
-      const resolvedBusinessUnitId = profile?.businessUnitId || currentUser?.businessUnitId;
-      return targetBusinessUnitId === resolvedBusinessUnitId;
+      return !(user.assignedRoles || []).some(assigned => {
+        const role = rolesList.find(r => r.id === assigned.id) || assigned;
+        const key = role.systemRole || role.system_role;
+        const admin = ['TENANT_ADMIN', 'SUPER_ADMIN', 'BRANCH_ADMIN', 'UNIT_ADMIN'].includes(key)
+          || role.permissions?.some((p: string) => administrative.includes(p)) || key === 'DELIVERY_HEAD';
+        return admin && key !== 'UNIT_ADMIN';
+      });
     }
-
-    return false; // Default: no administrative role
+    return true;
   };
 
   const getDomainSuffix = () => {
@@ -858,10 +812,14 @@ export default function UserManagementPage() {
       const finalRoles = assignment.assignedRoleIds.filter(id => !editRolesCatalog.some(r => r.id === id && isAutomaticPodLeadRole(r)));
 
 
+      const previousRoles = (selectedUser.assignedRoleIds || (selectedUser.roleId ? [selectedUser.roleId] : []))
+        .filter(id => !editRolesCatalog.some(r => r.id === id && isAutomaticPodLeadRole(r)));
+      const rolesChanged = previousRoles.length !== finalRoles.length || previousRoles.some(id => !finalRoles.includes(id));
+      if (rolesChanged && !canEditUserRoles(selectedUser)) throw new Error('You can edit this profile, but cannot change its protected role assignments.');
       await atsApi.auth.updateUserDetail(selectedUser.id, {
-        branchId: assignment.branchId,
-        businessUnitId: assignment.businessUnitId,
-        assignedRoleIds: finalRoles,
+        ...((assignment.branchId || null) !== (selectedUser.branchId || null) ? { branchId: assignment.branchId || null } : {}),
+        ...((assignment.businessUnitId || null) !== (selectedUser.businessUnitId || null) ? { businessUnitId: assignment.businessUnitId || null } : {}),
+        ...(rolesChanged ? { assignedRoleIds: finalRoles } : {}),
         ...((editForm.city || null) !== (selectedUser.city || null) ? { city: editForm.city || null } : {}),
       });
 
@@ -879,7 +837,7 @@ export default function UserManagementPage() {
         )
       );
 
-      toast.success("Role assignment updated successfully!");
+      toast.success("Member details updated successfully!");
       setIsEditModalOpen(false);
       setSelectedUser(null);
       await loadData();
@@ -933,6 +891,7 @@ export default function UserManagementPage() {
   };
 
   const handleStatusToggle = async (user: UserItem) => {
+    if (!actionsForUser(user).changeStatus) return;
     if (profile?.id === user.id && user.isActive) {
       return toast.error("You cannot deactivate your own account.");
     }
@@ -950,7 +909,7 @@ export default function UserManagementPage() {
   };
 
   const handleDeleteUser = async (user: UserItem) => {
-    if (!canDeleteUsers) return;
+    if (!actionsForUser(user).deleteUser) return;
     if (profile?.id === user.id) {
       return toast.error("You cannot delete your own account.");
     }
@@ -1028,6 +987,7 @@ export default function UserManagementPage() {
   }, [rolesList, reviewForm.branchId, reviewForm.businessUnitId]);
 
   const openReviewModal = (user: UserItem) => {
+    if (!actionsForUser(user).reviewRequest) return;
     setReviewUser(user);
     const reqUpper = (user.requestedRole || "").toUpperCase();
     const isReqTenant = reqUpper === 'TENANT_ADMIN' || reqUpper === 'TENANT_ADMIN' || reqUpper === 'TENANT ADMIN' || reqUpper === 'WORKSPACE_ADMIN' || reqUpper === 'WORKSPACE ADMINISTRATOR';
@@ -1609,6 +1569,7 @@ export default function UserManagementPage() {
   }, [reviewerTargetUser, rolesList]);
 
   const openReviewerModal = (user: UserItem) => {
+    if (!actionsForUser(user).assignManager) return;
     if (!user) return;
     setReviewerTargetUser(user);
     const existingReviewerId = user.jobReviewerId || (user as any).job_reviewer_id || "";
@@ -1673,6 +1634,7 @@ export default function UserManagementPage() {
 
 
   const openEditModal = (user: UserItem) => {
+    if (!actionsForUser(user).editProfile) return;
     if (!user) return;
     atsApi.auth.listRoles("ALL", true).then((freshRoles) => {
       if (freshRoles && Array.isArray(freshRoles)) {
@@ -1699,6 +1661,7 @@ export default function UserManagementPage() {
   };
 
   const openPasswordModal = (user: UserItem) => {
+    if (!actionsForUser(user).resetPassword) return;
     if (!user) return;
     setSelectedUser(user);
     setNewPassword("");
@@ -2211,7 +2174,7 @@ export default function UserManagementPage() {
                       <td className="py-3 px-4">
                         {user.isApproved === false ? (
                           <div className="flex items-center">
-                            {canManageUser(user) && (
+                            {actionsForUser(user).reviewRequest && (
                               <Button
                                 size="sm"
                                 onClick={() => openReviewModal(user)}
@@ -2249,7 +2212,7 @@ export default function UserManagementPage() {
                             return (
                               <>
                                 {groupEls}
-                                {canManageUser(user) && (
+                                {canEditUserRoles(user) && (
                                   <button
                                     type="button"
                                     onClick={() => { setEditModalTab("STAFF"); openEditModal(user); }}
@@ -2312,6 +2275,7 @@ export default function UserManagementPage() {
                               <button
                                 type="button"
                                 onClick={() => openReviewerModal(user)}
+                                disabled={!actionsForUser(user).assignManager}
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer"
                                 title="Click to change designated Manager"
                               >
@@ -2325,6 +2289,7 @@ export default function UserManagementPage() {
                             <button
                               type="button"
                               onClick={() => openReviewerModal(user)}
+                              disabled={!actionsForUser(user).assignManager}
                               className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800/60 transition-colors cursor-pointer"
                               title="Assign a Manager"
                             >
@@ -2340,7 +2305,7 @@ export default function UserManagementPage() {
                           <Switch
                             checked={user.isActive}
                             onCheckedChange={() => handleStatusToggle(user)}
-                            disabled={submittingId === user.id || isCurrent}
+                            disabled={submittingId === user.id || !actionsForUser(user).changeStatus}
                           />
                           <span className={`text-[11px] font-semibold ${user.isActive ? "text-emerald-600" : "text-default-400"}`}>
                             {user.isActive ? "Active" : "Inactive"}
@@ -2364,7 +2329,7 @@ export default function UserManagementPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-52 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 shadow-xl rounded-lg p-1 text-xs">
                               
-                              {user.isApproved === false && canManageUser(user) && (
+                              {user.isApproved === false && actionsForUser(user).reviewRequest && (
                                 <>
                                   <DropdownMenuItem
                                     onClick={() => openReviewModal(user)}
@@ -2381,28 +2346,29 @@ export default function UserManagementPage() {
                                   <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
                                 </>
                               )}
-                              <DropdownMenuItem
+                              {actionsForUser(user).editProfile && <DropdownMenuItem
                                 onClick={() => openEditModal(user)}
                                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
                               >
-                                <Edit2 className="h-3.5 w-3.5 text-indigo-600" /> Edit Profile & Roles
-                              </DropdownMenuItem>
+                                <Edit2 className="h-3.5 w-3.5 text-indigo-600" /> {canEditUserRoles(user) ? 'Edit Profile & Roles' : 'Edit Profile'}
+                              </DropdownMenuItem>}
 
-                              <DropdownMenuItem
+                              {actionsForUser(user).assignManager && <DropdownMenuItem
                                 onClick={() => openReviewerModal(user)}
+                                disabled={!actionsForUser(user).assignManager}
                                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
                               >
                                 <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> Assign Manager
-                              </DropdownMenuItem>
+                              </DropdownMenuItem>}
 
-                              <DropdownMenuItem
+                              {actionsForUser(user).resetPassword && <DropdownMenuItem
                                 onClick={() => openPasswordModal(user)}
                                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/50 text-neutral-800 dark:text-neutral-200 font-medium"
                               >
                                 <Key className="h-3.5 w-3.5 text-amber-500" /> Reset Password
-                              </DropdownMenuItem>
+                              </DropdownMenuItem>}
 
-                              {sessionPerms.includes('user:manage') && <DropdownMenuItem
+                              {actionsForUser(user).endSessions && <DropdownMenuItem
                                 onClick={() => handleLogoutUserSessions(user)}
                                 disabled={isCurrent || submittingId === user.id}
                                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-300 font-medium"
@@ -2412,10 +2378,10 @@ export default function UserManagementPage() {
 
                               <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
 
-                              {user.isActive ? (
+                              {actionsForUser(user).changeStatus && (user.isActive ? (
                                 <DropdownMenuItem
                                   onClick={() => handleStatusToggle(user)}
-                                  disabled={isCurrent}
+                                  disabled={!actionsForUser(user).changeStatus}
                                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/50 text-amber-700 font-medium"
                                 >
                                   <UserX className="h-3.5 w-3.5" /> Deactivate & Revoke Access
@@ -2427,9 +2393,9 @@ export default function UserManagementPage() {
                                 >
                                   <UserCheck className="h-3.5 w-3.5" /> Reactivate Account
                                 </DropdownMenuItem>
-                              )}
+                              ))}
 
-                              {canDeleteUsers && <>
+                              {actionsForUser(user).deleteUser && <>
                                 <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-slate-800" />
                                 <DropdownMenuItem
                                   onClick={() => handleDeleteUser(user)}
@@ -2600,7 +2566,7 @@ export default function UserManagementPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1">
           <label className="block text-[10px] font-bold text-neutral-700 dark:text-neutral-300 mb-1">Office Branch *</label>
-          {isBranchAdmin || isUnitAdmin ? (
+          {isBranchAdmin || isUnitScoped ? (
              <div className="flex items-center gap-2 min-h-9 px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                 <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
                 {(() => {
@@ -3059,7 +3025,7 @@ export default function UserManagementPage() {
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                   <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch *</label>
-                                  {isBranchAdmin || isUnitAdmin ? (
+                                  {isBranchAdmin || isUnitScoped ? (
                                     <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                                       <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
                                       <span>
@@ -3127,7 +3093,7 @@ export default function UserManagementPage() {
                           ) : (
                             <div className="space-y-1">
                               <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch *</label>
-                              {isBranchAdmin || isUnitAdmin ? (
+                              {isBranchAdmin || isUnitScoped ? (
                                 <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                                   <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
                                   <span>
@@ -3339,6 +3305,8 @@ export default function UserManagementPage() {
                 </select>
               </div>
 
+              {!canEditUserRoles(selectedUser) && <p className="text-xs text-neutral-500">You can update this member's profile. Their existing role assignments are protected.</p>}
+              <fieldset disabled={!canEditUserRoles(selectedUser)} className="disabled:opacity-60">
               {/* ADMINISTRATIVE ACCESS & STAFF ROLES LOGIC */}
               {(() => {
                 const selectedAdmin = (key: string) => hasAdministrativeRole(editForm.roles, editRolesCatalog, key);
@@ -3395,7 +3363,7 @@ export default function UserManagementPage() {
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                   <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch *</label>
-                                  {isBranchAdmin || isUnitAdmin ? (
+                                  {isBranchAdmin || isUnitScoped ? (
                                     <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                                       <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
                                       <span>
@@ -3463,7 +3431,7 @@ export default function UserManagementPage() {
                           ) : (
                             <div className="space-y-1">
                               <label className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 block">Office Branch *</label>
-                              {isBranchAdmin || isUnitAdmin ? (
+                              {isBranchAdmin || isUnitScoped ? (
                                 <div className="flex items-center gap-2 h-8.5 px-3 rounded-lg border border-neutral-200 dark:border-slate-700 bg-neutral-50 dark:bg-slate-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                                   <Building2 className="h-4 w-4 text-indigo-600 shrink-0" />
                                   <span>
@@ -3567,12 +3535,13 @@ export default function UserManagementPage() {
                   </div>
                 );
               })()}
+              </fieldset>
               <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100 dark:border-slate-800 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
                 <Button type="button" variant="outline" size="sm" onClick={() => setIsEditModalOpen(false)} className="h-8 text-xs cursor-pointer">
                   Cancel
                 </Button>
                 <Button type="submit" disabled={submitting} size="sm" className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer">
-                  {submitting ? "Saving..." : "Save Role Assignment"}
+                  {submitting ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             </form>

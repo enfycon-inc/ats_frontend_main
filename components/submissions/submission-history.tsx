@@ -33,6 +33,9 @@ function formatValue(field: string, value: string | null, zone: string) {
   if (/Status$/.test(field)) return statusLabel(value);
   return value;
 }
+function isCalendarColorField(field: string) {
+  return /^l[123]Color$/.test(field);
+}
 function activity(event: SubmissionHistoryEvent) {
   if (event.kind === 'BASELINE') return 'Existing record captured';
   if (event.kind === 'CREATED') return 'Submission created';
@@ -61,8 +64,8 @@ function presentation(event: SubmissionHistoryEvent) {
   return { Icon: FileText, color: 'text-muted-foreground' };
 }
 function EventDetails({ event, zone }: { event: SubmissionHistoryEvent; zone: string }) {
-  const changes = Object.entries(event.details.changes || {});
-  const snapshot = Object.entries(event.details.snapshot || {}).filter(([, value]) => value != null);
+  const changes = Object.entries(event.details.changes || {}).filter(([field]) => !isCalendarColorField(field));
+  const snapshot = Object.entries(event.details.snapshot || {}).filter(([field, value]) => !isCalendarColorField(field) && value != null);
   return <div className="space-y-3 rounded-lg bg-blue-50/70 px-5 py-4 dark:bg-blue-950/30">
     {event.kind === 'BASELINE' && <p className="text-xs text-muted-foreground">Earlier updates are unavailable. This captures the existing record, not when its decisions were made.</p>}
     {changes.length > 0 && <dl className="space-y-3">{changes.filter(([field, change]) => !(/remarks|feedback/i.test(field) && change.after && [event.details.bypassReason, event.details.correctionReason].includes(change.after))).map(([field, change]) => <div key={field} className="grid grid-cols-[100px_1fr] gap-4 text-xs sm:grid-cols-[120px_1fr]"><dt className="font-semibold text-slate-600 dark:text-slate-300">{/Status$/.test(field) && changes.filter(([name]) => /Status$/.test(name)).length === 1 ? 'Status' : label(field)}</dt><dd className="whitespace-pre-wrap [overflow-wrap:anywhere]"><span className="text-muted-foreground">{formatValue(field, change.before, zone)}</span><span aria-label="changed to"> → </span>{formatValue(field, change.after, zone)}</dd></div>)}</dl>}

@@ -156,9 +156,7 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
   const perms = getActiveRolePermissions(input, roles, profile);
   const has = (...keys: string[]) => perms.includes('*') || keys.some(k => perms.includes(k));
   const isAccountManager = resolveActiveSystemRole(input, roles, profile) === "ACCOUNT_MANAGER";
-  const isDeliveryHead = resolveActiveSystemRole(input, roles, profile) === "DELIVERY_HEAD"
-    || (perms.includes("user:manage") && perms.includes("unit_admin:manage") && perms.includes("job:approve")
-      && !perms.some(permission => ["tenant:settings", "tenant:manage", "platform:manage", "branch_admin:manage"].includes(permission)));
+  const isDeliveryHead = resolveActiveSystemRole(input, [...(profile?.assignedRoles || []), ...roles], profile) === "DELIVERY_HEAD";
   if (has("platform:manage")) return GLOBAL_ADMIN_MORE_ITEMS;
   const company = has("tenant:settings", "tenant:manage");
   const allowed: Record<string, boolean> = {
