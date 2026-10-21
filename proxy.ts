@@ -30,6 +30,7 @@ export async function proxy(req: NextRequest) {
 
   // Always allow static assets, Next.js internals, API routes
   if (
+    pathname.startsWith("/assets/images/auth/") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon.ico") ||
     pathname.startsWith("/api") ||

@@ -23,6 +23,9 @@ test('shared footer uses global attribution and links the configured company web
   assert.match(markup,/EnfySync ATS/);
   assert.match(markup,/href="https:\/\/enfycon.com\/"/);
   assert.match(markup,/rel="noopener noreferrer"/);
+  assert.doesNotMatch(markup,/>enfycon.com</);
+  const loginFooter=renderToStaticMarkup(React.createElement(result.ProductFooter,{showAttribution:false}));
+  assert.doesNotMatch(loginFooter,/A product of/);
 });
 test('login layout spans the viewport and uses configured product attribution',()=>{
   const result={};
@@ -37,6 +40,7 @@ test('login layout spans the viewport and uses configured product attribution',(
     '@/components/shared/enfycon-logo':{default:()=>React.createElement('span',null,'Example ATS'),__esModule:true},
     '@/components/shared/company-logo-image':{},
     '@/components/shared/product-footer':{ProductFooter:()=>React.createElement('footer',null,'Company footer')},
+    './recruitment-illustration':{RecruitmentIllustration:()=>React.createElement('svg',{'data-illustration':'recruitment'})},
     '@/lib/app-brand':{APP_BRAND:brand({NEXT_PUBLIC_APP_NAME:'Example ATS'})},
     '@/utils/subdomain-helper':{getTenantIdentifier:()=> 'workspace'},
     '@/hooks/use-sign-in-policy':{useSignInPolicy:()=>({data:{name:'A workspace with a long company name'}})},
@@ -44,8 +48,9 @@ test('login layout spans the viewport and uses configured product attribution',(
   new Function('exports','require',source('components/auth/login-page-content.tsx'))(result,name=>imports[name]);
   const markup=renderToStaticMarkup(React.createElement(result.default));
   assert.match(markup,/Example ATS/);
-  assert.match(markup,/\(Product of Enfycon India Pvt Ltd\)/);
-  assert.match(markup,/assets\/images\/auth\/auth-img.png/);
+  assert.match(markup,/\(Product of <a[^>]*><span[^>]*>Enfycon<\/span> India Pvt Ltd<\/a>\)/);
+  assert.match(markup,/data-illustration="recruitment"/);
+  assert.equal((markup.match(/href="https:\/\/enfycon.com\/"/g)||[]).length,2);
   assert.doesNotMatch(markup,/max-w-\[1120px\]|bg-\[#163b70\]/);
   assert.match(markup,/Company footer/);
   assert.match(markup,/hidden.*lg:flex/);
