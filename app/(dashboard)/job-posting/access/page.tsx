@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Shield, UserPlus, X } from "lucide-react";
+import { Loader2, Shield, UserPlus, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import { PeopleFinder } from "@/components/common/people-finder";
@@ -126,9 +126,6 @@ export default function JobCreationAccessPage() {
 
   return (
     <main className="w-full min-w-0 space-y-5 p-4 md:p-6 xl:p-8">
-      <button onClick={() => router.push("/job-posting")} className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-blue-700 dark:text-slate-300">
-        <ArrowLeft className="h-4 w-4" /> Back to jobs
-      </button>
       <header className="flex items-start gap-3">
         <span className="rounded-lg bg-blue-50 p-2.5 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"><Shield className="h-5 w-5" /></span>
         <div>
