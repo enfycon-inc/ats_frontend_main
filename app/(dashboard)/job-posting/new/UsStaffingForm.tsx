@@ -156,6 +156,7 @@ export function UsStaffingForm({ editJobId, onBehalfOfUserId }: { editJobId?: st
   const [activeWorkflow, setActiveWorkflow] = useState<"landing" | "manual" | "parse">(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
+      if (params.get("mode") === "manual") return "manual";
       if (params.get("cloneFrom") || params.get("duplicateFrom") || params.get("copyFrom")) {
         return "manual";
       }
@@ -535,12 +536,14 @@ const getInitialActiveBranchContext = () => {
 
   const fetchClients = useCallback(async () => {
     try {
-      const res = await atsApi.clients.list();
+      const res = onBehalfOfUserId
+        ? await atsApi.jobs.delegatedJobClients(onBehalfOfUserId)
+        : await atsApi.clients.list();
       setClientList(res || []);
     } catch (e) {
       console.error("Failed to fetch clients", e);
     }
-  }, []);
+  }, [onBehalfOfUserId]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -2608,7 +2611,7 @@ const getInitialActiveBranchContext = () => {
                                   ✔ Select "{clientSearchText.trim()}"
                                 </button>
                               )}
-                              <button
+                              {!onBehalfOfUserId && <button
                                 type="button"
                                 className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer text-xs ml-auto"
                                 onClick={() => {
@@ -2619,7 +2622,7 @@ const getInitialActiveBranchContext = () => {
                                 }}
                               >
                                 + Add Client
-                              </button>
+                              </button>}
                             </div>
                           </Command>
                         </PopoverContent>
@@ -2773,7 +2776,7 @@ const getInitialActiveBranchContext = () => {
                                   ✔ Select "{endClientSearchText.trim()}"
                                 </button>
                               )}
-                              <button
+                              {!onBehalfOfUserId && <button
                                 type="button"
                                 className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer text-xs ml-auto"
                                 onClick={() => {
@@ -2784,7 +2787,7 @@ const getInitialActiveBranchContext = () => {
                                 }}
                               >
                                 + Add Client
-                              </button>
+                              </button>}
                             </div>
                           </Command>
                         </PopoverContent>
@@ -3223,7 +3226,7 @@ const getInitialActiveBranchContext = () => {
         </form>
       )}
 
-      <AddClientModal
+      {!onBehalfOfUserId && <AddClientModal
         open={addClientModalOpen}
         onOpenChange={(open) => {
           setAddClientModalOpen(open);
@@ -3245,7 +3248,7 @@ const getInitialActiveBranchContext = () => {
           setPrefilledClientName("");
         }}
         
-      />
+      />}
 
       {/* 4. POSTING NEW JOB REQUISITION POPUP MODAL */}
       {publishingModalState && (

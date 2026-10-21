@@ -1168,18 +1168,30 @@ const jobs = {
   async creationTargets(): Promise<Array<{ id: string; name: string; email: string; branchId?: string; businessUnitId?: string }>> {
     return apiFetch('/api/jobs/creation-access/targets');
   },
-  async creationGrantPeople(accountManagerId?: string): Promise<Array<{ id: string; fullName: string; email: string; branchId?: string; businessUnitId?: string }>> {
-    const query = accountManagerId ? `?accountManagerId=${encodeURIComponent(accountManagerId)}` : '';
+  async delegatedJobClients(accountManagerId: string, search?: string): Promise<any[]> {
+    const params = new URLSearchParams({ accountManagerId });
+    if (search?.trim()) params.set('search', search.trim());
+    return apiFetch(`/api/jobs/creation-access/clients?${params.toString()}`);
+  },
+  async delegatedJobClientContacts(accountManagerId: string, clientId: string): Promise<{ myContacts: any[]; otherContacts: any[] }> {
+    return apiFetch(`/api/jobs/creation-access/clients/${encodeURIComponent(clientId)}/contacts?accountManagerId=${encodeURIComponent(accountManagerId)}`);
+  },
+  async creationGrantPeople(accountManagerId?: string, search?: string): Promise<Array<{ id: string; fullName: string; email: string; branchId?: string; businessUnitId?: string }>> {
+    const params = new URLSearchParams();
+    if (accountManagerId) params.set('accountManagerId', accountManagerId);
+    if (search?.trim()) params.set('search', search.trim());
+    const query = params.toString() ? `?${params.toString()}` : '';
     return apiFetch(`/api/jobs/creation-access/people${query}`);
   },
-  async creationGrantOwners(): Promise<Array<{ id: string; fullName: string; email: string; branchId?: string; businessUnitId?: string }>> {
-    return apiFetch('/api/jobs/creation-access/owners');
+  async creationGrantOwners(search?: string): Promise<Array<{ id: string; fullName: string; email: string; branchId?: string; businessUnitId?: string }>> {
+    const query = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : '';
+    return apiFetch(`/api/jobs/creation-access/owners${query}`);
   },
   async creationGrants(accountManagerId?: string): Promise<any[]> {
     const query = accountManagerId ? `?accountManagerId=${encodeURIComponent(accountManagerId)}` : '';
     return apiFetch(`/api/jobs/creation-access/grants${query}`);
   },
-  async grantJobCreation(payload: { accountManagerId: string; delegateUserId: string }): Promise<any> {
+  async grantJobCreation(payload: { accountManagerId: string; delegateUserId: string; expiresAt?: string | null; maxJobs?: number | null }): Promise<any> {
     return apiFetch('/api/jobs/creation-access/grants', { method: 'POST', body: JSON.stringify(payload) });
   },
   async revokeJobCreation(grantId: string): Promise<void> {

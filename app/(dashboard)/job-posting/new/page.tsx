@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { atsApi } from "@/lib/ats-api";
 import { Loader2, Users } from "lucide-react";
+import { PeopleFinder } from "@/components/common/people-finder";
 
 const IndiaStaffingForm = dynamic(() => import("./IndiaStaffingForm").then(mod => mod.IndiaStaffingForm), { ssr: false, loading: () => <FormLoader /> });
 const UsStaffingForm = dynamic(() => import("./UsStaffingForm").then(mod => mod.UsStaffingForm), { ssr: false, loading: () => <FormLoader /> });
@@ -89,9 +90,9 @@ export default function NewJobPostingPage() {
     <main className="mx-auto max-w-3xl p-6 md:p-10">
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-5 flex items-center gap-3"><span className="rounded-lg bg-blue-50 p-2.5 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"><Users className="h-5 w-5" /></span><div><h1 className="text-lg font-semibold text-slate-900 dark:text-white">Create a job for a colleague</h1><p className="text-sm text-slate-500">Choose a job owner who has authorized you.</p></div></div>
-        {targets.length ? <>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Job owner<select value={selectedOwnerId} onChange={(event) => setSelectedOwnerId(event.target.value)} className="mt-1.5 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="">Select a job owner</option>{targets.map((target) => <option key={target.id} value={target.id}>{target.name} · {target.email}</option>)}</select></label>
-        </> : <p className="rounded-md bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">You don’t have active access to create jobs for a colleague. Ask the account manager or an administrator to grant it.</p>}
+        {targets.length ? <label className="block space-y-1.5 text-sm font-medium text-slate-700 dark:text-slate-200">Job owner
+          <PeopleFinder options={targets} value={selectedOwnerId} onValueChange={setSelectedOwnerId} placeholder="Find a job owner you can represent" searchPlaceholder="Search authorized job owners..." emptyMessage="No authorized job owners found." />
+        </label> : <p className="rounded-md bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">You don’t have active access to create jobs for a colleague. Ask the account manager or an administrator to grant it.</p>}
       </section>
     </main>
   );

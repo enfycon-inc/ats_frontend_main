@@ -163,6 +163,7 @@ export function IndiaStaffingForm({ editJobId, onBehalfOfUserId }: { editJobId?:
   const [activeWorkflow, setActiveWorkflow] = useState<"landing" | "manual" | "parse">(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
+      if (params.get("mode") === "manual") return "manual";
       if (params.get("cloneFrom") || params.get("duplicateFrom") || params.get("copyFrom")) {
         return "manual";
       }
@@ -237,9 +238,12 @@ export function IndiaStaffingForm({ editJobId, onBehalfOfUserId }: { editJobId?:
   useEffect(() => {
     if (!selectedClientId) { setPocList({ myContacts: [], otherContacts: [] }); return; }
     let active = true;
-    atsApi.clients.getContacts(selectedClientId).then(data => { if (active) setPocList(data); }).catch(() => { if (active) setPocList({ myContacts: [], otherContacts: [] }); });
+    const contactsRequest = onBehalfOfUserId
+      ? atsApi.jobs.delegatedJobClientContacts(onBehalfOfUserId, selectedClientId)
+      : atsApi.clients.getContacts(selectedClientId);
+    contactsRequest.then(data => { if (active) setPocList(data); }).catch(() => { if (active) setPocList({ myContacts: [], otherContacts: [] }); });
     return () => { active = false; };
-  }, [selectedClientId]);
+  }, [selectedClientId, onBehalfOfUserId]);
   const [pocOpen, setPocOpen] = useState(false);
   const [pocSearch, setPocSearch] = useState('');
   const [selectedPocId, setSelectedPocId] = useState<string | null>(null);
@@ -263,13 +267,16 @@ export function IndiaStaffingForm({ editJobId, onBehalfOfUserId }: { editJobId?:
     }
     let active = true;
     setEndPocList({ myContacts: [], otherContacts: [] });
-    atsApi.clients.getContacts(selectedEndClientId).then(data => {
+    const contactsRequest = onBehalfOfUserId
+      ? atsApi.jobs.delegatedJobClientContacts(onBehalfOfUserId, selectedEndClientId)
+      : atsApi.clients.getContacts(selectedEndClientId);
+    contactsRequest.then(data => {
       if (active) setEndPocList(data);
     }).catch(() => {
       if (active) setEndPocList({ myContacts: [], otherContacts: [] });
     });
     return () => { active = false; };
-  }, [selectedEndClientId, session?.user?.email]);
+  }, [selectedEndClientId, session?.user?.email, onBehalfOfUserId]);
 
   // Auto-sync End POC with Client POC if they are the same company
   useEffect(() => {
@@ -599,7 +606,9 @@ const getInitialActiveBranchContext = () => {
     setClientsLoading(true);
     setClientsError("");
     try {
-      const res = await atsApi.clients.list();
+      const res = onBehalfOfUserId
+        ? await atsApi.jobs.delegatedJobClients(onBehalfOfUserId)
+        : await atsApi.clients.list();
       setClientList(res || []);
     } catch (e: any) {
       setClientList([]);
@@ -610,7 +619,7 @@ const getInitialActiveBranchContext = () => {
     } finally {
       setClientsLoading(false);
     }
-  }, []);
+  }, [onBehalfOfUserId]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -2425,7 +2434,7 @@ const getInitialActiveBranchContext = () => {
                                   ✔ Select "{clientSearchText.trim()}"
                                 </button>
                               )}
-                              <button
+                              {!onBehalfOfUserId && <button
                                 type="button"
                                 className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer text-xs ml-auto"
                                 onClick={() => {
@@ -2436,7 +2445,7 @@ const getInitialActiveBranchContext = () => {
                                 }}
                               >
                                 + Add Client
-                              </button>
+                              </button>}
                             </div>
                           </Command>
                         </PopoverContent>
@@ -2671,7 +2680,7 @@ const getInitialActiveBranchContext = () => {
                               )}
                             </CommandList>
                             <div className="p-2 border-t">
-                              <Button
+                              {!onBehalfOfUserId && <Button
                                 type="button"
                                 variant="ghost"
                                 className="w-full text-xs font-semibold text-blue-600 justify-start h-8"
@@ -2681,7 +2690,7 @@ const getInitialActiveBranchContext = () => {
                                 }}
                               >
                                 + Add New Contact
-                              </Button>
+                              </Button>}
                             </div>
                           </Command>
                         </PopoverContent>
@@ -2833,7 +2842,7 @@ const getInitialActiveBranchContext = () => {
                                   ✔ Select "{endClientSearchText.trim()}"
                                 </button>
                               )}
-                              <button
+                              {!onBehalfOfUserId && <button
                                 type="button"
                                 className="text-blue-600 dark:text-blue-400 font-bold flex items-center hover:underline bg-transparent border-0 cursor-pointer text-xs ml-auto"
                                 onClick={() => {
@@ -2844,7 +2853,7 @@ const getInitialActiveBranchContext = () => {
                                 }}
                               >
                                 + Add Client
-                              </button>
+                              </button>}
                             </div>
                           </Command>
                         </PopoverContent>
@@ -2938,7 +2947,7 @@ const getInitialActiveBranchContext = () => {
                                 </CommandGroup>
                               )}
                               <div className="p-1 mt-1 border-t border-neutral-200 dark:border-slate-800">
-                                <Button
+                                {!onBehalfOfUserId && <Button
                                   type="button"
                                   variant="ghost"
                                   className="w-full text-xs font-semibold text-blue-600 justify-start h-8"
@@ -2948,7 +2957,7 @@ const getInitialActiveBranchContext = () => {
                                   }}
                                 >
                                   + Add New Contact
-                                </Button>
+                                </Button>}
                               </div>
                             </CommandList>
                           </Command>
@@ -3454,16 +3463,16 @@ const getInitialActiveBranchContext = () => {
       
 
       {/* Add End POC Dialog */}
-      <ContactDialog open={addEndPocOpen} onOpenChange={setAddEndPocOpen} clientId={selectedEndClientId} market="IN" endClient onSaved={contact => {
+      {!onBehalfOfUserId && <ContactDialog open={addEndPocOpen} onOpenChange={setAddEndPocOpen} clientId={selectedEndClientId} market="IN" endClient onSaved={contact => {
         setEndPocList(prev => ({ ...prev, myContacts: [contact, ...prev.myContacts] }));
         setSelectedEndPocId(contact.id);
-      }} />
+      }} />}
       {/* Add POC Dialog */}
-      <ContactDialog open={addPocOpen} onOpenChange={setAddPocOpen} clientId={selectedClientId} market="IN"  onSaved={contact => {
+      {!onBehalfOfUserId && <ContactDialog open={addPocOpen} onOpenChange={setAddPocOpen} clientId={selectedClientId} market="IN"  onSaved={contact => {
         setPocList(prev => ({ ...prev, myContacts: [contact, ...prev.myContacts] }));
         setSelectedPocId(contact.id);
-      }} />
-      <AddClientModal
+      }} />}
+      {!onBehalfOfUserId && <AddClientModal
         market="IN"
         open={addClientModalOpen}
         onOpenChange={(open) => {
@@ -3490,7 +3499,7 @@ const getInitialActiveBranchContext = () => {
           setPrefilledClientName("");
         }}
         
-      />
+      />}
 
       {/* 4. POSTING NEW JOB REQUISITION POPUP MODAL */}
       {publishingModalState && (
