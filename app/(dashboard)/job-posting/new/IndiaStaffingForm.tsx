@@ -11,8 +11,6 @@ import * as zod from "zod";
 import {
   ChevronLeft,
   Briefcase,
-  Layers,
-  FileText,
   FileSearch,
   Save,
   CheckCircle,
@@ -1676,7 +1674,7 @@ const getInitialActiveBranchContext = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl w-full">
             {/* Card 1: Manual */}
             <div
               onClick={() => setActiveWorkflow("manual")}
@@ -1693,43 +1691,7 @@ const getInitialActiveBranchContext = () => {
               </p>
             </div>
 
-            {/* Card 2: Requisition */}
-            <div
-              onClick={() => {
-                toast("Coming Soon!", { icon: undefined });
-              }}
-              className="flex flex-col items-center text-center p-6 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg cursor-pointer shadow-xs hover:shadow-md hover:border-primary/50 group transition-all duration-300"
-            >
-              <div className="p-3 bg-green-50 dark:bg-green-950/20 text-green-600 dark:text-green-400 rounded-lg group-hover:bg-primary group-hover:text-white transition-colors">
-                <Layers className="h-6 w-6" />
-              </div>
-              <h3 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider mt-4">
-                From Requisition
-              </h3>
-              <p className="text-[11px] text-neutral-500 mt-2 font-medium">
-                Load client-approved requirements from VMS or internal intakes.
-              </p>
-            </div>
-
-            {/* Card 3: Job Template */}
-            <div
-              onClick={() => {
-                toast("Coming Soon!", { icon: undefined });
-              }}
-              className="flex flex-col items-center text-center p-6 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg cursor-pointer shadow-xs hover:shadow-md hover:border-primary/50 group transition-all duration-300"
-            >
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 rounded-lg group-hover:bg-primary group-hover:text-white transition-colors">
-                <FileText className="h-6 w-6" />
-              </div>
-              <h3 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider mt-4">
-                Job Template
-              </h3>
-              <p className="text-[11px] text-neutral-500 mt-2 font-medium">
-                Select from library of pre-configured developer/manager descriptions.
-              </p>
-            </div>
-
-            {/* Card 4: Parse Description */}
+            {/* Card 2: Parse Description */}
             <div
               onClick={() => setActiveWorkflow("parse")}
               className="flex flex-col items-center text-center p-6 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg cursor-pointer shadow-xs hover:shadow-md hover:border-primary/50 group transition-all duration-300"
