@@ -16,6 +16,7 @@ import { ssoErrorMessage } from "@/lib/sso-error";
 import toast from "react-hot-toast";
 import { getCurrentSubdomain, getBaseDomain, getTenantIdentifier } from "@/utils/subdomain-helper";
 import Social from "./social";
+import { safeLoginCallback } from "@/lib/safe-login-callback";
 import { useSearchParams } from "next/navigation";
 
 const schema = z.object({
@@ -200,6 +201,8 @@ const LoginForm = () => {
   };
 
   const navigateAfterLogin = async (destination: string) => {
+    const requestedReturn = searchParams.get("callbackUrl");
+    if (requestedReturn) destination = safeLoginCallback(requestedReturn);
     const MAX_ATTEMPTS = 12;
     const POLL_INTERVAL_MS = 250;
     for (let i = 0; i < MAX_ATTEMPTS; i++) {

@@ -70,6 +70,7 @@ export default function NotificationListener() {
       };
 
       const getActionUrl = () => {
+        if (notif.type === 'ROLE_REQUEST' && typeof notif.data?.url === 'string' && notif.data.url.startsWith('/auth/role-request?')) return notif.data.url;
         if (notif.data?.submissionId || notif.type.includes("SUBMISSION") || notif.type.includes("INTERVIEW")) {
           return `/utility/submissions`;
         }

@@ -1,5 +1,6 @@
 import type { TenantEmailSettings, EmailDispatchMode, EmailDispatchResult } from './system-email.types';
 import type { UserCity } from './user-city-contract';
+import type { RoleRequestDecision, RoleRequestReview, RoleRequestSubmission } from './role-request-contract';
 import type { DeliveryDashboard, DeliveryStage } from './delivery-dashboard-contract';
 import type { StaffProfile, ProfileDetailsInput, SignatureSettings, SignatureInput, SignatureDefaultsInput } from './profile-contract';
 export interface ClientAccessPolicy { clientsVisibleAcrossUnits: boolean; bdmClientsTenantWide: boolean; otherOwnerPocsVisible: boolean; maskOtherOwnerPocDetails: boolean; }
@@ -314,8 +315,8 @@ async function apiFetch<T = any>(
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string> || {}),
     ...activeRoleHeaders(),
+    ...(options.headers as Record<string, string> || {}),
   };
   // The browser supplies the multipart boundary for photo uploads.
   if (typeof FormData !== 'undefined' && options.body instanceof FormData) delete headers['Content-Type'];
@@ -478,7 +479,7 @@ const auth = {
 
   async approveUser(
     userId: string,
-    dataOrMarket?: string | { roleId?: string; roleIds?: string[]; branchId?: string; businessUnitId?: string; roles?: string[] },
+    dataOrMarket?: string | RoleRequestDecision,
     subdomain?: string,
     userLimit?: number,
     maxBranches?: number,
@@ -633,17 +634,33 @@ const auth = {
     });
   },
 
-  async requestRole(role: string, branchId?: string, businessUnitId?: string, city?: UserCity | null): Promise<any> {
-    return apiFetch<any>('/api/auth/request-role', {
+  async requestRole(role: string, branchId?: string, businessUnitId?: string, city?: UserCity | null): Promise<RoleRequestSubmission> {
+    return apiFetch<RoleRequestSubmission>('/api/auth/request-role', {
       method: 'POST',
       body: JSON.stringify({ role, branchId, businessUnitId, city }),
     });
   },
 
 
-  async rejectUser(userId: string): Promise<any> {
+  async rejectUser(userId: string, expectedRequestVersion?: string): Promise<any> {
     return apiFetch<any>(`/api/auth/users/${userId}/reject`, {
       method: 'PATCH',
+      body: JSON.stringify({ expectedRequestVersion }),
+    });
+  },
+
+  async reviewRoleRequest(userId: string, version: string, reviewRoleId?: string): Promise<RoleRequestReview> {
+    return apiFetch<RoleRequestReview>(`/api/auth/role-requests/${encodeURIComponent(userId)}?version=${encodeURIComponent(version)}`, {
+      headers: reviewRoleId ? { 'x-active-role-id': reviewRoleId } : {},
+    });
+  },
+
+  async decideRoleRequest(request: RoleRequestReview, action: 'approve' | 'reject', reviewRoleId?: string): Promise<{ success: boolean; emailNotification?: { status: string; message?: string } }> {
+    const decision: RoleRequestDecision = { expectedRequestVersion: request.requestVersion,
+      ...(action === 'approve' ? { roleId: request.roleId, roleIds: [request.roleId], branchId: request.branchId, businessUnitId: request.businessUnitId } : {}),
+    };
+    return apiFetch(`/api/auth/users/${encodeURIComponent(request.id)}/${action}`, {
+      method: 'PATCH', headers: reviewRoleId ? { 'x-active-role-id': reviewRoleId } : {}, body: JSON.stringify(decision),
     });
   },
 

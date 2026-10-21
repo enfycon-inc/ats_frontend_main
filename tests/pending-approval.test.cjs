@@ -13,6 +13,7 @@ function mount() {
     useState(initial) { const i = cursor++; if (!(i in hooks)) hooks[i] = initial; return [hooks[i], v => { hooks[i] = typeof v === 'function' ? v(hooks[i]) : v; }]; },
     useCallback(fn, deps) { const i = cursor++; if (!same(hooks[i]?.deps, deps)) hooks[i] = { deps, fn }; return hooks[i].fn; },
     useMemo(fn) { cursor++; return fn(); },
+    useRef(initial) { const i = cursor++; if (!(i in hooks)) hooks[i] = { current: initial }; return hooks[i]; },
     useEffect(fn, deps) { const i = cursor++; if (!same(hooks[i]?.deps, deps)) effects.push(() => { hooks[i]?.cleanup?.(); hooks[i] = { deps, cleanup: fn() }; }); },
   };
   const socket = { on: (name, fn) => socketListeners.set(name, fn), off: (name, fn) => { if (socketListeners.get(name) === fn) socketListeners.delete(name); } };

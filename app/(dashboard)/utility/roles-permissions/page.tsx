@@ -403,7 +403,13 @@ export default function RolesPermissionsPage() {
     const user = atsApi.auth.getCurrentUser();
     const override = typeof window !== "undefined" ? localStorage.getItem("override_role") : null;
 
-    const hasAccess = Array.isArray(user?.permissions) && user.permissions.some((p: string) => ['user:manage', 'platform:manage'].includes(p));
+    const systemRole = String(user?.systemRole || user?.roles?.[0] || '').toUpperCase().replace(/[\s-]/g, '_');
+    const isDeliveryHead = systemRole === 'DELIVERY_HEAD'
+      || (Array.isArray(user?.permissions) && ['user:manage', 'unit_admin:manage', 'job:approve'].every(permission => user.permissions.includes(permission))
+        && !user.permissions.some((permission: string) => ['tenant:settings', 'tenant:manage', 'platform:manage', 'branch_admin:manage'].includes(permission)));
+    const hasAccess = !isDeliveryHead
+      && Array.isArray(user?.permissions)
+      && user.permissions.some((p: string) => ['user:manage', 'platform:manage'].includes(p));
 
     setIsAdmin(hasAccess);
 
@@ -430,7 +436,13 @@ export default function RolesPermissionsPage() {
       const handleRoleChanged = () => {
         const u = atsApi.auth.getCurrentUser();
         const ov = typeof window !== "undefined" ? localStorage.getItem("override_role") : null;
-        const access = Array.isArray(u?.permissions) && u.permissions.some((p: string) => ['user:manage', 'platform:manage'].includes(p));
+        const activeSystemRole = String(u?.systemRole || u?.roles?.[0] || '').toUpperCase().replace(/[\s-]/g, '_');
+        const isDeliveryHead = activeSystemRole === 'DELIVERY_HEAD'
+          || (Array.isArray(u?.permissions) && ['user:manage', 'unit_admin:manage', 'job:approve'].every(permission => u.permissions.includes(permission))
+            && !u.permissions.some((permission: string) => ['tenant:settings', 'tenant:manage', 'platform:manage', 'branch_admin:manage'].includes(permission)));
+        const access = !isDeliveryHead
+          && Array.isArray(u?.permissions)
+          && u.permissions.some((p: string) => ['user:manage', 'platform:manage'].includes(p));
         setIsAdmin(access);
       };
 

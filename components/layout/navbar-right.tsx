@@ -638,6 +638,9 @@ function NotificationDropdownNav() {
               </Button>
 
               <div className="flex items-center gap-2">
+                {selectedNotification.type === 'ROLE_REQUEST' && typeof selectedNotification.data?.url === 'string' && selectedNotification.data.url.startsWith('/auth/role-request?') && (
+                  <Link href={selectedNotification.data.url} className="inline-flex items-center rounded-lg bg-blue-800 px-4 py-2 text-xs font-semibold text-white" onClick={() => setSelectedNotification(null)}>Review role request</Link>
+                )}
                 {(selectedNotification.data?.jobId || selectedNotification.data?.jobCode) && (
                   <Link
                     href={`/job-posting/${selectedNotification.data.jobId || selectedNotification.data.jobCode}`}

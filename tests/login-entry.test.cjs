@@ -21,6 +21,7 @@ function page(file, session) {
     '@/auth': { auth: async () => { if (session instanceof Error) throw session; return session; } },
     'next/navigation': { redirect: target => { throw new Error(`redirect:${target}`); } },
     '@/lib/login-entry': entry,
+    '@/lib/safe-login-callback': load('lib/safe-login-callback.ts', {}),
     '@/components/auth/login-page-content': { default: 'login-content' },
     'react/jsx-runtime': { jsx: type => ({ type }) },
   }).default;
@@ -49,4 +50,9 @@ test('SSO transfer, expiry, and error flows preserve login processing despite ex
 });
 test('unrelated query parameters do not override authenticated entry routing', async () => {
   await assert.rejects(page('app/auth/login/page.tsx', { user: {} })({ searchParams: Promise.resolve({ callbackUrl: 'https://evil.example', expired: 'false' }) }), /redirect:\/dashboard/);
+});
+
+test('a signed-in reviewer returns to the exact request after login', async () => {
+  const callbackUrl = '/auth/role-request?requestId=user&requestVersion=version&action=reject';
+  await assert.rejects(page('app/auth/login/page.tsx', { user: {} })({ searchParams: Promise.resolve({ callbackUrl }) }), /redirect:\/auth\/role-request\?requestId=user&requestVersion=version&action=reject/);
 });

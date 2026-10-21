@@ -115,6 +115,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
 
         // ── Specific Removals for Account Manager ──
       if (isAccountManager) {
+        if (child.href === "/job-posting/active") return false;
         if (child.href === "/job-posting/pod-jobs") return false;
         if (child.href === "/job-posting/boards") return false;
         if (child.href === "/utility/submissions?view=pod") return false;
@@ -155,13 +156,16 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
   const perms = getActiveRolePermissions(input, roles, profile);
   const has = (...keys: string[]) => perms.includes('*') || keys.some(k => perms.includes(k));
   const isAccountManager = resolveActiveSystemRole(input, roles, profile) === "ACCOUNT_MANAGER";
+  const isDeliveryHead = resolveActiveSystemRole(input, roles, profile) === "DELIVERY_HEAD"
+    || (perms.includes("user:manage") && perms.includes("unit_admin:manage") && perms.includes("job:approve")
+      && !perms.some(permission => ["tenant:settings", "tenant:manage", "platform:manage", "branch_admin:manage"].includes(permission)));
   if (has("platform:manage")) return GLOBAL_ADMIN_MORE_ITEMS;
   const company = has("tenant:settings", "tenant:manage");
   const allowed: Record<string, boolean> = {
     email: true, documents: true, settings: true, help: true,
     database: has("database:manage", "tenant:settings"), integrations: has("integration:manage", "tenant:settings"),
     "user-management": has("user:manage", "branch:assign_user", "unit_admin:manage"),
-    "role-management": has("user:manage"),
+    "role-management": !isDeliveryHead && has("user:manage"),
     "pod-management": !isAccountManager && has("pod:view", "pod:manage"), dictionaries: has("tenant:settings"),
     "operations-logs": has("notification:broadcast", "notification:view_all", "audit:view", "tenant:audit_logs"),
   };

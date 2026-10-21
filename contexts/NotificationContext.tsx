@@ -196,11 +196,16 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     };
 
     socket.on("notification", handleIncomingNotification);
+    // The presence channel carries only a signal for access-request notifications.
+    // Load their details and count through the authenticated API.
+    const refreshPrivateNotifications = () => { void fetchNotifications(); };
+    socket.on("notifications_changed", refreshPrivateNotifications);
 
     return () => {
       socket.off("notification", handleIncomingNotification);
+      socket.off("notifications_changed", refreshPrivateNotifications);
     };
-  }, [socket, isConnected, settings.soundEnabled, settings.soundPreset]);
+  }, [socket, isConnected, settings.soundEnabled, settings.soundPreset, fetchNotifications]);
 
   // Mark single notification as read
   const markAsRead = async (id: string) => {

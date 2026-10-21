@@ -57,16 +57,20 @@ export async function proxy(req: NextRequest) {
     return response;
   }
 
+  // Keep email request links intact through password or SSO sign-in.
+  const loginUrl = new URL('/auth/login', req.url);
+  if (pathname === '/auth/role-request') loginUrl.searchParams.set('callbackUrl', req.nextUrl.pathname + req.nextUrl.search);
+
   // --- AUTH LOGIC ---
   let session = null;
   try {
     session = await auth();
   } catch (error) {
-    return NextResponse.redirect(new URL("/auth/login", req.url));
+    return NextResponse.redirect(loginUrl);
   }
 
   if (!session?.user) {
-    return NextResponse.redirect(new URL("/auth/login", req.url));
+    return NextResponse.redirect(loginUrl);
   }
 
   // If we added headers in subdomain logic, we must return that response object,

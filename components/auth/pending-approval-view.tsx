@@ -97,6 +97,7 @@ export default function PendingApprovalView({
   const cityInitialized = React.useRef(false);
   const [isLoadingLocations, setIsLoadingLocations] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notificationWarning, setNotificationWarning] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [approvedRoles, setApprovedRoles] = useState<string[] | null>(null);
   const { socket } = useSocket();
@@ -240,9 +241,14 @@ export default function PendingApprovalView({
 
     try {
       setIsSubmitting(true);
-      await atsApi.auth.requestRole(effectiveRole, branchToSend, unitToSend, selectedCity || null);
-      toast.success("Role request submitted successfully!");
-      setRequestedRole(effectiveRole);
+      const result = await atsApi.auth.requestRole(effectiveRole, branchToSend, unitToSend, selectedCity || null);
+      if (result.notification.status === 'no_reviewers') {
+        setNotificationWarning('Your request was saved, but no eligible reviewer is available. Contact your workspace administrator.');
+      } else {
+        toast.success('Role request submitted. Reviewer notifications are queued.');
+      }
+      setRequestedRole(rolesList.find(role => role.id === effectiveRole)?.name || effectiveRole);
+      if (result.notification.status === 'no_reviewers') return;
       setTimeout(() => {
         window.location.reload();
       }, 800);
@@ -316,6 +322,7 @@ export default function PendingApprovalView({
             Please kindly wait while your designation is approved by your Workspace Administrator or Branch Administrator.
           </p>
 
+          {notificationWarning && <p role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{notificationWarning}</p>}
           {/* Requested Role Badge */}
           <div className="mb-6 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-left">
             <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-2">

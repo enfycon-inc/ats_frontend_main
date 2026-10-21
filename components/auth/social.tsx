@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import { signIn } from "next-auth/react";
 import { cn } from "@/lib/utils";
+import { useSearchParams } from "next/navigation";
+import { safeLoginCallback } from "@/lib/safe-login-callback";
 
 interface SocialProps {
   showGoogle?: boolean;
@@ -76,6 +78,8 @@ function SsoLoadingOverlay({ provider }: { provider: "google" | "microsoft" }) {
 }
 
 const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, microsoftReady = false }: SocialProps) => {
+  const searchParams = useSearchParams();
+  const callbackUrl = safeLoginCallback(searchParams.get("callbackUrl"));
   const [loadingProvider, setLoadingProvider] = useState<"google" | "microsoft" | null>(null);
 
   if (!showGoogle && !showMicrosoft) {
@@ -88,7 +92,7 @@ const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, 
   const handleGoogleSignIn = async () => {
     setLoadingProvider("google");
     try {
-      await signIn("google", { callbackUrl: "/dashboard" });
+      await signIn("google", { callbackUrl });
     } catch {
       setLoadingProvider(null);
     }
@@ -99,7 +103,7 @@ const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, 
     setLoadingProvider("microsoft");
     try {
       const scope = "openid profile email";
-      await signIn("keycloak", { callbackUrl: "/dashboard" }, { kc_idp_hint: `microsoft-${tenantId}`, scope });
+      await signIn("keycloak", { callbackUrl }, { kc_idp_hint: `microsoft-${tenantId}`, scope });
     } catch {
       setLoadingProvider(null);
     }

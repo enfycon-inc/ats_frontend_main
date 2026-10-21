@@ -62,6 +62,8 @@ interface UserItem {
   isActive: boolean;
   isApproved?: boolean;
   requestedRole?: string | null;
+  requestVersion?: string | null;
+  requestedRoleId?: string | null;
   lastLoginAt?: string;
   createdAt: string;
 }
@@ -379,6 +381,11 @@ export default function UserManagementPage() {
   }, [overrideRole, sessionPerms, currentUser]);
 
   const isTenantAdmin = sessionPerms.includes('tenant:settings') || (!isBranchAdmin && (overrideRole === 'TENANT_ADMIN' || overrideRole === 'Tenant Admin'));
+  const activeSystemRole = String(profile?.systemRole || currentUser?.systemRole || currentUser?.roles?.[0] || '').toUpperCase().replace(/[\s-]/g, '_');
+  const isDeliveryHead = activeSystemRole === 'DELIVERY_HEAD'
+    || (sessionPerms.includes('user:manage') && sessionPerms.includes('unit_admin:manage')
+      && sessionPerms.includes('job:approve')
+      && !sessionPerms.some(permission => ['tenant:settings', 'tenant:manage', 'platform:manage', 'branch_admin:manage'].includes(permission)));
 
   // The branches the current user is assigned to (for filtering dropdowns)
   const assignedBranches = useMemo(() => {
@@ -399,13 +406,16 @@ export default function UserManagementPage() {
   }, [businessUnits, sessionPerms, currentUser]);
 
   const isUnitAdmin = useMemo(() => {
-    if (overrideRole) return false;
+    if (overrideRole || isDeliveryHead) return false;
     // Check profile (async me() response) first, then localStorage currentUser as fallback
     const resolvedBusinessUnitId = profile?.businessUnitId || currentUser?.businessUnitId;
-    return !sessionPerms.includes('tenant:settings')
+    return sessionPerms.includes('unit_admin:manage')
+      && !sessionPerms.includes('tenant:settings')
       && !sessionPerms.includes('branch_admin:manage')
       && !!resolvedBusinessUnitId;
-  }, [overrideRole, sessionPerms, currentUser, profile]);
+  }, [overrideRole, sessionPerms, currentUser, profile, isDeliveryHead]);
+
+  const canAssignAdministrativeRoles = isTenantAdmin || isBranchAdmin || isUnitAdmin;
 
   // Can the current user manage (edit/delete/status) a given target user?
   const canManageUser = (targetUser: any): boolean => {
@@ -423,7 +433,7 @@ export default function UserManagementPage() {
 
     if (isDeliveryHead) {
       if (!targetBranchId) return false;
-      if (targetPerms.includes('tenant:settings') || targetPerms.includes('branch_admin:manage')) return false;
+      if (targetPerms.some(permission => ['tenant:settings', 'tenant:manage', 'platform:manage', 'branch_admin:manage', 'unit_admin:manage'].includes(permission))) return false;
       return assignedBranches.some((b) => b.id === targetBranchId);
     }
 
@@ -1036,7 +1046,7 @@ export default function UserManagementPage() {
       matchedRoleId = 'UNIT_ADMIN';
     } else if (user.requestedRole) {
       const match = rolesList.find(r => 
-        r.name?.toUpperCase() === reqUpper || r.systemRole?.toUpperCase() === reqUpper
+        r.id === user.requestedRoleId || (!user.requestedRoleId && (r.name?.toUpperCase() === reqUpper || r.systemRole?.toUpperCase() === reqUpper))
       );
       matchedRoleId = match?.id || user.requestedRole;
     }
@@ -1101,6 +1111,7 @@ export default function UserManagementPage() {
       const finalUnitId = (reviewForm.branchId === "none" || reviewForm.businessUnitId === "none") ? undefined : reviewForm.businessUnitId;
 
       const approval = await atsApi.auth.approveUser(reviewUser.id, {
+        expectedRequestVersion: reviewUser.requestVersion || undefined,
         roleId: reviewForm.roleId || undefined,
         roles: reviewForm.roles,
         branchId: finalBranchId,
@@ -1135,7 +1146,7 @@ export default function UserManagementPage() {
 
     try {
       setSubmittingId(user.id);
-      await atsApi.auth.rejectUser(user.id);
+      await atsApi.auth.rejectUser(user.id, user.requestVersion || undefined);
       toast.success(`Registration request for ${user.email} was rejected.`);
       loadData();
     } catch (err: any) {
@@ -2952,7 +2963,7 @@ export default function UserManagementPage() {
               {/* TABS FOR ADD MODAL */}
               <div className="flex border-b border-neutral-200 dark:border-slate-800 mb-4 pt-4">
                 <button type="button" onClick={() => setAddModalTab("STAFF")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${addModalTab === "STAFF" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Staff & Business Roles</button>
-                <button type="button" onClick={() => setAddModalTab("TENANT_ADMIN")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${addModalTab === "TENANT_ADMIN" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Administrative Access</button>
+                {canAssignAdministrativeRoles && <button type="button" onClick={() => setAddModalTab("TENANT_ADMIN")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${addModalTab === "TENANT_ADMIN" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Administrative Access</button>}
               </div>
 
               {/* ADMINISTRATIVE ACCESS & STAFF ROLES LOGIC */}
@@ -3014,7 +3025,7 @@ export default function UserManagementPage() {
 
                 return (
                   <div>
-                    {addModalTab === "TENANT_ADMIN" && (
+                    {addModalTab === "TENANT_ADMIN" && canAssignAdministrativeRoles && (
                       <div className="space-y-4 mb-4">
                         <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block mb-2">Select Administrative Level</label>
                         <div className="flex flex-wrap gap-4">
@@ -3308,7 +3319,7 @@ export default function UserManagementPage() {
               {/* TABS FOR EDIT MODAL */}
               <div className="flex border-b border-neutral-200 dark:border-slate-800 mb-4 pt-4">
                 <button type="button" onClick={() => setEditModalTab("STAFF")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${editModalTab === "STAFF" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Staff & Business Roles</button>
-                <button type="button" onClick={() => setEditModalTab("TENANT_ADMIN")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${editModalTab === "TENANT_ADMIN" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Administrative Access</button>
+                {canAssignAdministrativeRoles && <button type="button" onClick={() => setEditModalTab("TENANT_ADMIN")} className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors ${editModalTab === "TENANT_ADMIN" ? "border-indigo-600 text-indigo-600" : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"}`}>Administrative Access</button>}
               </div>
 
               <div className="max-w-sm space-y-1.5">
@@ -3351,7 +3362,7 @@ export default function UserManagementPage() {
 
                 return (
                   <div>
-                    {editModalTab === "TENANT_ADMIN" && (
+                    {editModalTab === "TENANT_ADMIN" && canAssignAdministrativeRoles && (
                       <div className="space-y-4 mb-4">
                         <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 block mb-2">Select Administrative Level</label>
                         <div className="flex flex-wrap gap-4">
