@@ -133,7 +133,6 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
       if (child.href === "/applicants/pipeline") return has("submission:view");
       if (child.href === "/job-posting/drafts") return has("job:create");
       if (child.href === "/job-posting/new?mode=manual") return has("job:create");
-      if (child.href === "/job-posting/access") return has("job:grant_creation_delegate", "job:manage_creation_access", "tenant:settings", "tenant:manage", "platform:manage");
       if (child.href === "/job-posting/boards") return has("job:publish_direct");
       if (child.href === "/job-posting/all?tab=shared") {
         const role = resolveActiveSystemRole(input, roles, profile);
@@ -179,6 +178,7 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
         { label: "Global Remarks Templates", href: "/utility/global-remarks" },
       );
       if (!company && has("branch_admin:manage", "branch:edit", "branch:view")) children.push({ label: "Branch Settings", href: "/settings/branch" });
+      if (has("job:grant_creation_delegate", "job:manage_creation_access")) children.push({ label: "Delegated Access", href: "/job-posting/access" });
       children.push({ label: "Sound & Tone Preferences", href: "/utility/settings-notifications" });
       return { ...item, children };
     }
