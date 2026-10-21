@@ -411,7 +411,7 @@ const LoginForm = () => {
             type={passwordType}
             id="password"
             name="password"
-            placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+            placeholder="Password"
             className={cn(
               "pl-10 pr-11 h-11 text-sm bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all rounded-lg",
               { "border-red-500 focus-visible:ring-red-500/20": errors.password }
