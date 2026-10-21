@@ -135,7 +135,7 @@ export default function JobCreationAccessPage() {
       </header>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="mb-4 flex items-center gap-3"><span className="rounded-lg bg-blue-50 p-2.5 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"><UserPlus className="h-5 w-5" /></span><div><h2 className="font-semibold text-slate-900 dark:text-white">Grant job access</h2><p className="text-sm text-slate-500 dark:text-slate-400">Choose a colleague who can create jobs on the job owner’s behalf.</p></div></div>
+        <div className="mb-4 flex items-center gap-3"><span className="rounded-lg bg-blue-50 p-2.5 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"><UserPlus className="h-5 w-5" /></span><div><h2 className="text-sm font-bold text-slate-900 dark:text-white">Grant job access</h2><p className="text-sm text-slate-500 dark:text-slate-400">Choose a colleague who can create jobs on the job owner’s behalf.</p></div></div>
         <form onSubmit={addAccess} className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(15rem,0.8fr)_minmax(20rem,1.4fr)_minmax(12rem,0.7fr)_minmax(10rem,0.6fr)_auto] xl:items-end">
           {isAdmin && <label className="block space-y-1.5 text-sm font-medium text-slate-700 dark:text-slate-200">Job owner
             <PeopleFinder options={ownerChoices} value={ownerId} onValueChange={(id) => { setOwnerId(id); setDelegateId(""); setPeopleQuery(""); }} onSearchChange={setOwnersQuery} loading={ownersSearching} placeholder="Find a job owner" searchPlaceholder="Search job owners..." emptyMessage="No eligible job owners found." />
@@ -157,7 +157,7 @@ export default function JobCreationAccessPage() {
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-          <h2 className="font-semibold text-slate-900 dark:text-white">Authorized colleagues</h2>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white">Authorized colleagues</h2>
         </div>
         {loading ? <div className="flex h-28 items-center justify-center text-sm text-slate-500"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading access</div> : grants.length ? (
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
