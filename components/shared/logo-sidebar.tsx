@@ -1,13 +1,13 @@
 
 'use client'
 
-import Image from "next/image";
+import EnfyconLogo from "./enfycon-logo";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
 import { cn } from '@/lib/utils';
-import EnfysyncLogo from '@/public/assets/images/logo.png';
+
 
 function LogoSidebar() {
   const isCollapsed = useSidebarCollapsed();
@@ -29,14 +29,7 @@ function LogoSidebar() {
         isCollapsed ? 'px-1' : 'px-4'
       )}
     >
-      <Image
-        src={EnfysyncLogo}
-        alt="Enfysync Logo"
-        width={isCollapsed ? 36 : 160}
-        height={40}
-        priority
-        style={{ objectFit: 'contain' }}
-      />
+      <EnfyconLogo iconOnly={isCollapsed} />
     </Link>
   )
 }

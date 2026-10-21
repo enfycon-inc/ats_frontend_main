@@ -1,9 +1,10 @@
+import { APP_BRAND } from "@/lib/app-brand";
 import JobPostingDashboard from "../components/job-posting-dashboard";
 import JobPostingSkeleton from "../components/job-posting-skeleton";
 import { Suspense } from "react";
 
 export const metadata = {
-  title: "Pod Jobs - Enfysync ATS",
+  title: `Pod Jobs - ${APP_BRAND.name}`,
   description: "View and manage jobs assigned to your pod.",
 };
 

@@ -225,7 +225,12 @@ const LoginForm = () => {
     navigateToDashboard(destination);
   };
 
+  const [credentialError, setCredentialError] = useState<{ mode: "password" | "developer"; message: string } | null>(null);
+
   const onSubmit = (data: z.infer<typeof schema>, developer = false) => {
+    if (isPending) return;
+    setCredentialError(null);
+    const mode = developer ? "developer" : "password";
     startTransition(async () => {
       try {
         // 1. Authenticate with the backend and request the selected session policy.
@@ -233,7 +238,8 @@ const LoginForm = () => {
         try {
           syncRes = await atsApi.auth.login(data.email, data.password, false, developer);
         } catch (apiErr: any) {
-          toast.error(apiErr.message || "Backend authentication failed.");
+          setCredentialError({ mode, message: apiErr.message || "Unable to sign in. Please try again." });
+          if (!developer) setValue("password", "");
           return;
         }
 
@@ -274,7 +280,7 @@ const LoginForm = () => {
         });
 
         if (signInRes?.error) {
-          toast.error("Sign in failed. Please check credentials.");
+          setCredentialError({ mode, message: "Sign in failed. Please try again." });
           return;
         }
 
@@ -287,12 +293,13 @@ const LoginForm = () => {
           : "/dashboard";
         await navigateAfterLogin(dest);
       } catch (err: any) {
-        toast.error(err.message || "Failed to sign in.");
+        setCredentialError({ mode, message: err.message || "Failed to sign in." });
+        if (!developer) setValue("password", "");
       }
     });
   };
 
-  if (isAuthorizingSso || isPending || isNavigating) {
+  if (isAuthorizingSso || isNavigating) {
     return (
       <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm">
         <div className="relative mb-6">
@@ -340,6 +347,7 @@ const LoginForm = () => {
           showGoogle={showGoogle}
           showMicrosoft={showMicrosoft}
           tenantId={authPolicy.tenantId}
+          disabled={isPending}
           microsoftReady={authPolicyStatus === "ready" && showMicrosoft && microsoftConfigured}
         />
       )}
@@ -359,12 +367,14 @@ const LoginForm = () => {
     </div>
   );
 
-  const developerAccess = <DeveloperAccess enabled={authPolicyStatus === "ready" && signInOptions(authPolicy).developer && !isGlobalPortal} onSignIn={data => onSubmit(data, true)} />;
+  const accessHelp = <p className="text-xs leading-relaxed text-slate-500">Need access? Contact your workspace administrator.</p>;
+  const developerAccess = <DeveloperAccess pending={isPending} error={credentialError?.mode === "developer" ? credentialError.message : undefined} enabled={authPolicyStatus === "ready" && signInOptions(authPolicy).developer && !isGlobalPortal} onSignIn={data => onSubmit(data, true)} />;
   if (authPolicyStatus !== "ready") return <div className="space-y-3 text-sm text-slate-500" role="status">
     {authPolicyStatus === "loading" ? "Loading sign-in options…" : <>Unable to load sign-in options. <button type="button" className="underline" onClick={() => void reloadPolicy()}>Retry</button></>}
   </div>;
   if (!showPassword) return <div className="space-y-5 text-left">
     {hasSocial ? socialLogin : <p className="text-sm text-slate-500">Sign-in is currently unavailable. Contact your workspace administrator.</p>}
+    {accessHelp}
     {developerAccess}
   </div>;
 
@@ -447,10 +457,11 @@ const LoginForm = () => {
         </Link>
       </div>
 
+      {credentialError?.mode === "password" && <p role="alert" className="rounded-md bg-red-50 p-3 text-xs leading-relaxed text-red-700">{credentialError.message}</p>}
       {/* Submit Button */}
       <Button
         disabled={isPending}
-        className="w-full h-11 mt-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold text-sm rounded-lg shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center justify-center gap-2 group cursor-pointer"
+        className="w-full h-11 mt-4 bg-blue-700 hover:bg-blue-800 text-white font-semibold text-sm rounded-lg shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center justify-center gap-2 group cursor-pointer"
       >
         {isPending ? (
           <>
@@ -480,7 +491,7 @@ const LoginForm = () => {
         </div>
       )}
 
-    </form>{developerAccess}</div>
+    </form>{accessHelp}{developerAccess}</div>
   );
 };
 

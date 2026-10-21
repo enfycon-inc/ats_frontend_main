@@ -1,9 +1,10 @@
+import { APP_BRAND } from "@/lib/app-brand";
 import JobPostingDashboard from "./components/job-posting-dashboard";
 import JobPostingSkeleton from "./components/job-posting-skeleton";
 import { Suspense } from "react";
 
 export const metadata = {
-  title: "Job Postings - Enfysync ATS",
+  title: `Job Postings - ${APP_BRAND.name}`,
   description: "View and manage job requirements, candidate pipelines, and recruiter workflows.",
 };
 

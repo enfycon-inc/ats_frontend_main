@@ -1,9 +1,10 @@
+import { APP_BRAND } from "@/lib/app-brand";
 import React from "react";
 import { FileText, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const metadata = {
-  title: "Job Templates - Enfysync ATS",
+  title: `Job Templates - ${APP_BRAND.name}`,
   description: "Manage pre-configured job description templates.",
 };
 

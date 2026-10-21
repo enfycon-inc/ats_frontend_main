@@ -1,3 +1,4 @@
+import { APP_BRAND } from "@/lib/app-brand";
 import { LoadingProvider } from "@/contexts/LoadingContext";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -8,20 +9,20 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Enfysync - ATS Recruitment Platform",
-  description: "Enfysync - Applicant Tracking System built with Next.js, TypeScript, ShadCN UI & Tailwind",
+  title: `${APP_BRAND.name} - Recruitment Platform`,
+  description: `${APP_BRAND.name} — a product of ${APP_BRAND.companyName}`,
   metadataBase: new URL("https://enfysync.com"),
   openGraph: {
-    title: "Enfysync - ATS Recruitment Platform",
+    title: `${APP_BRAND.name} - Recruitment Platform`,
     description: "A modern, responsive Applicant Tracking System built with Next.js, Tailwind CSS, and ShadCN UI.",
     url: "https://enfysync.com",
-    siteName: "Enfysync",
+    siteName: APP_BRAND.name,
     images: [
       {
         url: "https://enfysync.com/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Enfysync ATS Platform Preview",
+        alt: `${APP_BRAND.name} preview`,
       },
     ],
     locale: "en_US",
@@ -29,7 +30,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Enfysync - ATS Recruitment Platform",
+    title: `${APP_BRAND.name} - Recruitment Platform`,
     description: "A modern, responsive Applicant Tracking System built with Next.js, Tailwind CSS, and ShadCN UI.",
     images: ["https://enfysync.com/og-image.jpg"],
   },

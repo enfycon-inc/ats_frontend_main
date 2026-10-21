@@ -1,9 +1,10 @@
+import { APP_BRAND } from "@/lib/app-brand";
 import React from "react";
 import { Globe, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const metadata = {
-  title: "External Job Boards - Enfysync ATS",
+  title: `External Job Boards - ${APP_BRAND.name}`,
   description: "Configure external job boards integration.",
 };
 

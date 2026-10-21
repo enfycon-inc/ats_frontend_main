@@ -12,6 +12,7 @@ interface SocialProps {
   className?: string;
   tenantId?: string;
   microsoftReady?: boolean;
+  disabled?: boolean;
 }
 
 // Full-page loading overlay shown while SSO redirect is in progress
@@ -77,7 +78,7 @@ function SsoLoadingOverlay({ provider }: { provider: "google" | "microsoft" }) {
   );
 }
 
-const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, microsoftReady = false }: SocialProps) => {
+const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, microsoftReady = false, disabled = false }: SocialProps) => {
   const searchParams = useSearchParams();
   const callbackUrl = safeLoginCallback(searchParams.get("callbackUrl"));
   const [loadingProvider, setLoadingProvider] = useState<"google" | "microsoft" | null>(null);
@@ -90,6 +91,7 @@ const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, 
   const canSignInWithMicrosoft = microsoftReady && !!tenantId;
 
   const handleGoogleSignIn = async () => {
+    if (disabled) return;
     setLoadingProvider("google");
     try {
       await signIn("google", { callbackUrl });
@@ -99,7 +101,7 @@ const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, 
   };
 
   const handleMicrosoftSignIn = async () => {
-    if (!canSignInWithMicrosoft) return;
+    if (disabled || !canSignInWithMicrosoft) return;
     setLoadingProvider("microsoft");
     try {
       const scope = "openid profile email";
@@ -119,7 +121,7 @@ const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, 
         {showGoogle && (
           <button
             type="button"
-            disabled={!!loadingProvider}
+            disabled={disabled || !!loadingProvider}
             onClick={handleGoogleSignIn}
             className={cn(
               "flex items-center justify-center gap-2 w-full h-11 px-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 font-medium text-xs shadow-sm transition-all hover:scale-[1.01] cursor-pointer active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 disabled:transform-none",
@@ -141,7 +143,7 @@ const Social = ({ showGoogle = true, showMicrosoft = true, className, tenantId, 
         {showMicrosoft && (
           <button
             type="button"
-            disabled={!canSignInWithMicrosoft || !!loadingProvider}
+            disabled={disabled || !canSignInWithMicrosoft || !!loadingProvider}
             onClick={handleMicrosoftSignIn}
             className={cn(
               "flex items-center justify-center gap-2 w-full h-11 px-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 font-medium text-xs shadow-sm transition-all hover:scale-[1.01] cursor-pointer active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none",

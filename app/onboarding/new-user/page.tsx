@@ -1,3 +1,4 @@
+import { APP_BRAND } from "@/lib/app-brand";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { SessionProvider } from "next-auth/react";
@@ -23,7 +24,7 @@ async function getSessionSafe() {
 }
 
 export const metadata = {
-  title: "Set Up Your Workspace | Enfycon ATS",
+  title: `Set Up Your Workspace | ${APP_BRAND.name}`,
 };
 
 export default async function OnboardingNewUserPage() {

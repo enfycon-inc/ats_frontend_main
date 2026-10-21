@@ -1,5 +1,6 @@
 "use client";
 
+import { APP_BRAND } from "@/lib/app-brand";
 import Link from "next/link";
 import Image from "next/image";
 import { useTenantBranding } from "@/contexts/tenant-branding";
@@ -11,7 +12,7 @@ export function NavbarLogo({ className }: { className?: string }) {
     <Link
       href="/dashboard"
       id="navbar-logo"
-      aria-label={`${branding.name || 'enfySync'} – go to Dashboard`}
+      aria-label={`${branding.name || APP_BRAND.name} – go to Dashboard`}
       className={`
         flex items-center gap-2.5
         px-2 py-0 h-[34px]
@@ -37,7 +38,7 @@ export function NavbarLogo({ className }: { className?: string }) {
       <div className="flex-shrink-0 flex items-center justify-center h-7 w-7 rounded-md bg-white/15 border border-white/20 p-1 shadow-xs transition-transform duration-150 group-hover/logo:scale-105">
         <Image
           src="/assets/images/asset/logo/enfysync.ico"
-          alt="enfySync Logo"
+          alt={`${APP_BRAND.name} logo`}
           width={20}
           height={20}
           unoptimized
@@ -48,7 +49,7 @@ export function NavbarLogo({ className }: { className?: string }) {
       {/* Brand text (Hidden cleanly in collapsed icon mode) */}
       <div className="flex flex-col leading-tight select-none min-w-0 group-data-[collapsible=icon]:hidden">
         <span className="text-white font-extrabold text-[15px] tracking-tight transition-colors truncate">
-          enfy<span className="text-cyan-300">Sync</span>
+          {APP_BRAND.name}
         </span>
         <span className="text-[8.5px] text-blue-100 font-bold tracking-wider uppercase truncate">
           AI Recruitment

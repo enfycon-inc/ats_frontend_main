@@ -1,9 +1,10 @@
+import { APP_BRAND } from "@/lib/app-brand";
 import JobPostingDashboard from "../components/job-posting-dashboard";
 import JobPostingSkeleton from "../components/job-posting-skeleton";
 import { Suspense } from "react";
 
 export const metadata = {
-  title: "Draft Jobs - Enfysync ATS",
+  title: `Draft Jobs - ${APP_BRAND.name}`,
   description: "View and manage draft requirements.",
 };
 

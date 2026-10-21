@@ -128,7 +128,7 @@ export function GeneralTab({
                   <Input
                     value={siteTitle}
                     onChange={(e) => setSiteTitle(e.target.value)}
-                    placeholder="e.g. Enfycon ATS"
+                    placeholder="e.g. Recruitment workspace"
                     className="h-9 mt-1.5 text-sm"
                   />
                   <p className="text-[10px] text-neutral-500 mt-1">This appears on browser tabs and search engines.</p>

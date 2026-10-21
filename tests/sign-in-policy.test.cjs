@@ -28,7 +28,7 @@ test('developer disclosure is absent by default and collapsed when enabled', () 
   const markup = renderToStaticMarkup(React.createElement(DeveloperAccess,{enabled:true}));
   assert.match(markup, /<details/);
   assert.doesNotMatch(markup, /<details[^>]* open/);
-  assert.match(markup, /Developer Access/);
+  assert.match(markup, /Developer access/);
   assert.match(markup, /type="password"/);
 });
 test('frontend policy contract matches the backend canonical source', {skip:!fs.existsSync(path.join(__dirname,'../../ats_backend/src/auth/sign-in-policy.ts'))}, () => {
@@ -40,11 +40,11 @@ test('developer password access cannot bypass workspace-required MFA', () => {
   assert.equal(signInOptions({allowPasswordLogin:false,enforceSsoOnly:true,allowDeveloperLogin:true,requireMfa:true}).developer,false);
 });
 
-function renderLogin(policy, status = 'ready') {
+function renderLogin(policy, status = 'ready', pending = false, error = null) {
   let index = 0;
   const hookReact = {...React,
-    useState: initial => [initial === 'loading' ? status : (typeof initial === 'object' && initial?.allowPasswordLogin !== undefined ? policy : index++ === 1 ? true : initial), () => {}],
-    useTransition: () => [false, () => {}], useRef: () => ({current:null}), useEffect: () => {},
+    useState: initial => [initial === null ? error : initial === 'loading' ? status : (typeof initial === 'object' && initial?.allowPasswordLogin !== undefined ? policy : index++ === 1 ? true : initial), () => {}],
+    useTransition: () => [pending, () => {}], useRef: () => ({current:null}), useEffect: () => {},
   };
   const native = type => props => React.createElement(type,props);
   const { DeveloperAccess } = load('components/auth/developer-access.tsx', {
@@ -70,14 +70,29 @@ const policy = {allowPasswordLogin:false,allowMicrosoftSso:true,allowGoogleSso:f
 test('provider-only login removes enforcement text and puts collapsed developer access last', () => {
   const markup = renderLogin(policy);
   assert.doesNotMatch(markup,/SSO.*Enforced|Work Email/);
-  assert.ok(markup.indexOf('Continue with Microsoft') < markup.indexOf('Developer Access'));
+  assert.ok(markup.indexOf('Continue with Microsoft') < markup.indexOf('Developer access'));
   assert.match(markup, /<details/);
 });
 test('mixed sign-in keeps developer form outside the normal password form', () => {
   const markup = renderLogin({...policy,allowPasswordLogin:true,enforceSsoOnly:false});
   assert.match(markup,/Work Email/);
-  assert.ok(markup.indexOf('</form>') < markup.indexOf('Developer Access'));
+  assert.ok(markup.indexOf('</form>') < markup.indexOf('Developer access'));
 });
 test('policy loading or failure never renders credentials as a fallback', () => {
-  for (const status of ['loading','error']) assert.doesNotMatch(renderLogin(policy,status), /<form|Developer Access|type="password"/);
+  for (const status of ['loading','error']) assert.doesNotMatch(renderLogin(policy,status), /<form|Developer access|type="password"/);
+});
+
+test('developer form stays mounted and disabled while credential verification is pending', () => {
+  const markup = renderLogin(policy,'ready',true);
+  assert.match(markup, /Developer access/);
+  assert.match(markup, /aria-busy="true"/);
+  assert.match(markup, /Signing in/);
+  assert.doesNotMatch(markup, /fixed inset-0/);
+});
+test('developer failure stays inline below the expanded form controls', () => {
+  const markup = renderLogin(policy,'ready',false,{mode:'developer',message:'Unable to sign in with this account.'});
+  assert.match(markup, /role="alert"/);
+  assert.match(markup, /Unable to sign in with this account/);
+  assert.ok(markup.indexOf('Developer email') < markup.indexOf('Unable to sign in with this account'));
+  assert.ok(markup.indexOf('Need access?') < markup.indexOf('Developer access'));
 });

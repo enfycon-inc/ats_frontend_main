@@ -596,6 +596,7 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
                 </div>
               </div>
             )}
+            <p className="text-[10px] leading-relaxed text-slate-500">Need access? Contact your workspace administrator.</p>
             <DeveloperAccess enabled={signInOptions({ allowPasswordLogin, enforceSsoOnly, allowDeveloperLogin, requireMfa }).developer} preview />
           </div>
 
