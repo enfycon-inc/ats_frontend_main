@@ -1,5 +1,8 @@
 "use client";
 
+import { signInOptions } from "@/lib/sign-in-policy";
+import { DeveloperAccess } from "@/components/auth/developer-access";
+import useSWR from "swr";
 import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +38,27 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
   const [savingSection, setSavingSection] = useState<string | null>(null);
     const saving = savingSection !== null;
 
+  const [requireMfa, setRequireMfa] = useState(false);
+  const [allowDeveloperLogin, setAllowDeveloperLogin] = useState(false);
+  const [developerSearch, setDeveloperSearch] = useState('');
+  const [debouncedDeveloperSearch, setDebouncedDeveloperSearch] = useState('');
+  const [grantBusy, setGrantBusy] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedDeveloperSearch(developerSearch), 300);
+    return () => clearTimeout(timer);
+  }, [developerSearch]);
+  const { data: developerAccounts = [], error: grantError, mutate: refreshAccounts } = useSWR(
+    ['developer-accounts', tenantId, subdomain, debouncedDeveloperSearch],
+    () => atsApi.auth.developerAccounts(debouncedDeveloperSearch), { shouldRetryOnError: false });
+  const changeGrant = async (id: string, authorized: boolean) => {
+    setGrantBusy(true);
+    try {
+      await atsApi.auth.setDeveloperGrant(id, authorized);
+      await refreshAccounts();
+      toast.success(authorized ? 'Developer account authorized.' : 'Developer access revoked.');
+    } catch { toast.error('Unable to update developer access.'); }
+    finally { setGrantBusy(false); }
+  };
   // Policy state
   const [allowPasswordLogin, setAllowPasswordLogin] = useState(true);
   const [allowMicrosoftSso, setAllowMicrosoftSso] = useState(true);
@@ -57,6 +81,8 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
         setAllowPasswordLogin(res.allowPasswordLogin ?? true);
         setAllowMicrosoftSso(res.allowMicrosoftSso ?? true);
         setAllowGoogleSso(res.allowGoogleSso ?? true);
+        setRequireMfa(res.requireMfa === true);
+        setAllowDeveloperLogin(res.allowDeveloperLogin === true);
         setEnforceSsoOnly(res.enforceSsoOnly ?? false);
         setAllowedEmailDomains(res.allowedEmailDomains || []);
         setMicrosoftTenantId(res.microsoftTenantId || "");
@@ -161,6 +187,7 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
     try {
       setSavingSection(section);
       const updateRes = await atsApi.auth.updateTenantAuthPolicy({
+        allowDeveloperLogin,
         allowPasswordLogin,
         allowMicrosoftSso,
         allowGoogleSso,
@@ -184,6 +211,7 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
     }
   };
 
+  const showPassword = signInOptions({ allowPasswordLogin, enforceSsoOnly, allowDeveloperLogin }).password;
   const enabledCount = (allowPasswordLogin ? 1 : 0) + (allowMicrosoftSso ? 1 : 0) + (allowGoogleSso ? 1 : 0);
 
       const handleAddDomainKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -267,6 +295,25 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
               </div>
             </div>
 
+            <div className="rounded-lg border border-neutral-200 p-3.5 space-y-3 dark:border-slate-800">
+              <div className="flex items-center justify-between gap-3">
+                <div><Label htmlFor="developer-switch">Developer Access</Label>
+                  <p className="text-xs text-neutral-500 mt-1">Tenant administrators can allow selected accounts to sign in with email and password.</p></div>
+                <Switch id="developer-switch" checked={allowDeveloperLogin} onCheckedChange={setAllowDeveloperLogin} disabled={loading || saving} />
+              </div>
+              {requireMfa && <p className="text-xs text-amber-700">Developer password sign-in is unavailable while this workspace requires multi-factor authentication.</p>}
+              <details><summary className="text-xs cursor-pointer text-slate-600">Authorized accounts</summary>
+                <p className="text-xs text-slate-500 my-2">Account grants save immediately. The sign-in option is enabled using Save Authentication Methods.</p>
+                <Input aria-label="Search developer accounts" placeholder="Search workspace accounts" value={developerSearch} onChange={e => setDeveloperSearch(e.target.value)} />
+                {grantError && <p role="alert" className="text-xs text-red-600">Unable to load authorized accounts.</p>}
+                <div className="max-h-52 overflow-auto divide-y mt-2">
+                  {developerAccounts.map(account => <label key={account.id} className="flex items-center justify-between gap-3 py-2 text-xs">
+                    <span>{account.fullName || account.email}<span className="block text-slate-500">{account.email}</span></span>
+                    <input type="checkbox" aria-label={`Developer access for ${account.email}`} checked={account.authorized} disabled={grantBusy || loading} onChange={e => changeGrant(account.id, e.target.checked)} />
+                  </label>)}
+                </div>
+              </details>
+            </div>
             {/* Enforce SSO */}
             <div className="flex items-center justify-between p-3.5 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900/60">
               <div>
@@ -278,7 +325,7 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
                   <Badge variant="outline" className="text-[9px] h-4 px-1 ml-1 bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900">ENTERPRISE</Badge>
                 </div>
                 <p className="text-[11px] text-neutral-500 mt-1">
-                  When enabled, password-based login is completely disabled for this workspace. All users must authenticate via Google or Microsoft SSO.
+                  When enabled, password-based login is completely disabled for this workspace. Members sign in via Google or Microsoft. Separately authorized developer access follows its own setting.
                 </p>
               </div>
               <Switch
@@ -492,7 +539,7 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
             </div>
 
             {/* Simulated Password Fields */}
-            {allowPasswordLogin ? (
+            {showPassword ? (
               <div className="space-y-2">
                 <div className="space-y-1">
                   <div className="h-2 w-14 bg-slate-200 dark:bg-slate-700 rounded" />
@@ -510,18 +557,12 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
                   Sign In to Workspace
                 </div>
               </div>
-            ) : (
-              <div className="p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 rounded-lg text-center space-y-1">
-                <ShieldCheck className="h-4 w-4 text-emerald-600 mx-auto" />
-                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Single Sign-On Enforced</p>
-                <p className="text-[10px] text-slate-500 leading-snug">Password login is disabled. Sign in via your corporate identity provider below.</p>
-              </div>
-            )}
+            ) : null}
 
             {/* Simulated Social SSO buttons */}
             {(allowMicrosoftSso || allowGoogleSso) && (
               <div className="space-y-2 pt-1">
-                {allowPasswordLogin && (
+                {showPassword && (
                   <div className="relative flex items-center justify-center my-1.5">
                     <div className="border-t border-slate-200 dark:border-slate-800 w-full" />
                     <span className="absolute bg-white dark:bg-slate-900 px-2 text-[9px] uppercase font-semibold text-slate-400">
@@ -555,6 +596,7 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
                 </div>
               </div>
             )}
+            <DeveloperAccess enabled={signInOptions({ allowPasswordLogin, enforceSsoOnly, allowDeveloperLogin, requireMfa }).developer} preview />
           </div>
 
           <p className="text-[10px] text-neutral-400 dark:text-neutral-500 text-center">

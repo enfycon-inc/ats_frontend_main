@@ -6,7 +6,7 @@ import EnfyconLogo from "@/components/shared/enfycon-logo";
 import LoginForm from "@/components/auth/login-form";
 import Social from "@/components/auth/social";
 import { Building2 } from "lucide-react";
-import { atsApi } from "@/lib/ats-api";
+import { useSignInPolicy } from "@/hooks/use-sign-in-policy";
 import { CompanyLogoImage } from "@/components/shared/company-logo-image";
 
 const MAIN_DOMAINS = [
@@ -38,7 +38,8 @@ function Copyright({ tenantBranding }: { tenantBranding?: any }) {
 const Login = () => {
   const [mounted, setMounted] = React.useState(false);
   const [isSubdomain, setIsSubdomain] = React.useState(false);
-  const [tenantBranding, setTenantBranding] = React.useState<any>(null);
+  const { data: tenantPolicy } = useSignInPolicy();
+  const tenantBranding = isSubdomain ? tenantPolicy : null;
 
   React.useEffect(() => {
     setMounted(true);
@@ -47,22 +48,10 @@ const Login = () => {
       const isSub = checkIsSubdomain(hostname);
       setIsSubdomain(isSub);
       
-      if (isSub) {
-        atsApi.auth.getTenantAuthPolicy(hostname).then(policy => {
-          if (policy?.siteTitle || policy?.logoUrl) {
-            setTenantBranding({
-              name: policy.name,
-              siteTitle: policy.siteTitle,
-              logoUrl: policy.logoUrl,
-            });
-            if (policy.siteTitle) {
-              document.title = policy.siteTitle;
-            }
-          }
-        }).catch(() => {});
-      }
+
     }
   }, []);
+  React.useEffect(() => { if (tenantBranding?.siteTitle) document.title = tenantBranding.siteTitle; }, [tenantBranding?.siteTitle]);
   return (
     <div className="min-h-screen w-full bg-[#F8FAFC] text-slate-900 flex flex-col justify-between font-sans relative overflow-x-hidden">
       
@@ -127,10 +116,10 @@ const Login = () => {
               {/* Form Title & Subtitle */}
               <div className="text-center space-y-1.5">
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-                  Welcome Back
+                  Sign in to {tenantBranding?.name || "Enfycon ATS"}
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Sign in to your Enfycon ATS workspace
+                  Use your work account to continue.
                 </p>
               </div>
 

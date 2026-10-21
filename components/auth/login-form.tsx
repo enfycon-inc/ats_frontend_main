@@ -9,12 +9,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
-import { Loader2, Eye, EyeOff, Mail, Lock, ArrowRight, ShieldCheck } from "lucide-react";
+import { Loader2, Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
 import { signIn, signOut } from "next-auth/react";
 import { atsApi } from "@/lib/ats-api";
 import { ssoErrorMessage } from "@/lib/sso-error";
 import toast from "react-hot-toast";
 import { getCurrentSubdomain, getBaseDomain, getTenantIdentifier } from "@/utils/subdomain-helper";
+import { useSignInPolicy } from "@/hooks/use-sign-in-policy";
+import { signInOptions } from "@/lib/sign-in-policy";
+import { DeveloperAccess } from "./developer-access";
 import Social from "./social";
 import { safeLoginCallback } from "@/lib/safe-login-callback";
 import { useSearchParams } from "next/navigation";
@@ -35,7 +38,7 @@ const LoginForm = () => {
 
   const [isAuthorizingSso, setIsAuthorizingSso] = useState(false);
   const [authPolicyStatus, setAuthPolicyStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [authPolicyRetry, setAuthPolicyRetry] = useState(0);
+  const { data: loadedPolicy, error: policyError, mutate: reloadPolicy } = useSignInPolicy();
   const [authPolicy, setAuthPolicy] = useState<{
     allowPasswordLogin: boolean;
     allowMicrosoftSso: boolean;
@@ -43,11 +46,15 @@ const LoginForm = () => {
     microsoftTenantId?: string;
     microsoftClientId?: string;
     tenantId?: string;
+    requireMfa: boolean;
+    allowDeveloperLogin: boolean;
     enforceSsoOnly: boolean;
   }>({
     allowPasswordLogin: true,
     allowMicrosoftSso: true,
     allowGoogleSso: true,
+    requireMfa: false,
+    allowDeveloperLogin: false,
     enforceSsoOnly: false,
   });
 
@@ -71,32 +78,26 @@ const LoginForm = () => {
 
   React.useEffect(() => {
     setIsMounted(true);
-    let active = true;
-    setAuthPolicyStatus("loading");
-    atsApi.auth.getTenantAuthPolicy().then((policy) => {
-      if (!active) return;
-      const tenantId = typeof policy?.tenantId === "string" ? policy.tenantId.trim() : "";
-      if (!tenantId) throw new Error("Workspace sign-in policy is incomplete.");
-      setAuthPolicy({
-        allowPasswordLogin: policy.allowPasswordLogin ?? true,
-          allowMicrosoftSso: policy.allowMicrosoftSso === true,
-          allowGoogleSso: policy.allowGoogleSso ?? true,
-          microsoftTenantId: typeof policy.microsoftTenantId === "string" ? policy.microsoftTenantId.trim() : "",
-          microsoftClientId: typeof policy.microsoftClientId === "string" ? policy.microsoftClientId.trim() : "",
-          enforceSsoOnly: policy.enforceSsoOnly ?? false,
-        tenantId,
-      });
-      setAuthPolicyStatus("ready");
-    }).catch(() => {
-      if (active) setAuthPolicyStatus("error");
+    if (policyError) { setAuthPolicyStatus("error"); return; }
+    if (!loadedPolicy) { setAuthPolicyStatus("loading"); return; }
+    const policy = loadedPolicy;
+    if (!policy.tenantId) { setAuthPolicyStatus("error"); return; }
+    setAuthPolicy({
+      allowPasswordLogin: policy.allowPasswordLogin === true,
+      allowMicrosoftSso: policy.allowMicrosoftSso === true,
+      allowGoogleSso: policy.allowGoogleSso === true,
+      requireMfa: policy.requireMfa === true,
+      allowDeveloperLogin: policy.allowDeveloperLogin === true,
+      microsoftTenantId: policy.microsoftTenantId || '', microsoftClientId: policy.microsoftClientId || '',
+      enforceSsoOnly: policy.enforceSsoOnly === true, tenantId: policy.tenantId,
     });
-    return () => { active = false; };
-  }, [authPolicyRetry]);
+    setAuthPolicyStatus("ready");
+  }, [loadedPolicy, policyError]);
 
   React.useEffect(() => {
     const isExpired = searchParams.get("expired");
     if (isExpired === "true") {
-      toast.error("We couldn’t verify your sign-in. Please sign in again to continue.", {
+      toast.error("We couldnâ€™t verify your sign-in. Please sign in again to continue.", {
         id: "session-expired",
         duration: 5000,
       });
@@ -182,7 +183,7 @@ const LoginForm = () => {
    *
    * signIn({ redirect: false }) resolves as soon as the server sends Set-Cookie,
    * but the browser may not have persisted the cookie before window.location.href
-   * fires — causing the dashboard layout's server-side auth() to see no session
+   * fires â€” causing the dashboard layout's server-side auth() to see no session
    * and redirect straight back to /auth/login.
    *
    * We poll /api/auth/session (same origin) for up to ~3 s to confirm the cookie
@@ -216,21 +217,21 @@ const LoginForm = () => {
           }
         }
       } catch {
-        // network hiccup — keep trying
+        // network hiccup â€” keep trying
       }
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     }
-    // Session didn't appear within timeout — navigate anyway (best-effort)
+    // Session didn't appear within timeout â€” navigate anyway (best-effort)
     navigateToDashboard(destination);
   };
 
-  const onSubmit = (data: z.infer<typeof schema>) => {
+  const onSubmit = (data: z.infer<typeof schema>, developer = false) => {
     startTransition(async () => {
       try {
         // 1. Authenticate with the backend and request the selected session policy.
         let syncRes;
         try {
-          syncRes = await atsApi.auth.login(data.email, data.password);
+          syncRes = await atsApi.auth.login(data.email, data.password, false, developer);
         } catch (apiErr: any) {
           toast.error(apiErr.message || "Backend authentication failed.");
           return;
@@ -302,7 +303,7 @@ const LoginForm = () => {
           </div>
         </div>
         <div className="text-center space-y-1.5 px-8 max-w-xs">
-          <p className="text-base font-semibold text-slate-800 dark:text-slate-100">Signing in to workspace…</p>
+          <p className="text-base font-semibold text-slate-800 dark:text-slate-100">Signing in to workspaceâ€¦</p>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {isAuthorizingSso || isNavigating ? "Taking you directly to your dashboard." : "Verifying your credentials, please wait."}
           </p>
@@ -316,7 +317,7 @@ const LoginForm = () => {
     );
   }
 
-  const showPassword = !authPolicy.enforceSsoOnly && authPolicy.allowPasswordLogin;
+  const showPassword = signInOptions(authPolicy).password;
   const showGoogle = authPolicy.allowGoogleSso;
   const showMicrosoft = authPolicy.allowMicrosoftSso;
   const microsoftTenantConfigured = !!authPolicy.microsoftTenantId &&
@@ -345,43 +346,30 @@ const LoginForm = () => {
       {authPolicyStatus === "error" && (
         <p role="alert" className="text-xs text-red-600">
           Unable to load workspace sign-in options.{' '}
-          <button type="button" onClick={() => setAuthPolicyRetry(attempt => attempt + 1)} className="font-semibold underline cursor-pointer">
+          <button type="button" onClick={() => void reloadPolicy()} className="font-semibold underline cursor-pointer">
             Retry
           </button>
         </p>
       )}
       {authPolicyStatus === "ready" && showMicrosoft && !microsoftConfigured && (
         <p role="alert" className="text-xs text-amber-700">
-          Microsoft sign-in is not configured. An administrator must enter the Microsoft Entra Directory (Tenant) ID in workspace settings.
+          Microsoft sign-in is not configured. Contact your workspace administrator for help.
         </p>
       )}
     </div>
   );
 
-  if (!showPassword && hasSocial) {
-    return (
-      <div className="space-y-4 text-left">
-        <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200/80 dark:bg-indigo-950/20 dark:border-indigo-900/40 text-center space-y-2">
-          <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center mx-auto text-indigo-600 dark:text-indigo-400">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div className="space-y-0.5">
-            <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Single Sign-On (SSO) Enforced</p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-              Password login is disabled by your workspace administrator. Please authenticate using your authorized identity provider.
-            </p>
-          </div>
-        </div>
-
-        <div className="pt-2">
-          {socialLogin}
-        </div>
-      </div>
-    );
-  }
+  const developerAccess = <DeveloperAccess enabled={authPolicyStatus === "ready" && signInOptions(authPolicy).developer && !isGlobalPortal} onSignIn={data => onSubmit(data, true)} />;
+  if (authPolicyStatus !== "ready") return <div className="space-y-3 text-sm text-slate-500" role="status">
+    {authPolicyStatus === "loading" ? "Loading sign-in options…" : <>Unable to load sign-in options. <button type="button" className="underline" onClick={() => void reloadPolicy()}>Retry</button></>}
+  </div>;
+  if (!showPassword) return <div className="space-y-5 text-left">
+    {hasSocial ? socialLogin : <p className="text-sm text-slate-500">Sign-in is currently unavailable. Contact your workspace administrator.</p>}
+    {developerAccess}
+  </div>;
 
   return (
-    <form ref={formRef} method="POST" onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
+    <div className="space-y-5"><form ref={formRef} method="POST" onSubmit={handleSubmit(data => onSubmit(data))} className="space-y-4 text-left">
       
       {/* Email Field */}
       <div className="space-y-1.5">
@@ -423,7 +411,7 @@ const LoginForm = () => {
             type={passwordType}
             id="password"
             name="password"
-            placeholder="••••••••"
+            placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
             className={cn(
               "pl-10 pr-11 h-11 text-sm bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all rounded-lg",
               { "border-red-500 focus-visible:ring-red-500/20": errors.password }
@@ -492,7 +480,7 @@ const LoginForm = () => {
         </div>
       )}
 
-    </form>
+    </form>{developerAccess}</div>
   );
 };
 

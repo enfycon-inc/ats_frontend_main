@@ -1,3 +1,4 @@
+import type { SignInPolicy, SignInPolicyUpdate } from "./sign-in-policy";
 import type { TenantEmailSettings, EmailDispatchMode, EmailDispatchResult } from './system-email.types';
 import type { UserCity } from './user-city-contract';
 import type { RoleRequestDecision, RoleRequestReview, RoleRequestSubmission } from './role-request-contract';
@@ -398,7 +399,7 @@ async function apiFetch<T = any>(
 
 // ─── Auth API ───────────────────────────────────────────────────────
 const auth = {
-  async login(email: string, password: string, rememberMe = false) {
+  async login(email: string, password: string, rememberMe = false, developer = false) {
     const subdomain = getTenantIdentifier();
     const data = await apiFetch<{
       accessToken: string;
@@ -413,7 +414,7 @@ const auth = {
         tenantId: string;
         tenantDomain: string;
       };
-    }>('/api/auth/login', {
+    }>(developer ? '/api/auth/developer-login' : '/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password, subdomain, rememberMe }),
     });
@@ -884,17 +885,23 @@ const auth = {
     });
   },
 
-  async getTenantAuthPolicy(subdomain?: string): Promise<any> {
+  async developerAccounts(search = ''): Promise<Array<{ id: string; email: string; fullName: string; authorized: boolean }>> {
+    return apiFetch(`/api/auth/developer-access/accounts?search=${encodeURIComponent(search)}`);
+  },
+  async setDeveloperGrant(id: string, authorized: boolean) {
+    return apiFetch(`/api/auth/developer-access/accounts/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ authorized }) });
+  },
+  async getTenantAuthPolicy(subdomain?: string): Promise<SignInPolicy> {
       const sub = subdomain || getTenantIdentifier();
       const query = sub ? `?subdomain=${encodeURIComponent(sub)}` : '';
-      return apiFetch<any>(`/api/auth/tenant-auth-policy${query}`);
+      return apiFetch<SignInPolicy>(`/api/auth/tenant-auth-policy${query}`);
     },
     async checkEmailAvailability(email: string): Promise<any> {
       return apiFetch<any>(`/api/auth/check-email?email=${encodeURIComponent(email)}`);
     },
 
-  async updateTenantAuthPolicy(policy: any): Promise<any> {
-    return apiFetch<any>('/api/auth/tenant-auth-policy', {
+  async updateTenantAuthPolicy(policy: SignInPolicyUpdate): Promise<SignInPolicy> {
+    return apiFetch<SignInPolicy>('/api/auth/tenant-auth-policy', {
       method: 'PATCH',
       body: JSON.stringify(policy),
     });
