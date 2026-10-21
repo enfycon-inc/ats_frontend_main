@@ -287,10 +287,16 @@ async function apiFetch<T = any>(
   options: RequestInit = {},
   isRetry = false,
 ): Promise<T> {
-  const isPublicAuthPolicy = path.split('?')[0] === '/api/auth/tenant-auth-policy' &&
-    (options.method || 'GET').toUpperCase() === 'GET';
-  let token = isPublicAuthPolicy ? null : getToken();
-  if (!isPublicAuthPolicy && !token && typeof window !== 'undefined' && !path.includes('/api/auth/login') && !path.includes('/api/auth/register')) {
+  const pathname = path.split('?')[0];
+  const method = (options.method || 'GET').toUpperCase();
+  const isPublicAuthPolicy = pathname === '/api/auth/tenant-auth-policy' && method === 'GET';
+  const isCredentialLogin = method === 'POST' &&
+    (pathname === '/api/auth/login' || pathname === '/api/auth/developer-login');
+  // Credential login establishes a new session. Existing tokens and renewal
+  // failures must not affect its request or replace authentication errors.
+  const skipsSessionRecovery = isPublicAuthPolicy || isCredentialLogin;
+  let token = skipsSessionRecovery ? null : getToken();
+  if (!skipsSessionRecovery && !token && typeof window !== 'undefined' && !path.includes('/api/auth/register')) {
     token = await getOrFetchToken();
   }
   const activeBranchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
@@ -356,7 +362,7 @@ async function apiFetch<T = any>(
     const isExpired = res.status === 401 || (body.message && body.message.toLowerCase().includes('expired'));
 
     // Attempt automatic token refresh / session recovery if token expired and retry once
-    if (isExpired && !isRetry && !isPublicAuthPolicy) {
+    if (isExpired && !isRetry && !skipsSessionRecovery) {
       if (getRefreshToken()) {
         const refreshed = await tryAutoRefresh();
         if (refreshed) return apiFetch<T>(path, options, true);
@@ -373,7 +379,7 @@ async function apiFetch<T = any>(
     }
 
     // If request failed with 401 Unauthorized after all refresh attempts:
-    if (res.status === 401 && !isPublicAuthPolicy && typeof window !== 'undefined' && !path.includes('/api/auth/login') && !path.includes('/api/auth/session')) {
+    if (res.status === 401 && !skipsSessionRecovery && typeof window !== 'undefined' && pathname !== '/api/auth/session') {
       clearToken();
       if (!window.location.pathname.startsWith('/auth/')) {
         window.location.href = '/auth/login?expired=true';
