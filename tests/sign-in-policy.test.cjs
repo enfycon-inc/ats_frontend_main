@@ -30,6 +30,9 @@ test('developer disclosure is absent by default and collapsed when enabled', () 
   assert.doesNotMatch(markup, /<details[^>]* open/);
   assert.match(markup, /Developer access/);
   assert.match(markup, /type="password"/);
+  assert.match(markup, /w-full[^"]*justify-center/);
+  assert.doesNotMatch(markup, /⌄|rotate-180|chevron/i);
+  assert.match(markup, /list-none/);
 });
 test('frontend policy contract matches the backend canonical source', {skip:!fs.existsSync(path.join(__dirname,'../../ats_backend/src/auth/sign-in-policy.ts'))}, () => {
   const read = p => fs.readFileSync(p,'utf8').replace(/\r\n/g,'\n');

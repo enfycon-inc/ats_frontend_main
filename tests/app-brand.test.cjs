@@ -24,12 +24,14 @@ test('shared footer uses global attribution and links the configured company web
   assert.match(markup,/href="https:\/\/enfycon.com\/"/);
   assert.match(markup,/rel="noopener noreferrer"/);
 });
-test('login layout uses the shared brand and footer with responsive marketing panel',()=>{
+test('login layout spans the viewport and uses configured product attribution',()=>{
   const result={};
   const imports={
     react:{...React,useEffect:()=>{},useState:()=>[true,()=>{}]},
     'react/jsx-runtime':require('react/jsx-runtime'),
     'next/link':{default:props=>React.createElement('a',props),__esModule:true},
+    'next/image':{default:({priority,...props})=>React.createElement('img',props),__esModule:true},
+    './login-page.module.css':{default:{page:'auth-page',title:'auth-title'},__esModule:true},
     'lucide-react':new Proxy({},{get:()=>()=>React.createElement('svg')}),
     '@/components/auth/login-form':{default:()=>React.createElement('button',null,'Continue with Microsoft'),__esModule:true},
     '@/components/shared/enfycon-logo':{default:()=>React.createElement('span',null,'Example ATS'),__esModule:true},
@@ -42,7 +44,9 @@ test('login layout uses the shared brand and footer with responsive marketing pa
   new Function('exports','require',source('components/auth/login-page-content.tsx'))(result,name=>imports[name]);
   const markup=renderToStaticMarkup(React.createElement(result.default));
   assert.match(markup,/Example ATS/);
-  assert.match(markup,/A workspace with a long company name/);
+  assert.match(markup,/\(Product of Enfycon India Pvt Ltd\)/);
+  assert.match(markup,/assets\/images\/auth\/auth-img.png/);
+  assert.doesNotMatch(markup,/max-w-\[1120px\]|bg-\[#163b70\]/);
   assert.match(markup,/Company footer/);
   assert.match(markup,/hidden.*lg:flex/);
   assert.match(markup,/h-dvh overflow-y-auto/);

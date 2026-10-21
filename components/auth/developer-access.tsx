@@ -11,12 +11,14 @@ export function DeveloperAccess({enabled,preview=false,pending=false,error,onSig
   const errorId=useId();
   useEffect(()=>{if(error) setPassword('');},[error]);
   if(!enabled) return null;
-  return <details className="group/developer text-left">
-    <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm text-xs font-normal text-slate-500 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 [&::-webkit-details-marker]:hidden">
-      Developer access<span aria-hidden="true" className="text-[10px] transition-transform group-open/developer:rotate-180">⌄</span>
+  return <details className="text-left">
+    <summary className="flex min-h-11 w-full cursor-pointer list-none items-center justify-center gap-4 rounded-sm text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 [&::-webkit-details-marker]:hidden [&::marker]:content-none">
+      <span aria-hidden="true" className="h-px flex-1 bg-slate-200" />
+      <span>Developer access</span>
+      <span aria-hidden="true" className="h-px flex-1 bg-slate-200" />
     </summary>
-    <p className="mb-3 text-xs leading-relaxed text-slate-500">For accounts authorized by your workspace administrator.</p>
-    <form className="space-y-3" aria-busy={pending} onSubmit={event=>{event.preventDefault();if(!preview&&!pending) onSignIn?.({email,password});}}>
+    <p className="mt-2 px-4 text-center text-xs leading-relaxed text-slate-500 sm:px-5">For accounts authorized by your workspace administrator.</p>
+    <form className="space-y-3 rounded-2xl border border-transparent p-4 sm:p-5" aria-busy={pending} onSubmit={event=>{event.preventDefault();if(!preview&&!pending) onSignIn?.({email,password});}}>
       <label className="block text-xs font-medium">Developer email
         <Input className="mt-1" type="email" autoComplete="username" placeholder="name@company.com" required value={email} onChange={event=>setEmail(event.target.value)} disabled={preview||pending} aria-describedby={error?errorId:undefined} />
       </label>
