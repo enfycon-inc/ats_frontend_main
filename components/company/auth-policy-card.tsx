@@ -1,6 +1,6 @@
 "use client";
 
-import { signInOptions } from "@/lib/sign-in-policy";
+import { LOGIN_DESIGN_VARIANTS, signInOptions, type SignInPolicy } from "@/lib/sign-in-policy";
 import { DeveloperAccess } from "@/components/auth/developer-access";
 import useSWR from "swr";
 import React, { useEffect, useState } from "react";
@@ -69,6 +69,9 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
   const [microsoftClientId, setMicrosoftClientId] = useState("");
   const [microsoftClientSecret, setMicrosoftClientSecret] = useState("");
   const [microsoftRedirectUri, setMicrosoftRedirectUri] = useState("");
+  const [loginDesignVariant, setLoginDesignVariant] = useState<SignInPolicy['loginDesignVariant']>('balanced-split');
+  const [savedLoginDesignVariant, setSavedLoginDesignVariant] = useState<SignInPolicy['loginDesignVariant']>('balanced-split');
+  const [savingLoginDesign, setSavingLoginDesign] = useState(false);
 
   // Domain input scratch state
   const [domainInput, setDomainInput] = useState("");
@@ -79,6 +82,8 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
       const res = await atsApi.auth.getTenantAuthPolicy(subdomain);
       if (res) {
         setAllowPasswordLogin(res.allowPasswordLogin ?? true);
+        setLoginDesignVariant(res.loginDesignVariant || 'balanced-split');
+        setSavedLoginDesignVariant(res.loginDesignVariant || 'balanced-split');
         setAllowMicrosoftSso(res.allowMicrosoftSso ?? true);
         setAllowGoogleSso(res.allowGoogleSso ?? true);
         setRequireMfa(res.requireMfa === true);
@@ -211,6 +216,17 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
     }
   };
 
+  const saveLoginDesign = async () => {
+    setSavingLoginDesign(true);
+    try {
+      const result = await atsApi.auth.updateTenantLoginDesign(loginDesignVariant);
+      setSavedLoginDesignVariant(result.loginDesignVariant);
+      toast.success('Sign-in page design saved.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Unable to save sign-in page design.');
+    } finally { setSavingLoginDesign(false); }
+  };
+
   const showPassword = signInOptions({ allowPasswordLogin, enforceSsoOnly, allowDeveloperLogin }).password;
   const enabledCount = (allowPasswordLogin ? 1 : 0) + (allowMicrosoftSso ? 1 : 0) + (allowGoogleSso ? 1 : 0);
 
@@ -225,6 +241,38 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative">
       {/* Left Column (7 cols): Divided into distinct Cards for clarity */}
       <div className="lg:col-span-7 space-y-6">
+
+        <Card className="border border-neutral-200 shadow-sm dark:border-slate-800 dark:bg-slate-900/40">
+          <CardHeader className="pb-3 border-b border-neutral-150 dark:border-slate-800/60">
+            <CardTitle className="text-sm font-bold text-neutral-800 dark:text-neutral-100">Sign-in page design</CardTitle>
+            <CardDescription className="text-xs">Choose how your workspace sign-in page looks. This does not change who can sign in.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" role="radiogroup" aria-label="Sign-in page design">
+              {LOGIN_DESIGN_VARIANTS.map((variant, index) => {
+                const labels = ['Balanced split', 'Compact focus', 'Editorial', 'Bottom anchored', 'Workspace banner'];
+                const descriptions = ['Product illustration beside sign-in', 'Centered sign-in card', 'Story-led content with a focused form', 'Recruitment visual above the sign-in panel', 'Workspace identity in a top banner'];
+                const selected = loginDesignVariant === variant;
+                return <button key={variant} type="button" role="radio" aria-checked={selected} onClick={() => setLoginDesignVariant(variant)} className={`group rounded-lg border p-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${selected ? 'border-blue-600 bg-blue-50/70 ring-1 ring-blue-500 dark:bg-blue-950/30' : 'border-slate-200 hover:border-blue-300 dark:border-slate-700'}`}>
+                  <div className={`relative mb-2 flex h-[90px] overflow-hidden rounded-md border bg-white p-2 ${index === 1 ? 'items-center justify-center' : index === 3 ? 'items-end justify-center' : index === 4 ? 'flex-col' : 'items-center gap-2'} border-slate-200`} aria-hidden="true">
+                    {index === 4 && <div className="h-3 w-full rounded-sm bg-blue-100" />}
+                    {index !== 1 && index !== 3 && <div className={`h-full rounded-sm bg-gradient-to-br from-blue-50 to-blue-100 ${index === 2 ? 'w-2/5' : 'w-1/2'}`}><div className="m-2 h-3 rounded bg-blue-300/70"/><div className="mx-2 mt-1 h-2 rounded bg-white/90"/><div className="mx-2 mt-1 h-2 w-3/4 rounded bg-white/90"/></div>}
+                    <div className={`${index === 1 ? 'w-3/5' : index === 3 ? 'absolute bottom-2 w-4/5' : index === 4 ? 'mt-1 h-3/4 w-full' : 'w-1/2'} rounded border border-slate-200 bg-white p-2 shadow-sm`}><div className="mx-auto mb-2 h-1.5 w-1/2 rounded bg-slate-300"/><div className="mb-1 h-2 rounded border border-slate-200"/><div className="h-3 rounded bg-blue-600"/></div>
+                    {selected && <span className="absolute right-1 top-1 rounded bg-blue-600 px-1.5 py-0.5 text-[9px] font-semibold text-white">Selected</span>}
+                  </div>
+                  <span className="block text-xs font-semibold text-slate-800 dark:text-slate-100">{labels[index]}</span>
+                  <span className="mt-0.5 block text-[10px] leading-snug text-slate-500">{descriptions[index]}</span>
+                </button>;
+              })}
+            </div>
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+              <p className="text-[11px] text-slate-500">Applies to everyone signing in to this workspace.</p>
+              <Button type="button" size="sm" disabled={savingLoginDesign || loading || loginDesignVariant === savedLoginDesignVariant} onClick={saveLoginDesign} className="shrink-0 text-xs">
+                <Save className="mr-1.5 h-3.5 w-3.5" />{savingLoginDesign ? 'Saving…' : 'Save design'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
         
         {/* Card 1: Basic Authentication Methods */}
         <Card className="border border-neutral-200 shadow-sm dark:border-slate-800 dark:bg-slate-900/40">
@@ -529,6 +577,15 @@ export function AuthPolicyCard({ tenantId, subdomain, companyName }: AuthPolicyC
             <span className="text-[10px] font-mono text-primary font-semibold truncate max-w-[180px]" title={subdomain ? `${subdomain}.enfyjobs.com/auth/login` : "enfyjobs.com/auth/login"}>
               {subdomain ? `${subdomain}.enfyjobs.com` : "enfyjobs.com"}
             </span>
+          </div>
+
+          <div className="relative h-[150px] overflow-hidden rounded-lg border border-slate-200 bg-white p-2" aria-label={`Preview of ${loginDesignVariant} sign-in layout`}>
+            <span className="absolute right-2 top-2 z-10 rounded bg-slate-100 px-2 py-1 text-[9px] font-medium capitalize text-slate-500">{loginDesignVariant.replaceAll('-', ' ')}</span>
+            {loginDesignVariant === 'balanced-split' && <div className="grid h-full grid-cols-2 gap-2"><div className="rounded bg-gradient-to-br from-blue-50 to-blue-100 p-2"><div className="h-2 w-2/3 rounded bg-blue-300"/><div className="mt-3 grid grid-cols-3 gap-1">{Array.from({ length: 9 }, (_, i) => <div key={i} className="h-5 rounded-sm border border-white bg-white/80" />)}</div><div className="ml-auto mt-2 h-5 w-1/2 rounded border border-blue-100 bg-white shadow-sm"/></div><div className="flex flex-col items-center justify-center rounded bg-slate-50"><div className="mb-2 h-2 w-1/2 rounded bg-slate-300"/><div className="h-5 w-3/4 rounded border border-slate-200 bg-white"/><div className="mt-2 h-5 w-3/4 rounded bg-blue-600"/></div></div>}
+            {loginDesignVariant === 'compact-focus' && <div className="flex h-full items-center justify-center bg-slate-50"><div className="w-1/2 rounded-md border border-slate-200 bg-white p-3 shadow-sm"><div className="mx-auto mb-2 h-2 w-1/2 rounded bg-slate-300"/><div className="h-5 rounded border border-slate-200"/><div className="mt-2 h-5 rounded bg-blue-600"/></div></div>}
+            {loginDesignVariant === 'editorial' && <div className="grid h-full grid-cols-[1.2fr_.8fr] items-center gap-2"><div><div className="h-3 w-3/4 rounded bg-slate-700"/><div className="mt-2 h-2 w-1/2 rounded bg-slate-300"/><div className="mt-3 h-12 rounded bg-gradient-to-br from-blue-50 to-blue-100"/></div><div className="rounded border border-slate-200 p-2"><div className="mx-auto mb-2 h-2 w-1/2 rounded bg-slate-300"/><div className="h-4 rounded border border-slate-200"/><div className="mt-2 h-4 rounded bg-blue-600"/></div></div>}
+            {loginDesignVariant === 'bottom-anchored' && <div className="flex h-full flex-col justify-between rounded bg-gradient-to-b from-blue-50 to-white p-2"><div className="h-12 rounded bg-blue-100"><div className="ml-2 mt-2 h-2 w-1/3 rounded bg-blue-300"/></div><div className="mx-auto w-3/5 rounded border border-slate-200 bg-white p-2 shadow-sm"><div className="h-4 rounded border border-slate-200"/><div className="mt-1 h-4 rounded bg-blue-600"/></div></div>}
+            {loginDesignVariant === 'workspace-banner' && <div className="flex h-full flex-col"><div className="flex h-7 items-center gap-2 border-b border-slate-200"><span className="h-3 w-3 rounded-sm bg-blue-600"/><span className="h-2 w-1/3 rounded bg-slate-300"/></div><div className="flex flex-1 items-center justify-center bg-slate-50"><div className="w-1/2 rounded border border-slate-200 bg-white p-2"><div className="mx-auto mb-1 h-2 w-1/2 rounded bg-slate-300"/><div className="h-4 rounded border border-slate-200"/><div className="mt-1 h-4 rounded bg-blue-600"/></div></div></div>}
           </div>
 
           {/* Login Card Preview */}

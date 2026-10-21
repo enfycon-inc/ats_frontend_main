@@ -912,6 +912,11 @@ const auth = {
       body: JSON.stringify(policy),
     });
   },
+  async updateTenantLoginDesign(loginDesignVariant: SignInPolicy['loginDesignVariant']) {
+    return apiFetch<{ loginDesignVariant: SignInPolicy['loginDesignVariant'] }>('/api/auth/tenant-login-design', {
+      method: 'PATCH', body: JSON.stringify({ loginDesignVariant }),
+    });
+  },
 
   async verifyMyDomain(domainName: string): Promise<any> {
     return apiFetch<any>('/api/auth/tenants/my-domains/verify', {
