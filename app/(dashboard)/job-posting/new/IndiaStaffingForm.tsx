@@ -1301,7 +1301,7 @@ const getInitialActiveBranchContext = () => {
       const hasDirectPublish = currentUserProfile?.permissions?.some((permission: string) => ["job:publish_direct", "tenant:settings", "tenant:manage"].includes(permission));
       const hasDesignatedReviewer = Boolean(currentUserProfile?.jobReviewerId || currentUserProfile?.jobReviewerName || currentUserProfile?.job_reviewer_id);
 
-      const shouldRequireApproval = !hasDirectPublish;
+      const shouldRequireApproval = Boolean(onBehalfOfUserId) || !hasDirectPublish;
       const initialApprovalStatus = shouldRequireApproval ? "PENDING_APPROVAL" : "APPROVED";
       const initialJobStatus = shouldRequireApproval ? "Pending Approval" : (data.jobStatus || "Active");
       const finalApproverId = hasDesignatedReviewer ? (currentUserProfile?.jobReviewerId || currentUserProfile?.job_reviewer_id || resolvedApproverId) : resolvedApproverId;
@@ -1825,7 +1825,7 @@ const getInitialActiveBranchContext = () => {
               {(() => {
                 const hasDirectPublish = currentUserProfile?.permissions?.includes("job:publish_direct") || 
                   currentUserProfile?.roles?.some((r: string) => ["TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
-                const requiresApproval = !hasDirectPublish;
+                const requiresApproval = Boolean(onBehalfOfUserId) || !hasDirectPublish;
 
                 return (
                   <Button
@@ -3388,7 +3388,7 @@ const getInitialActiveBranchContext = () => {
                 {(() => {
                   const hasDirectPublish = currentUserProfile?.permissions?.includes("job:publish_direct") || 
                     currentUserProfile?.roles?.some((r: string) => ["TENANT_ADMIN", "SUPER_ADMIN", "BRANCH_ADMIN"].includes(r.toUpperCase().replace(/[\s-_]+/g, "")));
-                  const requiresApproval = !hasDirectPublish;
+                  const requiresApproval = Boolean(onBehalfOfUserId) || !hasDirectPublish;
 
                   return (
                     <Button

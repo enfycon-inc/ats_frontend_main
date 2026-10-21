@@ -357,11 +357,6 @@ export function JobTableRow({
                     For {job.accountManagerName}
                   </span>
                 )}
-                {((job as any).creatorEmail || (job as any).creator_email) && (
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[160px]">
-                    {(job as any).creatorEmail || (job as any).creator_email}
-                  </span>
-                )}
               </div>
             ) : colId === "businessUnit" ? (
               <div className="flex flex-col leading-tight py-0.5 min-w-[120px]">

@@ -1194,6 +1194,9 @@ const jobs = {
   async grantJobCreation(payload: { accountManagerId: string; delegateUserId: string; expiresAt?: string | null; maxJobs?: number | null }): Promise<any> {
     return apiFetch('/api/jobs/creation-access/grants', { method: 'POST', body: JSON.stringify(payload) });
   },
+  async updateJobCreationGrant(grantId: string, payload: { expiresAt?: string | null; maxJobs?: number | null }): Promise<any> {
+    return apiFetch(`/api/jobs/creation-access/grants/${encodeURIComponent(grantId)}`, { method: 'PATCH', body: JSON.stringify(payload) });
+  },
   async revokeJobCreation(grantId: string): Promise<void> {
     return apiFetch(`/api/jobs/creation-access/grants/${encodeURIComponent(grantId)}`, { method: 'DELETE' });
   },
