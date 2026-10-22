@@ -9,6 +9,60 @@ import { getApiBase } from '@/lib/ats-api';
 import { useSignInPolicy } from '@/hooks/use-sign-in-policy';
 import styles from './login-page.module.css';
 
+function SkeletonBlock({ className = '' }: { className?: string }) {
+  return <div aria-hidden="true" className={`animate-pulse motion-reduce:animate-none rounded-md bg-slate-200/80 ${className}`} />;
+}
+
+function LoginFormSkeleton() {
+  return <div className="mx-auto w-full max-w-[460px] space-y-5 py-8" role="status" aria-busy="true" aria-label="Loading sign-in form">
+    <span className="sr-only">Loading sign-in form…</span>
+    <div className="space-y-3 text-center"><SkeletonBlock className="mx-auto h-7 w-3/4" /><SkeletonBlock className="mx-auto h-4 w-2/3" /></div>
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <SkeletonBlock className="h-10 w-full rounded-lg" />
+      <SkeletonBlock className="h-11 w-full rounded-lg bg-blue-200/80" />
+      <SkeletonBlock className="mx-auto h-3 w-1/2" />
+      <SkeletonBlock className="h-10 w-full rounded-lg" />
+    </div>
+    <SkeletonBlock className="mx-auto h-3 w-3/4" />
+  </div>;
+}
+
+function LoginPageSkeleton({ error, onRetry }: { error?: boolean; onRetry?: () => void }) {
+  return <main className={`${styles.page} grid min-h-dvh w-full bg-white font-sans text-slate-900 lg:grid-cols-2`} role="status" aria-busy={!error} aria-label={error ? 'Workspace sign-in unavailable' : 'Loading workspace sign-in page'}>
+    <span className="sr-only">{error ? 'Unable to load the workspace sign-in page.' : 'Loading the workspace sign-in page…'}</span>
+    <section className="relative hidden items-center justify-center p-8 lg:flex xl:p-12" aria-hidden="true">
+      <div className="w-full max-w-[780px]">
+        <div className="mb-8 space-y-3 px-4"><SkeletonBlock className="h-7 w-3/4" /><SkeletonBlock className="h-4 w-2/5" /></div>
+        <div className="relative rounded-[2rem] bg-blue-50 p-6">
+          <div className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
+            <SkeletonBlock className="h-8 w-full rounded-none bg-blue-100" />
+            <div className="grid grid-cols-[52px_1fr]">
+              <SkeletonBlock className="h-56 rounded-none bg-blue-700/70" />
+              <div className="p-4"><SkeletonBlock className="mb-4 h-5 w-1/3" /><div className="grid grid-cols-4 gap-2">{Array.from({ length: 12 }, (_, i) => <div key={i} className="rounded-lg bg-blue-50 p-2"><SkeletonBlock className="mb-2 h-3 w-2/3" /><SkeletonBlock className="h-10 w-full bg-white" /></div>)}</div></div>
+            </div>
+          </div>
+          <div className="absolute -bottom-5 left-10 w-40 rounded-xl border border-blue-100 bg-white p-3 shadow-lg"><SkeletonBlock className="mb-2 h-4 w-3/4" /><SkeletonBlock className="h-12 w-full" /></div>
+          <div className="absolute -bottom-5 right-8 w-48 rounded-xl border border-blue-100 bg-white p-3 shadow-lg"><SkeletonBlock className="mb-2 h-4 w-2/3" /><SkeletonBlock className="h-12 w-full" /></div>
+        </div>
+      </div>
+    </section>
+    <section className="flex min-h-dvh flex-col justify-center px-5 py-8 sm:px-10 lg:px-12" aria-hidden={!error || undefined}>
+      <div className="mx-auto w-full max-w-[460px]">
+        <div className="mb-10 flex flex-col items-center gap-3"><SkeletonBlock className="h-12 w-12 rounded-xl" /><SkeletonBlock className="h-4 w-36" /><SkeletonBlock className="h-3 w-20" /></div>
+        <div className="space-y-6">
+          <div className="space-y-3 text-center"><SkeletonBlock className="mx-auto h-7 w-4/5" /><SkeletonBlock className="mx-auto h-4 w-3/5" /></div>
+          <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><SkeletonBlock className="h-11 w-full rounded-lg" /><SkeletonBlock className="h-11 w-full rounded-lg bg-blue-200/80" /></div>
+          <SkeletonBlock className="mx-auto h-3 w-4/5" />
+          <div className="flex items-center gap-3"><SkeletonBlock className="h-px flex-1 rounded-none" /><SkeletonBlock className="h-3 w-24" /><SkeletonBlock className="h-px flex-1 rounded-none" /></div>
+          <SkeletonBlock className="mx-auto h-3 w-28" />
+          <div className="space-y-2 pt-3"><SkeletonBlock className="mx-auto h-3 w-40" /><SkeletonBlock className="mx-auto h-3 w-48" /><SkeletonBlock className="mx-auto h-3 w-44" /></div>
+          {error && <div className="text-center" aria-hidden="false"><p className="text-sm text-slate-600">Unable to load your workspace sign-in page.</p><button type="button" onClick={onRetry} className="mt-2 text-sm font-medium text-blue-700 underline underline-offset-2">Try again</button></div>}
+        </div>
+      </div>
+    </section>
+  </main>;
+}
+
 export default function Login({ initialWorkspace }: { initialWorkspace: boolean }) {
   const [mounted, setMounted] = React.useState(false);
   const { data: policy, error: policyError, mutate: retryPolicy } = useSignInPolicy();
@@ -29,7 +83,7 @@ export default function Login({ initialWorkspace }: { initialWorkspace: boolean 
       <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">Workspace</p>
     </> : <a href={APP_BRAND.website} target="_blank" rel="noopener noreferrer" className="inline-block rounded-sm text-2xl font-bold tracking-tight text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">{APP_BRAND.name}</a>}
   </header>;
-  const loginForm = <React.Suspense fallback={<p className="my-auto py-10 text-center text-xs text-slate-500">Loading sign-in options…</p>}><LoginForm heading={<div className="mb-7 space-y-3 text-center">
+  const loginForm = <React.Suspense fallback={<LoginFormSkeleton />}><LoginForm heading={<div className="mb-7 space-y-3 text-center">
     <h1 className={styles.title}>{workspace ? 'Sign in to your workspace' : 'Sign in to your account'}</h1>
     <p className="text-sm leading-relaxed text-slate-500">Use your work account to continue.</p>
   </div>} afterForm={mounted && !workspace && <p className="mt-6 text-center text-xs text-slate-500">New to {APP_BRAND.name}?{' '}<Link href="/auth/register" className="font-medium text-blue-700 underline-offset-4 hover:underline">Register your company</Link></p>} footer={<footer className="space-y-1 text-[11px] leading-relaxed text-slate-500">
@@ -40,12 +94,7 @@ export default function Login({ initialWorkspace }: { initialWorkspace: boolean 
   const illustration = <RecruitmentIllustration />;
   const pageClass = `${styles.page} min-h-dvh overflow-y-auto bg-white font-sans text-slate-900`;
 
-  if (workspace && !policy) return <main className={`${pageClass} flex min-h-dvh items-center justify-center bg-slate-50 px-5`}>
-    <section className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm" role="status" aria-live="polite">
-      <div className="mx-auto mb-4 h-10 w-10 animate-pulse rounded-xl bg-blue-100" aria-hidden="true" />
-      {policyError ? <><p className="text-sm text-slate-600">Unable to load your workspace sign-in page.</p><button type="button" onClick={() => void retryPolicy()} className="mt-3 text-sm font-medium text-blue-700 underline underline-offset-2">Try again</button></> : <p className="text-sm text-slate-500">Loading your workspace sign-in…</p>}
-    </section>
-  </main>;
+  if (workspace && !policy) return <LoginPageSkeleton error={!!policyError} onRetry={() => void retryPolicy()} />;
 
   if (design === 'compact-focus') return <main className={`${pageClass} flex items-center justify-center bg-slate-50 px-4 py-8`}><section className="w-full max-w-[480px] rounded-2xl border border-slate-200 bg-white px-6 py-8 shadow-xl shadow-slate-200/60 sm:px-10"><div className="mb-8">{brandHeader}</div>{loginForm}</section></main>;
   if (design === 'editorial') return <main className={`${pageClass} grid lg:grid-cols-[1.05fr_.95fr]`}><section className="flex flex-col justify-center bg-slate-50 px-6 py-12 sm:px-12 lg:px-16"><div className="mx-auto w-full max-w-[700px]"><p className="mb-4 text-xs font-semibold uppercase tracking-[.18em] text-blue-700">{APP_BRAND.name}</p><h1 className="max-w-xl text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">From application to placement</h1><p className="mt-4 max-w-lg text-lg leading-relaxed text-slate-600">One workspace for your hiring team.</p><div className="mt-10">{illustration}</div></div></section><section className="flex flex-col justify-center px-5 py-8 sm:px-12 lg:px-16"><div className="mx-auto w-full max-w-[460px]">{brandHeader}{loginForm}</div></section></main>;
