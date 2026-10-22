@@ -497,8 +497,8 @@ const getInitialActiveBranchContext = () => {
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const assignmentPolicy = selectedUnitObj;
   const automaticPods = usesAutomaticPods(assignmentPolicy);
-  const canAssignRecruiters = !!currentUserProfile?.permissions?.includes("job:assign_recruiter") && !!currentUserProfile?.permissions?.includes("job:override_assignment");
-  const requiresAssignmentReason = canAssignRecruiters && !currentUserProfile?.permissions?.includes("job:assignment_reason_optional");
+  const canAssignRecruiters = !!currentUserProfile?.permissions?.includes("job:assign_recruiter") && (!editJobId || !!currentUserProfile?.permissions?.includes("job:override_assignment"));
+  const requiresAssignmentReason = !!editJobId && canAssignRecruiters && !currentUserProfile?.permissions?.includes("job:assignment_reason_optional");
   const canAssignPods = !!currentUserProfile?.permissions?.includes("job:assign_pod");
   const canAssignJob = canAssignRecruiters || canAssignPods;
   const assignmentRequired = assignmentPolicy?.allowUnassigned !== true;
