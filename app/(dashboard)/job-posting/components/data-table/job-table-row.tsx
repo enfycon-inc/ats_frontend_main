@@ -56,7 +56,7 @@ export interface JobTableRowProps {
   onContextMenu: (e: React.MouseEvent, jobId: string) => void;
   onOpenApproveModal: (job: Job) => void;
   onOpenRejectModal: (job: Job) => void;
-  onOpenAssignModal: (job: Job, tab?: "pods" | "users") => void;
+  onOpenAssignModal: (job: Job, mode?: "pods" | "users") => void;
   onOpenSourceModal: (job: Job) => void;
   onOpenDelegateModal: (job: Job) => void;
   onOpenStatusModal: (job: Job, status?: string) => void;

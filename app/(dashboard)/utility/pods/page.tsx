@@ -52,6 +52,40 @@ interface Pod {
 
 type ModalMode = "create" | "edit" | null;
 
+function PodRecruiters({ pod }: { pod: Pod }) {
+  const recruiters = podMembersWithoutLead(pod.members, pod.podHeadId || "");
+  const nameCounts = new Map<string, number>();
+  for (const member of recruiters) {
+    const name = member.fullName.trim().toLocaleLowerCase();
+    nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+  }
+
+  if (recruiters.length === 0) {
+    return <span className="text-xs text-neutral-500 dark:text-neutral-400">No recruiters assigned</span>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <ul aria-label={`Recruiters in ${pod.name}`} className="flex flex-wrap gap-2">
+        {recruiters.map((member) => (
+          <li key={member.id} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs font-medium text-neutral-800 dark:border-slate-700 dark:bg-slate-800 dark:text-neutral-200">
+            <UserAvatar user={member} className="h-5 w-5" />
+            <div className="min-w-0 [overflow-wrap:anywhere]">
+              <div>{member.fullName.trim() || member.email || "Name unavailable"}</div>
+              {(nameCounts.get(member.fullName.trim().toLocaleLowerCase()) || 0) > 1 && member.email && (
+                <div className="text-[11px] font-normal text-neutral-500 dark:text-neutral-400">{member.email}</div>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+        {recruiters.length} recruiter{recruiters.length !== 1 ? "s" : ""}
+      </div>
+    </div>
+  );
+}
+
 function checkIsTenantAdmin(user: any): boolean {
   if (!user) return false;
   const sysRole = (user.systemRole || "").toUpperCase();
@@ -691,7 +725,7 @@ export default function PodsPage() {
                   <th className="py-3 px-4 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
                     {podLeadRoleName}
                   </th>
-                  <th className="py-3 px-4 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
+                  <th className="w-[40%] min-w-[320px] py-3 px-4 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
                     Recruiters
                   </th>
                   <th className="py-3 px-4 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-center">
@@ -788,30 +822,8 @@ export default function PodsPage() {
                       </td>
 
                       {/* Recruiters */}
-                      <td className="py-3 px-4">
-                        {pod.members.length === 0 ? (
-                          <span className="text-neutral-400 italic text-[11px]">No recruiters</span>
-                        ) : (
-                          <div className="flex flex-wrap gap-1 max-w-[240px]">
-                            {pod.members.slice(0, 3).map((m) => (
-                              <Badge
-                                key={m.id}
-                                className="bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-neutral-300 text-[10px] px-1.5 py-0.5 border-0 font-medium"
-                              >
-                                {m.fullName.split(" ")[0]}
-                                <UserAvatar user={m} className="h-5 w-5 ml-1" />
-                              </Badge>
-                            ))}
-                            {pod.members.length > 3 && (
-                              <Badge className="bg-indigo-50 text-indigo-700 text-[10px] px-1.5 py-0.5 border border-indigo-200 font-semibold">
-                                +{pod.members.length - 3}
-                              </Badge>
-                            )}
-                            <div className="w-full text-[10px] text-neutral-400 mt-0.5">
-                              {pod.members.length} recruiter{pod.members.length !== 1 ? "s" : ""}
-                            </div>
-                          </div>
-                        )}
+                      <td className="w-[40%] min-w-[320px] py-3 px-4">
+                        <PodRecruiters pod={pod} />
                       </td>
 
                       {/* Jobs Assigned */}

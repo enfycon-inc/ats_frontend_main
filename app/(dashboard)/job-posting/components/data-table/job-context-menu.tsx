@@ -18,7 +18,7 @@ export interface JobContextMenuProps {
   onFindMatches: (job: Job) => void;
   onDelegateJob: (job: Job) => void;
   onEditJob: (job: Job) => void;
-  onOpenAssignModal: (job: Job) => void;
+  onOpenAssignModal: (job: Job, mode?: "pods" | "users") => void;
   onArchiveJob: (job: Job) => void;
   onClose: () => void;
 }

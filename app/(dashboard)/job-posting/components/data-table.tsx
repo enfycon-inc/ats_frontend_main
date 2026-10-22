@@ -48,7 +48,7 @@ import { JobStatusModal } from "./data-table/job-status-modal";
 import { JobSaveViewModal } from "./data-table/job-save-view-modal";
 import { ApproveJobModal, RejectJobModal } from "./data-table/job-approval-modals";
 import { JobContextMenu } from "./data-table/job-context-menu";
-import { JobAssignModal } from "./data-table/job-assign-modal";
+import { JobAssignModal, type JobAssignmentMode } from "./data-table/job-assign-modal";
 
 export interface DataTableProps {
   data: Job[];
@@ -299,9 +299,9 @@ export default function DataTable({
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState("");
   const [assignModalJob, setAssignModalJob] = useState<Job | null>(null);
-  const [assignModalTab, setAssignModalTab] = useState<"pods" | "users">("pods");
-  const openAssignModal = (job: Job, tab: "pods" | "users" = "pods") => {
-    setAssignModalTab(tab);
+  const [assignModalMode, setAssignModalMode] = useState<JobAssignmentMode>("combined");
+  const openAssignModal = (job: Job, mode: JobAssignmentMode = "combined") => {
+    setAssignModalMode(mode);
     setAssignModalJob(job);
   };
 
@@ -685,7 +685,7 @@ export default function DataTable({
       {/* Assign Recruiters Modal Dialog */}
       <JobAssignModal
         job={assignModalJob}
-        initialTab={assignModalTab}
+        mode={assignModalMode}
         currentUser={currentUser}
         currentUserBranchId={currentUserBranchId}
         isOpen={!!assignModalJob}

@@ -25,9 +25,11 @@ import { getAssignedPersonDisplay, canAssignRecruitersToJob } from "../../lib/jo
 import { PodLeadAssignModal } from "./pod-lead-assign-modal";
 export { PodLeadAssignModal };
 
+export type JobAssignmentMode = "combined" | "pods" | "users";
+
 export interface JobAssignModalProps {
   job: Job | null;
-  initialTab?: "pods" | "users";
+  mode?: JobAssignmentMode;
   currentUser: any;
   currentUserBranchId: string | null | undefined;
   isOpen: boolean;
@@ -37,7 +39,7 @@ export interface JobAssignModalProps {
 
 export function JobAssignModal({
   job,
-  initialTab = "pods",
+  mode = "combined",
   currentUser,
   currentUserBranchId,
   isOpen,
@@ -319,6 +321,8 @@ export function JobAssignModal({
     return true;
   }, [targetUnit, targetBranch, userPerms, currentUser, job, podsList]);
 
+  const currentModeAllowed = assignTab === "pods" ? branchAllowsPods : branchAllowsDirectStaff;
+
   // â”€â”€â”€ SCOPED PODS & USERS (Role Scoping) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const targetBranchPods = useMemo(() => {
     const bId = targetBranch?.id;
@@ -446,7 +450,7 @@ export function JobAssignModal({
     setRecruiterFilterMode("all");
     setHasUserInteracted(false);
     setAssignmentReason("");
-    setAssignTab(initialTab === "pods" && branchAllowsPods ? "pods" : initialTab === "users" && branchAllowsDirectStaff ? "users" : branchAllowsPods ? "pods" : "users");
+    setAssignTab(mode === "pods" ? "pods" : mode === "users" ? "users" : branchAllowsPods ? "pods" : "users");
 
     // Initial selected pod IDs from job
     const initialPodIds: string[] = [];
@@ -500,7 +504,13 @@ export function JobAssignModal({
     }
     setSelectedUserIds(initialSelected);
 
-    // Auto-select tab based on branch policy and current assignment
+    // Dedicated entry points stay on the requested assignment type.
+    if (mode !== "combined") {
+      setAssignTab(mode);
+      return;
+    }
+
+    // The combined entry point selects a useful tab based on branch policy and current assignment.
     if (!branchAllowsPods) {
       setAssignTab("users");
     } else if (!branchAllowsDirectStaff) {
@@ -512,7 +522,7 @@ export function JobAssignModal({
     } else {
       setAssignTab(targetBranchPods.length > 0 ? "pods" : "users");
     }
-  }, [isOpen, job?.id, branchAllowsPods, branchAllowsDirectStaff, initialTab]);
+  }, [isOpen, job?.id, branchAllowsPods, branchAllowsDirectStaff, mode]);
 
   // When usersList or targetBranchPods loads asynchronously after modal is open,
   // resolve any missing name-based matches into selectedUserIds IF the user hasn't made manual edits yet
@@ -626,6 +636,7 @@ export function JobAssignModal({
   }, [branchRecruiterUsers, isUserInSelectedPods]);
 
   const handleTogglePodSelection = (podId: string) => {
+    if (!branchAllowsPods) return;
     setHasUserInteracted(true);
     // If we are selecting a pod, we should auto-remove any independent recruiters who are in this pod
     const isSelecting = !selectedPodIds.includes(podId);
@@ -664,6 +675,7 @@ export function JobAssignModal({
   };
 
   const handleToggleUserSelection = (userId: string) => {
+    if (!branchAllowsDirectStaff) return;
     setHasUserInteracted(true);
     setSelectedUserIds((prev) =>
       prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
@@ -675,6 +687,10 @@ export function JobAssignModal({
   const [assignmentReason, setAssignmentReason] = useState("");
   const handleSaveCombinedAssignment = async (override?: { unassignAll?: boolean }) => {
     if (!job) return;
+    if (!override?.unassignAll && !currentModeAllowed) {
+      toast.error(assignTab === "pods" ? "Pod assignment is disabled for this branch or unit." : "Direct recruiter assignment is disabled for this branch or unit.");
+      return;
+    }
     if (!canAssignRecruitersToJob(job, currentUser)) {
       toast.error("You are only allowed to assign recruiters on your own created jobs.");
       return;
@@ -692,15 +708,17 @@ export function JobAssignModal({
       }
 
       if (override?.unassignAll) {
-        if (canAssignPods) {
+        if (mode !== "users" && canAssignPods) {
           payload.podId = "none";
           payload.podIds = [];
           payload.podName = "N/A";
         }
-        payload.assignedTo = "Unassigned";
-        payload.recruiter = "N/A";
-        payload.recruiterId = null;
-        payload.recruiterIds = [];
+        if (mode !== "pods" && userPerms.includes("job:assign_recruiter")) {
+          payload.assignedTo = "Unassigned";
+          payload.recruiter = "N/A";
+          payload.recruiterId = null;
+          payload.recruiterIds = [];
+        }
       } else if (assignTab === "pods") {
         if (!canAssignPods) throw new Error("You do not have permission to assign pods.");
         if (selectedPodIds.length > 0) {
@@ -752,7 +770,7 @@ export function JobAssignModal({
       }
 
       if (override?.unassignAll) {
-        toast.success("Job marked as Unassigned.");
+        toast.success(mode === "pods" ? "Pod assignment cleared." : mode === "users" ? "Recruiter assignment cleared." : "Job marked as Unassigned.");
       } else if (summaryParts.length === 0) {
         toast.success(assignTab === "pods" ? "Pod assignment cleared." : "Recruiter assignment cleared.");
       } else {
@@ -838,7 +856,7 @@ export function JobAssignModal({
         )}
 
         {/* Branch Policy Alert */}
-        {!branchAllowsDirectStaff ? (
+        {((mode === "combined" || assignTab === "users") && !branchAllowsDirectStaff) ? (
           <div className="mx-5 mt-2.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-[11.5px] text-amber-800 dark:text-amber-300">
             <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
             <span>
@@ -846,7 +864,7 @@ export function JobAssignModal({
               Requirements must be routed to Recruitment Pods.
             </span>
           </div>
-        ) : !branchAllowsPods && canAssignPods ? (
+        ) : (mode === "combined" || assignTab === "pods") && !branchAllowsPods && (canAssignPods || mode === "pods") ? (
           <div className="mx-5 mt-2.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center gap-2 text-[11.5px] text-amber-800 dark:text-amber-300">
             <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
             <span>
@@ -856,7 +874,9 @@ export function JobAssignModal({
           </div>
         ) : null}
 
-        {/* Tab Selector */}
+        {mode === "combined" && (
+          <>
+        {/* Tab Selector: shown only from the combined context-menu action */}
         <div className="px-5 pt-3 pb-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div className="p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 inline-flex items-center gap-1 border border-slate-200/60 dark:border-slate-700/60">
             <button
@@ -927,9 +947,11 @@ export function JobAssignModal({
           </div>
 
         </div>
+          </>
+        )}
 
         {/* Search Box & Multi-Select Toolbar */}
-        <div className="px-5 pt-1 space-y-2">
+        <div className={cn("px-5 pt-1 space-y-2", !currentModeAllowed && "pointer-events-none opacity-50")} aria-disabled={!currentModeAllowed}>
           <div className="relative">
             <Icon
               icon="heroicons:magnifying-glass"
@@ -942,6 +964,7 @@ export function JobAssignModal({
                   : "Search recruiters by name or email..."
               }
               value={assignSearch}
+              disabled={!currentModeAllowed}
               onChange={(e) => setAssignSearch(e.target.value)}
               className="h-8 pl-8.5 text-xs bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 rounded-lg"
               autoFocus
@@ -984,10 +1007,11 @@ export function JobAssignModal({
         </div>
 
         {/* Minimal Select All Bar */}
-        <div className="px-6 py-1.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
+        <div className={cn("px-6 py-1.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between", !currentModeAllowed && "pointer-events-none opacity-50")} aria-disabled={!currentModeAllowed}>
           <div className="flex items-center gap-2">
             <button
               type="button"
+              disabled={!currentModeAllowed}
               onClick={assignTab === "pods" ? handleSelectAllFilteredPods : handleSelectAllFiltered}
               className="h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors border cursor-pointer border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:border-blue-400"
               title="Toggle Select All"
@@ -1017,7 +1041,7 @@ export function JobAssignModal({
         </div>
 
         {/* Selection List */}
-        <div className="px-5 py-2 flex-1 overflow-y-auto max-h-[280px] space-y-1.5">
+        <div className={cn("px-5 py-2 flex-1 overflow-y-auto max-h-[280px] space-y-1.5", !currentModeAllowed && "pointer-events-none opacity-50")} aria-disabled={!currentModeAllowed}>
           {assignTab === "pods" ? (
             filteredPods.length === 0 ? (
               <div className="p-6 text-center text-xs text-slate-400">
@@ -1254,7 +1278,7 @@ export function JobAssignModal({
             onClick={() => handleSaveCombinedAssignment({ unassignAll: true })}
             className="text-xs text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 h-8 cursor-pointer font-medium"
           >
-            Clear Assignment
+            {mode === "pods" ? "Clear Pod Assignment" : mode === "users" ? "Clear Recruiter Assignment" : "Clear Assignment"}
           </Button>}
 
           <div className="flex items-center gap-2">
@@ -1272,7 +1296,7 @@ export function JobAssignModal({
               type="button"
               size="sm"
               disabled={
-                isAssigning || (selectedPodIds.length === 0 && selectedUserIds.length === 0)
+                isAssigning || !currentModeAllowed || (assignTab === "pods" ? selectedPodIds.length === 0 : selectedUserIds.length === 0)
               }
               onClick={() => handleSaveCombinedAssignment()}
               className="h-8 px-4 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
