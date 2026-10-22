@@ -5,15 +5,14 @@ import { RecruitmentIllustration } from './recruitment-illustration';
 import Link from 'next/link';
 import LoginForm from '@/components/auth/login-form';
 import { APP_BRAND } from '@/lib/app-brand';
-import { getTenantIdentifier } from '@/utils/subdomain-helper';
 import { getApiBase } from '@/lib/ats-api';
 import { useSignInPolicy } from '@/hooks/use-sign-in-policy';
 import styles from './login-page.module.css';
 
-export default function Login() {
+export default function Login({ initialWorkspace }: { initialWorkspace: boolean }) {
   const [mounted, setMounted] = React.useState(false);
-  const { data: policy } = useSignInPolicy();
-  const workspace = mounted && !!getTenantIdentifier();
+  const { data: policy, error: policyError, mutate: retryPolicy } = useSignInPolicy();
+  const workspace = initialWorkspace;
   const workspaceName = policy?.siteTitle?.trim() || policy?.name?.trim() || '';
   const tenantLogoPath = policy?.logoUrl?.match(/^\/public\/image\/logos\/[0-9a-f-]{36}\/[a-f0-9]{64}\.(?:png|jpg|gif|webp)$/i)?.[0];
   const tenantLogoUrl = workspace && tenantLogoPath ? new URL(tenantLogoPath, getApiBase()).toString() : null;
@@ -40,6 +39,13 @@ export default function Login() {
   </footer>} /></React.Suspense>;
   const illustration = <RecruitmentIllustration />;
   const pageClass = `${styles.page} min-h-dvh overflow-y-auto bg-white font-sans text-slate-900`;
+
+  if (workspace && !policy) return <main className={`${pageClass} flex min-h-dvh items-center justify-center bg-slate-50 px-5`}>
+    <section className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm" role="status" aria-live="polite">
+      <div className="mx-auto mb-4 h-10 w-10 animate-pulse rounded-xl bg-blue-100" aria-hidden="true" />
+      {policyError ? <><p className="text-sm text-slate-600">Unable to load your workspace sign-in page.</p><button type="button" onClick={() => void retryPolicy()} className="mt-3 text-sm font-medium text-blue-700 underline underline-offset-2">Try again</button></> : <p className="text-sm text-slate-500">Loading your workspace sign-in…</p>}
+    </section>
+  </main>;
 
   if (design === 'compact-focus') return <main className={`${pageClass} flex items-center justify-center bg-slate-50 px-4 py-8`}><section className="w-full max-w-[480px] rounded-2xl border border-slate-200 bg-white px-6 py-8 shadow-xl shadow-slate-200/60 sm:px-10"><div className="mb-8">{brandHeader}</div>{loginForm}</section></main>;
   if (design === 'editorial') return <main className={`${pageClass} grid lg:grid-cols-[1.05fr_.95fr]`}><section className="flex flex-col justify-center bg-slate-50 px-6 py-12 sm:px-12 lg:px-16"><div className="mx-auto w-full max-w-[700px]"><p className="mb-4 text-xs font-semibold uppercase tracking-[.18em] text-blue-700">{APP_BRAND.name}</p><h1 className="max-w-xl text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">From application to placement</h1><p className="mt-4 max-w-lg text-lg leading-relaxed text-slate-600">One workspace for your hiring team.</p><div className="mt-10">{illustration}</div></div></section><section className="flex flex-col justify-center px-5 py-8 sm:px-12 lg:px-16"><div className="mx-auto w-full max-w-[460px]">{brandHeader}{loginForm}</div></section></main>;
