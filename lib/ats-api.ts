@@ -1146,6 +1146,7 @@ export interface JobStaffOption {
   fullName: string;
   email?: string;
   avatar?: string | null;
+  /** True only when the user has the explicit direct-assignment eligibility capability. */
   canRecruit: boolean;
   canReview: boolean;
 }

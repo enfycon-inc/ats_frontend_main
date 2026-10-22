@@ -351,92 +351,9 @@ export function JobAssignModal({
   }, [podsList, targetBranch, job, targetUnit, isPodHead, myPod]);
 
   const branchRecruiterUsers = useMemo(() => {
-    // When populated from atsApi.jobs.staffingOptions (capability-checked for the job):
-    if (usersList.length > 0 && usersList[0].canRecruit !== undefined) {
-      return usersList.filter((u: any) => u.canRecruit !== false);
-    }
-
-    const bId = targetBranch?.id;
-    const targetUnitId = job?.businessUnitId || (job as any)?.business_unit_id || targetUnit?.id;
-    let list = usersList.filter((u: any) => u.isActive !== false && u.is_active !== false);
-
-    // Filter to users whose system role is Recruiter.
-    list = list.filter((u: any) => {
-      const rawSystemRole = u.systemRole || u.system_role;
-      if (rawSystemRole && rawSystemRole.toUpperCase() === "RECRUITER") {
-        return true;
-      }
-      const uRoles = u.roles || [];
-      const userSysRoles = uRoles.map((r: string) => {
-        const match = rolesList.find((cr: any) => cr.name === r || cr.id === r);
-        return match?.systemRole || r;
-      });
-      return userSysRoles.some((sr: any) => {
-        const upper = typeof sr === "string" ? sr.toUpperCase() : "";
-        return upper === "RECRUITER";
-      });
-    });
-
-    // Co-source scoping
-    const isCoSourcedJob =
-      (job as any)?.isCoSourced ||
-      ((job as any)?.sharedBranchIds && (job as any).sharedBranchIds.length > 0);
-    const isSharedBranchViewing = isCoSourcedJob && job?.branchId !== currentUserBranchId;
-
-    // Branch Admin and Delivery Head can see all recruiters in their branch regardless of unit.
-    // Unit Admin, Pod Lead, and lower roles remain unit-scoped.
-    const canSeeAllBranchRecruiters = isSuperOrTenantAdmin || isBranchAdmin || isDeliveryHead;
-
-    if (targetUnitId && !canSeeAllBranchRecruiters) {
-      const unitScoped = list.filter(
-        (u: any) => (u.businessUnitId || u.business_unit_id) === targetUnitId
-      );
-      if (unitScoped.length > 0) {
-        list = unitScoped;
-      }
-    } else if (isSharedBranchViewing && currentUserBranchId) {
-      list = list.filter((u: any) => {
-        const userBranchId = u.branchId || u.branch_id;
-        if (userBranchId === currentUserBranchId) return true;
-        const assignedBranches = Array.isArray(u.assignedBranchIds)
-          ? u.assignedBranchIds
-          : Array.isArray(u.assigned_branch_ids)
-          ? u.assigned_branch_ids
-          : [];
-        return assignedBranches.includes(currentUserBranchId);
-      });
-    } else if (bId && bId !== "all") {
-      const scoped = list.filter((u: any) => {
-        const userBranchId = u.branchId || u.branch_id;
-        if (userBranchId === bId) return true;
-        const assignedBranches = Array.isArray(u.assignedBranchIds)
-          ? u.assignedBranchIds
-          : Array.isArray(u.assigned_branch_ids)
-          ? u.assigned_branch_ids
-          : [];
-        if (assignedBranches.includes(bId)) return true;
-        return false;
-      });
-      if (scoped.length > 0) list = scoped;
-    }
-
-    // Role Scoping: If user is Pod Head, ONLY show recruiters in their own pod!
-    if (isPodHead && myPod) {
-      const myPodId = myPod.id;
-      const myPodMemberIds = new Set(
-        (myPod.users || myPod.members || []).map((m: any) => m.id || m.userId).filter(Boolean)
-      );
-      return list.filter(
-        (u: any) =>
-          u.podId === myPodId ||
-          u.pod_id === myPodId ||
-          myPodMemberIds.has(u.id) ||
-          u.id === myPod.podHeadId
-      );
-    }
-
-    return list;
-  }, [usersList, targetBranch, job, currentUserBranchId, isPodHead, myPod, rolesList, targetUnit]);
+    // The staffing-options API is the source of truth; fail closed if eligibility is absent.
+    return usersList.filter((u: any) => u.canRecruit === true);
+  }, [usersList]);
 
   // Synchronize initial selections on modal open or when target job changes
   useEffect(() => {
@@ -738,7 +655,10 @@ export function JobAssignModal({
       } else {
         if (!userPerms.includes("job:assign_recruiter")) throw new Error("You do not have permission to assign recruiters.");
         if (selectedUserIds.length > 0) {
-          const selectedUsers = usersList.filter((u) => selectedUserIds.includes(u.id) && u.canRecruit !== false);
+          const selectedUsers = usersList.filter((u) => selectedUserIds.includes(u.id) && u.canRecruit === true);
+          if (selectedUsers.length !== selectedUserIds.length) {
+            throw new Error("A current assignee is no longer eligible. Clear the existing recruiter assignment before assigning eligible recruiters.");
+          }
           const recruiterNames = selectedUsers.map((u) => u.fullName || u.name || u.email);
           payload.assignedTo = recruiterNames.join(", ");
           payload.recruiterId = selectedUsers[0]?.id || null;

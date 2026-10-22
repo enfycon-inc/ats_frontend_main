@@ -43,6 +43,7 @@ interface Pod {
   businessUnitName?: string | null;
   podHeadId: string | null;
   podHeadName: string | null;
+  podHeadEmail: string | null;
   description: string | null;
   isAvailableForAssignment: boolean;
   members: PodMember[];
@@ -66,19 +67,19 @@ function PodRecruiters({ pod }: { pod: Pod }) {
 
   return (
     <div className="space-y-2">
-      <ul aria-label={`Recruiters in ${pod.name}`} className="flex flex-wrap gap-2">
-        {recruiters.map((member) => (
-          <li key={member.id} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs font-medium text-neutral-800 dark:border-slate-700 dark:bg-slate-800 dark:text-neutral-200">
-            <UserAvatar user={member} className="h-5 w-5" />
-            <div className="min-w-0 [overflow-wrap:anywhere]">
-              <div>{member.fullName.trim() || member.email || "Name unavailable"}</div>
+      <div aria-label={`Recruiters in ${pod.name}`} className="text-xs leading-6 text-neutral-800 [overflow-wrap:anywhere] dark:text-neutral-200">
+        {recruiters.map((member, index) => (
+          <React.Fragment key={member.id}>
+            {index > 0 && ", "}
+            <span>
+              {member.fullName.trim() || member.email || "Name unavailable"}
               {(nameCounts.get(member.fullName.trim().toLocaleLowerCase()) || 0) > 1 && member.email && (
-                <div className="text-[11px] font-normal text-neutral-500 dark:text-neutral-400">{member.email}</div>
+                <span className="text-[11px] text-neutral-500 dark:text-neutral-400"> ({member.email})</span>
               )}
-            </div>
-          </li>
+            </span>
+          </React.Fragment>
         ))}
-      </ul>
+      </div>
       <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
         {recruiters.length} recruiter{recruiters.length !== 1 ? "s" : ""}
       </div>
@@ -152,6 +153,7 @@ export default function PodsPage() {
   const [activeView, setActiveView] = useState<"all" | "cycle">("all");
 
   const userPerms = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+  const canDelete = userPerms.includes("pod:delete") || userPerms.includes("*") || userPerms.includes("platform:manage");
   const canManage = isTenantAdmin || isUnitScoped || userPerms.includes("pod:manage") || userPerms.includes("pod:create") || userPerms.includes("pod:edit") || currentUser?.systemRole === "BRANCH_ADMIN";
 
   // Modal Pop-up state
@@ -475,6 +477,12 @@ export default function PodsPage() {
   };
 
   const handleDeletePod = async (id: string, name: string) => {
+    if (!canDelete || submitting) return;
+    const pod = pods.find(p => p.id === id);
+    if (pod && pod.jobsCount > 0) {
+      toast.error("Cannot delete this pod because it has assigned jobs. Reassign or remove all job assignments first.");
+      return;
+    }
     if (!confirm(`Are you sure you want to delete the pod "${name}"? Members will be unassigned.`)) return;
     try {
       setSubmitting(true);
@@ -734,7 +742,7 @@ export default function PodsPage() {
                   <th className="py-3 px-4 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-center">
                     Cycle Status
                   </th>
-                  {canManage && (
+                  {(canManage || canDelete) && (
                     <th className="py-3 px-4 text-[10.5px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 text-right">
                       Actions
                     </th>
@@ -805,15 +813,15 @@ export default function PodsPage() {
                       </td>
 
                       {/* Pod Lead */}
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="py-3 px-4">
                         {pod.podHeadName ? (
                           <div className="flex items-center gap-1.5">
                             <div className="h-6 w-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center shrink-0">
                               {pod.podHeadName.charAt(0).toUpperCase()}
                             </div>
-                            <div>
+                            <div className="min-w-0 [overflow-wrap:anywhere]">
                               <div className="font-semibold text-xs text-neutral-900 dark:text-white">{pod.podHeadName}</div>
-                              <div className="text-[9px] text-indigo-600 dark:text-indigo-400 font-semibold tracking-wide">POD LEAD</div>
+                              <div className="text-[11px] text-neutral-500 dark:text-neutral-400">{pod.podHeadEmail || "Email unavailable"}</div>
                             </div>
                           </div>
                         ) : (
@@ -847,9 +855,10 @@ export default function PodsPage() {
                       </td>
 
                       {/* Actions */}
-                      {canManage && (
+                      {(canManage || canDelete) && (
                         <td className="py-3 px-4 whitespace-nowrap text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {canManage && (
                             <button
                               onClick={() => openEditModal(pod)}
                               className="p-1 rounded-md border border-neutral-200 dark:border-slate-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 transition cursor-pointer"
@@ -857,13 +866,24 @@ export default function PodsPage() {
                             >
                               <Icon icon="heroicons:pencil-square" className="h-3.5 w-3.5" />
                             </button>
+                            )}
+                            {canDelete && (
+                            <span
+                              tabIndex={pod.jobsCount > 0 ? 0 : undefined}
+                              role="group"
+                              aria-label={pod.jobsCount > 0 ? "Deletion blocked: reassign or remove all job assignments first." : undefined}
+                              title={pod.jobsCount > 0 ? "Reassign or remove all job assignments before deleting this pod." : "Delete Pod"}
+                            >
                             <button
                               onClick={() => handleDeletePod(pod.id, pod.name)}
-                              className="p-1 rounded-md border border-neutral-200 dark:border-slate-700 hover:border-red-500 hover:bg-red-50 dark:hover:bg-slate-800 text-neutral-400 hover:text-red-600 transition cursor-pointer"
-                              title="Delete Pod"
+                              disabled={submitting || pod.jobsCount > 0}
+                              aria-label={pod.jobsCount > 0 ? `Cannot delete ${pod.name}: assigned jobs must be reassigned or removed first` : `Delete ${pod.name}`}
+                              className="p-1 rounded-md border border-neutral-200 dark:border-slate-700 hover:border-red-500 hover:bg-red-50 dark:hover:bg-slate-800 text-neutral-400 hover:text-red-600 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <Icon icon="heroicons:trash" className="h-3.5 w-3.5" />
                             </button>
+                            </span>
+                            )}
                           </div>
                         </td>
                       )}
@@ -1209,7 +1229,7 @@ export default function PodsPage() {
                 </div>
 
                 {/* Danger Zone (Edit mode only) */}
-                {modalMode === "edit" && selectedPod && (
+                {modalMode === "edit" && selectedPod && canDelete && (
                   <div className="border border-red-200 dark:border-red-900/40 rounded-xl p-3 bg-red-50/30 dark:bg-red-950/10 flex items-center justify-between">
                     <div>
                       <div className="text-xs font-bold text-red-700 dark:text-red-400 flex items-center gap-1">
@@ -1217,7 +1237,9 @@ export default function PodsPage() {
                         Delete Pod
                       </div>
                       <p className="text-[10px] text-red-600/80">
-                        Unassigns all recruiters and removes this pod from cycle routing.
+                        {selectedPod.jobsCount > 0
+                          ? "Reassign or remove all job assignments before deleting this pod."
+                          : "Unassigns all recruiters and removes this pod from cycle routing."}
                       </p>
                     </div>
                     <Button
@@ -1225,7 +1247,7 @@ export default function PodsPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => handleDeletePod(selectedPod.id, selectedPod.name)}
-                      disabled={submitting}
+                      disabled={submitting || selectedPod.jobsCount > 0}
                       className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 text-xs font-semibold h-7 px-3"
                     >
                       Delete
