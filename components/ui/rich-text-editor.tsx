@@ -2,18 +2,21 @@
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import type ReactQuillInstance from "react-quill-new";
+import { formatJobDescription, hasJobDescriptionMarkdown, sanitizeJobDescription } from "@/lib/job-description-format";
 import { cn } from "@/lib/utils";
 import { Code, Eye, Sparkles, FileText } from "lucide-react";
 import "react-quill-new/dist/quill.snow.css";
 
-const ReactQuill = dynamic(() => import("react-quill-new"), {
+const ReactQuill = dynamic(async () => {
+  const { default: Editor } = await import("react-quill-new");
+  return function QuillEditor({ forwardedRef, ...props }: React.ComponentProps<typeof ReactQuillInstance> & { forwardedRef: React.Ref<ReactQuillInstance> }) {
+    return <Editor ref={forwardedRef} {...props} />;
+  };
+}, {
   ssr: false,
-  loading: () => (
-    <div className="h-64 w-full bg-neutral-50 dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-b-lg animate-pulse flex items-center justify-center text-xs text-neutral-400">
-      Loading Rich Text Editor...
-    </div>
-  ),
-}) as any;
+  loading: () => <div className="h-64 w-full animate-pulse rounded-b-lg border border-neutral-200 bg-neutral-50 text-xs text-neutral-400 dark:border-slate-800 dark:bg-slate-900">Loading Rich Text Editor...</div>,
+});
 
 interface RichTextEditorProps {
   value: string;
@@ -21,73 +24,6 @@ interface RichTextEditorProps {
   placeholder?: string;
   className?: string;
   minHeight?: string;
-}
-
-/**
- * Helper to convert raw or HTML-wrapped Markdown string (e.g. **bold**, ## Header, * List) to HTML
- */
-function convertMarkdownToHtml(text: string): string {
-  if (!text || !text.trim()) return "";
-  
-  let html = text.trim();
-
-  // If already wrapped in HTML tags (e.g. pasted into Quill), clean inner markdown syntax
-  html = html
-    .replace(/<p>\s*###\s*([^<]+)<\/p>/gi, "<h3>$1</h3>")
-    .replace(/<p>\s*##\s*([^<]+)<\/p>/gi, "<h2>$1</h2>")
-    .replace(/<p>\s*#\s*([^<]+)<\/p>/gi, "<h1>$1</h1>")
-    .replace(/<p>\s*(?:[\*\-\•]|&bull;|&middot;)\s*([^<]+)<\/p>/gi, "<li>$1</li>")
-    .replace(/\*\*([^*<]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/__([^_<]+)__/g, "<strong>$1</strong>")
-    .replace(/(<li>[\s\S]*?<\/li>)/gi, "<ul>$1</ul>")
-    .replace(/<\/ul>\s*<ul>/g, "");
-
-  // If raw markdown without HTML tags:
-  if (!/<[a-z][\s\S]*>/i.test(html)) {
-    // Escape basic HTML chars before converting markdown
-    html = html
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
-    // Headers
-    html = html.replace(/^### (.*$)/gim, "<h3>$1</h3>");
-    html = html.replace(/^## (.*$)/gim, "<h2>$1</h2>");
-    html = html.replace(/^# (.*$)/gim, "<h1>$1</h1>");
-
-    // Bold & Italic
-    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/__(.*?)__/g, "<strong>$1</strong>");
-    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
-    html = html.replace(/_(.*?)_/g, "<em>$1</em>");
-
-    // Bullet & numbered Lists
-    html = html.replace(/^\s*[\*\-\•] (.*$)/gim, "<li>$1</li>");
-    html = html.replace(/(<li>.*<\/li>)/gis, "<ul>$1</ul>");
-    html = html.replace(/<\/ul>\s*<ul>/g, "");
-    html = html.replace(/^\s*\d+\. (.*$)/gim, "<li>$1</li>");
-
-    // Paragraphs
-    const lines = html.split(/\n\s*\n/);
-    html = lines
-      .map((p) => {
-        const trimmed = p.trim();
-        if (!trimmed) return "";
-        if (
-          trimmed.startsWith("<h") ||
-          trimmed.startsWith("<ul") ||
-          trimmed.startsWith("<ol") ||
-          trimmed.startsWith("<li")
-        ) {
-          return trimmed;
-        }
-        return `<p>${trimmed.replace(/\n/g, "<br/>")}</p>`;
-      })
-      .filter(Boolean)
-      .join("");
-  }
-
-  return html;
 }
 
 export function RichTextEditor({
@@ -98,12 +34,13 @@ export function RichTextEditor({
   minHeight = "240px",
 }: RichTextEditorProps) {
   const [isHtmlMode, setIsHtmlMode] = useState(false);
-  const [htmlValue, setHtmlValue] = useState(value || "");
+  const [htmlValue, setHtmlValue] = useState(() => sanitizeJobDescription(value || ""));
+  const quillRef = useRef<ReactQuillInstance | null>(null);
 
   // Sync internal state when external value updates
   useEffect(() => {
-    setHtmlValue(value || "");
-  }, [value]);
+    setHtmlValue(isHtmlMode ? value || "" : sanitizeJobDescription(value || ""));
+  }, [value, isHtmlMode]);
 
   const modules = useMemo(
     () => ({
@@ -141,8 +78,9 @@ export function RichTextEditor({
   ];
 
   const handleEditorChange = (content: string) => {
-    setHtmlValue(content);
-    onChange(content);
+    const safe = sanitizeJobDescription(content);
+    setHtmlValue(safe);
+    onChange(safe);
   };
 
   const handleHtmlInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -152,9 +90,37 @@ export function RichTextEditor({
   };
 
   const handleAutoFormatMarkdown = () => {
-    const formatted = convertMarkdownToHtml(htmlValue);
+    const formatted = formatJobDescription(htmlValue);
     setHtmlValue(formatted);
     onChange(formatted);
+  };
+
+  const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const editor = quillRef.current?.getEditor();
+    if (!editor) return;
+    const html = event.clipboardData.getData("text/html");
+    const plain = event.clipboardData.getData("text/plain");
+    if (!html && !plain) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const formatted = formatJobDescription(hasJobDescriptionMarkdown(plain) ? plain : html || plain);
+    if (!formatted) return;
+    const selection = editor.getSelection(true) || { index: Math.max(0, editor.getLength() - 1), length: 0 };
+    const delta = editor.clipboard.convert({ html: formatted });
+    const Delta = (editor.constructor as typeof import('quill').default).import('delta');
+    editor.history.cutoff();
+    editor.updateContents(new Delta().retain(selection.index).delete(selection.length).concat(delta), 'user');
+    editor.setSelection(selection.index + delta.length(), 0, 'silent');
+    editor.history.cutoff();
+  };
+
+  const toggleHtmlMode = () => {
+    if (isHtmlMode) {
+      const formatted = formatJobDescription(htmlValue);
+      setHtmlValue(formatted);
+      onChange(formatted);
+    }
+    setIsHtmlMode(!isHtmlMode);
   };
 
   return (
@@ -168,7 +134,7 @@ export function RichTextEditor({
 
         <div className="flex items-center gap-2">
           {/* Convert Raw Markdown to HTML Button */}
-          {htmlValue && (htmlValue.includes("**") || htmlValue.includes("##") || htmlValue.includes("* ")) && (
+          {htmlValue && hasJobDescriptionMarkdown(htmlValue.replace(/<[^>]+>/g, "\n")) && (
             <button
               type="button"
               onClick={handleAutoFormatMarkdown}
@@ -183,7 +149,7 @@ export function RichTextEditor({
           {/* Toggle HTML Source Mode */}
           <button
             type="button"
-            onClick={() => setIsHtmlMode(!isHtmlMode)}
+            onClick={toggleHtmlMode}
             className={cn(
               "px-2.5 py-1 rounded text-[11px] font-bold border transition-colors flex items-center gap-1 cursor-pointer",
               isHtmlMode
@@ -215,8 +181,9 @@ export function RichTextEditor({
             placeholder="<html><body>Raw HTML Source Code...</body></html>"
           />
         ) : (
-          <div className="quill-custom-wrapper text-neutral-900 dark:text-neutral-100">
+          <div className="quill-custom-wrapper text-neutral-900 dark:text-neutral-100" onPasteCapture={handlePaste}>
             <ReactQuill
+              forwardedRef={quillRef}
               theme="snow"
               value={htmlValue}
               onChange={handleEditorChange}

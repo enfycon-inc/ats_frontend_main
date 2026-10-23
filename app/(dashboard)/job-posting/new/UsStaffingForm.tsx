@@ -1,7 +1,7 @@
-import { ContactDialog } from "../components/contact-dialog";
 // @ts-nocheck
 "use client";
 
+import { ContactDialog } from "../components/contact-dialog";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -48,6 +48,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { formatJobDescription } from "@/lib/job-description-format";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -1042,15 +1043,8 @@ const getInitialActiveBranchContext = () => {
         setPrimarySkills(res.primarySkills || []);
         setSecondarySkills(res.secondarySkills || []);
 
-        // Pre-fill description
-        // Format description in HTML
-        let formattedDesc = `<h3>${res.jobTitle || 'Job Requirement'}</h3>`;
-        if (parseText.includes("\n")) {
-          formattedDesc += parseText.split("\n").map(para => `<p>${para.trim()}</p>`).filter(p => p !== "<p></p>").join("");
-        } else {
-          formattedDesc += `<p>${parseText}</p>`;
-        }
-        setValue("jobDescription", formattedDesc);
+        // Preserve the original JD once, with automatic safe rich-text formatting.
+        setValue("jobDescription", formatJobDescription(parseText, extractedTitle), { shouldValidate: true, shouldDirty: true });
 
         setActiveWorkflow("manual");
         toast.success("AI extraction completed! Review pre-filled form fields below.");
