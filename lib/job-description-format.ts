@@ -7,6 +7,10 @@ import {
 
 const markdown = new Marked({ async: false, gfm: true, breaks: true });
 export const MAX_JOB_DESCRIPTION_CHARS = 50_000;
+const SANITIZED_CACHE_MAX_ENTRIES = 8;
+const SANITIZED_CACHE_MAX_CHARS = 250_000;
+const sanitizedDescriptionCache = new Map<string, string>();
+let sanitizedDescriptionCacheChars = 0;
 const policy = {
   ALLOWED_TAGS: JOB_DESCRIPTION_TAGS,
   ALLOWED_ATTR: JOB_DESCRIPTION_ATTRIBUTES,
@@ -31,7 +35,46 @@ function safeDescriptionDom(html: string): HTMLElement {
 }
 
 export function sanitizeJobDescription(html: string): string {
-  return safeDescriptionDom(html).innerHTML.trim();
+  const cached = sanitizedDescriptionCache.get(html);
+  if (cached !== undefined) {
+    sanitizedDescriptionCache.delete(html);
+    sanitizedDescriptionCache.set(html, cached);
+    return cached;
+  }
+
+  const startedAt = typeof performance !== 'undefined' ? performance.now() : 0;
+  const sanitized = safeDescriptionDom(html).innerHTML.trim();
+  rememberSanitizedDescription(html, sanitized);
+  if (sanitized !== html) rememberSanitizedDescription(sanitized, sanitized);
+  reportSlowJobDescriptionPhase('sanitize', startedAt);
+  return sanitized;
+}
+
+function rememberSanitizedDescription(input: string, sanitized: string): void {
+  const entrySize = input.length + sanitized.length;
+  if (entrySize > SANITIZED_CACHE_MAX_CHARS) return;
+  const existing = sanitizedDescriptionCache.get(input);
+  if (existing !== undefined) {
+    sanitizedDescriptionCacheChars -= input.length + existing.length;
+    sanitizedDescriptionCache.delete(input);
+  }
+  sanitizedDescriptionCache.set(input, sanitized);
+  sanitizedDescriptionCacheChars += entrySize;
+  while (sanitizedDescriptionCache.size > SANITIZED_CACHE_MAX_ENTRIES || sanitizedDescriptionCacheChars > SANITIZED_CACHE_MAX_CHARS) {
+    const oldest = sanitizedDescriptionCache.keys().next().value;
+    if (oldest === undefined) break;
+    const oldestValue = sanitizedDescriptionCache.get(oldest);
+    sanitizedDescriptionCache.delete(oldest);
+    sanitizedDescriptionCacheChars -= oldest.length + (oldestValue?.length || 0);
+  }
+}
+
+function reportSlowJobDescriptionPhase(phase: string, startedAt: number): void {
+  if (typeof performance === 'undefined' || typeof console === 'undefined') return;
+  const durationMs = performance.now() - startedAt;
+  if (durationMs >= 50) {
+    console.warn(`[Job description] ${phase} took ${durationMs.toFixed(1)} ms.`);
+  }
 }
 
 export function hasJobDescriptionMarkdown(text: string): boolean {
@@ -44,6 +87,7 @@ function parseMarkdown(text: string): string {
 
 /** Convert only input/paste boundaries, never a user's ordinary keystrokes. */
 export function formatJobDescription(input: string, jobTitle?: string): string {
+  const startedAt = typeof performance !== 'undefined' ? performance.now() : 0;
   let source = input.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').trim();
   if (!source) return '';
   // Chat tools sometimes put the entire JD in a Markdown/text fence. Preserve
@@ -93,6 +137,8 @@ export function formatJobDescription(input: string, jobTitle?: string): string {
     if (firstTitle && firstTitle.toLowerCase() === secondTitle.toLowerCase()
       && (title.toLowerCase() === firstTitle.toLowerCase() || /^\s*Job Title\s*:/i.test(second.textContent || ''))) first.remove();
   }
-  return sanitizeJobDescription(root.innerHTML);
+  const formatted = sanitizeJobDescription(root.innerHTML);
+  reportSlowJobDescriptionPhase('format', startedAt);
+  return formatted;
 }
 
