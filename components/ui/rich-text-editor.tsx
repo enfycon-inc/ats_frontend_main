@@ -6,7 +6,7 @@ import type ReactQuillInstance from "react-quill-new";
 import { formatJobDescription, hasJobDescriptionMarkdown, MAX_JOB_DESCRIPTION_CHARS, sanitizeJobDescription } from "@/lib/job-description-format";
 import { cn } from "@/lib/utils";
 import { Code, Eye, Sparkles, FileText } from "lucide-react";
-import { toast } from "sonner";
+import toast from "react-hot-toast";
 import "react-quill-new/dist/quill.snow.css";
 
 const ReactQuill = dynamic(async () => {
