@@ -575,7 +575,7 @@ export default function JobDetailPage() {
             </Card>
 
             <Card className="rounded-xl border border-border bg-card p-4">
-              {submissionResponse && <JobSubmissions jobId={String(id)} initialResponse={submissionResponse} onSaved={loadData} />}
+              {submissionResponse && <JobSubmissions jobId={String(id)} jobType={job.jobType} market={job.market} initialResponse={submissionResponse} onSaved={loadData} showStageFilters={false} />}
             </Card>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
@@ -697,7 +697,7 @@ export default function JobDetailPage() {
         {/* TAB 2: SUBMISSIONS PIPELINE */}
         {activeTab === "pipeline" && submissionResponse && (
           <Card className="rounded-xl border border-border bg-card p-4">
-            <JobSubmissions jobId={String(id)} initialResponse={submissionResponse} onSaved={loadData} showBoard />
+            <JobSubmissions jobId={String(id)} jobType={job.jobType} market={job.market} initialResponse={submissionResponse} onSaved={loadData} showBoard />
           </Card>
         )}
 

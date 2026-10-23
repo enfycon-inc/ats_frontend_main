@@ -60,22 +60,84 @@ test('shared status distinguishes internal rejection from L2 rejection', () => {
   assert.match(later, /L2 rejected/);
   assert.doesNotMatch(later, /Internal review rejected/);
 });
-test('job table renders server totals, pagination, shared status and scoped actions', () => {
-  const response = { data: [{ ...base, resume: { available: true, canDownload: true, filename: 'CV.docx' } }], page: 1, limit: 20, total: 41, totalPages: 3, counts: { all: 41, review: 10, interviews: 20, offers: 5, closed: 6 } };
+function renderJob(submission = {}, options = {}, menuOpen = false) {
+  const response = { data: [{ ...base, resume: { available: true, canDownload: true, filename: 'CV.docx' }, ...submission }], page: 1, limit: 20, total: 41, totalPages: 3, counts: { all: 41, review: 10, interviews: 20, offers: 5, closed: 6 } };
+  const menu = props => React.createElement(React.Fragment, null, props.children);
   const testLoad = modules({
     swr: { __esModule: true, default: () => ({ data: response, mutate() {}, isValidating: false }) },
     'next/link': { __esModule: true, default: props => React.createElement('a', props) },
     '@/lib/ats-api': { atsApi: {} },
-    '@/components/ui/button': { Button: ({ asChild, variant, ...props }) => React.createElement('button', props) },
-    '@/components/ui/dropdown-menu': { DropdownMenuItem: props => React.createElement('div', props) },
+    '@/components/ui/button': { Button: ({ asChild, variant, size, ...props }) => React.createElement('button', props) },
+    ...(menuOpen ? { '@/components/ui/dropdown-menu': {
+      DropdownMenu: menu, DropdownMenuTrigger: menu, DropdownMenuContent: menu,
+      DropdownMenuItem: ({ children }) => React.createElement('div', { role: 'menuitem' }, children),
+    } } : {}),
     './update-submission-dialog': {}, './review-workspace': {},
   });
   const { JobSubmissions } = testLoad('components/submissions/job-submissions.tsx');
-  const html = renderToStaticMarkup(React.createElement(JobSubmissions, { jobId: 'job', initialResponse: response, onSaved() {} }));
+  return renderToStaticMarkup(React.createElement(JobSubmissions, { jobId: 'job', jobType: 'Full Time', market: 'IN', initialResponse: response, onSaved() {}, ...options }));
+}
+test('job table preserves server totals, pagination and status with a closed three-dot menu', () => {
+  const html = renderJob();
   assert.match(html, /Candidate submissions \(41\)/);
   assert.match(html, /Page 1 of 3/);
   assert.match(html, /L1 scheduled/);
-  assert.match(html, /Download resume/);
-  assert.match(html, /View details/);
-  assert.doesNotMatch(html, /Edit status|Submitted to Client/);
+  assert.match(html, /aria-label="Actions for Sample Candidate"/);
+  assert.match(html, /aria-haspopup="menu"/);
+  assert.doesNotMatch(html, /Edit status|View details|Download resume|Submitted to Client/);
+});
+test('summary hides stage filters while the dedicated pipeline retains them', () => {
+  assert.doesNotMatch(renderJob({}, { showStageFilters: false }), /aria-label="Submission stage"/);
+  assert.match(renderJob({}, { showStageFilters: true, showBoard: true }), /aria-label="Submission stage"/);
+  assert.match(renderJob({}, { showStageFilters: false }), /Page 1 of 3/);
+});
+test('expected full-time CTC and recruiter email replace the empty submitted-rate cell', () => {
+  const html = renderJob({ submittedRate: null, expectedCompensationAmount: '1500000', compensationInputUnit: 'LPA', compensationPeriod: 'YEAR', compensationCurrency: 'INR', recruiterName: 'Riya Sharma', recruiterEmail: 'riya@example.com' });
+  assert.match(html, /Expected CTC/);
+  assert.match(html, /INR 15 LPA/);
+  assert.match(html, /Riya Sharma/);
+  assert.match(html, /riya@example.com/);
+  assert.doesNotMatch(html, /Submitted rate/);
+});
+test('contract table shows monthly expectation instead of a separately recorded submitted rate', () => {
+  const html = renderJob({ submittedRate: '99999', expectedCompensationAmount: '60000', compensationInputUnit: 'MONTH', compensationPeriod: 'MONTH', compensationCurrency: 'INR' }, { jobType: 'Contractual' });
+  assert.match(html, /Expected monthly pay/);
+  assert.match(html, /INR 60,000 \/ month/);
+  assert.doesNotMatch(html, /99999|Expected CTC/);
+});
+test('international full-time expectations retain their recorded currency and annual unit', () => {
+  const html = renderJob({ expectedCompensationAmount: '90000', compensationInputUnit: 'YEAR', compensationPeriod: 'YEAR', compensationCurrency: 'EUR' }, { market: 'US' });
+  assert.match(html, /Expected annual compensation/);
+  assert.match(html, /EUR 90,000 \/ year/);
+  assert.doesNotMatch(html, /USD|INR|LPA/);
+});
+test('legacy annual CTC is not displayed as monthly contract pay', () => {
+  const html = renderJob({ candidateExpectedCtc: '12', candidateCtcCurrency: 'INR', candidateCtcTerm: 'LPA' }, { jobType: 'Contractual' });
+  assert.match(html, /Not recorded/);
+  assert.match(html, /Annual amount on file/);
+  assert.doesNotMatch(html, /INR 12/);
+});
+test('missing expectations do not borrow rate or legacy amounts from a new compensation snapshot', () => {
+  const html = renderJob({ expectedCompensationAmount: null, compensationInputUnit: 'MONTH', submittedRate: '99999', candidateExpectedCtc: '88888' }, { jobType: 'Contractual' });
+  assert.match(html, /Not recorded/);
+  assert.match(html, /Email not provided/);
+  assert.doesNotMatch(html, /99999|88888/);
+});
+test('the action menu retains view/download access and does not grant edit access by role name', () => {
+  const readOnly = renderJob({ systemRole: 'TENANT_ADMIN' }, {}, true);
+  assert.match(readOnly, /View details/);
+  assert.match(readOnly, /Download resume/);
+  assert.doesNotMatch(readOnly, /Edit status/);
+  const permitted = renderJob({ capabilities: { schedule: true, results: {} }, resume: { available: true, canDownload: false } }, {}, true);
+  assert.match(permitted, /Edit status/);
+  assert.doesNotMatch(permitted, /Download resume/);
+});
+test('compensation formatting preserves zero/decimals and never guesses missing periods or currencies', () => {
+  const { expectedSubmissionCompensation, expectedCompensationLabel } = load('lib/submission-compensation.ts');
+  assert.equal(expectedSubmissionCompensation({ compensationInputUnit: 'LPA', expectedCompensationAmount: '0', compensationCurrency: 'INR' }).value, 'INR 0 LPA');
+  assert.equal(expectedSubmissionCompensation({ compensationInputUnit: 'LPA', expectedCompensationAmount: '1250000.00', compensationCurrency: 'INR' }).value, 'INR 12.5 LPA');
+  assert.deepEqual(expectedSubmissionCompensation({ candidateExpectedCtc: '90000', candidateCtcCurrency: 'USD' }), { value: 'Not recorded', note: 'Compensation period unavailable' });
+  assert.deepEqual(expectedSubmissionCompensation({ expectedCompensationAmount: '90000.50', compensationInputUnit: 'YEAR', compensationPeriod: 'YEAR' }), { value: '90,000.5 / year', note: 'Currency not recorded' });
+  assert.equal(expectedCompensationLabel(undefined, 'IN'), 'Expected compensation');
+  assert.equal(expectedCompensationLabel('Unknown', 'IN'), 'Expected compensation');
 });

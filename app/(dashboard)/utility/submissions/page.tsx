@@ -1,7 +1,8 @@
 "use client";
 
 import { StageBadge, Pipeline } from "@/components/submissions/submission-stage";
-import { ResumeDownloadButton, ResumeDownloadMenuItem } from "@/components/submissions/resume-download";
+import { ResumeDownloadButton } from "@/components/submissions/resume-download";
+import { SubmissionActions } from "@/components/submissions/submission-actions";
 import { useTrackerColumns, TRACKER_COLUMN_WIDTHS, type TrackerColumn } from "@/components/submissions/tracker-columns";
 import { UpdateSubmissionDialog } from "@/components/submissions/update-submission-dialog";
 import { SubmissionHistory } from "@/components/submissions/submission-history";
@@ -12,7 +13,7 @@ import { USER_CITY_OPTIONS } from "@/lib/user-city-contract";
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock3, Filter, Loader2, RefreshCw, Search, MoreHorizontal, Pencil, Eye, Mail, Phone, MapPin, BriefcaseBusiness, Building2, ExternalLink } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock3, Filter, Loader2, RefreshCw, Search, Mail, Phone, MapPin, BriefcaseBusiness, Building2, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import { resolveActiveSystemRole } from "@/lib/role-permissions";
@@ -22,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { TrackerBucket, TrackerResponse, TrackerSubmission, TrackerUpdate } from "@/lib/submission-contract";
 import { ACTION_LABELS, canRejectRound, canRecordResult, canUpdateOutcome, needsOutcomeReason, currentRound, formatInterview, interviewInstant, localInterviewParts, primaryAction, validTimezone, ROUNDS, type TrackerAction } from "@/lib/submission-tracker";
@@ -111,10 +111,6 @@ function PersonProfileDialog({ target, onClose }: { target: ProfileTarget; onClo
 }
 function CandidateCell({ submission: sub, onOpen }: { submission: TrackerSubmission; onOpen: () => void }) {
   return <><button type="button" onClick={onOpen} className="text-left font-semibold text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.candidateName || "Name unavailable"}</button>{[sub.candidateEmail || "Email unavailable", sub.candidatePhone || "Mobile unavailable", sub.candidateCurrentLocation || "Location unavailable"].map((text, i) => <p key={i} className="mt-1 break-words text-[10.5px] text-muted-foreground">{text}</p>)}</>;
-}
-function SubmissionActions({ submission: sub, href, onAction }: { submission: TrackerSubmission; href: string; onAction: (action: TrackerAction) => void }) {
-  const canEdit = Boolean(sub.capabilities && (sub.capabilities.review || sub.capabilities.schedule || sub.capabilities.results.l1 || sub.capabilities.results.l2 || sub.capabilities.results.l3 || sub.capabilities.outcome || sub.capabilities.notes || sub.capabilities.rate));
-  return <div className="flex justify-center"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" title="Submission actions" aria-label={"Actions for " + (sub.candidateName || "candidate")}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44">{canEdit && <DropdownMenuItem onSelect={event => { event.preventDefault(); setTimeout(() => onAction("rounds"), 50); }}><Pencil className="h-4 w-4" />Edit status</DropdownMenuItem>}<DropdownMenuItem asChild><Link href={href}><Eye className="h-4 w-4" />View details</Link></DropdownMenuItem><ResumeDownloadMenuItem submission={sub} /></DropdownMenuContent></DropdownMenu></div>;
 }
 interface RemarkTemplate { id: number; stage: string; remarkText: string; remarkType?: string }
 function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
