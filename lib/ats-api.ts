@@ -2072,6 +2072,38 @@ const marketSegments = {
   },
 };
 
+export interface PublicJobsApiKey {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  scope: 'TENANT' | 'BRANCH' | 'BUSINESS_UNIT';
+  branchId: string | null;
+  businessUnitId: string | null;
+  allowedOrigins: string[];
+  expiresAt: string;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+const publicJobsApiKeys = {
+  list(): Promise<PublicJobsApiKey[]> {
+    return apiFetch('/api/public-jobs/keys');
+  },
+  create(input: {
+    name: string;
+    scope: PublicJobsApiKey['scope'];
+    branchId?: string;
+    businessUnitId?: string;
+    allowedOrigins: string[];
+    expiresAt: string;
+  }): Promise<PublicJobsApiKey & { secret: string; message: string }> {
+    return apiFetch('/api/public-jobs/keys', { method: 'POST', body: JSON.stringify(input) });
+  },
+  revoke(id: string): Promise<{ revoked: boolean }> {
+    return apiFetch(`/api/public-jobs/keys/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────
 const profile = {
   async get(): Promise<StaffProfile> {
@@ -2104,6 +2136,7 @@ const profile = {
 };
 
 export const atsApi = {
+  publicJobsApiKeys,
   profile,
   auth,
   jobs,
