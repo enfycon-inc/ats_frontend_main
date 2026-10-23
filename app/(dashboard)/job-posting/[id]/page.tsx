@@ -7,7 +7,7 @@ import type { TrackerResponse, TrackerSubmission } from "@/lib/submission-contra
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Pencil, Sparkles, DollarSign, Briefcase, MapPin, CreditCard, Building2, Clock, Zap, AlertCircle, UserPlus, ClipboardList, RefreshCw, Loader2, FileText, CheckCircle, XCircle, Upload, Share2 } from "lucide-react";
+import { ChevronLeft, Pencil, Sparkles, DollarSign, Briefcase, MapPin, CreditCard, Building2, Clock, Zap, AlertCircle, User, UserPlus, ClipboardList, RefreshCw, Loader2, FileText, CheckCircle, XCircle, Upload, Share2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -669,18 +669,25 @@ export default function JobDetailPage() {
                   </CardContent>
                 </Card>
 
-                {/* Account Manager */}
+                {/* Created By */}
                 <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-sm">
                   <CardContent className="p-5 space-y-4">
-                    <h3 className="text-xs font-bold text-neutral-800 dark:text-white">Account Manager</h3>
+                    <h3 className="text-xs font-bold text-neutral-800 dark:text-white">Created By</h3>
                     
                     <div className="flex items-center gap-4 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-100 dark:border-slate-800">
                       <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white dark:bg-slate-800 shadow-sm border border-neutral-100 dark:border-slate-700 shrink-0">
-                        <UserPlus className="h-4 w-4 text-neutral-500" />
+                        <User className="h-4 w-4 text-neutral-500" />
                       </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-neutral-450 block tracking-wider mb-0.5">Account Manager</span>
-                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 block">{job.recruitmentManager}</span>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[9px] uppercase font-bold text-neutral-450 block tracking-wider mb-0.5">Created By</span>
+                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 block truncate">
+                          {job.createdBy || job.accountManagerName || "System Admin"}
+                        </span>
+                        {(job.creatorEmail || job.accountManagerEmail) && (
+                          <span className="text-[11px] text-neutral-500 dark:text-neutral-400 block truncate">
+                            {job.creatorEmail || job.accountManagerEmail}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </CardContent>
