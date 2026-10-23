@@ -6,7 +6,8 @@ import { Country, State, City } from 'country-state-city';
 import { LockKeyhole, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { atsApi, activeRoleHeaders } from '@/lib/ats-api';
-import { CLIENT_CATEGORIES, clientCreationErrors, type ClientCreationRequest, type CreatedClient } from '@/lib/client-creation-contract';
+import { CLIENT_CATEGORIES, clientCreationErrors, type ClientCreationRequest, type ClientContactInput, type CreatedClient } from '@/lib/client-creation-contract';
+import { ClientPocFields } from '@/components/clients/client-poc-fields';
 import { Button } from '@/components/ui/button';
 
 interface Props {
@@ -25,7 +26,7 @@ export function ClientForm({ initialClientName = '', expectedMarket, onSaved, on
   const [country, setCountry] = useState<string | null>(null);
   const [stateIso, setStateIso] = useState('');
   const [addContact, setAddContact] = useState(false);
-  const [contact, setContact] = useState({ name: '', designation: '', email: '', phone: '' });
+  const [contact, setContact] = useState<ClientContactInput>({ firstName: '', lastName: '', designation: '', otherDesignation: '', email: '', phone: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [existingClient, setExistingClient] = useState<CreatedClient | null>(null);
@@ -82,7 +83,7 @@ export function ClientForm({ initialClientName = '', expectedMarket, onSaved, on
         branch_id: current.branchId, business_unit_id: current.businessUnitId, market: current.market, currency: current.currency,
         country: countryIso, state: stateIso ? State.getStateByCodeAndCountry(stateIso, countryIso)?.name : '',
         gstin: draft.gstin?.trim().toUpperCase(), pan_number: draft.pan_number?.trim().toUpperCase(),
-        email_id: draft.email_id?.trim(), contact: addContact ? { ...contact, name: contact.name.trim(), email: contact.email.trim() } : undefined,
+        email_id: draft.email_id?.trim(), contact: addContact ? contact : undefined,
       } as ClientCreationRequest;
       const validation = clientCreationErrors(payload);
       setErrors(validation);
@@ -128,14 +129,14 @@ export function ClientForm({ initialClientName = '', expectedMarket, onSaved, on
       </details>}
       <section className="space-y-3 rounded-lg border border-neutral-200 p-3 dark:border-slate-800">
         <label className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={addContact} onChange={e => setAddContact(e.target.checked)} />Add primary point of contact (optional)</label>
-        {addContact && <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{(['name', 'designation', 'email', 'phone'] as const).map((key, i) => <div key={key} className="space-y-1"><label htmlFor={`${id}-contact-${key}`} className="font-semibold">{['Contact name *', 'Designation', 'Work email *', 'Phone'][i]}</label><input id={`${id}-contact-${key}`} className={control} type={key === 'email' ? 'email' : key === 'phone' ? 'tel' : 'text'} value={contact[key]} onChange={e => setContact(prev => ({ ...prev, [key]: e.target.value }))} placeholder={key === 'phone' ? context.market === 'INDIA' ? '+91 98765 43210' : '+1 555 019 8234' : ''} /></div>)}</div>}
+        {addContact && <ClientPocFields id={id} value={contact} onChange={setContact} market={context.market} errors={errors} disabled={saving} />}
         {errors.contact && <p role="alert" className="text-red-600">{errors.contact}</p>}
       </section>
       {!existingClient && <details className="space-y-3 rounded-lg border border-neutral-200 p-3 dark:border-slate-800"><summary className="cursor-pointer text-sm font-bold">Advanced qualification (optional)</summary><div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {select('tier_rating', 'Client tier', ['TIER_1', 'TIER_2', 'TIER_3'])}{select('credit_check_status', 'Credit check', ['PENDING_CHECK', 'APPROVED', 'HIGH_RISK'])}{select('fillability_score', 'Fillability', ['HIGH', 'MEDIUM', 'LOW'])}
       </div>{field('vetting_notes', 'Internal qualification notes')}</details>}
       {!existingClient && <div className="space-y-1"><label htmlFor={`${id}-about`} className="font-semibold">About company</label><textarea id={`${id}-about`} rows={3} className={`${control} h-auto py-2`} value={draft.about_company || ''} onChange={e => set('about_company', e.target.value)} /></div>}
-      {Object.entries(errors).filter(([key]) => !['client_name', 'category', 'email_id', 'website', 'commission_percentage', 'gstin', 'pan_number', 'contact'].includes(key)).map(([key, message]) => <p role="alert" key={key} className="text-red-600">{message}</p>)}
+      {Object.entries(errors).filter(([key]) => !key.startsWith('contact.') && !['client_name', 'category', 'email_id', 'website', 'commission_percentage', 'gstin', 'pan_number', 'contact'].includes(key)).map(([key, message]) => <p role="alert" key={key} className="text-red-600">{message}</p>)}
     </fieldset>
     <div className="flex justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-slate-800"><Button type="button" variant="outline" disabled={saving} onClick={onCancel}>Cancel</Button><Button type="submit" disabled={saving} className="bg-indigo-600 text-xs text-white hover:bg-indigo-700">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{existingClient ? addContact ? 'Add contact' : 'Use existing client' : context.canDirectAdd ? 'Add Client' : 'Submit for approval'}</Button></div>
   </form>;

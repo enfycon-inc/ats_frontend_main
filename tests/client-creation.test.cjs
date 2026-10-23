@@ -13,6 +13,8 @@ function load(file, selectedContext = context, failure) {
   const localRequire = name => {
     if (name === 'swr') return { default: key => ({ data: key?.[0] === 'client-creation-context' ? selectedContext : undefined, error: failure, mutate: async () => selectedContext }) };
     if (name === '@/lib/ats-api') return { atsApi: {}, activeRoleHeaders: () => ({}) };
+    if (name === '@/components/clients/client-poc-fields') return load('components/clients/client-poc-fields.tsx');
+    if (name === '@/components/ui/phone-input') return { PhoneInput: props => React.createElement('input', { id: props.id, type: 'tel', value: props.value, readOnly: true, 'data-country': props.defaultCountry }) };
     if (name === '@/lib/client-creation-contract') return load('lib/client-creation-contract.ts');
     if (name === '@/components/ui/button') return { Button: ({ children, ...props }) => React.createElement('button', props, children) };
     return require(name);
@@ -62,3 +64,15 @@ if (process.argv.includes('--preview')) {
   fs.mkdirSync(folder, { recursive: true });
   fs.writeFileSync(path.join(folder, 'index.html'), `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="style.css"><title>Shared Add Client form preview</title></head><body class="bg-neutral-50 text-neutral-900"><header class="bg-blue-800 p-4 text-white font-bold">EnfySync ATS — Local design verification</header><main class="mx-auto max-w-5xl p-6"><h1 class="text-xl font-bold mb-4">Add Client</h1><div class="bg-white p-6 rounded-xl border border-neutral-200">${html}</div></main></body></html>`);
 }
+
+
+test('POC fields show separate names, common titles, and a country-aware mobile control', () => {
+  const { ClientPocFields } = load('components/clients/client-poc-fields.tsx');
+  const html = renderToStaticMarkup(React.createElement(ClientPocFields, { id: 'poc', value: { firstName: 'Ananya', lastName: 'Sen', designation: 'HR Manager' }, onChange() {}, market: 'INDIA', errors: {} }));
+  for (const text of ['First name', 'Last name', 'HR Manager', 'Hiring Manager', 'VMS Lead', 'Mobile number', 'data-country="IN"']) assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /Specify designation/);
+  const other = renderToStaticMarkup(React.createElement(ClientPocFields, { id: 'poc', value: { designation: 'Other' }, onChange() {}, market: 'US', errors: { 'contact.phone': 'Invalid mobile number' } }));
+  assert.match(other, /Specify designation/);
+  assert.match(other, /data-country="US"/);
+  assert.match(other, /Invalid mobile number/);
+});
