@@ -3,9 +3,10 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import type ReactQuillInstance from "react-quill-new";
-import { formatJobDescription, hasJobDescriptionMarkdown, sanitizeJobDescription } from "@/lib/job-description-format";
+import { formatJobDescription, hasJobDescriptionMarkdown, MAX_JOB_DESCRIPTION_CHARS, sanitizeJobDescription } from "@/lib/job-description-format";
 import { cn } from "@/lib/utils";
 import { Code, Eye, Sparkles, FileText } from "lucide-react";
+import { toast } from "sonner";
 import "react-quill-new/dist/quill.snow.css";
 
 const ReactQuill = dynamic(async () => {
@@ -101,9 +102,24 @@ export function RichTextEditor({
     const html = event.clipboardData.getData("text/html");
     const plain = event.clipboardData.getData("text/plain");
     if (!html && !plain) return;
+    if (plain.length > MAX_JOB_DESCRIPTION_CHARS) {
+      event.preventDefault();
+      event.stopPropagation();
+      toast.error("This job description is too large to process in one paste. Split it into smaller sections and paste them separately.");
+      return;
+    }
+    const usePlainText = hasJobDescriptionMarkdown(plain) || !html;
+    const source = usePlainText ? plain : html;
+    const maxPasteLength = MAX_JOB_DESCRIPTION_CHARS * (usePlainText ? 1 : 4);
+    if (source.length > maxPasteLength) {
+      event.preventDefault();
+      event.stopPropagation();
+      toast.error("This job description is too large to process in one paste. Split it into smaller sections and paste them separately.");
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
-    const formatted = formatJobDescription(hasJobDescriptionMarkdown(plain) ? plain : html || plain);
+    const formatted = formatJobDescription(source);
     if (!formatted) return;
     const selection = editor.getSelection(true) || { index: Math.max(0, editor.getLength() - 1), length: 0 };
     const delta = editor.clipboard.convert({ html: formatted });

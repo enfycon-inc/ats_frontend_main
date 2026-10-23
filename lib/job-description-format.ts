@@ -6,6 +6,7 @@ import {
 } from './job-description-policy';
 
 const markdown = new Marked({ async: false, gfm: true, breaks: true });
+export const MAX_JOB_DESCRIPTION_CHARS = 50_000;
 const policy = {
   ALLOWED_TAGS: JOB_DESCRIPTION_TAGS,
   ALLOWED_ATTR: JOB_DESCRIPTION_ATTRIBUTES,

@@ -1327,6 +1327,7 @@ const jobs = {
     return apiFetch('/api/jobs/parse-jd', {
       method: 'POST',
       body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(15_000),
     });
   },
 
