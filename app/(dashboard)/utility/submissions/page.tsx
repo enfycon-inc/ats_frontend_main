@@ -1,5 +1,7 @@
 "use client";
 
+import { StageBadge, Pipeline } from "@/components/submissions/submission-stage";
+import { ResumeDownloadButton, ResumeDownloadMenuItem } from "@/components/submissions/resume-download";
 import { useTrackerColumns, TRACKER_COLUMN_WIDTHS, type TrackerColumn } from "@/components/submissions/tracker-columns";
 import { UpdateSubmissionDialog } from "@/components/submissions/update-submission-dialog";
 import { SubmissionHistory } from "@/components/submissions/submission-history";
@@ -10,7 +12,7 @@ import { USER_CITY_OPTIONS } from "@/lib/user-city-contract";
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, X, Download, Filter, Loader2, RefreshCw, Search, XCircle, MoreHorizontal, Pencil, Eye, Mail, Phone, MapPin, BriefcaseBusiness, Building2, ExternalLink } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock3, Filter, Loader2, RefreshCw, Search, MoreHorizontal, Pencil, Eye, Mail, Phone, MapPin, BriefcaseBusiness, Building2, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import { resolveActiveSystemRole } from "@/lib/role-permissions";
@@ -23,7 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { TrackerBucket, TrackerResponse, TrackerSubmission, TrackerUpdate } from "@/lib/submission-contract";
-import { ACTION_LABELS, canRejectRound, canRecordResult, rejectionStage, canUpdateOutcome, needsOutcomeReason, currentRound, formatInterview, interviewInstant, localInterviewParts, primaryAction, stage, statusDate, validTimezone, ROUNDS, type TrackerAction } from "@/lib/submission-tracker";
+import { ACTION_LABELS, canRejectRound, canRecordResult, canUpdateOutcome, needsOutcomeReason, currentRound, formatInterview, interviewInstant, localInterviewParts, primaryAction, validTimezone, ROUNDS, type TrackerAction } from "@/lib/submission-tracker";
 
 const FILTERS: { key: TrackerBucket; label: string }[] = [
   { key: "all", label: "All" }, { key: "review", label: "Needs review" },
@@ -38,13 +40,6 @@ function submissionOrdinal(value: number): string {
 const PRIMARY = "bg-[#1a4fa0] text-white hover:bg-[#154181]";
 const OUTLINE = "border-[#1a4fa0]/40 text-[#1a4fa0] hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950";
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500";
-const TONES = {
-  amber: "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  blue: "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  green: "bg-[#008000] text-white",
-  red: "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-300",
-  neutral: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-};
 function TableDate({ value, timezone }: { value?: string | null; timezone?: string | null }) {
   if (!value || !Number.isFinite(new Date(value).getTime())) return <span>—</span>;
   const instant = new Date(value);
@@ -119,50 +114,8 @@ function CandidateCell({ submission: sub, onOpen }: { submission: TrackerSubmiss
 }
 function SubmissionActions({ submission: sub, href, onAction }: { submission: TrackerSubmission; href: string; onAction: (action: TrackerAction) => void }) {
   const canEdit = Boolean(sub.capabilities && (sub.capabilities.review || sub.capabilities.schedule || sub.capabilities.results.l1 || sub.capabilities.results.l2 || sub.capabilities.results.l3 || sub.capabilities.outcome || sub.capabilities.notes || sub.capabilities.rate));
-  return <div className="flex justify-center"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" title="Submission actions" aria-label={"Actions for " + (sub.candidateName || "candidate")}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44">{canEdit && <DropdownMenuItem onSelect={event => { event.preventDefault(); setTimeout(() => onAction("rounds"), 50); }}><Pencil className="h-4 w-4" />Edit status</DropdownMenuItem>}<DropdownMenuItem asChild><Link href={href}><Eye className="h-4 w-4" />View details</Link></DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>;
+  return <div className="flex justify-center"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" title="Submission actions" aria-label={"Actions for " + (sub.candidateName || "candidate")}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44">{canEdit && <DropdownMenuItem onSelect={event => { event.preventDefault(); setTimeout(() => onAction("rounds"), 50); }}><Pencil className="h-4 w-4" />Edit status</DropdownMenuItem>}<DropdownMenuItem asChild><Link href={href}><Eye className="h-4 w-4" />View details</Link></DropdownMenuItem><ResumeDownloadMenuItem submission={sub} /></DropdownMenuContent></DropdownMenu></div>;
 }
-function StageBadge({ submission }: { submission: TrackerSubmission }) {
-  const state = stage(submission);
-  const date = statusDate(submission);
-  const Icon = state.tone === "green" ? CheckCircle2 : state.tone === "red" ? XCircle : state.tone === "blue" ? CalendarDays : Clock3;
-  return <div className="flex flex-col items-center gap-1.5"><span className={cn("inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[10.5px] font-semibold max-w-full text-center", TONES[state.tone])}><Icon className="h-3.5 w-3.5" />{state.label}</span>{date && <time dateTime={date.value} title={date.label} className="text-[10.5px] leading-4 text-muted-foreground">{date.label === "Scheduled interview" ? "" : date.label + " "}{formatInterview(date.value, validTimezone(submission.timezone))}</time>}</div>;
-}
-function Pipeline({ submission }: { submission: TrackerSubmission }) {
-  const state = stage(submission);
-  const rejectedKey = rejectionStage(submission);
-  const approvalEvidence = ["SUBMITTED", "OFFER"].includes(submission.rejectionFromStatus || "") || ROUNDS.some(round => ["SCHEDULED", "CLEARED", "REJECTED"].includes(submission[`${round.key}Status`] || ""));
-  const reviewComplete = submission.finalStatus !== "PENDING_APPROVAL" && rejectedKey !== "review" && (submission.finalStatus !== "REJECTED" || approvalEvidence);
-  const terminal = ["SELECTED", "JOIN", "OFFER"].includes(submission.finalStatus);
-  const current = currentRound(submission)?.key;
-  const stages = [{ key: "review", label: "Internal review", complete: reviewComplete }, ...ROUNDS.map(round => ({ key: round.key, label: round.label, complete: submission[`${round.key}Status`] === "CLEARED" })) , { key: "final", label: "Final", complete: terminal }];
-  const activeKey = submission.finalStatus === "PENDING_APPROVAL" ? "review" : current || "final";
-  return <div className="mx-auto w-full min-w-0 max-w-[300px]" aria-label={`Pipeline: ${state.label}`}><div className="grid grid-cols-5">{stages.map((item, index) => {
-    const rejected = item.key === rejectedKey;
-    const active = !["NOT_SELECTED", "WITHDRAWN", "JOIN"].includes(submission.finalStatus) && !rejectedKey && item.key === activeKey && !item.complete;
-    const skipped = terminal && ROUNDS.some(round => round.key === item.key) && !item.complete;
-    return <div key={item.key} className="relative flex min-w-0 flex-col items-center gap-1.5">
-      {index < stages.length - 1 && <span aria-hidden="true" className={cn("absolute left-[calc(50%+14px)] top-2.5 h-px w-[calc(100%-28px)]", item.complete ? "bg-[#008000]" : "bg-slate-200 dark:bg-slate-700")} />}
-      <span className="relative flex h-5 w-5 items-center justify-center">
-        {active && <span aria-hidden="true" className="absolute -inset-1 rounded-full bg-[#1a4fa0]/15 motion-safe:animate-pulse" />}
-        <span aria-hidden="true" className={cn("relative flex h-5 w-5 items-center justify-center rounded-full border-2", rejected ? "border-red-600 bg-red-600" : item.complete ? "border-[#008000] bg-[#008000]" : active ? state.tone === "red" ? "border-red-500 bg-red-50" : "border-[#1a4fa0] bg-[#1a4fa0]" : "border-slate-300 bg-background")}>{rejected ? <X className="h-3 w-3 text-white" strokeWidth={3} /> : item.complete ? <Check className="h-3 w-3 text-white" strokeWidth={3} /> : skipped ? <span className="text-xs leading-none text-muted-foreground">−</span> : null}</span>
-      </span>
-      <span className={cn("text-center text-[10px] leading-tight", active ? "font-semibold text-[#1a4fa0] dark:text-blue-300" : "text-muted-foreground")}>{item.label}{skipped && <span className="sr-only"> (skipped)</span>}</span>
-    </div>;
-  })}</div></div>;
-}
-async function downloadResume(sub: TrackerSubmission) {
-  try {
-    const blob = await atsApi.candidates.fetchResumeBlob(sub.candidateId);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    const extension = blob.type === "application/pdf" ? ".pdf" : blob.type === "application/msword" ? ".doc" : blob.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ? ".docx" : "";
-    link.download = `${sub.candidateName || sub.candidateId}-resume${extension}`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  } catch { toast.error("Unable to download the resume. Please try again."); }
-}
-
 interface RemarkTemplate { id: number; stage: string; remarkText: string; remarkType?: string }
 function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
   submission: TrackerSubmission; action: TrackerAction; onClose: () => void; onSaved: (sub: TrackerSubmission) => void;
@@ -186,7 +139,6 @@ function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
   const [outcome, setOutcome] = useState("OFFER");
   const [rate, setRate] = useState("");
   const [templates, setTemplates] = useState<RemarkTemplate[]>([]);
-  const [resumeLoading, setResumeLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -286,7 +238,6 @@ function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
             <div className="space-y-1.5"><Label htmlFor="interview-timezone" className="text-xs">Timezone</Label><Input id="interview-timezone" readOnly value={timezone} className="text-xs h-9" /><p className="text-[10.5px] text-muted-foreground">{current.timezone ? "Timezone from this job." : "Using your device timezone; this job has no timezone configured."}</p></div>
             <div className="space-y-1.5"><Label htmlFor="meeting-link" className="text-xs">Meeting link (optional)</Label><Input id="meeting-link" type="url" value={meetingLink} onChange={e => setMeetingLink(e.target.value)} placeholder="Add meeting link" className="text-xs h-9" /></div>
           </>}
-          {action === "review" && atsApi.auth.getCurrentUser()?.permissions?.includes("candidate:download_resume") && <div className="flex items-center justify-between rounded-md border border-border p-3"><span className="text-xs">Review candidate resume</span><Button type="button" variant="outline" size="sm" className="text-xs" disabled={resumeLoading} onClick={async () => { setResumeLoading(true); await downloadResume(current); setResumeLoading(false); }}><Download className="h-3.5 w-3.5" />Resume</Button></div>}
           {action === "result" && <div className="space-y-1.5"><Label htmlFor="interview-result" className="text-xs">Result</Label><select id="interview-result" className={SELECT} value={result} onChange={e => setResult(e.target.value)}><option value="CLEARED">Selected</option><option value="REJECTED">Rejected</option></select></div>}
           {action === "outcome" && <><div className="space-y-1.5"><Label htmlFor="submission-outcome" className="text-xs">Status</Label><select id="submission-outcome" className={SELECT} value={outcome} onChange={e => setOutcome(e.target.value)}>{current.finalStatus !== "OFFER" && <option value="OFFER">Offer issued</option>}<option value="JOIN">Joined</option><option value="REJECTED">Rejected</option></select></div>{needsOutcomeReason(current, outcome) && <div className="space-y-1.5"><Label htmlFor="bypass-reason" className="text-xs">Remarks</Label><Textarea id="bypass-reason" value={bypassReason} onChange={e => setBypassReason(e.target.value)} maxLength={4000} required rows={2} className="text-xs" placeholder="Type remarks to see suggestions…" />{bypassSuggestions.length > 0 && <div aria-label="Final remark suggestions" className="max-h-40 space-y-1 overflow-y-auto">{bypassSuggestions.map(template => <button key={template.id} type="button" disabled={saving} className="block w-full rounded border border-border px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => setBypassReason(template.remarkText)}>{template.remarkText}</button>)}</div>}<p className="text-xs text-muted-foreground">These remarks will be recorded in the history.</p></div>}</>}
           <div className="space-y-1.5">
@@ -316,7 +267,7 @@ function SubmissionDetails({ submission }: { submission: TrackerSubmission }) {
   return <div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h1 className="text-xl font-bold tracking-tight">{submission.candidateName || "Name unavailable"}</h1><p className="mt-1 text-xs text-muted-foreground">{[submission.jobTitle, submission.clientName].filter(Boolean).join(" · ") || "Job details unavailable"}</p></div>
-      {atsApi.auth.getCurrentUser()?.permissions?.includes("candidate:download_resume") && <div className="flex flex-wrap gap-2"><Button variant="outline" className="text-xs" onClick={() => void downloadResume(submission)}><Download className="h-3.5 w-3.5" />Resume</Button></div>}
+      <ResumeDownloadButton submission={submission} />
     </div>
     <div className="rounded-xl border border-border bg-card p-5"><StageBadge submission={submission} /><dl className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{detail.map(([label, value]) => <div key={label}><dt className="text-[11px] text-muted-foreground">{label}</dt><dd className="mt-1 text-xs break-words">{value || "—"}</dd></div>)}</dl></div>
     <SubmissionHistory submission={submission} />

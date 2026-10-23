@@ -1691,6 +1691,22 @@ const pods = {
 };
 
 const submissions = {
+  async downloadResume(id: string): Promise<{ blob: Blob; filename: string | null }> {
+    const token = getToken();
+    const headers: Record<string, string> = activeRoleHeaders();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${getApiBase()}/api/recruiter-submissions/${encodeURIComponent(id)}/resume`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(response.status === 404 ? 'No resume is available for this submission.'
+        : response.status === 403 ? 'You cannot download this resume. Check your permission and submission approval status.'
+        : 'Unable to download the resume. Please try again.');
+    }
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    let filename = disposition.match(/filename="([^"]+)"/i)?.[1] || null;
+    if (encoded) { try { filename = decodeURIComponent(encoded); } catch { /* Use the plain filename. */ } }
+    return { blob: await response.blob(), filename };
+  },
   async getPersonProfile(id: string, kind: 'recruiter' | 'account-manager'): Promise<any> {
     return apiFetch(`/api/recruiter-submissions/${id}/people/${kind}`);
   },

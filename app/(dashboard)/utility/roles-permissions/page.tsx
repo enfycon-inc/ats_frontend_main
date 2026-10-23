@@ -81,7 +81,7 @@ const SYSTEM_ARCHETYPES = [
       "job:create", "job:grant_creation_delegate", "job:edit", "job:view", "job:publish_direct", "job:approve", "job:reject",
       "job:assign_recruiter",
       "candidate:view", "candidate:create",
-      "submission:view", "submission:create", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
+      "submission:download_resume", "submission:view", "submission:create", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
       "pod:view", "client:view", "client:bdm_access", "client:create", "client:direct_add", "client:edit",
       "placement:view", "placement:create", "report:view"
     ]
@@ -553,7 +553,7 @@ export default function RolesPermissionsPage() {
     );
     const dbPerms = dbSysRole?.allowedPermissions || (dbSysRole && Array.isArray(dbSysRole.permissions) ? dbSysRole.permissions : []);
 
-    return [...new Set([...(dbSysRole ? dbPerms : archPerms), ...(['TENANT_ADMIN', 'BRANCH_ADMIN', 'UNIT_ADMIN'].includes(keyUpper) ? ['candidate:download_resume'] : []), 'job:view_pod_jobs', 'job:submit_pod_jobs', ...(keyUpper === 'POD_LEAD' ? ['job:assign_recruiter'] : []), ...(['DELIVERY_HEAD', 'UNIT_ADMIN', 'BRANCH_ADMIN', 'TENANT_ADMIN'].includes(keyUpper) ? ['job:override_assignment'] : [])])];
+    return [...new Set([...(dbSysRole ? dbPerms : archPerms), ...(keyUpper === 'ACCOUNT_MANAGER' ? ['submission:download_resume'] : []), ...(['TENANT_ADMIN', 'BRANCH_ADMIN', 'UNIT_ADMIN'].includes(keyUpper) ? ['candidate:download_resume'] : []), 'job:view_pod_jobs', 'job:submit_pod_jobs', ...(keyUpper === 'POD_LEAD' ? ['job:assign_recruiter'] : []), ...(['DELIVERY_HEAD', 'UNIT_ADMIN', 'BRANCH_ADMIN', 'TENANT_ADMIN'].includes(keyUpper) ? ['job:override_assignment'] : [])])];
   };
 
   const matrixAllowedPerms = useMemo(() => {

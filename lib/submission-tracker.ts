@@ -8,6 +8,17 @@ export const ROUNDS: { key: RoundKey; label: string }[] = [
   { key: 'l3', label: 'L3' },
 ];
 export type TrackerAction = 'rounds' | 'review' | 'schedule' | 'result' | 'reject' | 'outcome' | 'notes' | 'rate';
+export function canMaintainSubmission(sub: TrackerSubmission): boolean {
+  const caps = sub.capabilities;
+  return Boolean(caps && (caps.review || caps.schedule || caps.outcome || Object.values(caps.results).some(Boolean)));
+}
+
+export function submissionBucket(sub: TrackerSubmission): 'review' | 'interviews' | 'offers' | 'closed' {
+  if (['SELECTED', 'OFFER'].includes(sub.finalStatus)) return 'offers';
+  if (['REJECTED', 'NOT_SELECTED', 'WITHDRAWN', 'JOIN'].includes(sub.finalStatus)) return 'closed';
+  const started = ROUNDS.some(({ key }) => ['SCHEDULED', 'AWAITING_FEEDBACK', 'CLEARED', 'REJECTED', 'CANCELLED'].includes(sub[`${key}Status`] || '') || Boolean(sub[`${key}Date`]));
+  return sub.finalStatus === 'SUBMITTED' && started ? 'interviews' : 'review';
+}
 export const ACTION_LABELS: Record<TrackerAction, string> = {
   rounds: 'Update submission', review: 'Review submission', schedule: 'Schedule interview', result: 'Record result',
   reject: 'Reject at current stage', outcome: 'Update status', notes: 'Edit notes', rate: 'Edit rate',

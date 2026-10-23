@@ -3,9 +3,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 const mod = { exports: {} };
-new Function('exports', ts.transpileModule(fs.readFileSync('lib/submission-tracker.ts', 'utf8'), {
+const contract = { exports: {} };
+new Function('exports', ts.transpileModule(fs.readFileSync('lib/submission-contract.ts', 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS },
-}).outputText)(mod.exports);
+}).outputText)(contract.exports);
+new Function('exports', 'require', ts.transpileModule(fs.readFileSync('lib/submission-tracker.ts', 'utf8'), {
+  compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS },
+}).outputText)(mod.exports, name => name === './submission-contract' ? contract.exports : require(name));
 const { stage, primaryAction, canRejectRound, canRecordResult, rejectionStage, canUpdateOutcome, needsOutcomeReason, interviewInstant, localInterviewParts } = mod.exports;
 const base = {
   finalStatus: 'SUBMITTED', l1Status: 'PENDING', l2Status: null, l3Status: null,
@@ -87,7 +91,8 @@ test('outcome updates are available independently from the current interview', (
   assert.equal(canUpdateOutcome(sub), true);
   assert.equal(needsOutcomeReason(sub, 'JOIN'), true);
   assert.equal(canUpdateOutcome({ ...sub, finalStatus: 'PENDING_APPROVAL' }), false);
-  assert.equal(canUpdateOutcome({ ...sub, finalStatus: 'JOIN' }), false);
+  // The current editor supports correcting/reopening a closed outcome with a reason.
+  assert.equal(canUpdateOutcome({ ...sub, finalStatus: 'JOIN' }), true);
   assert.equal(canUpdateOutcome({ ...sub, capabilities: { ...sub.capabilities, outcome: false } }), false);
   assert.equal(needsOutcomeReason({ ...sub, finalStatus: 'OFFER', l3Status: 'CLEARED' }, 'JOIN'), false);
 });
