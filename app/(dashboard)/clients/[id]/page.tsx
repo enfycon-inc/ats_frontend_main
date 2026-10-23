@@ -614,15 +614,7 @@ export default function ClientDetailPage() {
                 <div className="space-y-1">
                   <label className="font-bold text-neutral-700 dark:text-neutral-300">Target Market</label>
                   {isEditing ? (
-                    <select
-                      name="market"
-                      value={formData.market}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-xs bg-neutral-50 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 rounded outline-none"
-                    >
-                      <option value="US">US IT Staffing Market ($)</option>
-                      <option value="INDIA">India Domestic Market (₹)</option>
-                    </select>
+                    <span className="text-xs font-semibold" aria-label="Market (read-only)">{formData.market === "INDIA" ? "India Domestic Market (₹)" : "US IT Staffing Market ($)"}</span>
                   ) : (
                     <p className="font-semibold text-neutral-800 dark:text-neutral-200">{isIndiaMarket ? "India Domestic (₹)" : "US IT Market ($)"}</p>
                   )}

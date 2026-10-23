@@ -882,14 +882,7 @@ export default function ClientDashboard() {
                     <Globe className="h-4 w-4" /> 3. Market Alignment &amp; Tax Identifiers
                   </h4>
 
-                  <select
-                    value={editFormData.market}
-                    onChange={(e) => setEditFormData({ ...editFormData, market: e.target.value, currency: e.target.value === "INDIA" ? "INR" : "USD" })}
-                    className="text-xs font-bold px-2.5 py-1 bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 rounded-md text-indigo-700 dark:text-indigo-300"
-                  >
-                    <option value="US">US IT Staffing Market ($)</option>
-                    <option value="INDIA">India Domestic Market (₹)</option>
-                  </select>
+                  <span className="text-xs font-semibold" aria-label="Market (read-only)">{editFormData.market === "INDIA" ? "India Domestic Market (₹)" : "US IT Staffing Market ($)"}</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -1,4 +1,5 @@
 import type { SignInPolicy, SignInPolicyUpdate } from "./sign-in-policy";
+import type { ClientCreationContext, ClientCreationRequest, CreatedClient } from './client-creation-contract';
 import type { TenantEmailSettings, EmailDispatchMode, EmailDispatchResult } from './system-email.types';
 import type { UserCity } from './user-city-contract';
 import type { RoleRequestDecision, RoleRequestReview, RoleRequestSubmission } from './role-request-contract';
@@ -1562,6 +1563,9 @@ const candidates = {
 };
 
 const clients = {
+  async creationContext(): Promise<ClientCreationContext> {
+    return apiFetch('/api/clients/creation-context');
+  },
   async getVisibilityPolicy(): Promise<ClientAccessPolicy> {
     return apiFetch('/api/clients/visibility-policy');
   },
@@ -1587,8 +1591,8 @@ const clients = {
     return apiFetch<any>(`/api/clients/${id}`);
   },
 
-  async create(data: Record<string, any>): Promise<any> {
-    return apiFetch<any>('/api/clients', {
+  async create(data: ClientCreationRequest): Promise<CreatedClient> {
+    return apiFetch<CreatedClient>('/api/clients', {
       method: 'POST',
       body: JSON.stringify(data),
     });

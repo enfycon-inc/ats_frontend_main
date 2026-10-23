@@ -3445,19 +3445,14 @@ const getInitialActiveBranchContext = () => {
           }
         }}
         initialClientName={prefilledClientName}
-        onClientAdded={async (clientName) => {
-          const latestClients = await atsApi.clients.list();
-          const addedClient = latestClients.find((c: any) => (c.client_name || c.clientName) === clientName);
-          setClientList(latestClients);
+        onClientAdded={(clientName, addedClient) => {
+          setClientList(prev => [...prev.filter(c => c.id !== addedClient.id), addedClient]);
           setClientsError("");
           if (clientModalTarget === "client") {
-            selectClient(clientName, addedClient?.id || null);
+            selectClient(clientName, addedClient.id);
             applyClientCommission(addedClient);
-            if (!getValues("endClientName")) {
-              selectClient(clientName, addedClient?.id || null, true);
-            }
           } else {
-            selectClient(clientName, addedClient?.id || null, true);
+            selectClient(clientName, addedClient.id, true);
           }
           setPrefilledClientName("");
         }}

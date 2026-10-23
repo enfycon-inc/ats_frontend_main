@@ -379,15 +379,7 @@ export default function EditClientCRMPage() {
 
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">Target Market:</span>
-                <select
-                  name="market"
-                  value={formData.market}
-                  onChange={handleChange}
-                  className="text-xs font-bold px-2.5 py-1 bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 rounded-md text-indigo-700 dark:text-indigo-300"
-                >
-                  <option value="US">US IT Staffing Market ($)</option>
-                  <option value="INDIA">India Domestic Market (₹)</option>
-                </select>
+                <span className="text-xs font-semibold" aria-label="Market (read-only)">{formData.market === "INDIA" ? "India Domestic Market (₹)" : "US IT Staffing Market ($)"}</span>
               </div>
             </div>
 

@@ -3198,13 +3198,10 @@ const getInitialActiveBranchContext = () => {
           }
         }}
         initialClientName={prefilledClientName}
-        onClientAdded={(clientName) => {
-          fetchClients();
+        onClientAdded={(clientName, addedClient) => {
+          setClientList(prev => [...prev.filter(c => c.id !== addedClient.id), addedClient]);
           if (clientModalTarget === "client") {
             setValue("client", clientName, { shouldValidate: true });
-            if (!getValues("endClientName")) {
-              setValue("endClientName", clientName, { shouldValidate: true });
-            }
           } else {
             setValue("endClientName", clientName, { shouldValidate: true });
           }
