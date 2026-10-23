@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
 import { Job } from "../../data/mock-jobs";
+import { jobLocationDisplay } from "@/lib/job-location";
 import {
   getRecruiterDisplay,
   formatDateTimeDisplay,
@@ -394,7 +395,7 @@ export function JobTableRow({
                   {job.jobType || "Contract"}
                 </span>
                 <span className="text-[10.5px] text-slate-400 dark:text-slate-500">
-                  {job.location || job.states || "Remote"}
+                  {jobLocationDisplay(job)}
                 </span>
               </div>
             ) : colId === "submissionsCount" ? (

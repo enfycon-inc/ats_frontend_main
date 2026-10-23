@@ -1,6 +1,7 @@
 "use client";
 
 import { JobSubmissions } from "@/components/submissions/job-submissions";
+import { jobLocationDisplay } from "@/lib/job-location";
 import type { TrackerResponse, TrackerSubmission } from "@/lib/submission-contract";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
@@ -395,7 +396,7 @@ export default function JobDetailPage() {
               </h1>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-neutral-500 font-medium">
                 <span className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-neutral-400" /> {job.client} {job.clientJobId !== "N/A" ? `→ ${job.clientJobId}` : ""}</span>
-                <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-neutral-400" /> {job.location || "Remote"}</span>
+                <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-neutral-400" /> {jobLocationDisplay(job)}</span>
                 <span className="flex items-center gap-1.5"><Briefcase className="h-3.5 w-3.5 text-neutral-400" /> {job.jobType || "Contract"}</span>
                 <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5 text-neutral-400" /> {job.visaType || "ALL_VISA"}</span>
               </div>
@@ -574,10 +575,6 @@ export default function JobDetailPage() {
               </div>
             </Card>
 
-            <Card className="rounded-xl border border-border bg-card p-4">
-              {submissionResponse && <JobSubmissions jobId={String(id)} jobType={job.jobType} market={job.market} initialResponse={submissionResponse} onSaved={loadData} showStageFilters={false} />}
-            </Card>
-
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
               
               {/* Left Description area */}
@@ -697,7 +694,7 @@ export default function JobDetailPage() {
         {/* TAB 2: SUBMISSIONS PIPELINE */}
         {activeTab === "pipeline" && submissionResponse && (
           <Card className="rounded-xl border border-border bg-card p-4">
-            <JobSubmissions jobId={String(id)} jobType={job.jobType} market={job.market} initialResponse={submissionResponse} onSaved={loadData} showBoard />
+            <JobSubmissions jobId={String(id)} jobType={job.jobType} market={job.market} initialResponse={submissionResponse} onSaved={loadData} showBoard showStageFilters={false} />
           </Card>
         )}
 

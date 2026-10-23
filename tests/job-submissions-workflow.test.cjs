@@ -86,10 +86,12 @@ test('job table preserves server totals, pagination and status with a closed thr
   assert.match(html, /aria-haspopup="menu"/);
   assert.doesNotMatch(html, /Edit status|View details|Download resume|Submitted to Client/);
 });
-test('summary hides stage filters while the dedicated pipeline retains them', () => {
-  assert.doesNotMatch(renderJob({}, { showStageFilters: false }), /aria-label="Submission stage"/);
-  assert.match(renderJob({}, { showStageFilters: true, showBoard: true }), /aria-label="Submission stage"/);
-  assert.match(renderJob({}, { showStageFilters: false }), /Page 1 of 3/);
+test('pipeline hides stage filters and retains table/board controls and pagination', () => {
+  const html = renderJob({}, { showStageFilters: false, showBoard: true });
+  assert.doesNotMatch(html, /aria-label="Submission stage"/);
+  assert.match(html, />Table</);
+  assert.match(html, />Board</);
+  assert.match(html, /Page 1 of 3/);
 });
 test('expected full-time CTC and recruiter email replace the empty submitted-rate cell', () => {
   const html = renderJob({ submittedRate: null, expectedCompensationAmount: '1500000', compensationInputUnit: 'LPA', compensationPeriod: 'YEAR', compensationCurrency: 'INR', recruiterName: 'Riya Sharma', recruiterEmail: 'riya@example.com' });

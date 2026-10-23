@@ -4,6 +4,7 @@
 import React, { useState } from "react";
 import { CheckCircle, XCircle } from "lucide-react";
 import { Job } from "../../data/mock-jobs";
+import { jobLocationDisplay } from "@/lib/job-location";
 import { Button } from "@/components/ui/button";
 import { atsApi } from "@/lib/ats-api";
 import { toast } from "react-hot-toast";
@@ -141,7 +142,7 @@ export function ApproveJobModal({
                   Location & Work Mode
                 </span>
                 <span className="font-medium text-slate-800 dark:text-slate-200">
-                  {job.location || "Remote"}
+                  {jobLocationDisplay(job)}
                   {job.states ? `, ${job.states}` : ""}
                 </span>
               </div>
@@ -373,7 +374,7 @@ export function RejectJobModal({
                   Location & Work Mode
                 </span>
                 <span className="font-medium text-slate-800 dark:text-slate-200">
-                  {job.location || "Remote"}
+                  {jobLocationDisplay(job)}
                   {job.states ? `, ${job.states}` : ""}
                 </span>
               </div>

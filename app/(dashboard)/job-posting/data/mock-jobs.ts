@@ -1,4 +1,6 @@
 import type { JobStatus } from '@/lib/job-status-contract';
+import { jobLocation } from '@/lib/job-location';
+import { normalizeJobWorkMode, type JobWorkMode } from '@/lib/job-work-mode';
 export interface AssignedRecruiterProfile {
   id: string;
   fullName: string;
@@ -18,6 +20,7 @@ export interface Job {
   endClientName?: string;
   clientJobId: string;
   location: string;
+  workMode?: JobWorkMode;
   states: string;
   jobStatus: JobStatus | "Close" | "Hold";
   priority?: "Hot" | "Warm" | "Cold" | "High" | "Medium" | "Low" | "Urgent";
@@ -92,7 +95,8 @@ export function mapApiJobToJob(api: any): Job {
     client: api.client || api.clientName || "",
     endClientName: api.endClientName || api.endClient || api.client || "",
     clientJobId: api.clientJobId || "N/A",
-    location: api.location || api.jobLocation || "",
+    location: jobLocation(api),
+    workMode: normalizeJobWorkMode(api.workMode) || normalizeJobWorkMode(api.remoteJob),
     states: api.state || api.states || "",
     jobStatus: (api.jobStatus || api.status || "Active") as any,
     priority: (() => {

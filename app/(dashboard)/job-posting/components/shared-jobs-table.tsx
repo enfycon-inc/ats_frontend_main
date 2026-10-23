@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { atsApi } from "@/lib/ats-api";
+import { jobLocationDisplay } from "@/lib/job-location";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { Briefcase, MapPin, Building2, ExternalLink } from "lucide-react";
@@ -190,7 +191,7 @@ export default function SharedJobsTable({ onRefresh, branchUsesPods }: { onRefre
                         <Building2 className="h-3.5 w-3.5" /> {(job as any).clientName || "Direct"}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-                        <MapPin className="h-3 w-3" /> {job.location || job.workSetup || "Remote"}
+                        <MapPin className="h-3 w-3" /> {jobLocationDisplay(job)}
                       </div>
                     </td>
                     <td className="py-3 px-4">

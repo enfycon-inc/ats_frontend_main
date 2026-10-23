@@ -1,9 +1,19 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 const ts = require('typescript');
-const mod = { exports: {} };
-new Function('exports', 'require', ts.transpileModule(fs.readFileSync('app/(dashboard)/job-posting/data/mock-jobs.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mod.exports, require);
+function load(file) {
+  const mod = { exports: {} };
+  const resolved = path.resolve(file);
+  new Function('exports', 'require', ts.transpileModule(fs.readFileSync(resolved, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText)(mod.exports, name => {
+    if (name.startsWith('@/')) return load(name.slice(2) + '.ts');
+    if (name.startsWith('.')) return load(path.resolve(path.dirname(resolved), name + '.ts'));
+    return require(name);
+  });
+  return mod.exports;
+}
+const mod = { exports: load('app/(dashboard)/job-posting/data/mock-jobs.ts') };
 
 test('API employment type survives list and detail mapping', () => {
   for (const type of ['Contract', 'Contractual', 'C2H', 'Full Time']) {

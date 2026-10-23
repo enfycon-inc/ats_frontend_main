@@ -49,6 +49,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { formatJobDescription } from "@/lib/job-description-format";
+import { jobLocation } from "@/lib/job-location";
+import { normalizeJobWorkMode } from "@/lib/job-work-mode";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -781,7 +783,8 @@ const getInitialActiveBranchContext = () => {
         if (sourceJob.client) setValue("client", sourceJob.client);
         if (sourceJob.endClientName) setValue("endClientName", sourceJob.endClientName);
         if (sourceJob.clientJobId) setValue("clientJobId", sourceJob.clientJobId);
-        if (sourceJob.location) setValue("city", sourceJob.location);
+        if (sourceJob.city) setValue("city", sourceJob.city);
+        setValue("locationAutocomplete", jobLocation(sourceJob));
         if (sourceJob.state) setValue("states", sourceJob.state);
         if (sourceJob.country) {
           setValue("country", sourceJob.country);
@@ -791,8 +794,8 @@ const getInitialActiveBranchContext = () => {
           const p = sourceJob.priority;
           setValue("priority", p === "Hot" || p === "High" || p === "Urgent" ? "Hot" : p === "Cold" || p === "Low" ? "Cold" : "Warm");
         }
-        if (sourceJob.remoteJob) {
-          const rLower = (sourceJob.remoteJob || "").toLowerCase();
+        if (sourceJob.workMode || sourceJob.remoteJob) {
+          const rLower = (normalizeJobWorkMode(sourceJob.workMode) || normalizeJobWorkMode(sourceJob.remoteJob) || "").toLowerCase();
           if (rLower.includes("remote") || rLower === "yes") {
             setValue("remoteJob", "Remote");
           } else if (rLower.includes("hybrid")) {
@@ -886,7 +889,7 @@ const getInitialActiveBranchContext = () => {
       setValue("jobTitle", jobData.jobTitle || "");
       setValue("client", jobData.client || "");
       setValue("endClientName", jobData.endClientName || "");
-      setValue("locationAutocomplete", jobData.location || "");
+      setValue("locationAutocomplete", jobLocation(jobData));
       
       const shiftTimingMatch = jobData.description?.match(/<p>\s*<strong>Shift Timing:<\/strong>\s*([^<]+)<\/p>/i)
         || jobData.description?.match(/Shift Timing:\s*([^\n<]+)/i);
@@ -931,7 +934,7 @@ const getInitialActiveBranchContext = () => {
       setValue("priority", (jobData.priority || "Warm") as any);
       setValue("taxTerms", jobData.taxTerms || "C2C");
       
-      const rLower = (jobData.remoteJob || "").toLowerCase();
+      const rLower = (normalizeJobWorkMode(jobData.workMode) || normalizeJobWorkMode(jobData.remoteJob) || "").toLowerCase();
       setValue("remoteJob", (rLower.includes("remote") || rLower === "yes") ? "Remote" : rLower.includes("hybrid") ? "Hybrid" : "In Office");
       
       setValue("startDate", jobData.startDate ? jobData.startDate.split("T")[0] : "");
@@ -1229,7 +1232,7 @@ const getInitialActiveBranchContext = () => {
       assembledPayRate = formatRatePayload(data.payRate, payCurrency, payUnit, payTerm);
     }
 
-    const locSummary = [data.city, data.states, data.country].filter(Boolean).join(", ") || data.locationAutocomplete || "Remote";
+    const locSummary = [data.city, data.states, data.country].filter(Boolean).join(", ") || data.locationAutocomplete || "Location not specified";
 
     // Show posting popup window immediately with short details
     setPublishingModalState({
@@ -1297,7 +1300,7 @@ const getInitialActiveBranchContext = () => {
         title: data.jobTitle,
         client: data.client || data.endClientName || "Direct Client",
         endClientName: data.endClientName || undefined,
-        location: data.locationAutocomplete || data.city || data.states || "Remote",
+        location: jobLocation({ location: data.locationAutocomplete, city: data.city, state: data.states, country: data.country }),
         type: data.jobType || "Full Time",
         description: finalDescription,
         skillsRequired: primarySkills,
@@ -1318,7 +1321,7 @@ const getInitialActiveBranchContext = () => {
         submissionRequired: data.maxSubmissions,
         priority: data.priority,
         taxTerms: data.taxTerms,
-        remoteJob: data.remoteJob,
+        workMode: normalizeJobWorkMode(data.remoteJob),
         startDate: data.startDate || undefined,
         endDate: data.endDate || undefined,
         hoursPerWeek: data.hoursPerWeek,
@@ -3314,7 +3317,7 @@ const getInitialActiveBranchContext = () => {
                 </div>
                 <div>
                   <span className="text-[10px] font-medium text-slate-400 block">Type & Location</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.jobType || "Full Time"} {"\u2022"} {publishingModalState.location || "Remote"}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{publishingModalState.jobType || "Full Time"} {"\u2022"} {publishingModalState.location || "Location not specified"}</span>
                 </div>
                 <div>
                   <span className="text-[10px] font-medium text-slate-400 block">Positions & Pay Rate</span>
