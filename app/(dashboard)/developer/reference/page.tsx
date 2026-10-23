@@ -1,25 +1,38 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+"use client";
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { getApiBase } from '@/lib/ats-api';
+import { endpoints, languages, requestExample, type Language } from '@/lib/career-api-reference';
 
+function Code({ title, value, children }: { title: string; value: string; children?: React.ReactNode }) {
+ const [message, setMessage] = useState('Copy');
+ async function copy() { try { await navigator.clipboard.writeText(value); setMessage('Copied'); } catch { setMessage('Select text to copy'); } }
+ useEffect(() => { setMessage('Copy'); }, [value]);
+ const tokens = value.split(/("(?:\\.|[^"\\])*"|'[^']*'|\b(?:const|var|return|import|from|if|throw|new|await|using|null|true|false)\b|\b\d+\b)/g);
+ return <section className="overflow-hidden rounded-xl border border-slate-700 bg-slate-950 text-slate-200"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700 bg-slate-800 px-4 py-3"><span className="text-xs font-semibold">{title}</span><div className="flex gap-3">{children}<button onClick={() => void copy()} className="text-xs text-slate-300 hover:text-white" aria-label={'Copy ' + title}>{message}</button></div></div><pre tabIndex={0} className="max-h-[600px] overflow-auto p-4 text-[11px] leading-6"><code>{tokens.map((token, i) => <span key={i} className={/^["']/.test(token) ? 'text-emerald-300' : /^\d+$/.test(token) ? 'text-amber-300' : /^(const|var|return|import|from|if|throw|new|await|using|null|true|false)$/.test(token) ? 'text-violet-300' : undefined}>{token}</span>)}</code></pre></section>;
+}
 export default function ApiReference() {
-  return <div className="w-full space-y-5 pb-10 text-xs">
-    <h1 className="text-xl font-bold">Developer API Reference</h1>
-    <p>Use your configured ATS API host. Integrate from your website server and keep client secrets private.</p>
-    <Card><CardHeader><CardTitle className="text-sm">1. Obtain an access token</CardTitle></CardHeader><CardContent className="space-y-3">
-      <p>Create a client in Developer → API Clients. Send its ID and secret using HTTP Basic authentication. Tokens last up to 15 minutes; cache the token until shortly before expires_in, then request a new one. No refresh token is issued.</p>
-      <pre className="overflow-auto rounded border p-3">{`POST /api/oauth/token
-Authorization: Basic BASE64(CLIENT_ID:CLIENT_SECRET)
-Content-Type: application/x-www-form-urlencoded
-
-grant_type=client_credentials`}</pre>
-      <pre className="overflow-auto rounded border p-3">{`{"access_token":"cat_...","token_type":"Bearer","expires_in":899}`}</pre>
-      <p>Send the returned token as Authorization: Bearer &lt;access_token&gt;. Revoking the client blocks new tokens and all subsequent requests using its existing tokens.</p>
-    </CardContent></Card>
-    <Card><CardHeader><CardTitle className="text-sm">2. Published jobs</CardTitle></CardHeader><CardContent className="space-y-3"><pre>{`GET /api/public/jobs
-GET /api/public/jobs/{slug}`}</pre><p>Only active, approved, publicly published jobs inside the client's tenant, branch, or unit scope are returned. There are no public job modification or deletion endpoints.</p></CardContent></Card>
-    <Card><CardHeader><CardTitle className="text-sm">3. Submit an application</CardTitle></CardHeader><CardContent className="space-y-3">
-      <pre>POST /api/public/jobs/&#123;slug&#125;/applications</pre><p>Send multipart/form-data with resume (PDF or DOCX, maximum 8 MB), fullName, email, consent="true", totalExperienceYears, relevantExperienceYears, currentCompany, currentLocation, preferredLocations (comma-separated), noticePeriodDays, currentCompensation (Current CTC), expectedCompensation (Expected CTC), compensationCurrency, and compensationInputUnit. Include phone when available. Compensation fields must match the job's employment type.</p>
-      <p>Source and recruiter attribution are assigned by the backend. Internal remarks are not candidate-facing fields.</p>
-    </CardContent></Card>
-    <Card><CardHeader><CardTitle className="text-sm">Access controls and errors</CardTitle></CardHeader><CardContent><p>400: invalid input or grant type. 401: invalid client credentials, expired token, revoked client, inactive tenant/branch, or disallowed origin. 404: unavailable or out-of-scope job. 429: request limit reached. Origins may contain explicit HTTPS origins or * for any origin; this does not enable public browser storage of secrets or override the server's CORS policy.</p></CardContent></Card>
-  </div>;
+ const [selected, setSelected] = useState('authentication');
+ const [language, setLanguage] = useState<Language>('cURL');
+ const [search, setSearch] = useState('');
+ const [base, setBase] = useState('');
+ const [status, setStatus] = useState('200');
+ useEffect(() => { setBase(getApiBase()); }, []);
+ const endpoint = endpoints.find(item => item.id === selected)!;
+ const filtered = endpoints.filter(item => (item.title + item.path + item.method).toLowerCase().includes(search.toLowerCase()));
+ function select(id: string) { setSelected(id); setStatus(Object.keys(endpoints.find(item => item.id === id)!.responses)[0]); }
+ const auth = selected === 'authentication';
+ const selectClass = 'rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-white';
+ return <div className="w-full space-y-5 pb-10 text-xs text-neutral-700 dark:text-neutral-200">
+ <header className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 pb-5 dark:border-slate-700"><div><h1 className="text-xl font-bold text-neutral-900 dark:text-white">Careers API Reference</h1><p className="mt-2 text-neutral-500">OAuth authentication, published jobs, and candidate applications.</p></div><Link href="/developer/clients" className="rounded-lg border px-3 py-2 font-semibold text-indigo-700 dark:text-indigo-300">Manage API clients →</Link></header>
+ <div className="grid items-start gap-6 xl:grid-cols-[180px_minmax(0,1fr)]">
+ <aside className="space-y-4 xl:sticky xl:top-4"><input value={search} onChange={e => setSearch(e.target.value)} aria-label="Search endpoints" placeholder="Find endpoint…" className="w-full rounded-lg border bg-transparent px-3 py-2"/><nav aria-label="API endpoints" className="hidden space-y-1 xl:block">{filtered.map(item => <button key={item.id} onClick={() => select(item.id)} aria-current={selected === item.id ? 'page' : undefined} className={'flex w-full items-center gap-2 rounded-lg px-2 py-3 text-left ' + (selected === item.id ? 'bg-indigo-50 font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200' : 'hover:bg-neutral-100 dark:hover:bg-slate-800')}><span className={'rounded px-1 py-0.5 text-[9px] font-bold ' + (item.method === 'GET' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700')}>{item.method}</span>{item.title}</button>)}{!filtered.length && <p>No matching endpoints.</p>}</nav><select className="w-full rounded border bg-white p-2 dark:bg-slate-900 xl:hidden" aria-label="Choose endpoint" value={selected} onChange={e => select(e.target.value)}>{filtered.map(item => <option key={item.id} value={item.id}>{item.method} · {item.title}</option>)}</select><div className="rounded-lg border p-3"><p className="font-bold">API base URL</p><code className="mt-2 block break-all text-[10px]">{base || 'Loading configuration…'}</code><p className="mt-2 text-[10px] leading-5 text-neutral-500">Use HTTPS in production. Keep credentials on your website server.</p></div></aside>
+ <div className="grid min-w-0 items-start gap-6 2xl:grid-cols-2">
+ <article className="min-w-0 space-y-6"><div><h2 className="text-xl font-bold text-neutral-900 dark:text-white">{endpoint.title}</h2><div className="mt-3 flex gap-2 rounded-lg border p-3 font-mono"><span className="font-bold text-emerald-600">{endpoint.method}</span><span className="break-all">{endpoint.path}</span></div><p className="mt-4 leading-6">{endpoint.description}</p></div>
+ <section><h3 className="text-sm font-bold">Authentication & headers</h3><table className="mt-3 w-full text-left"><thead className="border-b text-[10px] uppercase text-neutral-500"><tr><th className="py-2">Header</th><th>Value</th></tr></thead><tbody><tr className="border-b"><td className="py-3 font-mono">Authorization</td><td className="break-all pl-3 font-mono">{auth ? 'Basic BASE64(CLIENT_ID:CLIENT_SECRET)' : 'Bearer ACCESS_TOKEN'}</td></tr>{endpoint.method === 'POST' && <tr><td className="py-3 font-mono">Content-Type</td><td className="pl-3">{auth ? 'application/x-www-form-urlencoded' : 'multipart/form-data (library generates boundary)'}</td></tr>}</tbody></table></section>
+ <section><h3 className="mb-3 text-sm font-bold">{auth ? 'Form parameters' : selected === 'jobs' ? 'Query parameters' : selected === 'applications' ? 'Path & form parameters' : 'Path parameters'}</h3><div className="divide-y dark:divide-slate-700">{endpoint.parameters.map(parameter => <div key={parameter.name} className="py-3"><div className="flex flex-wrap items-center gap-2"><code className="font-semibold text-neutral-900 dark:text-white">{parameter.name}</code><span className="text-[10px] text-neutral-500">{parameter.type}</span><span className={'text-[9px] font-semibold ' + (parameter.required ? 'text-red-600 dark:text-red-300' : 'text-neutral-400')}>{parameter.required ? 'REQUIRED' : 'OPTIONAL'}</span></div><p className="mt-1.5 leading-5 text-neutral-500 dark:text-neutral-400">{parameter.description}</p></div>)}</div></section>
+ <section className="rounded-lg border border-blue-200 bg-blue-50/50 p-4 leading-6 dark:border-blue-900 dark:bg-blue-950/20"><h3 className="font-bold">Integration notes</h3><p>Access is restricted by the client’s tenant, branch, or unit. Revoking the client blocks subsequent requests using issued tokens. No-expiry clients still receive short-lived tokens. A 429 response means you should back off before retrying.</p><p className="mt-2">Origin * does not override CORS or make it safe to put client secrets in browser code. There are no public job edit or delete endpoints.</p>{selected === 'applications' && <p className="mt-2">Keep the returned reference. Repeated applications for the same email and job may return the existing reference. Concurrent duplicates can return 409; avoid automatic resubmission after an uncertain network result.</p>}</section>
+ </article>
+ <aside className="min-w-0 space-y-5 2xl:sticky 2xl:top-4"><Code title={endpoint.method + ' · Request example'} value={requestExample(endpoint, language, base || 'https://YOUR_API_HOST')}><select aria-label="Programming language" className={selectClass} value={language} onChange={e => setLanguage(e.target.value as Language)}>{languages.map(item => <option key={item}>{item}</option>)}</select></Code><Code title="Example response" value={JSON.stringify(endpoint.responses[status], null, 2)}><select aria-label="Response status" className={selectClass} value={status} onChange={e => setStatus(e.target.value)}>{Object.keys(endpoint.responses).map(item => <option key={item}>{item}</option>)}</select></Code><p className="text-[10px] leading-5 text-neutral-500">Illustrative data and placeholder credentials. Install the dependency noted in each sample. This page does not execute requests.</p></aside>
+ </div></div></div>;
 }
