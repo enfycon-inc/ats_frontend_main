@@ -160,7 +160,7 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
   if (has("platform:manage")) return GLOBAL_ADMIN_MORE_ITEMS;
   const company = has("tenant:settings", "tenant:manage");
   const allowed: Record<string, boolean> = {
-    email: true, documents: true, settings: true, help: true,
+    developer: company, email: true, documents: true, settings: true, help: true,
     database: has("database:manage", "tenant:settings"), integrations: has("integration:manage", "tenant:settings"),
     "user-management": has("user:manage", "branch:assign_user", "unit_admin:manage"),
     "role-management": !isDeliveryHead && has("user:manage"),
@@ -172,7 +172,6 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
       const children = [];
       if (company) children.push(
         { label: "Company & Structure", href: "/company?tab=general" },
-        ...(has("tenant:settings", "tenant:manage") ? [{ label: "Public Careers API", href: "/settings/public-careers-api" }] : []),
         ...(has("tenant:settings") ? [{ label: "Client & POC Access", href: "/settings/client-access" }] : []),
         { label: "Authentication & SSO", href: "/company?tab=auth" },
         { label: "Custom Domains", href: "/company?tab=domains" },

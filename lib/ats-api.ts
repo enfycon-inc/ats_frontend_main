@@ -24,7 +24,7 @@ import type { CandidateAssessment, EligibleInterviewResponse, SubmissionHistoryR
  */
 
 import { getTenantIdentifier, getBaseDomain } from '@/utils/subdomain-helper';
-import { getSavedDashboardRole } from './dashboard-preference';
+import { clearSavedDashboardRole, getSavedDashboardRole } from './dashboard-preference';
 
 export interface InvitationDetails {
   email: string;
@@ -287,6 +287,8 @@ async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {},
   isRetry = false,
+  roleRecoveryRetry = false,
+  omitActiveRole = false,
 ): Promise<T> {
   const pathname = path.split('?')[0];
   const method = (options.method || 'GET').toUpperCase();
@@ -321,9 +323,11 @@ async function apiFetch<T = any>(
     }
   }
 
+  const savedRolePreference = typeof window !== 'undefined' ? getSavedDashboardRole(getCurrentUser()) : null;
+  const activeRoleHeader = omitActiveRole ? {} : activeRoleHeaders();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...activeRoleHeaders(),
+    ...activeRoleHeader,
     ...(options.headers as Record<string, string> || {}),
   };
   // The browser supplies the multipart boundary for photo uploads.
@@ -366,7 +370,7 @@ async function apiFetch<T = any>(
     if (isExpired && !isRetry && !skipsSessionRecovery) {
       if (getRefreshToken()) {
         const refreshed = await tryAutoRefresh();
-        if (refreshed) return apiFetch<T>(path, options, true);
+        if (refreshed) return apiFetch<T>(path, options, true, roleRecoveryRetry, omitActiveRole);
       }
 
       // If no refresh token or refresh failed, fetch a fresh session token from NextAuth
@@ -374,7 +378,7 @@ async function apiFetch<T = any>(
         clearToken();
         const freshToken = await fetchSessionToken();
         if (freshToken) {
-          return apiFetch<T>(path, options, true);
+          return apiFetch<T>(path, options, true, roleRecoveryRetry, omitActiveRole);
         }
       }
     }
@@ -389,6 +393,17 @@ async function apiFetch<T = any>(
     }
 
     const errMsg = body.message || `API Error: ${res.status}`;
+    const requestedRoleId = (options.headers as Record<string, string> | undefined)?.['x-active-role-id'] || activeRoleHeader['x-active-role-id'];
+    const savedRoleId = savedRolePreference;
+    if (res.status === 403 && !roleRecoveryRetry &&
+        errMsg === 'The selected role is not assigned to you.' &&
+        requestedRoleId && requestedRoleId === savedRoleId) {
+      const profile = getCurrentUser();
+      clearSavedDashboardRole(profile);
+      const retryHeaders = { ...(options.headers as Record<string, string> || {}) };
+      if (retryHeaders['x-active-role-id'] === requestedRoleId) delete retryHeaders['x-active-role-id'];
+      return apiFetch<T>(path, { ...options, headers: retryHeaders }, isRetry, true, true);
+    }
     if (typeof window !== 'undefined' && res.status === 403 && !(options as any)?.silent403) {
       const event = new CustomEvent("app_show_error_modal", {
         detail: { message: errMsg, title: "Permission Access Required" },
@@ -2104,6 +2119,13 @@ const publicJobsApiKeys = {
   },
 };
 
+export type CareerOauthClient = Omit<PublicJobsApiKey, 'keyPrefix' | 'expiresAt'> & { expiresAt: string | null };
+const careerOauthClients = {
+ list: () => apiFetch<CareerOauthClient[]>('/api/developer/clients'),
+ create: (input: { name: string; scope: CareerOauthClient['scope']; branchId?: string; businessUnitId?: string; allowedOrigins: string[]; expiryMonths: number | null }) => apiFetch<CareerOauthClient & { client_id: string; client_secret: string }>('/api/developer/clients', { method: 'POST', body: JSON.stringify(input) }),
+ revoke: (id: string) => apiFetch('/api/developer/clients/' + encodeURIComponent(id), { method: 'DELETE' }),
+};
+
 // ─── Export ─────────────────────────────────────────────────────────
 const profile = {
   async get(): Promise<StaffProfile> {
@@ -2136,6 +2158,7 @@ const profile = {
 };
 
 export const atsApi = {
+  careerOauthClients,
   publicJobsApiKeys,
   profile,
   auth,

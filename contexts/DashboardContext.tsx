@@ -76,10 +76,10 @@ export function DashboardProvider({ initialNavigation = null, children }: {
   useEffect(() => {
     if (!profile) return;
     const savedRole = getSavedDashboardRole(profile);
-    if (savedRole) {
-      saveDashboardRole(profile, savedRole);
-      setOverrideRole(savedRole);
-    }
+    // getSavedDashboardRole clears a cached selection that is absent from the
+    // current profile. Apply null as well so a stale SSR preference cannot stick.
+    if (savedRole) saveDashboardRole(profile, savedRole);
+    setOverrideRole(savedRole);
     const handlePreference = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if (detail?.profileId === profile.id && detail?.tenantId === profile.tenantId) {

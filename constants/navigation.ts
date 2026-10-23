@@ -207,6 +207,10 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
 // ─────────────────────────────────────────────
 
 export const MORE_NAV_ITEMS: NavItem[] = [
+ { id: "developer", label: "Developer", href: "/developer/clients", icon: Globe, children: [
+  { label: "API Clients", href: "/developer/clients" },
+  { label: "API Reference", href: "/developer/reference" },
+ ] },
   { id: "email", label: "Mass Mail", href: "/email", icon: Mail },
   { id: "documents", label: "Documents", href: "/documents", icon: FileText },
   { id: "database", label: "Database", href: "/database", icon: Database },
