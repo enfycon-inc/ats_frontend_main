@@ -48,7 +48,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
-import { formatJobDescription } from "@/lib/job-description-format";
+import { formatJobDescription, extractPlainTextFromHtml } from "@/lib/job-description-format";
 import { jobLocation } from "@/lib/job-location";
 import { normalizeJobWorkMode } from "@/lib/job-work-mode";
 import { cn } from "@/lib/utils";
@@ -1012,13 +1012,15 @@ const getInitialActiveBranchContext = () => {
 
   // Parser real extraction using Python/Gemini NLP pipeline
   const handleStartParsing = async () => {
-    if (!parseText.trim()) {
+    const rawInput = parseText.trim();
+    if (!rawInput) {
       toast.error("Please paste or type a job description first.");
       return;
     }
     setIsParsing(true);
     try {
-      const res = await atsApi.jobs.parseJd(parseText);
+      const plainTextForExtraction = extractPlainTextFromHtml(rawInput);
+      const res = await atsApi.jobs.parseJd(plainTextForExtraction || rawInput);
       if (res && res.success) {
         // Pre-fill extracted details
         const extractedTitle = res.jobTitle || res.title;
@@ -1725,11 +1727,12 @@ const getInitialActiveBranchContext = () => {
                 Copy and paste the raw email requirement, client specifications, or portal text.
               </p>
             </div>
-            <Textarea
+            <RichTextEditor
               value={parseText}
-              onChange={(e) => setParseText(e.target.value)}
-              placeholder="e.g. We require a Java Full Stack Developer for an initial 12-month C2C project with our client in Plano, TX. Rate: $95/hr C2C. Required skills: Java 17, Spring Boot, Microservices, and basic AWS container services..."
-              className="flex-1 w-full p-4 text-xs font-mono min-h-[300px]"
+              onChange={setParseText}
+              placeholder="e.g. Paste job requirement from email, client portal, or ChatGPT. Markdown and rich formatting will be styled automatically..."
+              minHeight="340px"
+              className="flex-1 shadow-xs"
             />
           </div>
         </div>

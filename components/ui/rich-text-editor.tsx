@@ -37,10 +37,14 @@ export function RichTextEditor({
   const [isHtmlMode, setIsHtmlMode] = useState(false);
   const [htmlValue, setHtmlValue] = useState(() => sanitizeJobDescription(value || ""));
   const quillRef = useRef<ReactQuillInstance | null>(null);
+  const lastEmittedValueRef = useRef<string>(sanitizeJobDescription(value || ""));
 
-  // Sync internal state when external value updates
+  // Sync internal state only when an EXTERNAL value genuinely updates (not self-emitted)
   useEffect(() => {
-    setHtmlValue(isHtmlMode ? value || "" : sanitizeJobDescription(value || ""));
+    const sanitizedVal = isHtmlMode ? value || "" : sanitizeJobDescription(value || "");
+    if (sanitizedVal === lastEmittedValueRef.current) return;
+    lastEmittedValueRef.current = sanitizedVal;
+    setHtmlValue(sanitizedVal);
   }, [value, isHtmlMode]);
 
   const modules = useMemo(
@@ -78,20 +82,26 @@ export function RichTextEditor({
     "link",
   ];
 
-  const handleEditorChange = (content: string) => {
+  const handleEditorChange = (content: string, _delta: any, source?: string) => {
+    // Critical: Ignore programmatic/internal Quill updates to prevent infinite re-render loops
+    if (source && source !== "user") return;
     const safe = sanitizeJobDescription(content);
+    if (safe === lastEmittedValueRef.current) return;
+    lastEmittedValueRef.current = safe;
     setHtmlValue(safe);
     onChange(safe);
   };
 
   const handleHtmlInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newVal = e.target.value;
+    lastEmittedValueRef.current = newVal;
     setHtmlValue(newVal);
     onChange(newVal);
   };
 
   const handleAutoFormatMarkdown = () => {
     const formatted = formatJobDescription(htmlValue);
+    lastEmittedValueRef.current = formatted;
     setHtmlValue(formatted);
     onChange(formatted);
   };
@@ -133,6 +143,7 @@ export function RichTextEditor({
   const toggleHtmlMode = () => {
     if (isHtmlMode) {
       const formatted = formatJobDescription(htmlValue);
+      lastEmittedValueRef.current = formatted;
       setHtmlValue(formatted);
       onChange(formatted);
     }

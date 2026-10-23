@@ -15,7 +15,7 @@ function load(file) {
     ? load(path.resolve(path.dirname(resolved), name + '.ts')) : require(name));
   return module.exports;
 }
-const { formatJobDescription: format, sanitizeJobDescription: sanitize } = load('lib/job-description-format.ts');
+const { formatJobDescription: format, sanitizeJobDescription: sanitize, extractPlainTextFromHtml } = load('lib/job-description-format.ts');
 const { normalizeJobTitle } = load('lib/job-description-policy.ts');
 
 test('ChatGPT JD becomes headings, emphasis and lists while preserving technical names', () => {
@@ -95,5 +95,67 @@ test('editor paste replaces the selection as one undoable user edit and prefers 
   assert.equal(calls.source, 'user');
   assert.deepEqual(calls.selection, [13, 0, 'silent']);
   assert.equal(calls.cutoffs, 2);
+});
+
+test('extractPlainTextFromHtml preserves section headings, lines and bullet points for extraction', () => {
+  const html = '<h1>Job Title: Data Engineer</h1>\n<p><strong>Job Type:</strong> Full-Time<br><strong>Experience:</strong> 3-6 Years<br><strong>Location:</strong> Bangalore</p>\n<h2>Job Summary</h2>\n<p>Build scalable pipelines.</p>\n<ul>\n<li>Design ETL</li>\n<li>Python &amp; SQL</li>\n</ul>';
+  const plain = extractPlainTextFromHtml(html);
+  assert.match(plain, /Job Title: Data Engineer/);
+  assert.match(plain, /Job Type: Full-Time/);
+  assert.match(plain, /Experience: 3-6 Years/);
+  assert.match(plain, /Location: Bangalore/);
+  assert.match(plain, /Job Summary/);
+  assert.match(plain, /Design ETL/);
+  assert.match(plain, /Python & SQL/);
+  assert.equal(plain.includes('<'), false);
+  assert.equal(plain.includes('>'), false);
+});
+
+test('RichTextEditor ignores non-user onChange source to prevent infinite re-render cycles', () => {
+  const React = require('react');
+  let renderedProps = null;
+  const file = path.resolve('components/ui/rich-text-editor.tsx');
+  const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
+  }).outputText;
+  const module = { exports: {} };
+  new Function('exports', 'require', code)(module.exports, name => {
+    if (name === 'react') return { ...React, useState: value => [typeof value === 'function' ? value() : value, () => {}], useRef: () => ({ current: null }), useMemo: fn => fn(), useEffect: () => {} };
+    if (name === 'next/dynamic') return () => (props) => { renderedProps = props; return null; };
+    if (name.endsWith('.css')) return {};
+    if (name === '@/lib/utils') return { cn: (...values) => values.filter(Boolean).join(' ') };
+    if (name === '@/lib/job-description-format') return load('lib/job-description-format.ts');
+    return require(name);
+  });
+
+  let emitted = 0;
+  const tree = module.exports.RichTextEditor({ value: '<p>Initial</p>', onChange: () => { emitted++; } });
+  assert.ok(tree);
+
+  // Find the mocked ReactQuill component inside the tree
+  function findQuill(node) {
+    if (!node || typeof node !== 'object') return null;
+    if (node.props?.onChange && typeof node.props.onChange === 'function') return node;
+    for (const child of React.Children.toArray(node.props?.children)) {
+      const found = findQuill(child);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const quillNode = findQuill(tree);
+  assert.ok(quillNode, 'Quill element found in tree');
+
+  // Trigger onChange with source === 'api' (programmatic). Must be IGNORED!
+  quillNode.props.onChange('<p>Programmatic change</p>', {}, 'api');
+  assert.equal(emitted, 0, 'Programmatic updates must not trigger parent onChange');
+
+  // Trigger onChange with source === 'silent'. Must be IGNORED!
+  quillNode.props.onChange('<p>Silent change</p>', {}, 'silent');
+  assert.equal(emitted, 0, 'Silent updates must not trigger parent onChange');
+
+  // Trigger onChange with source === 'user'. Must emit to parent!
+  quillNode.props.onChange('<p>User typed text</p>', {}, 'user');
+  assert.equal(emitted, 1, 'User actions must emit to parent');
 });
 
