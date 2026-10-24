@@ -17,6 +17,7 @@ import {
   CheckCircle,
   XCircle,
   Plus,
+  LockKeyhole,
 } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
@@ -298,8 +299,11 @@ export function JobTableRow({
               )
             ) : colId === "jobTitle" ? (
               (() => {
+                const normalizedStatus = String(job.jobStatus || "").trim().toLowerCase();
+                const isClosed = normalizedStatus === "closed" || normalizedStatus === "close";
+                const isActive = normalizedStatus === "active" && job.approvalStatus !== "PENDING_APPROVAL";
                 const isRecent = isJobRecent(job);
-                const statusLabel = isRecent ? "NEW" : null;
+                const statusLabel = !isClosed && isRecent ? "NEW" : null;
                 const statusClasses =
                   "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/40";
                 const isCoSourced =
@@ -328,6 +332,19 @@ export function JobTableRow({
                         {job.jobTitle}
                       </span>
                     </Link>
+                    {(isActive || isClosed) && (
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border select-none leading-none shrink-0",
+                          isClosed
+                            ? "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600"
+                            : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                        )}
+                      >
+                        {isClosed && <LockKeyhole className="h-2.5 w-2.5" aria-hidden="true" />}
+                        {isClosed ? "Closed" : "Active"}
+                      </span>
+                    )}
                     {isCoSourced && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border select-none leading-none shrink-0 bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800">
                         Co-Sourced
@@ -343,14 +360,14 @@ export function JobTableRow({
                         {statusLabel}
                       </span>
                     )}
-                    <span
+                    {!isClosed && <span
                       className={cn(
                         "inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border select-none leading-none shrink-0",
                         priorityClasses
                       )}
                     >
                       {priorityLabel}
-                    </span>
+                    </span>}
                     {job.agingDays > 30 && (
                       <Badge className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/30 text-[9px] scale-90 flex items-center gap-0.5 shadow-none px-1 py-0 font-medium shrink-0">
                         <AlertTriangle className="h-2.5 w-2.5" /> SLA
