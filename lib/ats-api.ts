@@ -1048,6 +1048,9 @@ const email = {
 
 // ─── Jobs API ───────────────────────────────────────────────────────
 export interface JobPayload {
+  isPubliclyPublished?: boolean;
+  publicSlug?: string | null;
+  publicDescription?: string | null;
   businessUnitId?: string | null;
   clientId?: string | null;
   endClientId?: string | null;
@@ -1181,6 +1184,11 @@ export interface JobPodOption {
 const staffingRequests = new Map<string, Promise<JobStaffOption[]>>();
 
 const jobs = {
+  setPublication(id: string, published: boolean, publicDescription?: string) {
+    return apiFetch<{ id: string; publicSlug: string | null; isPubliclyPublished: boolean }>(`/api/jobs/${encodeURIComponent(id)}/publication`, {
+      method: 'PATCH', body: JSON.stringify({ published, ...(publicDescription !== undefined ? { publicDescription } : {}) }),
+    });
+  },
   async saveDraft(data: Record<string, any>, id?: string): Promise<JobPayload> {
     return apiFetch<JobPayload>(id ? `/api/jobs/${id}/draft` : '/api/jobs/drafts', {
       method: id ? 'PATCH' : 'POST', body: JSON.stringify(data),
