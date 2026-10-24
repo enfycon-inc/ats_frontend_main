@@ -26,6 +26,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Applicant } from "@/app/(dashboard)/applicants/data/mock-applicants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -79,10 +82,12 @@ export const ALL_COLUMNS: { id: string; label: string }[] = [
   { id: "candidateCode", label: "Candidate Code" },
   { id: "applicantName", label: "Applicant Name" },
   { id: "jobTitle", label: "Designation / Profession" },
-  { id: "assignedJobCode", label: "Assigned Job" },
+  { id: "assignedJobCode", label: "Assigned Jobs" },
   { id: "email", label: "Email" },
   { id: "mobile", label: "Mobile" },
-  { id: "city", label: "City" },
+  { id: "city", label: "Current Location" },
+  { id: "currentCompany", label: "Current Company" },
+  { id: "updatedAt", label: "Last Updated" },
   { id: "state", label: "State" },
   { id: "source", label: "Source" },
   { id: "uploadedByName", label: "Uploaded By" },
@@ -92,7 +97,7 @@ export const ALL_COLUMNS: { id: string; label: string }[] = [
   { id: "experience", label: "Experience" },
   { id: "skills", label: "Skills" },
   { id: "expectedSalary", label: "Exp. Salary (LPA)" },
-  { id: "currentSalary", label: "Curr. Salary (LPA)" },
+  { id: "currentSalary", label: "Current CTC" },
   { id: "noticePeriod", label: "Notice Period" },
 ];
 
@@ -104,12 +109,15 @@ export const DEFAULT_COLUMNS = [
   "email",
   "mobile",
   "city",
+  "currentCompany",
+  "currentSalary",
   "state",
   "source",
   "uploadedByName",
   "status",
   "workAuthorization",
   "createdOn",
+  "updatedAt",
   "experience",
   "skills",
 ];
@@ -344,6 +352,20 @@ export default function ApplicantsTable({
 
     if (sortColumn) {
       result.sort((a, b) => {
+        if (sortColumn === 'updatedAt') {
+          const left = a.updatedAt ? Date.parse(a.updatedAt) : NaN;
+          const right = b.updatedAt ? Date.parse(b.updatedAt) : NaN;
+          if (!Number.isFinite(left)) return Number.isFinite(right) ? 1 : 0;
+          if (!Number.isFinite(right)) return -1;
+          return sortDirection === 'asc' ? left - right : right - left;
+        }
+        if (sortColumn === 'assignedJobCode' || sortColumn === 'currentSalary') {
+          const left = sortColumn === 'currentSalary' ? a.currentCTC : a.assignedJobCount;
+          const right = sortColumn === 'currentSalary' ? b.currentCTC : b.assignedJobCount;
+          if (left == null) return right == null ? 0 : 1;
+          if (right == null) return -1;
+          return sortDirection === 'asc' ? left - right : right - left;
+        }
         const valA = String(a[sortColumn] || "").toLowerCase();
         const valB = String(b[sortColumn] || "").toLowerCase();
         if (valA < valB) return sortDirection === "asc" ? -1 : 1;
@@ -504,17 +526,40 @@ export default function ApplicantsTable({
           </span>
         );
 
-      case "assignedJobCode":
-        const jobCodeVal = (applicant as any).assignedJobCode;
-        return jobCodeVal ? (
-          <span className="inline-flex px-1.5 py-0.5 rounded border text-[10px] font-semibold bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
-            {jobCodeVal}
-          </span>
-        ) : (
-          <span className="inline-flex px-1.5 py-0.5 rounded border text-[10px] font-normal bg-neutral-50 text-neutral-500 border-neutral-200 dark:bg-slate-800 dark:text-neutral-400">
-            Unassigned (Lead)
-          </span>
-        );
+      case "assignedJobCode": {
+        const jobs = applicant.assignedJobs;
+        if (!jobs) return <span className="text-muted-foreground">—</span>;
+        if (!jobs.length) return <span className="text-muted-foreground">0 jobs</span>;
+        return <Popover><PopoverTrigger asChild>
+          <button type="button" onClick={event => event.stopPropagation()} aria-label={`Show ${jobs.length} assigned jobs for ${applicant.applicantName}`} className="rounded text-xs font-medium text-[#1a4fa0] hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300">{jobs.length} {jobs.length === 1 ? 'job' : 'jobs'}</button>
+        </PopoverTrigger><PopoverContent align="start" className="w-80 p-3" onClick={event => event.stopPropagation()}>
+          <h3 className="mb-2 text-xs font-semibold">Assigned jobs ({jobs.length})</h3>
+          <ul className="max-h-64 divide-y divide-border overflow-y-auto">{jobs.map(job => <li key={job.id}>
+            <Link href={`/job-posting/${encodeURIComponent(job.id)}`} className="flex items-center justify-between gap-3 rounded px-1 py-2 text-xs text-[#1a4fa0] hover:bg-muted focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300"><span className="min-w-0"><span className="block font-medium">{job.jobCode}</span><span className="mt-0.5 block break-words text-muted-foreground">{job.jobTitle}</span></span><ExternalLink aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /></Link>
+          </li>)}</ul>
+        </PopoverContent></Popover>;
+      }
+      case "uploadedByName": {
+        const name = applicant.uploadedByName || 'Uploader unavailable';
+        const initials = applicant.uploadedByName?.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase() || '?';
+        return <div className="flex min-w-[210px] items-center gap-2">
+          <Avatar className="size-7"><AvatarImage src={applicant.uploadedByAvatar || undefined} alt="" /><AvatarFallback className="bg-blue-50 text-[10px] text-[#1a4fa0] dark:bg-blue-950 dark:text-blue-200">{initials}</AvatarFallback></Avatar>
+          <div className="min-w-0"><p className="text-xs font-medium" title={name}>{name}</p>{applicant.uploadedByEmail ? <a href={`mailto:${applicant.uploadedByEmail}`} onClick={event => event.stopPropagation()} className="mt-0.5 block text-[10.5px] text-muted-foreground hover:underline">{applicant.uploadedByEmail}</a> : <p className="mt-0.5 text-[10.5px] text-muted-foreground">Email unavailable</p>}</div>
+        </div>;
+      }
+      case "currentSalary":
+        return <span className="whitespace-nowrap tabular-nums">{applicant.currentSalary || '—'}</span>;
+      case "city":
+      case "currentCompany": {
+        const value = colId === 'city' ? applicant.city : applicant.currentCompany;
+        return <span className="block max-w-[240px] truncate" title={value || undefined}>{value || '—'}</span>;
+      }
+      case "updatedAt": {
+        const value = applicant.updatedAt;
+        if (!value || !Number.isFinite(Date.parse(value))) return <span className="text-muted-foreground">—</span>;
+        const date = new Date(value);
+        return <time dateTime={value} title={date.toLocaleString()} className="block whitespace-nowrap text-[10.5px] text-muted-foreground"><span className="block">{date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span><span className="mt-0.5 block">{date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}</span></time>;
+      }
 
       case "createdOn":
         return (
@@ -580,6 +625,11 @@ export default function ApplicantsTable({
                     "status",
                     "source",
                     "jobTitle",
+                    "assignedJobCode",
+                    "currentSalary",
+                    "currentCompany",
+                    "updatedAt",
+                    "uploadedByName",
                     "createdOn",
                   ].includes(colId);
 

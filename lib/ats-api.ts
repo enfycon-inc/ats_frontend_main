@@ -1373,7 +1373,7 @@ const jobs = {
 };
 
 const candidates = {
-  async list(filters?: Record<string, any>): Promise<any[]> {
+  async list(filters?: Record<string, any>): Promise<import('./candidate-contract').CandidateProfile[]> {
     const cleanFilters: Record<string, string> = {};
     if (filters) {
       Object.entries(filters).forEach(([key, val]) => {
@@ -1383,7 +1383,7 @@ const candidates = {
       });
     }
     const query = new URLSearchParams(cleanFilters).toString();
-    return apiFetch<any[]>(`/api/candidates${query ? `?${query}` : ''}`);
+    return apiFetch<import('./candidate-contract').CandidateProfile[]>(`/api/candidates${query ? `?${query}` : ''}`);
   },
 
   async get(id: string | number): Promise<any> {

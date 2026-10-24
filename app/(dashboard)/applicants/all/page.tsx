@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import useSWR from "swr";
+import { useDashboardContext } from "@/contexts/DashboardContext";
 import ApplicantToolbar from "@/components/applicants/applicant-toolbar";
 import SearchToolbar from "@/components/applicants/search-toolbar";
 import ApplicantsTable, {
@@ -17,9 +19,13 @@ import { mockApplicants, Applicant } from "../data/mock-applicants";
 import { atsApi } from "@/lib/ats-api";
 import { useSession } from "next-auth/react";
 import { CheckCircle2, AlertCircle, Users, FileText, UploadCloud, Database } from "lucide-react";
-import { getUserColumnPreferences, saveUserColumnPreferences } from "@/utils/user-column-preferences";
+import { getCurrentUserStorageKey, getUserColumnPreferences, saveUserColumnPreferences } from "@/utils/user-column-preferences";
+import type { CandidateProfile } from "@/lib/candidate-contract";
+
+const EMPTY_CANDIDATES: CandidateProfile[] = [];
 
 export default function AllApplicantsPage() {
+  const { status: workspaceStatus, selection, profile, reload: reloadWorkspace } = useDashboardContext();
   // ── View state ────────────────────────────────────────────
   const [savedViews, setSavedViews] = useState<string[]>([]);
   const [activeView, setActiveView] = useState("All Applicants");
@@ -52,7 +58,21 @@ export default function AllApplicantsPage() {
 
   useEffect(() => {
     if (session?.user) {
-      setSelectedColumns(getUserColumnPreferences("applicants", DEFAULT_COLUMNS));
+      const columns = getUserColumnPreferences("applicants", DEFAULT_COLUMNS);
+      try {
+        const migrationKey = `ats_applicant_details_v3_${getCurrentUserStorageKey()}`;
+        if (!localStorage.getItem(migrationKey)) {
+          for (const column of ['assignedJobCode', 'city', 'currentCompany', 'currentSalary', 'uploadedByName', 'updatedAt']) {
+            if (!columns.includes(column)) {
+              const anchor = column === 'currentSalary' ? columns.indexOf('city') : -1;
+              columns.splice(anchor >= 0 ? anchor + 1 : columns.length, 0, column);
+            }
+          }
+          saveUserColumnPreferences('applicants', columns);
+          localStorage.setItem(migrationKey, '1');
+        }
+      } catch { /* Column defaults remain usable when storage is unavailable. */ }
+      setSelectedColumns([...columns]);
     }
   }, [session]);
 
@@ -85,24 +105,14 @@ export default function AllApplicantsPage() {
   }, [toast]);
 
   // ── Backend Live Data State ──────────────────────────────
-  const [dbCandidates, setDbCandidates] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadCandidates = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await atsApi.candidates.list({ allMarkets: true, allBranches: true, limit: 5000 });
-      setDbCandidates(data);
-    } catch (err) {
-      console.error("Failed to load candidates from database:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadCandidates();
-  }, [loadCandidates]);
+  const [busy, setLoading] = useState(false);
+  const { data: candidateRows, error: listError, isLoading, mutate: loadCandidates } = useSWR(
+    workspaceStatus === 'ready' ? ['candidate-list-details', profile?.tenantId, profile?.id, selection.active.id, profile?.branchId] : null,
+    () => atsApi.candidates.list({ allMarkets: true, allBranches: true, limit: 5000 }),
+    { keepPreviousData: false, shouldRetryOnError: false },
+  );
+  const dbCandidates = candidateRows || EMPTY_CANDIDATES;
+  const loading = busy || isLoading || workspaceStatus === 'loading';
 
   const isTenantAdmin = systemRole === "TENANT_ADMIN" || systemRole === "SUPER_ADMIN";
 
@@ -129,14 +139,26 @@ export default function AllApplicantsPage() {
 
   // ── Filtered data ───────────────────────────────────────
   const filteredData = useMemo(() => {
-    const dbMapped: any[] = dbCandidates.map((c) => ({
+    const dbMapped: Applicant[] = dbCandidates.map((c) => ({
+      dbId: c.dbId,
       candidateCode: c.candidateCode || `CAN-${String(c.dbId || c.id).padStart(6, '0')}`,
-      uploadedByName: c.uploadedByName || "System Upload",
+      uploadedByName: c.uploadedByName,
+      uploadedByEmail: c.uploadedByEmail,
+      uploadedByAvatar: c.uploadedByAvatar,
+      assignedJobs: c.assignedJobs,
+      assignedJobCount: c.assignedJobCount,
+      assignedJobCode: c.assignedJobs?.map(job => `${job.jobCode} · ${job.jobTitle}`).join('; ') || '',
+      currentCTC: c.currentCTC,
+      currentSalary: c.currentCTC == null ? '—' : ['IN', 'INDIA'].includes(c.market?.toUpperCase() || '')
+        ? `₹${c.currentCTC.toLocaleString('en-IN', { maximumFractionDigits: 2 })} LPA`
+        : `${c.currentCTC.toLocaleString('en-IN', { maximumFractionDigits: 2 })} (unit unavailable)`,
       applicantId: c.applicantId || `APP-${c.id}`,
       applicantName: c.fullName,
       email: c.email,
       mobile: c.phone || "N/A",
-      city: c.city || "Unknown",
+      city: c.currentLocation || '—',
+      currentCompany: c.currentCompany || null,
+      updatedAt: c.updatedAt || null,
       state: c.state || "Unknown",
       source: c.source || "CV Upload",
       status: c.status || "New lead",
@@ -200,8 +222,10 @@ export default function AllApplicantsPage() {
     );
     const rows = filteredData.map((a) =>
       selectedColumns.map((colId) => {
-        const val = a[colId as keyof typeof a];
-        return `"${String(val || "").replace(/"/g, '""')}"`;
+        const val = colId === 'uploadedByName'
+          ? [a.uploadedByName, a.uploadedByEmail].filter(Boolean).join(' · ')
+          : a[colId as keyof typeof a];
+        return `"${String(val ?? "").replace(/"/g, '""')}"`;
       })
     );
     const csvContent =
@@ -338,6 +362,10 @@ export default function AllApplicantsPage() {
         />
 
         {/* Professional Enterprise Data Grid */}
+        {(listError || workspaceStatus === 'error') && <div role="alert" className="flex items-center gap-3 border-y border-border px-4 py-3 text-xs text-red-700 dark:text-red-300">
+          Unable to load candidate details. Please try again.
+          <button type="button" onClick={() => { if (workspaceStatus === 'error') reloadWorkspace(); else void loadCandidates(); }} className="rounded font-medium underline focus-visible:outline-2 focus-visible:outline-blue-500">Retry</button>
+        </div>}
         <ApplicantsTable
           data={filteredData}
           selectedColumns={selectedColumns}

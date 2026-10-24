@@ -1,4 +1,15 @@
 export interface Applicant {
+  dbId?: string;
+  candidateCode?: string;
+  uploadedByName?: string | null;
+  uploadedByEmail?: string | null;
+  uploadedByAvatar?: string | null;
+  assignedJobs?: import('@/lib/candidate-contract').CandidateProfile['assignedJobs'];
+  assignedJobCount?: number;
+  assignedJobCode?: string;
+  currentCTC?: number | null;
+  currentCompany?: string | null;
+  updatedAt?: string | null;
   applicantId: string;
   applicantName: string;
   email: string;
