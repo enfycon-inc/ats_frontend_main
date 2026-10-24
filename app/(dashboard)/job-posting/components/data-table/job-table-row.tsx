@@ -44,6 +44,7 @@ import { JobPodHoverCard } from "./job-pod-hover-card";
 
 
 export interface JobTableRowProps {
+  podSystemEnabled?: boolean;
   job: Job;
   idx: number;
   isSelected: boolean;
@@ -69,6 +70,7 @@ export interface JobTableRowProps {
 }
 
 export function JobTableRow({
+  podSystemEnabled = false,
   job,
   idx,
   isSelected,
@@ -97,7 +99,7 @@ export function JobTableRow({
   const canAssignRecruiters = canAssignRecruitersToJob(job, currentUser);
   const userPermissions: string[] = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
   const canAssignDirectRecruiters = userPermissions.includes("job:assign_recruiter");
-  const canAssignPods = userPermissions.includes("job:assign_pod");
+  const canAssignPods = podSystemEnabled && userPermissions.includes("job:assign_pod");
 
   const closedJob = ['closed', 'close'].includes(String(job.jobStatus).toLowerCase());
   const hasEditPermission = job.capabilities?.edit === true;
@@ -277,7 +279,7 @@ export function JobTableRow({
                   : "Warm"}
               </Badge>
             ) : colId === "podName" ? (
-              isDelegatedView ? (
+              !podSystemEnabled ? <span className="text-muted-foreground">—</span> : isDelegatedView ? (
                  <span className="text-neutral-400 italic text-[11px]">Hidden</span>
               ) : (
                 <div className="flex items-center justify-between gap-1.5 w-full min-w-0 py-0.5">

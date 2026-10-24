@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import useSWR from "swr";
 import { toast } from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import { Job } from "../data/mock-jobs";
@@ -10,9 +11,10 @@ import { getAssignedPersonDisplay, getRecruiterDisplay } from "./job-table-utils
 export interface UseJobTableDataOptions {
   data: Job[];
   branchUsesPods?: boolean;
+  podAllowedUnitIds?: string[];
 }
 
-export function useJobTableData({ data, branchUsesPods }: UseJobTableDataOptions) {
+export function useJobTableData({ data, branchUsesPods, podAllowedUnitIds }: UseJobTableDataOptions) {
   // Sorting State
   const [sortColumn, setSortColumn] = useState<keyof Job | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -29,44 +31,38 @@ export function useJobTableData({ data, branchUsesPods }: UseJobTableDataOptions
   const [endDate, setEndDate] = useState("");
   const [selectedSort, setSelectedSort] = useState("Latest Posted");
   const [showRangePicker, setShowRangePicker] = useState(false);
-  const [podsList, setPodsList] = useState<any[]>([]);
 
-  // Check whether pod system is enabled for current active branch / workspace
+
   const isPodSystemEnabled = useMemo(() => {
-    if (branchUsesPods !== undefined) return branchUsesPods;
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("active_branch_allow_pods");
-      if (stored !== null) return stored === "true";
-      const user = atsApi.auth.getCurrentUser();
-      if ((user as any)?.podSystemEnabled !== false) return true;
-    }
-    return false;
-  }, [branchUsesPods]);
+    if (branchUsesPods !== true) return false;
+    if (selectedBranch === 'All' || !podAllowedUnitIds) return true;
+    return data.some(job => (job.businessUnit || job.branchName) === selectedBranch && podAllowedUnitIds.includes(job.businessUnitId || ''));
+  }, [branchUsesPods, selectedBranch, podAllowedUnitIds, data]);
 
+  const { data: podRecords } = useSWR(isPodSystemEnabled ? ['job-filter-pods', ...(podAllowedUnitIds || [])] : null, () => atsApi.pods.list());
+  const podsList = useMemo(() => (podRecords || []).filter(pod => !podAllowedUnitIds || podAllowedUnitIds.includes(pod.businessUnitId)), [podRecords, podAllowedUnitIds]);
   useEffect(() => {
-    if (isPodSystemEnabled) {
-      atsApi.pods
-        .list()
-        .then((res) => {
-          if (Array.isArray(res)) setPodsList(res);
-        })
-        .catch((e) => console.warn("Could not load pods:", e));
+    if (!isPodSystemEnabled) {
+      setSelectedPod('All');
+      setSortColumn(previous => previous === 'podName' ? null : previous);
     }
   }, [isPodSystemEnabled]);
 
   // Unique available pods for dropdown
   const availablePods = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>();
+    if (!isPodSystemEnabled) return [];
     podsList.forEach((p: any) => {
       if (p && p.name) map.set(p.name, { id: p.id, name: p.name });
     });
     data.forEach((j) => {
+      if (podAllowedUnitIds && !podAllowedUnitIds.includes(j.businessUnitId || '')) return;
       if (j.podName && j.podName !== "N/A" && j.podName.toLowerCase() !== "unassigned") {
         map.set(j.podName, { id: j.podId || j.podName, name: j.podName });
       }
     });
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [podsList, data]);
+  }, [podsList, data, isPodSystemEnabled, podAllowedUnitIds]);
 
   // Unique available Branches for dropdown
   const availableBranches = useMemo(() => {
@@ -115,7 +111,7 @@ export function useJobTableData({ data, branchUsesPods }: UseJobTableDataOptions
   const isAnyFilterActive = useMemo(() => {
     return (
       searchQuery.trim() !== "" ||
-      selectedPod !== "All" ||
+      (isPodSystemEnabled && selectedPod !== "All") ||
       selectedBranch !== "All" ||
       selectedCreator !== "All" ||
       selectedAssignee !== "All" ||
@@ -127,6 +123,7 @@ export function useJobTableData({ data, branchUsesPods }: UseJobTableDataOptions
     );
   }, [
     searchQuery,
+    isPodSystemEnabled,
     selectedPod,
     selectedBranch,
     selectedCreator,

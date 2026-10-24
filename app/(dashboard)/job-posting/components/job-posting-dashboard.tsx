@@ -8,6 +8,8 @@ import { atsApi } from "@/lib/ats-api";
 import { resolveActiveSystemRole, getActiveRolePermissions } from "@/lib/role-permissions";
 import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 import DataTable from "./data-table";
+import { useJobPodVisibility } from "../lib/use-job-pod-visibility";
+import { useDashboardContext } from "@/contexts/DashboardContext";
 import { PendingDelegationRequests } from "./pending-delegation-requests";
 import FilterDrawer, { SelectedFilters } from "./filter-drawer";
 import ColumnDrawer from "./column-drawer";
@@ -73,22 +75,10 @@ export default function JobPostingDashboard({
   const [isColumnOpen, setIsColumnOpen] = useState(false);
   const [market, setMarket] = useState<"US" | "IN">("IN");
 
-  // Branch Pods System Support State
-  const [branchUsesPods, setBranchUsesPods] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("active_branch_allow_pods");
-      if (stored !== null) return stored === "true";
-    }
-    return true;
-  });
-
-  // User details & permission controls
-  const currentUser = useMemo(() => {
-    if (typeof window !== "undefined") {
-      return atsApi.auth.getCurrentUser();
-    }
-    return null;
-  }, []);
+  const { profile: currentUser, selection } = useDashboardContext();
+  const { enabled: branchUsesPods, allowedUnitIds: podAllowedUnitIds } = useJobPodVisibility(currentUser, selection.active.id);
+  const [tableUsesPods, setTableUsesPods] = useState(false);
+  const showPodColumns = branchUsesPods && tableUsesPods;
 
   const systemRole = useMemo(() => {
     if (!currentUser) return "RECRUITER";
@@ -162,44 +152,6 @@ export default function JobPostingDashboard({
     return allowedRoles.includes(systemRole);
   }, [systemRole]);
 
-  // Load and verify active branch's pod system capability
-  useEffect(() => {
-    async function checkBranchPodSupport() {
-      try {
-        const branches = await atsApi.branches.list();
-        const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;
-        const tenantHasPods = (currentUser as any)?.podSystemEnabled !== false;
-
-        // Find active branch, or user's assigned branch, or any branch allowing pods
-        const currentBranch =
-          branches.find((b: any) => b.id === (activeBranchId || (currentUser as any)?.branchId)) ||
-          branches.find((b: any) => b.allowPods !== false) ||
-          branches[0];
-
-        const podsAllowed =
-          tenantHasPods &&
-          Boolean(
-            currentBranch?.allowPods !== false ||
-            branches.some((b: any) => b.allowPods !== false || (b.podsCount && b.podsCount > 0))
-          );
-
-        setBranchUsesPods(podsAllowed);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("active_branch_allow_pods", String(podsAllowed));
-        }
-      } catch (e) {
-        console.warn("Could not determine branch pod support:", e);
-      }
-    }
-    checkBranchPodSupport();
-
-    const handleBranchChange = () => {
-      checkBranchPodSupport();
-    };
-    window.addEventListener("branchChanged", handleBranchChange);
-    return () => window.removeEventListener("branchChanged", handleBranchChange);
-  }, [currentUser]);
-
   // Sanitize user columns: remove legacy recruiter / recruitmentManager,
   // ensure podName is restored right after assignedTo when pods are enabled,
   // or remove podName only if the pod system is disabled.
@@ -220,23 +172,23 @@ export default function JobPostingDashboard({
 
   // Table Configuration States (User Persistent)
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
-    const defaultCols = getBaseJobColumns(branchUsesPods);
+    const defaultCols = getBaseJobColumns(showPodColumns);
     const userCols = getUserColumnPreferences("jobs", defaultCols);
-    return sanitizeColumns(userCols, branchUsesPods);
+    return sanitizeColumns(userCols, showPodColumns);
   });
 
   // Sync user-specific columns when branchUsesPods or currentUser changes
   useEffect(() => {
-    setSelectedColumns((prev) => sanitizeColumns(prev, branchUsesPods));
-  }, [branchUsesPods, sanitizeColumns]);
+    setSelectedColumns((prev) => sanitizeColumns(prev, showPodColumns));
+  }, [showPodColumns, sanitizeColumns]);
 
   useEffect(() => {
     if (currentUser) {
-      const defaultCols = getBaseJobColumns(branchUsesPods);
+      const defaultCols = getBaseJobColumns(showPodColumns);
       const userSavedCols = getUserColumnPreferences("jobs", defaultCols);
-      setSelectedColumns(sanitizeColumns(userSavedCols, branchUsesPods));
+      setSelectedColumns(sanitizeColumns(userSavedCols, showPodColumns));
     }
-  }, [currentUser, branchUsesPods, sanitizeColumns]);
+  }, [currentUser, showPodColumns, sanitizeColumns]);
 
   const activeSelectedColumns = useMemo(() => {
     if (!hasEditPermission) {
@@ -396,7 +348,7 @@ export default function JobPostingDashboard({
       { id: "businessUnit", label: "Business Unit" },
       { id: "createdBy", label: "Created By" },
       { id: "assignedTo", label: "Recruiter" },
-      ...(branchUsesPods ? [{ id: "podName", label: "Assigned Pod" }] : []),
+      ...(showPodColumns ? [{ id: "podName", label: "Assigned Pod" }] : []),
       { id: "client", label: "Client" },
       { id: "endClientName", label: "End Client" },
       { id: "clientJobId", label: "Client Job ID" },
@@ -420,7 +372,7 @@ export default function JobPostingDashboard({
       return cols.filter((col) => col.id !== "clientBillRate");
     }
     return cols;
-  }, [market, hasEditPermission, branchUsesPods]);
+  }, [market, hasEditPermission, showPodColumns]);
 
   const handleApplyFilters = (filters: SelectedFilters) => {
     setCurrentFilters(filters);
@@ -723,6 +675,8 @@ export default function JobPostingDashboard({
             selectedColumns={activeSelectedColumns}
             allColumns={allColumns}
             branchUsesPods={branchUsesPods}
+            podAllowedUnitIds={podAllowedUnitIds}
+            onPodVisibilityChange={setTableUsesPods}
             onOpenFilters={() => setIsFilterOpen(true)}
             onOpenColumns={() => setIsColumnOpen(true)}
             onRefresh={handleRefresh}
@@ -748,15 +702,16 @@ export default function JobPostingDashboard({
         isOpen={isColumnOpen}
         onClose={() => setIsColumnOpen(false)}
         allColumns={allColumns}
-        defaultColumns={getBaseJobColumns(branchUsesPods)}
+        defaultColumns={getBaseJobColumns(showPodColumns)}
         selectedColumns={activeSelectedColumns}
         onApply={(newCols) => {
-          setSelectedColumns(newCols);
-          saveUserColumnPreferences("jobs", newCols);
+          const visibleCols = showPodColumns ? newCols : newCols.filter(column => column !== "podName");
+          setSelectedColumns(visibleCols);
+          saveUserColumnPreferences("jobs", visibleCols);
           toast.success("Column preferences saved!");
         }}
         onResetToDefault={() => {
-          const defaultCols = getBaseJobColumns(branchUsesPods);
+          const defaultCols = getBaseJobColumns(showPodColumns);
           setSelectedColumns(defaultCols);
           saveUserColumnPreferences("jobs", defaultCols);
           toast.success("Columns reset to default view!");

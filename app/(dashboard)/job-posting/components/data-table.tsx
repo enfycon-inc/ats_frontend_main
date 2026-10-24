@@ -57,6 +57,8 @@ export interface DataTableProps {
   selectedColumns: string[];
   allColumns: { id: string; label: string }[];
   branchUsesPods?: boolean;
+  podAllowedUnitIds?: string[];
+  onPodVisibilityChange?: (enabled: boolean) => void;
   onOpenFilters: () => void;
   onOpenColumns: () => void;
   onRefresh: () => void;
@@ -74,6 +76,8 @@ export default function DataTable({
   selectedColumns,
   allColumns,
   branchUsesPods,
+  podAllowedUnitIds,
+  onPodVisibilityChange,
   onOpenFilters,
   onOpenColumns,
   onRefresh,
@@ -173,14 +177,14 @@ export default function DataTable({
     return permissions.includes("job:approve") || (permissions.length === 0 && isSuperOrAdmin);
   }, [currentUser]);
 
-  const activeSelectedColumns = useMemo(() => {
+  const permissionSelectedColumns = useMemo(() => {
     if (!hasEditPermission) {
       return selectedColumns.filter((colId) => colId !== "clientBillRate");
     }
     return selectedColumns;
   }, [selectedColumns, hasEditPermission]);
 
-  const activeAllColumns = useMemo(() => {
+  const permissionAllColumns = useMemo(() => {
     if (!hasEditPermission) {
       return allColumns.filter((col) => col.id !== "clientBillRate");
     }
@@ -285,7 +289,12 @@ export default function DataTable({
     totalPages,
     processedData,
     paginatedData,
-  } = useJobTableData({ data, branchUsesPods });
+  } = useJobTableData({ data, branchUsesPods, podAllowedUnitIds });
+
+  useEffect(() => { onPodVisibilityChange?.(isPodSystemEnabled); }, [isPodSystemEnabled, onPodVisibilityChange]);
+
+  const activeSelectedColumns = permissionSelectedColumns.filter(column => isPodSystemEnabled || column !== 'podName');
+  const activeAllColumns = permissionAllColumns.filter(column => isPodSystemEnabled || column.id !== 'podName');
 
   // Modal States
   const [isSavingView, setIsSavingView] = useState(false);
@@ -545,6 +554,7 @@ export default function DataTable({
                 <JobTableRow
                   key={job.id}
                   job={job}
+                  podSystemEnabled={isPodSystemEnabled && (!podAllowedUnitIds || podAllowedUnitIds.includes(job.businessUnitId || ''))}
                   idx={idx}
                   isSelected={selectedRowIds.includes(job.id)}
                   onToggleSelect={handleSelectRow}
