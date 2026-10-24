@@ -1,4 +1,5 @@
 "use client";
+import { useStaffProfile } from "@/hooks/use-staff-profile";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import {
@@ -30,6 +31,7 @@ import { getSavedDashboardRole, saveDashboardRole } from "@/lib/dashboard-prefer
 import type { NavigationBootstrap } from "@/lib/navigation-bootstrap";
 
 export function AppSidebar({ initialNavigation = null }: { initialNavigation?: NavigationBootstrap | null }) {
+  const { data: refreshedProfile, loading: profileLoading } = useStaffProfile();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -43,7 +45,7 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
     return false;
   };
   const [overrideRole, setOverrideRole] = useState<string | null>(initialNavigation?.overrideRole ?? null);
-  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>(() => {
+  const [initialRoles] = useState<CustomRoleDefinition[]>(() => {
     if (initialNavigation?.roles && initialNavigation.roles.length > 0) return initialNavigation.roles;
     if (typeof window !== "undefined") {
       const cached = atsApi.auth.getCurrentUser();
@@ -53,35 +55,16 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
     }
     return [];
   });
-  const [liveProfile, setLiveProfile] = useState<any>(() => {
+  const [initialProfile] = useState<any>(() => {
     if (initialNavigation?.profile) return initialNavigation.profile;
     if (typeof window !== "undefined") {
       return atsApi.auth.getCurrentUser();
     }
     return null;
   });
-  const [isLoadingProfile, setIsLoadingProfile] = useState(() => {
-    if (initialNavigation?.profile) return false;
-    if (typeof window !== "undefined" && atsApi.auth.getCurrentUser()) return false;
-    return true;
-  });
-
-  useEffect(() => {
-    if (initialNavigation?.profile) return;
-    let cancelled = false;
-    Promise.all([atsApi.auth.me(), atsApi.auth.listRoles(undefined, true)]).then(([profile, roles]) => {
-      if (cancelled) return;
-      setAvailableRoles(Array.isArray(roles) ? roles : []);
-      if (profile) {
-        setLiveProfile(profile);
-        try { localStorage.setItem("ats_current_user", JSON.stringify(profile)); } catch {}
-      }
-      setIsLoadingProfile(false);
-    }).catch(() => {
-      if (!cancelled) setIsLoadingProfile(false);
-    });
-    return () => { cancelled = true; };
-  }, [initialNavigation]);
+  const liveProfile = refreshedProfile || initialProfile;
+  const availableRoles = useMemo<CustomRoleDefinition[]>(() => refreshedProfile?.assignedRoles?.map(role => ({ ...role, systemRole: role.systemRole || undefined })) || initialRoles, [refreshedProfile, initialRoles]);
+  const isLoadingProfile = !liveProfile && profileLoading;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -101,7 +84,7 @@ export function AppSidebar({ initialNavigation = null }: { initialNavigation?: N
     }
   }, [liveProfile]);
 
-  const userProfile = liveProfile;
+  const userProfile = refreshedProfile || liveProfile;
   const { active } = getDashboardRoleSelection(userProfile, availableRoles, overrideRole, false);
   // Use the exact assigned ID; names can be duplicated across branches.
   const activeRoleName = active.id || active.systemRole;

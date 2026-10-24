@@ -595,7 +595,7 @@ export function JobTableRow({
                     Sourcing & Pipeline
                   </div>
 
-                  {hasSubmitCandidatePermission && (
+                  {job.capabilities?.submitCandidate === true && (
                     <DropdownMenuItem
                       disabled={closedJob}
                       title={closedJob ? "This job is closed." : undefined}
@@ -609,7 +609,7 @@ export function JobTableRow({
                     </DropdownMenuItem>
                   )}
 
-                  {(canFindMatches || closedJob) && <DropdownMenuItem
+                  {(canFindMatches && !closedJob) && <DropdownMenuItem
                     disabled={closedJob}
                     title={closedJob ? "This job is closed." : undefined}
                     onClick={() => router.push(`/job-posting/${job.id}/matches`)}
@@ -634,7 +634,7 @@ export function JobTableRow({
               )}
 
               {/* Section 2: Management Actions */}
-              {(hasEditPermission || canChangeStatus || closedJob ||
+              {(hasEditPermission || canChangeStatus || job.capabilities?.managePublication ||
                 hasCreatePermission ||
                 (hasDelegatePermission && job.branchId === currentUserBranchId)) && (
                 <>
@@ -712,7 +712,7 @@ export function JobTableRow({
                       </DropdownMenuItem>
                     )}
 
-                    {(hasEditPermission || closedJob) && (
+                    {(hasEditPermission && !closedJob) && (
                       <DropdownMenuItem
                         disabled={closedJob}
                         title={closedJob ? "Reopen this job before editing." : undefined}
@@ -726,7 +726,7 @@ export function JobTableRow({
                       </DropdownMenuItem>
                     )}
 
-                    {(hasEditPermission || canChangeStatus || closedJob) && (
+                    {(job.capabilities?.managePublication === true && !closedJob) && (
                       <DropdownMenuItem
                         disabled={!job.capabilities?.managePublication}
                         title={!job.capabilities?.managePublication ? 'Only authorized, active, approved jobs can be published or unpublished.' : undefined}

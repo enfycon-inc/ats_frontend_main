@@ -101,7 +101,7 @@ export default function JobDetailPage() {
 
   const isAM = activeSystemRole === "ACCOUNT_MANAGER";
   const isPodLead = activeSystemRole === "POD_LEAD";
-  const canSubmitCandidate = useMemo(() => String(job?.jobStatus).toLowerCase() === "active" && (isAdmin || effectivePerms.includes("submission:create")), [job?.jobStatus, isAdmin, effectivePerms]);
+  const canSubmitCandidate = job?.capabilities?.submitCandidate === true;
 
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
@@ -113,7 +113,7 @@ export default function JobDetailPage() {
   const [publicationOpen, setPublicationOpen] = useState(false);
   const [publicationSaving, setPublicationSaving] = useState(false);
   const [publicationError, setPublicationError] = useState('');
-  const canManagePublication = Boolean(job?.capabilities?.managePublication || String(job?.jobStatus).toUpperCase() === "CLOSED" && job?.capabilities?.changeStatus);
+  const canManagePublication = job?.capabilities?.managePublication === true;
   async function savePublication() {
     const publish = !publication.published;
     setPublicationSaving(true); setPublicationError('');
@@ -202,7 +202,7 @@ export default function JobDetailPage() {
       setPublication({ published: Boolean(jobData.isPubliclyPublished), slug: jobData.publicSlug || null, description: jobData.publicDescription || '', visible: Boolean(jobData.isPubliclyPublished) && ['ACTIVE', 'CLOSED'].includes(String(jobData.jobStatus).toUpperCase()) && (!jobData.approvalStatus || jobData.approvalStatus === 'APPROVED'), eligible: String(jobData.jobStatus).toUpperCase() === 'ACTIVE' && (!jobData.approvalStatus || jobData.approvalStatus === 'APPROVED') });
       setSubmissions(subsData.data);
       setSubmissionResponse(subsData);
-      
+
       // Fetch matches asynchronously so it doesn't block UI load
       if (jobData.capabilities?.findMatches) loadMatches();
     } catch (err: any) {
@@ -380,7 +380,7 @@ export default function JobDetailPage() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-neutral-50 dark:bg-slate-955 font-sans p-4 space-y-4">
-      
+
       {/* TOP HEADER CONTROLS */}
       <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm shrink-0 mb-2">
         <CardContent className="p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -463,7 +463,7 @@ export default function JobDetailPage() {
                 <Share2 className="mr-1.5 h-3.5 w-3.5" />{publication.published ? 'Unpublish from website' : 'Publish to website'}
               </Button>
             </div>}
-            {String(job?.jobStatus).toLowerCase() === "closed" && <Button size="sm" disabled title="Reopen this job before editing." className="h-9 text-xs"><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit Job</Button>}
+
             {hasEditPermission && (
               <Link href={`/job-posting/${job.id}/edit`}>
                 <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 cursor-pointer">
@@ -472,8 +472,8 @@ export default function JobDetailPage() {
               </Link>
             )}
             {effectivePerms.includes("job:delegate") && (
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 onClick={() => setDelegateModalOpen(true)}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 cursor-pointer"
               >
@@ -579,7 +579,7 @@ export default function JobDetailPage() {
         {/* TAB 1: JOB REQUISITION DETAILS */}
         {activeTab === "details" && (
           <div className="space-y-4">
-            
+
             {/* TOP STATS CARDS (US IT Template) */}
             <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm p-5">
               <div className="grid grid-cols-4 gap-4 mb-4">
@@ -600,15 +600,15 @@ export default function JobDetailPage() {
                   <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-450 mt-1">CFR Age</span>
                 </div>
               </div>
-              
+
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
                   <span>Submission Progress</span>
                   <span>{Math.min(100, Math.round((totalSubCount / (job.submissionRequired || 1)) * 100))}%</span>
                 </div>
                 <div className="h-1.5 w-full bg-neutral-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-emerald-500 dark:bg-emerald-400 rounded-full transition-all duration-500" 
+                  <div
+                    className="h-full bg-emerald-500 dark:bg-emerald-400 rounded-full transition-all duration-500"
                     style={{ width: `${Math.min(100, Math.round((totalSubCount / (job.submissionRequired || 1)) * 100))}%` }}
                   />
                 </div>
@@ -616,7 +616,7 @@ export default function JobDetailPage() {
             </Card>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-              
+
               {/* Left Description area */}
               <div className="lg:col-span-8 space-y-4 min-w-0">
                 <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
@@ -624,9 +624,9 @@ export default function JobDetailPage() {
                     <h2 className="text-sm font-bold text-neutral-800 dark:text-white flex items-center gap-2 border-b border-neutral-100 dark:border-slate-800 pb-2">
                       <FileText className="h-4 w-4 text-indigo-500" /> Job Description
                     </h2>
-                    <JobDescriptionView 
-                      content={job.jobDescription} 
-                      jobTitle={job.jobTitle} 
+                    <JobDescriptionView
+                      content={job.jobDescription}
+                      jobTitle={job.jobTitle}
                     />
                   </CardContent>
                 </Card>
@@ -652,12 +652,12 @@ export default function JobDetailPage() {
 
               {/* Right Sidebar */}
               <div className="lg:col-span-4 space-y-4">
-                
+
                 {/* Job Info */}
                 <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-sm">
                   <CardContent className="p-5 space-y-4">
                     <h3 className="text-xs font-bold text-neutral-800 dark:text-white">Job Info</h3>
-                    
+
                     <div className="flex items-center gap-4 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-100 dark:border-slate-800">
                       <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white dark:bg-slate-800 shadow-sm border border-neutral-100 dark:border-slate-700 shrink-0">
                         <DollarSign className="h-4 w-4 text-neutral-500" />
@@ -667,7 +667,7 @@ export default function JobDetailPage() {
                         <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 block">{job.payRate}</span>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-4 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-100 dark:border-slate-800">
                       <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white dark:bg-slate-800 shadow-sm border border-neutral-100 dark:border-slate-700 shrink-0">
                         <Zap className="h-4 w-4 text-neutral-500" />
@@ -684,7 +684,7 @@ export default function JobDetailPage() {
                 <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-sm">
                   <CardContent className="p-5 space-y-4">
                     <h3 className="text-xs font-bold text-neutral-800 dark:text-white">Client</h3>
-                    
+
                     <div className="flex items-center gap-4 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-100 dark:border-slate-800">
                       <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white dark:bg-slate-800 shadow-sm border border-neutral-100 dark:border-slate-700 shrink-0">
                         <Building2 className="h-4 w-4 text-neutral-500" />
@@ -694,7 +694,7 @@ export default function JobDetailPage() {
                         <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 block">{job.client}</span>
                       </div>
                     </div>
-                    
+
                     {job.clientJobId && job.clientJobId !== "N/A" && (
                       <div className="flex items-center gap-4 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-100 dark:border-slate-800">
                         <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white dark:bg-slate-800 shadow-sm border border-neutral-100 dark:border-slate-700 shrink-0">
@@ -713,7 +713,7 @@ export default function JobDetailPage() {
                 <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-sm">
                   <CardContent className="p-5 space-y-4">
                     <h3 className="text-xs font-bold text-neutral-800 dark:text-white">Created By</h3>
-                    
+
                     <div className="flex items-center gap-4 bg-neutral-50 dark:bg-slate-850 p-3 rounded-lg border border-neutral-100 dark:border-slate-800">
                       <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white dark:bg-slate-800 shadow-sm border border-neutral-100 dark:border-slate-700 shrink-0">
                         <User className="h-4 w-4 text-neutral-500" />
@@ -748,7 +748,7 @@ export default function JobDetailPage() {
         {/* TAB 3: AI CANDIDATE MATCHES */}
         {activeTab === "matches" && job?.capabilities?.findMatches && (
           <div className="space-y-4">
-            
+
             <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 p-4 rounded-sm">
               <h3 className="text-sm font-bold text-neutral-850 dark:text-neutral-100 flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4 text-violet-500" />
@@ -769,7 +769,7 @@ export default function JobDetailPage() {
                 aiMatches.map((match, idx) => {
                   const styles = TIER_STYLES[match.matchTier] || TIER_STYLES.Low;
                   const alreadySubmitted = submissions.some((s) => s.candidateId === match.candidateId);
-                  
+
                   return (
                     <div
                       key={match.candidateId}
@@ -779,7 +779,7 @@ export default function JobDetailPage() {
                         <span className="text-xs font-mono font-bold text-neutral-400 pt-1">
                           {(idx + 1).toString().padStart(2, "0")}
                         </span>
-                        
+
                         {/* Score meter circle */}
                         <div className="h-11 w-11 rounded-full border-2 border-indigo-650 flex items-center justify-center font-black text-indigo-700 bg-indigo-50/10 text-xs shrink-0 select-none">
                           {match.matchScore}%

@@ -59,6 +59,7 @@ export function isRoleAdmin(input: any, roles: CustomRoleDefinition[] = [], prof
 }
 
 export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] = [], profile?: any): NavItem[] {
+  const podsEnabled = profile?.features?.podsEnabled === true;
   const perms = getActiveRolePermissions(input, roles, profile);
   const has = (...keys: string[]) => perms.includes('*') || keys.some(k => perms.includes(k));
   if (has("platform:manage")) return GLOBAL_ADMIN_NAV_ITEMS;
@@ -79,6 +80,8 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
   return PRIMARY_NAV_ITEMS.filter(item => allowed[item.id]).map(item => {
     if (!item.children) return item;
     const children = item.children.filter(child => {
+      if (child.href === '/job-posting/pod-jobs' && !(podsEnabled && has('job:view_pod_jobs', 'job:submit_pod_jobs'))) return false;
+      if (child.href === '/utility/submissions?view=pod' && !podsEnabled) return false;
       if (child.href === "/utility/submissions?view=all" && !canViewAllSubmissions) return false;
       if (child.href === "/utility/submissions?view=my" && !canAccessSubmissions) return false;
       if (child.href === "/utility/submissions?view=pod" && !(canAccessSubmissions && has("pod:view"))) return false;
@@ -153,6 +156,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
 }
 
 export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [], profile?: any): NavItem[] {
+  const podsEnabled = profile?.features?.podsEnabled === true;
   const perms = getActiveRolePermissions(input, roles, profile);
   const has = (...keys: string[]) => perms.includes('*') || keys.some(k => perms.includes(k));
   const isAccountManager = resolveActiveSystemRole(input, roles, profile) === "ACCOUNT_MANAGER";
@@ -164,7 +168,7 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
     database: has("database:manage", "tenant:settings"), integrations: has("integration:manage", "tenant:settings"),
     "user-management": has("user:manage", "branch:assign_user", "unit_admin:manage"),
     "role-management": !isDeliveryHead && has("user:manage"),
-    "pod-management": !isAccountManager && has("pod:view", "pod:manage"), dictionaries: has("tenant:settings"),
+    "pod-management": podsEnabled && !isAccountManager && has("pod:view", "pod:manage"), dictionaries: has("tenant:settings"),
     "operations-logs": has("notification:broadcast", "notification:view_all", "audit:view", "tenant:audit_logs"),
   };
   return MORE_NAV_ITEMS.filter(item => allowed[item.id]).map(item => {

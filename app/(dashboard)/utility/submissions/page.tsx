@@ -1,4 +1,5 @@
 "use client";
+import { PodFeatureGate } from "@/components/shared/pod-feature-gate";
 
 import { StageBadge, Pipeline } from "@/components/submissions/submission-stage";
 import { ResumeDownloadButton } from "@/components/submissions/resume-download";
@@ -11,7 +12,7 @@ import { ReviewWorkspace } from "@/components/submissions/review-workspace";
 import { stageRemarkSuggestions } from "@/lib/stage-remarks";
 import { USER_CITY_OPTIONS } from "@/lib/user-city-contract";
 
-import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock3, Filter, Loader2, RefreshCw, Search, Mail, Phone, MapPin, BriefcaseBusiness, Building2, ExternalLink } from "lucide-react";
@@ -285,7 +286,7 @@ function SubmissionDetails({ submission, onReview }: { submission: TrackerSubmis
   </div>;
 }
 
-export default function SubmissionsPage() {
+function SubmissionsPageContent() {
   const router = useRouter();
   const params = useSearchParams();
   const { status: workspaceStatus, selection, profile, roles } = useDashboardContext();
@@ -427,3 +428,9 @@ export default function SubmissionsPage() {
     {profileTarget && <PersonProfileDialog key={`${profileTarget.kind}-${profileTarget.submission.id}`} target={profileTarget} onClose={() => setProfileTarget(null)} />}
   </main>;
 }
+
+function ScopedSubmissionsPage() {
+  const search = useSearchParams();
+  return search.get('view') === 'pod' ? <PodFeatureGate><SubmissionsPageContent /></PodFeatureGate> : <SubmissionsPageContent />;
+}
+export default function SubmissionsPage() { return <Suspense fallback={<p role="status" className="p-4 text-xs">Loading submissions…</p>}><ScopedSubmissionsPage /></Suspense>; }

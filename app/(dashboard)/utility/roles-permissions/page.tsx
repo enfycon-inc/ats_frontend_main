@@ -1,4 +1,5 @@
 "use client";
+import { jobAccessGrants } from '@/lib/job-access-grants';
 
 import { isAutomaticPodLeadRole } from "@/lib/pod-lead-role-policy";
 import React, { useEffect, useState, useMemo } from "react";
@@ -210,7 +211,7 @@ const SYSTEM_ARCHETYPES = [
       "placement:view", "placement:create", "report:view"
     ]
   }
-];
+].map(template => ({ ...template, perms: [...new Set([...template.perms, ...jobAccessGrants(template.perms)])] }));
 
 export default function RolesPermissionsPage() {
   const [loading, setLoading] = useState(true);

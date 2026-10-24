@@ -1,4 +1,5 @@
 "use client";
+import { useStaffProfile } from "@/hooks/use-staff-profile";
 
 import { Menu, X } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
@@ -13,20 +14,11 @@ import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 import { getSavedDashboardRole } from "@/lib/dashboard-preference";
 
 export function TopNavbar() {
+  const { data: refreshedProfile } = useStaffProfile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [overrideRole, setOverrideRole] = useState<string | null>(null);
-  const [availableRoles, setAvailableRoles] = useState<CustomRoleDefinition[]>([]);
-  const [liveProfile, setLiveProfile] = useState<any>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([atsApi.auth.me(), atsApi.auth.listRoles(undefined, true)]).then(([profile, roles]) => {
-      if (cancelled) return;
-      setAvailableRoles(Array.isArray(roles) ? roles : []);
-      setLiveProfile(profile);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+  const liveProfile = refreshedProfile || null;
+  const availableRoles = useMemo<CustomRoleDefinition[]>(() => refreshedProfile?.assignedRoles?.map(role => ({ ...role, systemRole: role.systemRole || undefined })) || [], [refreshedProfile]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -43,7 +35,7 @@ export function TopNavbar() {
     }
   }, [liveProfile]);
   
-  const user = liveProfile;
+  const user = refreshedProfile || liveProfile;
   const { active } = getDashboardRoleSelection(user, availableRoles, overrideRole);
   const activeRoleName = active.id || active.name;
 

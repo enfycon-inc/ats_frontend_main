@@ -1,3 +1,4 @@
+import { PodFeatureGate } from '@/components/shared/pod-feature-gate';
 import { APP_BRAND } from "@/lib/app-brand";
 import JobPostingDashboard from "../components/job-posting-dashboard";
 import JobPostingSkeleton from "../components/job-posting-skeleton";
@@ -11,7 +12,7 @@ export const metadata = {
 export default function PodJobsPage() {
   return (
     <Suspense fallback={<JobPostingSkeleton />}>
-      <JobPostingDashboard initialStatusFilter="All" initialFilter="pod" />
+      <PodFeatureGate><JobPostingDashboard initialStatusFilter="All" initialFilter="pod" /></PodFeatureGate>
     </Suspense>
   );
 }

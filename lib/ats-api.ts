@@ -813,10 +813,12 @@ const auth = {
     jobCodePattern?: string;
     enforceJobCodePattern?: boolean;
   } & TenantBrandingUpdate): Promise<TenantBrandingSettingsResponse> {
-    return apiFetch<TenantBrandingSettingsResponse>('/api/auth/tenants/my-settings', {
+    const saved = await apiFetch<TenantBrandingSettingsResponse>('/api/auth/tenants/my-settings', {
       method: 'PATCH',
       body: JSON.stringify(settings),
     });
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('atsWorkspaceSettingsChanged'));
+    return saved;
   },
 
   async getTenantDetails(tenantId: string): Promise<any> {
@@ -1977,10 +1979,12 @@ const businessUnits = {
       podDistributionStrategy?: string;
     },
   ): Promise<any> {
-    return apiFetch<any>(`/api/business-units/${id}`, {
+    const saved = await apiFetch<any>(`/api/business-units/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('atsWorkspaceSettingsChanged'));
+    return saved;
   },
   async delete(id: string): Promise<any> {
     return apiFetch<any>(`/api/business-units/${id}`, {

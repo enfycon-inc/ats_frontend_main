@@ -56,7 +56,7 @@ export function JobContextMenu({
           Quick Actions
         </div>
 
-        {hasSubmitCandidatePermission && (
+        {job.capabilities?.submitCandidate === true && (
           <button
             disabled={closedJob}
             title={closedJob ? "This job is closed." : undefined}
@@ -73,7 +73,7 @@ export function JobContextMenu({
           </button>
         )}
 
-        {(job.capabilities?.findMatches || closedJob) && <button
+        {(job.capabilities?.findMatches && !closedJob) && <button
           disabled={closedJob}
           title={closedJob ? "This job is closed." : undefined}
           onClick={() => {
@@ -112,8 +112,8 @@ export function JobContextMenu({
         )}
 
         {job.capabilities?.changeStatus && <button type="button" onClick={() => { onOpenStatusModal(job); onClose(); }} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200"><Pencil className="h-3.5 w-3.5" />Edit Status</button>}
-        {(job.capabilities?.edit || job.capabilities?.changeStatus || closedJob) && <button type="button" disabled={!job.capabilities?.managePublication} title={!job.capabilities?.managePublication ? 'Only authorized, active, approved jobs can be published or unpublished.' : undefined} onClick={() => { onOpenPublicationModal(job); onClose(); }} className="disabled:opacity-50 disabled:cursor-not-allowed w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-[#1a4fa0]"><Globe className="h-3.5 w-3.5" />{job.isPubliclyPublished ? 'Unpublish from website' : 'Publish to website'}</button>}
-        {(job.capabilities?.edit || closedJob) && (
+        {(job.capabilities?.managePublication && !closedJob) && <button type="button" disabled={!job.capabilities?.managePublication} title={!job.capabilities?.managePublication ? 'Only authorized, active, approved jobs can be published or unpublished.' : undefined} onClick={() => { onOpenPublicationModal(job); onClose(); }} className="disabled:opacity-50 disabled:cursor-not-allowed w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-[#1a4fa0]"><Globe className="h-3.5 w-3.5" />{job.isPubliclyPublished ? 'Unpublish from website' : 'Publish to website'}</button>}
+        {(job.capabilities?.edit && !closedJob) && (
           <>
             <button
               disabled={closedJob}

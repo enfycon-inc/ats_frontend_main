@@ -1,4 +1,5 @@
 "use client";
+import { PodFeatureGate } from "@/components/shared/pod-feature-gate";
 
 import React, { useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -129,7 +130,7 @@ function checkIsBranchAdmin(user: any): boolean {
   );
 }
 
-export default function PodsPage() {
+function PodsContent() {
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1295,3 +1296,5 @@ export default function PodsPage() {
     </div>
   );
 }
+
+export default function PodsPage() { return <PodFeatureGate><PodsContent /></PodFeatureGate>; }

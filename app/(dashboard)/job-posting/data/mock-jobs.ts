@@ -1,3 +1,4 @@
+import type { JobCapabilities } from '@/lib/job-capabilities';
 import type { JobStatus } from '@/lib/job-status-contract';
 import { jobLocation } from '@/lib/job-location';
 import { normalizeJobWorkMode, type JobWorkMode } from '@/lib/job-work-mode';
@@ -11,7 +12,7 @@ export interface AssignedRecruiterProfile {
 export interface Job {
   isPubliclyPublished?: boolean;
   publicSlug?: string | null;
-  capabilities?: { edit: boolean; changeStatus: boolean; findMatches: boolean; managePublication?: boolean };
+  capabilities?: JobCapabilities;
   id: string;
   jobCode: string;
   jobTitle: string;

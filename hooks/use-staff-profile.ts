@@ -24,15 +24,17 @@ export function useStaffProfile() {
     }
     return data;
   }, [identity, user?.id, user?.tenantId]);
-  const profile = useSWR<StaffProfile>(key, fetchProfile, { dedupingInterval: 15000, revalidateOnFocus: true });
+  const profile = useSWR<StaffProfile>(key, fetchProfile, { dedupingInterval: 15000, revalidateOnFocus: true, revalidateOnReconnect: true, refreshInterval: 30000 });
   const mutate = profile.mutate;
   useEffect(() => {
     const changed = (event: Event) => {
       const data = (event as CustomEvent<StaffProfile>).detail;
       if (data?.id === user?.id && data?.tenantId === user?.tenantId) void mutate(data, false);
     };
+    const settingsChanged = () => { void mutate(); };
     window.addEventListener('atsProfileChanged', changed);
-    return () => window.removeEventListener('atsProfileChanged', changed);
+    window.addEventListener('atsWorkspaceSettingsChanged', settingsChanged);
+    return () => { window.removeEventListener('atsProfileChanged', changed); window.removeEventListener('atsWorkspaceSettingsChanged', settingsChanged); };
   }, [mutate, user?.id, user?.tenantId]);
   const confirmed = Boolean(
     identity && confirmedProfiles.has(identity) && !profile.isValidating && !profile.error &&
