@@ -253,7 +253,7 @@ function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
   </Dialog>;
 }
 
-function SubmissionDetails({ submission }: { submission: TrackerSubmission }) {
+function SubmissionDetails({ submission, onReview }: { submission: TrackerSubmission; onReview: () => void }) {
   const detail = [
     ["Job code", submission.jobCode], ["Client", submission.clientName], ["End client", submission.endClientName],
     ["Recruiter", submission.recruiterName], ["Account manager", submission.accountManagerName],
@@ -265,7 +265,18 @@ function SubmissionDetails({ submission }: { submission: TrackerSubmission }) {
       <div><h1 className="text-xl font-bold tracking-tight">{submission.candidateName || "Name unavailable"}</h1><p className="mt-1 text-xs text-muted-foreground">{[submission.jobTitle, submission.clientName].filter(Boolean).join(" · ") || "Job details unavailable"}</p></div>
       <ResumeDownloadButton submission={submission} />
     </div>
-    <div className="rounded-xl border border-border bg-card p-5"><StageBadge submission={submission} /><dl className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{detail.map(([label, value]) => <div key={label}><dt className="text-[11px] text-muted-foreground">{label}</dt><dd className="mt-1 text-xs break-words">{value || "—"}</dd></div>)}</dl></div>
+    <div className="rounded-xl border border-border bg-card p-5">
+      <div className="flex flex-col items-center gap-1.5">
+        <StageBadge submission={submission} />
+        {submission.capabilities?.review && submission.finalStatus === "PENDING_APPROVAL" && <button
+          type="button"
+          aria-label={`Review submission for ${submission.candidateName || "candidate"}`}
+          onClick={onReview}
+          className="inline-flex min-h-6 items-center justify-center gap-1 rounded px-2 text-xs font-medium text-[#1a4fa0] hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300"
+        >Review <span aria-hidden="true">→</span></button>}
+      </div>
+      <dl className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{detail.map(([label, value]) => <div key={label}><dt className="text-[11px] text-muted-foreground">{label}</dt><dd className="mt-1 text-xs break-words">{value || "—"}</dd></div>)}</dl>
+    </div>
     <SubmissionHistory submission={submission} />
   </div>;
 }
@@ -400,7 +411,7 @@ export default function SubmissionsPage() {
         <nav aria-label="Submission pages" className="flex items-center gap-1"><Button variant="outline" size="icon" className="h-8 w-8" aria-label="Previous page" disabled={loading || page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>{response && Array.from({ length: Math.min(5, response.totalPages) }, (_, i) => Math.max(1, Math.min(page - 2, response.totalPages - 4)) + i).map(p => <Button key={p} variant={p === page ? "default" : "outline"} className={cn("h-8 min-w-8 px-2 text-xs", p === page && PRIMARY)} aria-label={`Page ${p}`} aria-current={p === page ? "page" : undefined} disabled={loading} onClick={() => setPage(p)}>{p}</Button>)}<Button variant="outline" size="icon" className="h-8 w-8" aria-label="Next page" disabled={loading || !response || page >= response.totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button></nav>
       </div>
     </section>}
-    {submissionId && (loading ? <div role="status" className="p-12 text-center text-xs">Loading submission…</div> : error ? <div role="alert" className="text-xs">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : detail && <SubmissionDetails submission={detail} />)}
+    {submissionId && (loading ? <div role="status" className="p-12 text-center text-xs">Loading submission…</div> : error ? <div role="alert" className="text-xs">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : detail && <SubmissionDetails submission={detail} onReview={() => setEditor({ submission: detail, action: "review" })} />)}
     {editor && !["review", "notes", "rate"].includes(editor.action) && <UpdateSubmissionDialog key={editor.submission.id} submission={editor.submission} href={detailHref(editor.submission.id)} onReview={() => {
       const targetSub = editor.submission;
       setEditor(null);
