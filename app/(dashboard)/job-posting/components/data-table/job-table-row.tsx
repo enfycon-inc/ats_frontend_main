@@ -18,6 +18,7 @@ import {
   XCircle,
   Plus,
   LockKeyhole,
+  Globe,
 } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
@@ -64,6 +65,7 @@ export interface JobTableRowProps {
   onOpenStatusModal: (job: Job, status?: string) => void;
   onUpdateJob?: (jobId: string, updatedFields: Partial<Job>) => void;
   onRefresh?: () => void;
+  onOpenPublicationModal: (job: Job) => void;
 }
 
 export function JobTableRow({
@@ -88,6 +90,7 @@ export function JobTableRow({
   onOpenStatusModal,
   onUpdateJob,
   onRefresh,
+  onOpenPublicationModal,
 }: JobTableRowProps) {
   const isTenantAdmin = Boolean(currentUser?.permissions?.some((p: string) => ["tenant:manage", "tenant:settings"].includes(p)));
   const isDelegatedView = Boolean(!isTenantAdmin && currentUserBranchId && job.branchId && currentUserBranchId !== job.branchId);
@@ -718,6 +721,18 @@ export function JobTableRow({
                           <Pencil className="h-3.5 w-3.5" />
                         </div>
                         <span className="font-semibold">Edit Job</span>
+                      </DropdownMenuItem>
+                    )}
+
+                    {(hasEditPermission || canChangeStatus || closedJob) && (
+                      <DropdownMenuItem
+                        disabled={!job.capabilities?.managePublication}
+                        title={!job.capabilities?.managePublication ? 'Only authorized, active, approved jobs can be published or unpublished.' : undefined}
+                        onSelect={() => onOpenPublicationModal(job)}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200"
+                      >
+                        <div className="h-6 w-6 rounded-md bg-blue-50 text-[#1a4fa0] flex items-center justify-center shrink-0"><Globe className="h-3.5 w-3.5" /></div>
+                        <span>{job.isPubliclyPublished ? 'Unpublish from website' : 'Publish to website'}</span>
                       </DropdownMenuItem>
                     )}
 

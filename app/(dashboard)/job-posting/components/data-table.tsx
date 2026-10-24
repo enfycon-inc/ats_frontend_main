@@ -13,6 +13,8 @@ import {
   ChevronRight,
   RefreshCw,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { QUICK_CHANGE_JOB_STATUSES, normalizeJobStatus } from "@/lib/job-status-contract";
@@ -297,6 +299,10 @@ export default function DataTable({
   const [statusModalValue, setStatusModalValue] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState("");
+  const [publicationJob, setPublicationJob] = useState<Job | null>(null);
+  const [publicationSaving, setPublicationSaving] = useState(false);
+  const [publicationError, setPublicationError] = useState('');
+  const openPublication = (job: Job) => { setPublicationJob(job); setPublicationError(''); };
   const [assignModalJob, setAssignModalJob] = useState<Job | null>(null);
   const [assignModalMode, setAssignModalMode] = useState<JobAssignmentMode>("combined");
   const openAssignModal = (job: Job, mode: JobAssignmentMode = "combined") => {
@@ -562,6 +568,7 @@ export default function DataTable({
                     setSourceModalOpen(true);
                   }}
                   onOpenDelegateModal={setDelegateModalJob}
+                  onOpenPublicationModal={openPublication}
                   onOpenStatusModal={(job, status) => { setStatusModalJob(job); const initialStatus = normalizeJobStatus(status || job.jobStatus); setStatusModalValue(initialStatus && QUICK_CHANGE_JOB_STATUSES.some(option => option === initialStatus) ? initialStatus : ""); setStatusError(''); }}
                   onUpdateJob={onUpdateJob}
                   onRefresh={onRefresh}
@@ -654,12 +661,31 @@ export default function DataTable({
               onDelegateJob={setDelegateModalJob}
               onEditJob={(j) => router.push(`/job-posting/${j.id}/edit`)}
               onOpenAssignModal={openAssignModal}
+              onOpenPublicationModal={openPublication}
+              onOpenStatusModal={job => { setStatusModalJob(job); setStatusModalValue(normalizeJobStatus(job.jobStatus) || ""); setStatusError(""); }}
               onArchiveJob={(j) => onUpdateJob?.(j.id, { jobStatus: "Archived" })}
               onClose={() => setContextMenu(null)}
             />
           );
         })()
       )}
+
+      <Dialog open={Boolean(publicationJob)} onOpenChange={open => { if (!open && !publicationSaving) setPublicationJob(null); }}>
+        <DialogContent className="sm:max-w-md" onInteractOutside={event => { if (publicationSaving) event.preventDefault(); }} onEscapeKeyDown={event => { if (publicationSaving) event.preventDefault(); }}>
+          <DialogHeader><DialogTitle className="text-sm">{publicationJob?.isPubliclyPublished ? 'Unpublish from website' : 'Publish to website'}</DialogTitle><DialogDescription className="text-xs">{publicationJob?.jobTitle} ({publicationJob?.jobCode}). {publicationJob?.isPubliclyPublished ? 'This job will be removed from the public website feed.' : 'This job will appear in the public website feed using its existing job description.'}</DialogDescription></DialogHeader>
+          {publicationError && <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-xs text-red-800">{publicationError}</p>}
+          <DialogFooter><Button variant="outline" disabled={publicationSaving} onClick={() => setPublicationJob(null)}>Cancel</Button><Button disabled={publicationSaving} onClick={async () => {
+            if (!publicationJob || publicationSaving) return;
+            setPublicationSaving(true); setPublicationError('');
+            try {
+              const saved = await atsApi.jobs.setPublication(publicationJob.id, !publicationJob.isPubliclyPublished);
+              onUpdateJob?.(publicationJob.id, { isPubliclyPublished: saved.isPubliclyPublished, publicSlug: saved.publicSlug, _alreadySaved: true } as Partial<Job>);
+              onRefresh?.(); setPublicationJob(null);
+            } catch (error) { setPublicationError(error instanceof Error ? error.message : 'Unable to update website publication.'); }
+            finally { setPublicationSaving(false); }
+          }}>{publicationSaving ? 'Saving...' : publicationJob?.isPubliclyPublished ? 'Unpublish' : 'Publish'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Job Status Modal Dialog */}
       <JobStatusModal

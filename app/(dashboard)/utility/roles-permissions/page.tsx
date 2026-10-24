@@ -78,7 +78,7 @@ const SYSTEM_ARCHETYPES = [
     badge: "Business Development",
     desc: "Client relations, direct client creation (no approval needed), job requisition authoring, interview scheduling, and placements.",
     perms: [
-      "job:create", "job:grant_creation_delegate", "job:edit", "job:view", "job:publish_direct", "job:approve", "job:reject",
+      "job:create", "job:grant_creation_delegate", "job:edit", "job:change_status", "job:find_matches", "job:view", "job:publish_direct", "job:approve", "job:reject",
       "job:assign_recruiter",
       "candidate:view", "candidate:create",
       "submission:download_resume", "submission:view", "submission:create", "submission:audit_rounds", "submission:audit_l1", "submission:audit_l2", "submission:audit_l3", "submission:final_status", "submission:schedule_interview", "submission:edit_rate", "submission:edit",
@@ -105,7 +105,7 @@ const SYSTEM_ARCHETYPES = [
     desc: "Branch delivery orchestration, client approvals & rejections, recruiter & pod allocation, requisition activation, and audit gates.",
     // perms = full ceiling (all permissions visible/grantable in the matrix)
     perms: [
-      "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:create", "job:view", "job:edit", "job:change_status", "job:find_matches", "job:publish_direct", "job:approve", "job:reject",
       "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:view", "candidate:create",
@@ -119,7 +119,7 @@ const SYSTEM_ARCHETYPES = [
     ],
     // defaultPerms = pre-selected when creating a new role (submission enabled for delivery oversight)
     defaultPerms: [
-      "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:create", "job:view", "job:edit", "job:change_status", "job:find_matches", "job:publish_direct", "job:approve", "job:reject",
       "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:view", "candidate:create",
@@ -139,7 +139,7 @@ const SYSTEM_ARCHETYPES = [
     desc: "Branch unit administrative authority, staff assignment, and unit-level recruitment oversight.",
     // perms = full ceiling (submission perms visible/grantable for Branch Admin to enable)
     perms: [
-      "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:create", "job:view", "job:edit", "job:change_status", "job:find_matches", "job:publish_direct", "job:approve", "job:reject",
       "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
@@ -152,7 +152,7 @@ const SYSTEM_ARCHETYPES = [
     ],
     // defaultPerms = pre-selected when creating a new role (submission disabled by default)
     defaultPerms: [
-      "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:create", "job:view", "job:edit", "job:change_status", "job:find_matches", "job:publish_direct", "job:approve", "job:reject",
       "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
@@ -170,7 +170,7 @@ const SYSTEM_ARCHETYPES = [
     desc: "Branch administrative authority, client approval & management, staff role configuration, and branch recruitment oversight.",
     // perms = full ceiling (submission perms visible/grantable for Tenant Admin to enable)
     perms: [
-      "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:create", "job:view", "job:edit", "job:change_status", "job:find_matches", "job:publish_direct", "job:approve", "job:reject",
       "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
@@ -182,7 +182,7 @@ const SYSTEM_ARCHETYPES = [
     ],
     // defaultPerms = pre-selected when creating a new role (submission disabled by default)
     defaultPerms: [
-      "job:create", "job:view", "job:edit", "job:publish_direct", "job:approve", "job:reject",
+      "job:create", "job:view", "job:edit", "job:change_status", "job:find_matches", "job:publish_direct", "job:approve", "job:reject",
       "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",
@@ -198,7 +198,7 @@ const SYSTEM_ARCHETYPES = [
     badge: "Full Admin",
     desc: "Full company administration privileges across jobs, clients (create, direct add, approve, reject, delete), candidates, pods, users, and branch offices.",
     perms: [
-      "job:create", "job:edit", "job:view", "job:publish_direct", "job:approve", "job:reject",
+      "job:create", "job:edit", "job:change_status", "job:find_matches", "job:view", "job:publish_direct", "job:approve", "job:reject",
       "job:manage_creation_access",
       "job:assign", "job:assign_recruiter", "job:assign_pod", "job:delegate", "job:accept_delegation",
       "candidate:create", "candidate:view",

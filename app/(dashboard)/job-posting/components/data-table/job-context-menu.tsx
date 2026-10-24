@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { UserPlus, Sparkles, Pencil, Plus, Archive } from "lucide-react";
+import { UserPlus, Sparkles, Pencil, Plus, Archive, Globe } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { Job } from "../../data/mock-jobs";
 
@@ -20,6 +20,8 @@ export interface JobContextMenuProps {
   onEditJob: (job: Job) => void;
   onOpenAssignModal: (job: Job, mode?: "pods" | "users") => void;
   onArchiveJob: (job: Job) => void;
+  onOpenPublicationModal: (job: Job) => void;
+  onOpenStatusModal: (job: Job) => void;
   onClose: () => void;
 }
 
@@ -39,6 +41,8 @@ export function JobContextMenu({
   onOpenAssignModal,
   onArchiveJob,
   onClose,
+  onOpenPublicationModal,
+  onOpenStatusModal,
 }: JobContextMenuProps) {
   const closedJob = ['closed', 'close'].includes(String(job.jobStatus).toLowerCase());
   return (
@@ -107,6 +111,8 @@ export function JobContextMenu({
           </button>
         )}
 
+        {job.capabilities?.changeStatus && <button type="button" onClick={() => { onOpenStatusModal(job); onClose(); }} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200"><Pencil className="h-3.5 w-3.5" />Edit Status</button>}
+        {(job.capabilities?.edit || job.capabilities?.changeStatus || closedJob) && <button type="button" disabled={!job.capabilities?.managePublication} title={!job.capabilities?.managePublication ? 'Only authorized, active, approved jobs can be published or unpublished.' : undefined} onClick={() => { onOpenPublicationModal(job); onClose(); }} className="disabled:opacity-50 disabled:cursor-not-allowed w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-[#1a4fa0]"><Globe className="h-3.5 w-3.5" />{job.isPubliclyPublished ? 'Unpublish from website' : 'Publish to website'}</button>}
         {(job.capabilities?.edit || closedJob) && (
           <>
             <button

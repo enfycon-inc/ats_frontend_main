@@ -1048,7 +1048,7 @@ const email = {
 
 // ─── Jobs API ───────────────────────────────────────────────────────
 export interface JobPayload {
-  capabilities?: { edit: boolean; changeStatus: boolean; findMatches: boolean };
+  capabilities?: { edit: boolean; changeStatus: boolean; findMatches: boolean; managePublication?: boolean };
   isPubliclyPublished?: boolean;
   publicSlug?: string | null;
   publicDescription?: string | null;

@@ -9,7 +9,9 @@ export interface AssignedRecruiterProfile {
 }
 
 export interface Job {
-  capabilities?: { edit: boolean; changeStatus: boolean; findMatches: boolean };
+  isPubliclyPublished?: boolean;
+  publicSlug?: string | null;
+  capabilities?: { edit: boolean; changeStatus: boolean; findMatches: boolean; managePublication?: boolean };
   id: string;
   jobCode: string;
   jobTitle: string;
@@ -120,6 +122,8 @@ export function mapApiJobToJob(api: any): Job {
     recruiterDetails: Array.isArray(api.recruiterDetails) ? api.recruiterDetails : [],
     
     capabilities: api.capabilities,
+    isPubliclyPublished: Boolean(api.isPubliclyPublished),
+    publicSlug: api.publicSlug || null,
     accountManagerId: api.accountManagerId || api.account_manager_id || undefined,
     accountManagerName: api.accountManagerName || api.account_manager_name || null,
     accountManagerEmail: api.accountManagerEmail || api.account_manager_email || null,

@@ -113,7 +113,7 @@ export default function JobDetailPage() {
   const [publicationOpen, setPublicationOpen] = useState(false);
   const [publicationSaving, setPublicationSaving] = useState(false);
   const [publicationError, setPublicationError] = useState('');
-  const canManagePublication = effectivePerms.some(permission => ['tenant:settings', 'tenant:manage'].includes(permission)) || Boolean(effectivePerms.includes('job:edit') && currentUser?.branchId && job?.branchId === currentUser.branchId && (!effectivePerms.includes('unit_admin:manage') || job?.businessUnitId === currentUser.businessUnitId));
+  const canManagePublication = Boolean(job?.capabilities?.managePublication || String(job?.jobStatus).toUpperCase() === "CLOSED" && job?.capabilities?.changeStatus);
   async function savePublication() {
     const publish = !publication.published;
     setPublicationSaving(true); setPublicationError('');
