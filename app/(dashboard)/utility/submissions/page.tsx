@@ -346,7 +346,17 @@ export default function SubmissionsPage() {
       case "jobCreated": return <td key="jobCreated" className="px-2.5 py-3"><TableDate value={sub.jobCreatedAt} timezone={sub.timezone} /></td>;
       case "submitted": return <td key="submitted" className="px-2.5 py-3"><TableDate value={sub.createdAt} timezone={sub.timezone} /></td>;
       case "pipeline": return <td key="pipeline" className="px-2.5 py-4 text-center"><Pipeline submission={sub} /></td>;
-      case "status": return <td key="status" className="px-2.5 py-3 text-center"><StageBadge submission={sub} /></td>;
+      case "status": return <td key="status" className="px-2.5 py-3 text-center">
+        <div className="flex flex-col items-center gap-1.5">
+          <StageBadge submission={sub} />
+          {sub.capabilities?.review && sub.finalStatus === "PENDING_APPROVAL" && <button
+            type="button"
+            aria-label={`Review submission for ${sub.candidateName || "candidate"}`}
+            onClick={() => setEditor({ submission: sub, action: "review" })}
+            className="inline-flex min-h-6 items-center justify-center gap-1 rounded px-2 text-xs font-medium text-[#1a4fa0] hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300 [@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover/submission:opacity-100 group-focus-within/submission:opacity-100 focus-visible:opacity-100"
+          >Review <span aria-hidden="true">→</span></button>}
+        </div>
+      </td>;
       case "actions": return <td key="actions" className="sticky right-0 z-10 bg-white dark:bg-slate-950 pl-3 pr-6 py-3 text-center shadow-[-1px_0_0_0_var(--border)]"><SubmissionActions submission={sub} href={detailHref(sub.id)} onAction={action => setEditor({ submission: sub, action })} /></td>;
     }
   }
@@ -370,14 +380,14 @@ export default function SubmissionsPage() {
           <tbody className="divide-y divide-border">
             {loading || workspaceStatus !== "ready" ? <tr><td colSpan={columns.length} className="py-16 text-center text-muted-foreground" role="status"><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading submissions…</td></tr> : error ? <tr><td colSpan={columns.length} className="py-12 text-center" role="alert">{error}{!error.includes("permission") && <Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button>}</td></tr> : !response?.data.length ? <tr><td colSpan={columns.length} className="py-16 text-center text-muted-foreground">No submissions match these filters.</td></tr> : !groupByJob ? response.data.map(sub => {
 
-              return <tr key={sub.id} className="hover:bg-muted/25">
+              return <tr key={sub.id} className="group/submission hover:bg-muted/25">
                 {columns.map(column => renderCell(sub, column))}
               </tr>;
             }) : Array.from(new Set(response.data.map(sub => sub.jobId))).map(jobId => {
               const submissions = response.data.filter(sub => sub.jobId === jobId);
               const job = submissions[0];
               return <Fragment key={jobId}><tr className="bg-blue-50/70 dark:bg-blue-950/40"><td colSpan={columns.length} className="px-5 py-3"><div className="flex items-center justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-x-3 gap-y-2"><button type="button" className="font-semibold text-[#1a4fa0] dark:text-blue-200" aria-expanded={!collapsedJobs[jobId]} onClick={() => setCollapsedJobs(previous => ({ ...previous, [jobId]: !previous[jobId] }))}>{collapsedJobs[jobId] ? "▸" : "▾"} {job.jobCode || "Code unavailable"}</button><span className="font-semibold text-[#1a4fa0] dark:text-blue-200">{job.jobTitle || "Title unavailable"}</span>{job.jobUrgency && <span className="rounded bg-amber-100 px-2 py-1 text-[10.5px] text-amber-900">{job.jobUrgency}</span>}{job.jobIsCoSourced && <span className="rounded bg-violet-100 px-2 py-1 text-[10.5px] text-violet-800">Co-sourced</span>}</div><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>Client: {job.clientName || "Not provided"}</span><span>End client: {job.endClientName || "Not provided"}</span></div></div><span className="shrink-0 text-xs font-medium text-muted-foreground">{job.jobSubmissionDone ?? job.matchingJobSubmissionCount ?? submissions.length} / {job.jobSubmissionRequired ?? "—"} submissions{submissions.length < (job.matchingJobSubmissionCount ?? submissions.length) && ` · ${submissions.length} on this page`}</span></div></td></tr>{!collapsedJobs[jobId] && submissions.map(sub => {
-              return <tr key={sub.id} className="hover:bg-muted/25 transition-colors">
+              return <tr key={sub.id} className="group/submission hover:bg-muted/25 transition-colors">
                 {columns.map(column => renderCell(sub, column))}
               </tr>;
             })}</Fragment>;

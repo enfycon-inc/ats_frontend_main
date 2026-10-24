@@ -1,11 +1,11 @@
 "use client";
 
 import Link from 'next/link';
-import { Eye, MoreHorizontal, Pencil } from 'lucide-react';
+import { ClipboardCheck, Eye, MoreHorizontal, Pencil } from 'lucide-react';
 import type { TrackerSubmission } from '@/lib/submission-contract';
 import type { TrackerAction } from '@/lib/submission-tracker';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ResumeDownloadMenuItem } from './resume-download';
 
 export function SubmissionActions({ submission, href, onAction, canEdit }: {
@@ -21,6 +21,10 @@ export function SubmissionActions({ submission, href, onAction, canEdit }: {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
+        {caps?.review && submission.finalStatus === 'PENDING_APPROVAL' && <>
+          <DropdownMenuItem className="text-[#1a4fa0] dark:text-blue-300" onSelect={() => { setTimeout(() => onAction('review'), 50); }}><ClipboardCheck className="h-4 w-4" />Review submission</DropdownMenuItem>
+          <DropdownMenuSeparator />
+        </>}
         {editable && <DropdownMenuItem onSelect={() => { setTimeout(() => onAction('rounds'), 50); }}><Pencil className="h-4 w-4" />Edit status</DropdownMenuItem>}
         <DropdownMenuItem asChild><Link href={href}><Eye className="h-4 w-4" />View details</Link></DropdownMenuItem>
         <ResumeDownloadMenuItem submission={submission} />
