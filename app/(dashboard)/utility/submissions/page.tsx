@@ -293,7 +293,7 @@ export default function SubmissionsPage() {
   const [profileTarget, setProfileTarget] = useState<ProfileTarget | null>(null);
   const [collapsedJobs, setCollapsedJobs] = useState<Record<string, boolean>>({});
   const [groupByJob, setGroupByJob] = useState(false);
-  const { columns, sort, headers } = useTrackerColumns(profile ? `submission-columns:v1:${profile.tenantId}:${profile.id}` : null, groupByJob, response?.accountManagerLabel || 'Created by');
+  const { columns, sort, headers } = useTrackerColumns(profile ? `submission-columns:v1:${profile.tenantId}:${profile.id}` : null, groupByJob, 'Created By');
   const [jobFilter, setJobFilter] = useState<{ id: string; label: string; previousPage: number } | null>(null);
   useEffect(() => { const timer = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 300); return () => clearTimeout(timer); }, [search]);
   useEffect(() => {
