@@ -24,11 +24,18 @@ export default function EditJobPostingPage() {
   const id = params.id as string;
   const [marketVariant, setMarketVariant] = useState<"USIT" | "INDIA" | "GLOBAL" | null>(null);
 
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     async function determineMarketForEdit() {
       if (!id) return;
+      setError(null);
       try {
         const jobData = await atsApi.jobs.get(id);
+        if (!jobData?.capabilities?.edit) {
+          setError('You do not have permission to edit this job.');
+          return;
+        }
         if (!jobData) {
           setMarketVariant("GLOBAL");
           return;
@@ -63,12 +70,14 @@ export default function EditJobPostingPage() {
         } else {
           setMarketVariant("GLOBAL");
         }
-      } catch (err) {
-        setMarketVariant("GLOBAL");
+      } catch (err: any) {
+        setError(err.message || 'Could not load this job.');
       }
     }
     determineMarketForEdit();
   }, [id]);
+
+  if (error) return <div role="alert" className="m-5 rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-800">{error}</div>;
 
   if (!marketVariant) return <FormLoader />;
 

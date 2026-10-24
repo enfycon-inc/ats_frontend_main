@@ -72,7 +72,7 @@ export function JobTableRow({
   isSelected,
   onToggleSelect,
   activeSelectedColumns,
-  hasEditPermission,
+  hasEditPermission: legacyHasEditPermission,
   hasCreatePermission,
   hasSubmitCandidatePermission,
   hasDelegatePermission,
@@ -96,6 +96,9 @@ export function JobTableRow({
   const canAssignDirectRecruiters = userPermissions.includes("job:assign_recruiter");
   const canAssignPods = userPermissions.includes("job:assign_pod");
 
+  const hasEditPermission = job.capabilities?.edit === true;
+  const canChangeStatus = job.capabilities?.changeStatus === true;
+  const canFindMatches = job.capabilities?.findMatches === true;
   const router = useRouter();
 
   return (
@@ -227,7 +230,7 @@ export function JobTableRow({
                 return (
                   <button
                     type="button"
-                    disabled={!hasEditPermission || isPending || Boolean(job.approvalStatus && job.approvalStatus !== "APPROVED")}
+                    disabled={!canChangeStatus || isPending || Boolean(job.approvalStatus && job.approvalStatus !== "APPROVED")}
                     aria-label={`Edit status for ${job.jobCode}`}
                     title="Edit Status"
                     onClick={(event) => { event.stopPropagation(); onOpenStatusModal(job); }}
@@ -598,7 +601,7 @@ export function JobTableRow({
                     </DropdownMenuItem>
                   )}
 
-                  <DropdownMenuItem
+                  {canFindMatches && <DropdownMenuItem
                     onClick={() => router.push(`/job-posting/${job.id}/matches`)}
                     className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/40 transition-colors"
                   >
@@ -606,7 +609,7 @@ export function JobTableRow({
                       <Sparkles className="h-3.5 w-3.5" />
                     </div>
                     <span className="font-semibold">Find AI Matches</span>
-                  </DropdownMenuItem>
+                  </DropdownMenuItem>}
 
                   <DropdownMenuItem
                     onClick={() => router.push(`/job-posting/${job.id}`)}
@@ -621,7 +624,7 @@ export function JobTableRow({
               )}
 
               {/* Section 2: Management Actions */}
-              {(hasEditPermission ||
+              {(hasEditPermission || canChangeStatus ||
                 hasCreatePermission ||
                 (hasDelegatePermission && job.branchId === currentUserBranchId)) && (
                 <>
@@ -684,7 +687,7 @@ export function JobTableRow({
                         </>
                       )}
 
-                    {hasEditPermission && job.jobStatus !== 'Pending Approval' && (!job.approvalStatus || job.approvalStatus === 'APPROVED') && <DropdownMenuItem onSelect={() => onOpenStatusModal(job)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><div className="h-6 w-6 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0 shadow-2xs"><Pencil className="h-3.5 w-3.5" /></div><span className="font-semibold">Edit Status</span></DropdownMenuItem>}
+                    {canChangeStatus && job.jobStatus !== 'Pending Approval' && (!job.approvalStatus || job.approvalStatus === 'APPROVED') && <DropdownMenuItem onSelect={() => onOpenStatusModal(job)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><div className="h-6 w-6 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0 shadow-2xs"><Pencil className="h-3.5 w-3.5" /></div><span className="font-semibold">Edit Status</span></DropdownMenuItem>}
                     {hasEditPermission && job.jobStatus === "Draft" && (
                       <DropdownMenuItem
                         onClick={() => {

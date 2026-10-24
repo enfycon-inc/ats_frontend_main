@@ -9,6 +9,7 @@ export interface AssignedRecruiterProfile {
 }
 
 export interface Job {
+  capabilities?: { edit: boolean; changeStatus: boolean; findMatches: boolean };
   id: string;
   jobCode: string;
   jobTitle: string;
@@ -118,6 +119,7 @@ export function mapApiJobToJob(api: any): Job {
       : [],
     recruiterDetails: Array.isArray(api.recruiterDetails) ? api.recruiterDetails : [],
     
+    capabilities: api.capabilities,
     accountManagerId: api.accountManagerId || api.account_manager_id || undefined,
     accountManagerName: api.accountManagerName || api.account_manager_name || null,
     accountManagerEmail: api.accountManagerEmail || api.account_manager_email || null,

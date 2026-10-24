@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { atsApi, type JobMatchesResponse, type CandidateMatch } from "@/lib/ats-api";
 import { Button } from "@/components/ui/button";
-import toast from "react-hot-toast";
+
 import { CandidateSubmissionModal } from "@/components/job-posting/CandidateSubmissionModal";
 
 const TIER_STYLES: Record<CandidateMatch["matchTier"], { ring: string; text: string; chip: string; label: string }> = {
@@ -134,7 +134,7 @@ export default function JobMatchesPage() {
   const [submissionJob, setSubmissionJob] = useState<any>(null);
   const handleOpenSubmitModal = async (m: CandidateMatch) => {
     try { setSubmissionJob(await atsApi.jobs.get(jobId)); }
-    catch (error: any) { toast.error(error.message || 'Could not load job details.'); return; }
+    catch (error: any) { setError(error.message || 'Could not load job details.'); return; }
     setSelectedCandidate(m);
 
     setSubmitModalOpen(true);

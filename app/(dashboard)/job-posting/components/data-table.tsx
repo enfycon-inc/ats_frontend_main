@@ -120,10 +120,9 @@ export default function DataTable({
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
     const { active } = getDashboardRoleSelection(currentUser, currentUser.assignedRoles || []);
-    const sysRole = resolveActiveSystemRole(active.id, currentUser.assignedRoles || [], currentUser);
-    const isAdmin = sysRole === "TENANT_ADMIN" || sysRole === "SUPER_ADMIN";
     const perms = getActiveRolePermissions(active.id, currentUser.assignedRoles || [], currentUser);
-    return isAdmin || perms.includes("job:edit");
+    return perms.some(permission => ['*', 'platform:manage', 'tenant:settings', 'tenant:manage', 'branch_admin:manage', 'unit_admin:manage'].includes(permission)
+      || /^job:(edit|change_status)(_(unit|branch|tenant))?$/.test(permission));
   }, [currentUser]);
 
   const hasCreatePermission = useMemo(() => {
@@ -675,7 +674,7 @@ export default function DataTable({
           try {
             const saved = await atsApi.jobs.changeStatus(statusModalJob.id, { status: statusModalValue, expectedStatus: statusModalJob.jobStatus });
             onUpdateJob?.(statusModalJob.id, { jobStatus: saved.status, _alreadySaved: true } as Partial<Job>);
-            onRefresh?.(); setStatusModalJob(null); toast.success('Job status updated.');
+            onRefresh?.(); setStatusModalJob(null);
           } catch (error) { setStatusError(error instanceof Error ? error.message : 'Unable to change status.'); }
           finally { setStatusSaving(false); }
         }}

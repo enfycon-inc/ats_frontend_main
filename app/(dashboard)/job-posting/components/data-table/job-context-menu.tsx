@@ -66,7 +66,7 @@ export function JobContextMenu({
           </button>
         )}
 
-        <button
+        {job.capabilities?.findMatches && <button
           onClick={() => {
             onFindMatches(job);
             onClose();
@@ -77,7 +77,7 @@ export function JobContextMenu({
             <Sparkles className="h-3.5 w-3.5" />
           </div>
           <span>Find AI Matches</span>
-        </button>
+        </button>}
       </div>
 
       <div className="border-t border-neutral-100 dark:border-slate-800 my-0.5" />
@@ -102,7 +102,7 @@ export function JobContextMenu({
           </button>
         )}
 
-        {hasEditPermission && (
+        {job.capabilities?.edit && (
           <>
             <button
               onClick={() => {

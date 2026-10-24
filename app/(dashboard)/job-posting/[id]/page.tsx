@@ -46,6 +46,7 @@ export default function JobDetailPage() {
   const [aiMatches, setAiMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesError, setMatchesError] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"details" | "pipeline" | "matches">("details");
 
@@ -104,8 +105,8 @@ export default function JobDetailPage() {
 
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
-    return effectivePerms.includes("job:edit") || isAdmin || isAM;
-  }, [currentUser, effectivePerms, isAdmin, isAM]);
+    return job?.capabilities?.edit === true;
+  }, [currentUser, job]);
 
   const [submitting, setSubmitting] = useState(false);
   const [publication, setPublication] = useState({ published: false, slug: null as string | null, description: '', eligible: false, visible: false });
@@ -176,13 +177,14 @@ export default function JobDetailPage() {
   const loadMatches = useCallback(async () => {
     if (!id) return;
     setMatchesLoading(true);
+    setMatchesError('');
     try {
       const matchesData = await atsApi.jobs.matches(id, { limit: 15 });
       if (matchesData && matchesData.matches) {
         setAiMatches(matchesData.matches);
       }
-    } catch (err) {
-      console.error("Failed to load AI matches:", err);
+    } catch (err: any) {
+      setMatchesError(err.message || "Could not load AI matches.");
     } finally {
       setMatchesLoading(false);
     }
@@ -202,7 +204,7 @@ export default function JobDetailPage() {
       setSubmissionResponse(subsData);
       
       // Fetch matches asynchronously so it doesn't block UI load
-      loadMatches();
+      if (jobData.capabilities?.findMatches) loadMatches();
     } catch (err: any) {
       console.error("Failed to load job order details:", err);
       setError(err.message || "Failed to load job order details.");
@@ -556,7 +558,7 @@ export default function JobDetailPage() {
         >
           <ClipboardList className="h-4 w-4" /> Pipeline ({totalSubCount})
         </button>
-        <button
+        {job?.capabilities?.findMatches && <button
           onClick={() => setActiveTab("matches")}
           className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 border-transparent -mb-[2px] cursor-pointer flex items-center gap-1.5 ${
             activeTab === "matches"
@@ -565,7 +567,7 @@ export default function JobDetailPage() {
           }`}
         >
           <Sparkles className="h-4 w-4" /> AI Candidate Matches {matchesLoading ? <Loader2 className="h-3 w-3 animate-spin ml-1" /> : `(${aiMatches.length})`}
-        </button>
+        </button>}
       </div>
 
       {/* DASHBOARD WORKSPACE */}
@@ -741,7 +743,7 @@ export default function JobDetailPage() {
         )}
 
         {/* TAB 3: AI CANDIDATE MATCHES */}
-        {activeTab === "matches" && (
+        {activeTab === "matches" && job?.capabilities?.findMatches && (
           <div className="space-y-4">
             
             <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 p-4 rounded-sm">
@@ -754,6 +756,7 @@ export default function JobDetailPage() {
               </p>
             </div>
 
+            {matchesError && <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-xs text-red-800">{matchesError}</p>}
             <div className="space-y-3">
               {aiMatches.length === 0 ? (
                 <div className="text-center p-8 border border-dashed border-neutral-250 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-sm">
