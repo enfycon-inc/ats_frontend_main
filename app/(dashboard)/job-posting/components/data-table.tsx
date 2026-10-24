@@ -704,11 +704,11 @@ export default function DataTable({
         onStatusValueChange={setStatusModalValue}
         saving={statusSaving}
         error={statusError}
-        onConfirm={async () => {
+        onConfirm={async closure => {
           if (!statusModalJob || statusSaving) return;
           setStatusSaving(true); setStatusError('');
           try {
-            const saved = await atsApi.jobs.changeStatus(statusModalJob.id, { status: statusModalValue, expectedStatus: statusModalJob.jobStatus });
+            const saved = await atsApi.jobs.changeStatus(statusModalJob.id, { status: statusModalValue, expectedStatus: statusModalJob.jobStatus, ...closure });
             onUpdateJob?.(statusModalJob.id, { jobStatus: saved.status, _alreadySaved: true } as Partial<Job>);
             onRefresh?.(); setStatusModalJob(null);
           } catch (error) { setStatusError(error instanceof Error ? error.message : 'Unable to change status.'); }

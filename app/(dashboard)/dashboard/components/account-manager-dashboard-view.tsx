@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef } from "react";
-import { JobStatusModal } from "../../job-posting/components/data-table/job-status-modal";
+import { JobStatusModal, type JobClosureOptions } from "../../job-posting/components/data-table/job-status-modal";
 import { normalizeJobStatus, QUICK_CHANGE_JOB_STATUSES } from "@/lib/job-status-contract";
 import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -70,15 +70,15 @@ function AccountManagerDashboardView({
     setStatusValue(status && QUICK_CHANGE_JOB_STATUSES.some(option => option === status) ? status : '');
     setStatusError('');
   };
-  const confirmStatus = async () => {
+  const confirmStatus = async (closure?: JobClosureOptions) => {
     if (!statusJob || statusInFlight.current || !canEditStatus || !statusValue || normalizeJobStatus(statusValue) === normalizeJobStatus(statusJob.jobStatus || '')) return;
     statusInFlight.current = true;
     setStatusSaving(true); setStatusError('');
     try {
-      const saved = await atsApi.jobs.changeStatus(statusJob.id, { status: statusValue, expectedStatus: statusJob.jobStatus });
+      const saved = await atsApi.jobs.changeStatus(statusJob.id, { status: statusValue, expectedStatus: statusJob.jobStatus, ...closure });
       await onUpdateJob(statusJob.id, { jobStatus: saved.status, _alreadySaved: true });
       setStatusJob(null);
-      toast.success('Job status updated.');
+
     } catch (error) {
       setStatusError(error instanceof Error ? error.message : 'Unable to change status.');
     } finally {

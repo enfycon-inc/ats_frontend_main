@@ -263,7 +263,8 @@ function SubmissionDetails({ submission, onReview }: { submission: TrackerSubmis
     [compensationLabel(true, submission.jobType, submission.compensationPeriod), submissionCompensationValue(submission, true)],
   ];
   return <div className="space-y-5">
-    {submission.workflowPaused && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">Job closed. Pending workflow actions are paused. Recorded outcomes and interview history are preserved.</p>}
+    {submission.keepExistingSubmissionsOpen && submission.jobStatus?.toLowerCase() === "closed" && <p role="status" className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:bg-blue-950 dark:text-blue-200">Closed to new submissions. Existing candidates remain in progress.</p>}
+    {submission.workflowPaused && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">Job closed - workflow paused. Activate the job to edit submission status. Recorded outcomes and interview history are preserved.</p>}
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h1 className="text-xl font-bold tracking-tight">{submission.candidateName || "Name unavailable"}</h1><p className="mt-1 text-xs text-muted-foreground">{[submission.jobTitle, submission.clientName].filter(Boolean).join(" · ") || "Job details unavailable"}</p></div>
       <ResumeDownloadButton submission={submission} />

@@ -1198,7 +1198,7 @@ const jobs = {
   async publishDraft(id: string, data: Record<string, any>): Promise<JobPayload> {
     return apiFetch<JobPayload>(`/api/jobs/${id}/publish`, { method: 'POST', body: JSON.stringify(data) });
   },
-  async changeStatus(id: string, data: { status: string; expectedStatus: string; reason?: string }): Promise<{ status: string }> {
+  async changeStatus(id: string, data: { status: string; expectedStatus: string; reason?: string; keepExistingSubmissionsOpen?: boolean }): Promise<{ status: string }> {
     return apiFetch('/api/jobs/' + id + '/status', { method: 'PATCH', body: JSON.stringify(data) });
   },
   async podOptions(scope: { branchId?: string; businessUnitId: string }): Promise<JobPodOption[]> {

@@ -143,7 +143,8 @@ export function UpdateSubmissionDialog({ submission, href, onClose, onSaved, onR
         : !current || !draft ? <p role="status" className="p-8 text-center text-xs"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading submission…</p>
         : showHistory ? <div className="min-h-0 overflow-y-auto px-6 py-5"><SubmissionHistory submission={current} /></div> : <form className="flex min-h-0 flex-col" onSubmit={event => { event.preventDefault(); void save(); }}>
           <div className="space-y-5 overflow-y-auto px-6 py-5">
-            {!canMaintain && <p className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">Submission statuses are maintained by the Account Manager. Your access is read-only.</p>}
+            {current.workflowPaused ? <p role="status" className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200"><strong className="block">Job closed - workflow paused.</strong>Activate the job to edit submission status.</p> : current.keepExistingSubmissionsOpen && current.jobStatus?.toLowerCase() === "closed" ? <p className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:bg-blue-950 dark:text-blue-200">Closed to new submissions. Existing candidates remain in progress.</p> : null}
+            {!current.workflowPaused && !canMaintain && <p className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">Your current permissions allow viewing submission statuses only.</p>}
             {!approved && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">Internal approval is required before updating interviews.
               {caps?.review && <Button type="button" variant="outline" className="ml-3 text-xs" onClick={() => {
                 if (typeof document !== 'undefined') {
