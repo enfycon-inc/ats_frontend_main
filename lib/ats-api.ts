@@ -1,3 +1,4 @@
+import type { TenantBrandingUpdate, TenantBrandingSettingsResponse } from './tenant-branding-contract';
 import type { SignInPolicy, SignInPolicyUpdate } from "./sign-in-policy";
 import type { ClientCreationContext, ClientCreationRequest, CreatedClient } from './client-creation-contract';
 import type { TenantEmailSettings, EmailDispatchMode, EmailDispatchResult } from './system-email.types';
@@ -811,11 +812,8 @@ const auth = {
     jobAssignmentOptions?: any;
     jobCodePattern?: string;
     enforceJobCodePattern?: boolean;
-    siteTitle?: string;
-    logoUrl?: string;
-    name?: string;
-  }): Promise<any> {
-    return apiFetch<any>('/api/auth/tenants/my-settings', {
+  } & TenantBrandingUpdate): Promise<TenantBrandingSettingsResponse> {
+    return apiFetch<TenantBrandingSettingsResponse>('/api/auth/tenants/my-settings', {
       method: 'PATCH',
       body: JSON.stringify(settings),
     });

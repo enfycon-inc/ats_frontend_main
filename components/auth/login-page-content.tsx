@@ -33,7 +33,7 @@ export default function Login({ initialWorkspace }: { initialWorkspace: boolean 
   const { data: policy, error: policyError, mutate: retryPolicy } = useSignInPolicy();
   const workspace = initialWorkspace;
   const workspaceName = policy?.siteTitle?.trim() || policy?.name?.trim() || '';
-  const tenantLogoPath = policy?.logoUrl?.match(/^\/public\/image\/logos\/[0-9a-f-]{36}\/[a-f0-9]{64}\.(?:png|jpg|gif|webp)$/i)?.[0];
+  const tenantLogoPath = policy?.loginLogoUrl?.match(/^\/public\/image\/logos\/[0-9a-f-]{36}\/[a-f0-9]{64}\.(?:png|jpg|gif|webp)$/i)?.[0];
   const tenantLogoUrl = workspace && tenantLogoPath ? new URL(tenantLogoPath, getApiBase()).toString() : null;
   const design = policy?.loginDesignVariant || 'balanced-split';
   React.useEffect(() => { setMounted(true); }, []);

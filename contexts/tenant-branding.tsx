@@ -1,45 +1,53 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { atsApi } from "@/lib/ats-api";
+import useSWR from 'swr';
+import { useSession } from 'next-auth/react';
+import { getTenantIdentifier } from '@/utils/subdomain-helper';
+import type { TenantBranding as Branding } from '@/lib/tenant-branding-contract';
 
-type Branding = { name?: string; siteTitle?: string; logoUrl?: string | null };
-const BrandingContext = createContext({ branding: {} as Branding, brandingReady: false, updateBranding: (_: Branding) => {} });
+const BrandingContext = createContext<{ branding: Branding; brandingReady: boolean; updateBranding: (saved: Branding) => void }>({
+  branding: {}, brandingReady: false, updateBranding: () => {},
+});
 export const useTenantBranding = () => useContext(BrandingContext);
 
-export function TenantBrandingProvider({ initialBranding, children }: { initialBranding?: Branding; children: ReactNode }) {
-  const [branding, setBranding] = useState<Branding>(initialBranding || {});
+type Props = { initialBranding?: Branding; children: ReactNode };
+export function TenantBrandingProvider(props: Props) {
+  const { data: session } = useSession();
+  const sessionTenantId = (session?.user as { tenantId?: string } | undefined)?.tenantId;
+  const identity = `${session?.user?.id || ''}:${sessionTenantId || ''}:${getTenantIdentifier()}`;
+  return <TenantBrandingState key={identity} {...props} identity={session?.user?.id ? identity : null} />;
+}
+
+function TenantBrandingState({ initialBranding, children, identity }: Props & { identity: string | null }) {
   const revision = useRef(0);
+  const currentBranding = useRef<Branding>(initialBranding || {});
+  const pathname = usePathname();
+  const { data, mutate } = useSWR(identity ? ['tenant-branding', identity] : null, async () => {
+    const startedAt = revision.current;
+    const profile = await atsApi.auth.me();
+    if (!profile?.tenant) throw new Error('Company branding is unavailable');
+    // A save is authoritative over an older request, including its cache entry.
+    if (startedAt !== revision.current) return currentBranding.current;
+    const knownFields = Object.fromEntries(Object.entries(profile.tenant).filter(([, value]) => value !== undefined));
+    return { ...currentBranding.current, ...knownFields } as Branding;
+  }, { errorRetryCount: 3, errorRetryInterval: 2000, dedupingInterval: 5000,
+    revalidateOnFocus: true, revalidateOnReconnect: true });
+
+  const branding: Branding = { ...initialBranding, ...data };
+  useEffect(() => { currentBranding.current = { ...initialBranding, ...data }; }, [initialBranding, data]);
   const updateBranding = useCallback((saved: Branding) => {
     revision.current += 1;
-    setBranding(saved);
-  }, []);
-  const pathname = usePathname();
-
-  useEffect(() => {
-    let cancelled = false;
-    const startedAt = revision.current;
-    // Revalidate even a partial server snapshot. Use the same token recovery
-    // as the settings form instead of silently abandoning a stale session token.
-    atsApi.auth.me().then(profile => {
-      if (!cancelled && revision.current === startedAt && profile) {
-        if (profile.tenant) {
-          // Partial replies must not erase an already resolved logo.
-          setBranding(previous => ({ ...previous, ...profile.tenant }));
-        } else if (profile.tenant === null) {
-          setBranding({ logoUrl: null });
-        }
-      }
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [initialBranding]);
+    currentBranding.current = { ...currentBranding.current, ...saved };
+    void mutate(currentBranding.current, { revalidate: false });
+  }, [mutate]);
 
   useEffect(() => {
     document.title = branding.siteTitle || "Enfysync - ATS Recruitment Platform";
   }, [branding.siteTitle, pathname]);
 
-  // Missing means unknown; null/empty means the tenant explicitly has no logo.
   const brandingReady = branding.logoUrl !== undefined;
   return <BrandingContext.Provider value={{ branding, brandingReady, updateBranding }}>{children}</BrandingContext.Provider>;
 }

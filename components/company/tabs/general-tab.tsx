@@ -15,6 +15,8 @@ export interface GeneralTabProps {
   setSiteTitle: (val: string) => void;
   logoUrl: string;
   setLogoUrl: (val: string) => void;
+  loginLogoUrl: string;
+  setLoginLogoUrl: (val: string) => void;
   handleSaveCompanyProfile: () => void;
   savingCompanyProfile: boolean;
   subdomain: string;
@@ -33,6 +35,8 @@ export function GeneralTab({
   setSiteTitle,
   logoUrl,
   setLogoUrl,
+  loginLogoUrl,
+  setLoginLogoUrl,
   handleSaveCompanyProfile,
   savingCompanyProfile,
   subdomain,
@@ -43,8 +47,6 @@ export function GeneralTab({
   isSuperAdmin,
   base,
 }: GeneralTabProps) {
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [logoSize, setLogoSize] = useState<{ width: number; height: number } | null>(null);
 
   return (
     <div className="space-y-6">
@@ -57,70 +59,22 @@ export function GeneralTab({
             Company Identity & Branding
           </CardTitle>
           <CardDescription className="text-xs text-neutral-500 mt-0.5">
-            Manage your company's global display name, official logo, and primary brand assets.
+            Manage your company name and separate logos for the site and sign-in page.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-5 space-y-6">
           
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Logo Upload Area */}
-            <div className="w-full sm:w-64 flex-shrink-0">
-              <Label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-2">Company Logo</Label>
-              <div>
-                <input 
-                  ref={fileInputRef}
-                  id="logo-upload"
-                  type="file" 
-                  accept="image/png,image/jpeg,image/gif,image/webp"
-                  className="hidden" onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
-                        toast.error('Choose a PNG, JPEG, GIF, or WebP image up to 2 MB.');
-                        e.target.value = '';
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        setLogoSize(null);
-                        setLogoUrl(reader.result as string);
-                      };
-                      reader.onerror = () => toast.error('Could not read the logo image. Please try again.');
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                />
-                <button type="button" onClick={() => fileInputRef.current?.click()}
-                  aria-label="Upload or replace company logo" aria-describedby="company-logo-guide"
-                  className="w-full h-[60px] rounded-lg border border-blue-800 bg-[#1a4fa0] dark:bg-[#0f2d6b] px-2.5 flex items-center justify-start overflow-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
-                {logoUrl ? (
-                  <CompanyLogoImage src={logoUrl} alt="Company logo header preview" onDimensions={setLogoSize}
-                    className="h-[34px] w-auto max-w-[240px]" />
-                ) : (
-                  <span className="flex items-center gap-2 text-xs text-white"><ImageIcon className="h-5 w-5" />Upload logo</span>
-                )}
-                </button>
-                <p className="mt-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">Header preview · Click to change</p>
-                <div id="company-logo-guide" className="mt-2 space-y-1 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
-                  <p className="font-semibold text-neutral-700 dark:text-neutral-200">Recommended: 480 × 96 px (5:1)</p>
-                  <p>Use a tightly cropped logo with a transparent background. Light lettering works best on the blue header.</p>
-                  <p>PNG or WebP recommended. JPEG and GIF accepted. Maximum 2 MB.</p>
-                  {logoUrl && logoSize && <p>Current image: {logoSize.width} × {logoSize.height} px</p>}
-                </div>
-              </div>
-            </div>
-
+          <div className="space-y-5">
             {/* Form Fields */}
             <div className="flex-1 min-w-0 space-y-4">
-              <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Company Name</Label>
                   <Input
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="e.g. Enfycon Inc."
-                    className="h-9 mt-1.5 text-sm"
+                    className="h-9 mt-1.5 text-xs"
                   />
                 </div>
                 <div>
@@ -129,11 +83,16 @@ export function GeneralTab({
                     value={siteTitle}
                     onChange={(e) => setSiteTitle(e.target.value)}
                     placeholder="e.g. Recruitment workspace"
-                    className="h-9 mt-1.5 text-sm"
+                    className="h-9 mt-1.5 text-xs"
                   />
                   <p className="text-[10px] text-neutral-500 mt-1">This appears on browser tabs and search engines.</p>
                 </div>
               </div>
+
+            <div className="grid w-full gap-5 sm:grid-cols-2">
+              <LogoUpload label="Site Logo" value={logoUrl} onChange={setLogoUrl} />
+              <LogoUpload label="Login Page Logo" value={loginLogoUrl} onChange={setLoginLogoUrl} login />
+            </div>
 
               <div className="pt-2 flex justify-end">
                 <Button 
@@ -238,4 +197,37 @@ export function GeneralTab({
 
     </div>
   );
+}
+
+function LogoUpload({ label, value, onChange, login = false }: {
+  label: string; value: string; onChange: (value: string) => void; login?: boolean;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  return <div className="min-w-0 space-y-2">
+    <Label className="text-xs font-semibold">{label}</Label>
+    <p className="text-xs text-neutral-500">{login ? 'Used on the sign-in page.' : 'Used in the application header.'}</p>
+    <div className={`flex h-20 items-center overflow-hidden rounded-lg border px-3 ${login ? 'bg-white text-blue-900' : 'bg-[#1a4fa0] text-white'}`}>
+      {value ? <CompanyLogoImage key={value} src={value} alt={`${label} preview`} onDimensions={setSize} className="h-12 w-full" /> : <span className="flex items-center gap-2 text-xs"><ImageIcon className="h-4 w-4" />No logo selected</span>}
+    </div>
+    <input ref={input} type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label={`Choose ${label.toLowerCase()}`} className="hidden" onChange={event => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+      if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type) || file.size > 200 * 1024) {
+        toast.error('Choose a PNG, JPEG, GIF, or WebP image up to 200 KB.'); return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => { setSize(null); onChange(reader.result as string); };
+      reader.onerror = () => toast.error('Could not read the logo. Please try again.');
+      reader.readAsDataURL(file);
+    }} />
+    <div className="flex gap-2">
+      <Button type="button" variant="outline" size="sm" aria-label={`Change ${label.toLowerCase()}`} onClick={() => input.current?.click()}>Change logo</Button>
+      <Button type="button" variant="ghost" size="sm" aria-label={`Remove ${label.toLowerCase()}`} disabled={!value} onClick={() => { setSize(null); onChange(''); }}>Remove</Button>
+    </div>
+    <p className="text-[11px] text-neutral-500">{login ? 'Recommended: within 360 × 96 px.' : 'Recommended: 480 × 96 px.'} Keep the original proportions and use a transparent background.</p>
+    <p className="text-[11px] text-neutral-500">PNG, JPEG, static GIF or WebP · Maximum 200 KB. Optimized automatically.</p>
+    {value && size && <p className="text-[11px] text-neutral-500">Current image: {size.width} × {size.height} px</p>}
+  </div>;
 }

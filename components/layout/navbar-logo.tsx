@@ -29,7 +29,7 @@ export function NavbarLogo({ className }: { className?: string }) {
       `}
     >
       {!brandingReady ? (
-        <span aria-label="Loading company branding" className="block h-[34px] w-[240px] max-w-full group-data-[collapsible=icon]:w-7 group-data-[collapsible=icon]:h-7" />
+        <span aria-label="Loading company branding" className="flex h-[34px] w-[240px] max-w-full items-center text-xs text-white">{branding.name || "Workspace"}</span>
       ) : branding.logoUrl ? (
         <CompanyLogoImage src={branding.logoUrl} alt={`${branding.name || 'Company'} Logo`}
           className="h-[34px] w-[240px] max-w-full min-w-0 group-data-[collapsible=icon]:w-7 group-data-[collapsible=icon]:h-7" />

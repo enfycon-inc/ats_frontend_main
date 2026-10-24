@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
 import { visibleLogoBounds } from '@/lib/logo-bounds';
 
 type Dimensions = { width: number; height: number };
@@ -10,8 +10,12 @@ export function CompanyLogoImage({ src, alt, className, onDimensions }: {
   src: string; alt: string; className?: string; onDimensions?: (size: Dimensions) => void;
 }) {
   const [measured, setMeasured] = useState<{ src: string; size: Dimensions; viewBox: string; intrinsic?: Dimensions } | null>(null);
-  function measure(event: SyntheticEvent<HTMLImageElement>) {
-    const image = event.currentTarget;
+  const [failure, setFailure] = useState({ src, attempts: 0 });
+  const attempts = failure.src === src ? failure.attempts : 0;
+  const [retry, setRetry] = useState({ src, count: 0 });
+  const retryCount = retry.src === src ? retry.count : 0;
+  const imageSrc = retryCount && !src.startsWith('data:') ? `${src}${src.includes('?') ? '&' : '?'}logoRetry=${retryCount}` : src;
+  const measureImage = useCallback((image: HTMLImageElement) => {
     const size = { width: image.naturalWidth, height: image.naturalHeight };
     if (!size.width || !size.height) return;
     let viewBox = `0 0 ${size.width} ${size.height}`;
@@ -33,15 +37,43 @@ export function CompanyLogoImage({ src, alt, className, onDimensions }: {
     const intrinsic = { width: parts[2], height: parts[3] };
     setMeasured({ src, size, viewBox, intrinsic });
     onDimensions?.(size);
+  }, [src, onDimensions]);
+  const imageRef = useCallback((image: HTMLImageElement | null) => {
+    if (image?.complete && image.naturalWidth) measureImage(image);
+  }, [measureImage]);
+  useEffect(() => {
+    if (!attempts || attempts > 2) return;
+    const timer = setTimeout(() => setRetry({ src, count: attempts }), attempts * 1500);
+    return () => clearTimeout(timer);
+  }, [src, attempts]);
+  useEffect(() => {
+    if (!attempts) return;
+    const recover = () => {
+      setFailure({ src, attempts: 0 });
+      setRetry(previous => ({ src, count: (previous.src === src ? previous.count : 0) + 1 }));
+    };
+    window.addEventListener('online', recover);
+    window.addEventListener('focus', recover);
+    return () => {
+      window.removeEventListener('online', recover);
+      window.removeEventListener('focus', recover);
+    };
+  }, [src, attempts]);
+  function failed() {
+    setFailure(previous => ({ src, attempts: previous.src === src ? previous.attempts + 1 : 1 }));
+    setMeasured(null);
   }
+  function measure(event: SyntheticEvent<HTMLImageElement>) { measureImage(event.currentTarget); }
 
+
+  if (attempts > 2 || attempts > retryCount) return <span role="img" aria-label={alt} className={`${className || ''} flex items-center text-xs`}>{alt}</span>;
   if (!measured || measured.src !== src) {
-    // Reserve the slot without painting padded artwork at a different scale.
-    return <img src={src} alt={alt} onLoad={measure} crossOrigin="anonymous" style={{ visibility: 'hidden' }} className={`${className || ''} object-contain object-left`} />;
+    // Keep artwork visible while measuring; failures must never leave a hidden slot.
+    return <img key={imageSrc} ref={imageRef} src={imageSrc} alt={alt} onLoad={measure} onError={failed} className={`${className || ''} object-contain object-left`} />;
   }
   return (
     <svg role="img" aria-label={alt} viewBox={measured.viewBox} preserveAspectRatio="xMinYMid meet" className={className} width={measured.intrinsic?.width} height={measured.intrinsic?.height}>
-      <image href={src} width={measured.size.width} height={measured.size.height} />
+      <image onError={failed} href={imageSrc} width={measured.size.width} height={measured.size.height} />
     </svg>
   );
 }

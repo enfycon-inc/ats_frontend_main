@@ -68,6 +68,7 @@ function CompanySettingsContent() {
   const [companyName, setCompanyName] = useState("");
     const [siteTitle, setSiteTitle] = useState("");
     const [logoUrl, setLogoUrl] = useState("");
+    const [loginLogoUrl, setLoginLogoUrl] = useState("");
     const [savingCompanyProfile, setSavingCompanyProfile] = useState(false);
   const [podSystemEnabled, setPodSystemEnabled] = useState(true);
   const [togglingPodSystem, setTogglingPodSystem] = useState(false);
@@ -152,6 +153,7 @@ function CompanySettingsContent() {
           setCompanyName(profileData.tenant.name || "");
           setSiteTitle(profileData.tenant.siteTitle || "");
           setLogoUrl(profileData.tenant.logoUrl || "");
+          setLoginLogoUrl(profileData.tenant.loginLogoUrl || "");
           setSubdomain(profileData.tenant.domain || "");
           setOriginalSubdomain(profileData.tenant.domain || "");
           if (profileData.tenant.jobCodePattern !== undefined) setJobCodePattern(profileData.tenant.jobCodePattern || "{BRANCH}-{UNIT}-{YYMMDD}-{SEQ}");
@@ -245,11 +247,13 @@ function CompanySettingsContent() {
       const saved = await atsApi.auth.updateMySettings({
         name: companyName,
         siteTitle: siteTitle,
-        logoUrl: logoUrl
+        logoUrl: logoUrl,
+        loginLogoUrl: loginLogoUrl
       });
       
       setLogoUrl(saved.logo_url || '');
-      updateBranding({ name: saved.name, siteTitle: saved.site_title || '', logoUrl: saved.logo_url || '' });
+      setLoginLogoUrl(saved.login_logo_url || '');
+      updateBranding({ name: saved.name, siteTitle: saved.site_title || '', logoUrl: saved.logo_url || '', loginLogoUrl: saved.login_logo_url || '' });
       toast.success("Company profile saved successfully!");
     } catch (err: any) {
       toast.error(err.message || "Failed to save company profile");
@@ -447,6 +451,8 @@ function CompanySettingsContent() {
           setSiteTitle={setSiteTitle}
           logoUrl={logoUrl}
           setLogoUrl={setLogoUrl}
+          loginLogoUrl={loginLogoUrl}
+          setLoginLogoUrl={setLoginLogoUrl}
           savingCompanyProfile={savingCompanyProfile}
           handleSaveCompanyProfile={handleSaveCompanyProfile}
           subdomain={subdomain}
@@ -596,6 +602,8 @@ function TenantAdminSettingsView(props: any) {
             setSiteTitle={props.setSiteTitle}
             logoUrl={props.logoUrl}
             setLogoUrl={props.setLogoUrl}
+            loginLogoUrl={props.loginLogoUrl}
+            setLoginLogoUrl={props.setLoginLogoUrl}
             savingCompanyProfile={props.savingCompanyProfile}
             handleSaveCompanyProfile={props.handleSaveCompanyProfile}
             subdomain={props.subdomain}
