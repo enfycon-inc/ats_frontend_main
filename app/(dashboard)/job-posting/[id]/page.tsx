@@ -108,19 +108,17 @@ export default function JobDetailPage() {
   }, [currentUser, effectivePerms, isAdmin, isAM]);
 
   const [submitting, setSubmitting] = useState(false);
-  const [publication, setPublication] = useState({ published: false, slug: null as string | null, description: '', eligible: false });
+  const [publication, setPublication] = useState({ published: false, slug: null as string | null, description: '', eligible: false, visible: false });
   const [publicationOpen, setPublicationOpen] = useState(false);
-  const [publicDescription, setPublicDescription] = useState('');
   const [publicationSaving, setPublicationSaving] = useState(false);
   const [publicationError, setPublicationError] = useState('');
   const canManagePublication = effectivePerms.some(permission => ['tenant:settings', 'tenant:manage'].includes(permission)) || Boolean(effectivePerms.includes('job:edit') && currentUser?.branchId && job?.branchId === currentUser.branchId && (!effectivePerms.includes('unit_admin:manage') || job?.businessUnitId === currentUser.businessUnitId));
   async function savePublication() {
     const publish = !publication.published;
-    if (publish && !publicDescription.replace(/<[^>]*>/g, '').trim()) { setPublicationError('Enter a description approved for the public website.'); return; }
     setPublicationSaving(true); setPublicationError('');
     try {
-      const result = await atsApi.jobs.setPublication(id, publish, publish ? publicDescription : undefined);
-      setPublication(previous => ({ ...previous, published: result.isPubliclyPublished, slug: result.publicSlug, description: publish ? publicDescription : previous.description }));
+      const result = await atsApi.jobs.setPublication(id, publish);
+      setPublication(previous => ({ ...previous, published: result.isPubliclyPublished, visible: result.isPubliclyPublished, slug: result.publicSlug, description: previous.description }));
       setPublicationOpen(false);
       toast.success(publish ? 'Job published to the website feed.' : 'Job removed from the website feed.');
     } catch (error: any) { setPublicationError(error.message || 'Could not update website publication.'); }
@@ -199,7 +197,7 @@ export default function JobDetailPage() {
       const subsData = await atsApi.submissions.list({ jobId: id, page: 1, limit: 20 });
 
       setJob(mapApiJobToJob(jobData));
-      setPublication({ published: Boolean(jobData.isPubliclyPublished), slug: jobData.publicSlug || null, description: jobData.publicDescription || '', eligible: String(jobData.jobStatus).toUpperCase() === 'ACTIVE' && (!jobData.approvalStatus || jobData.approvalStatus === 'APPROVED') });
+      setPublication({ published: Boolean(jobData.isPubliclyPublished), slug: jobData.publicSlug || null, description: jobData.publicDescription || '', visible: Boolean(jobData.isPubliclyPublished) && ['ACTIVE', 'CLOSED'].includes(String(jobData.jobStatus).toUpperCase()) && (!jobData.approvalStatus || jobData.approvalStatus === 'APPROVED'), eligible: String(jobData.jobStatus).toUpperCase() === 'ACTIVE' && (!jobData.approvalStatus || jobData.approvalStatus === 'APPROVED') });
       setSubmissions(subsData.data);
       setSubmissionResponse(subsData);
       
@@ -456,8 +454,8 @@ export default function JobDetailPage() {
               </Button>
             )}
             {canManagePublication && <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="text-[10px]">{publication.published ? 'Published to website' : 'Not published to website'}</Badge>
-              <Button variant="outline" size="sm" className="h-9 text-xs border-blue-300 text-blue-800 dark:text-blue-200" disabled={publicationSaving || (!publication.published && !publication.eligible)} title={!publication.published && !publication.eligible ? 'Only active, approved jobs can be published.' : undefined} onClick={() => { setPublicDescription(publication.description); setPublicationError(''); setPublicationOpen(true); }}>
+              <Badge variant="outline" className="text-[10px]">{publication.published ? (publication.visible ? 'Published to website' : 'Automatic publication pending') : 'Not published to website'}</Badge>
+              <Button variant="outline" size="sm" className="h-9 text-xs border-blue-300 text-blue-800 dark:text-blue-200" disabled={publicationSaving || !publication.eligible} title={!publication.eligible ? 'Only active, approved jobs can be published or unpublished.' : undefined} onClick={() => { setPublicationError(''); setPublicationOpen(true); }}>
                 <Share2 className="mr-1.5 h-3.5 w-3.5" />{publication.published ? 'Unpublish from website' : 'Publish to website'}
               </Button>
             </div>}
@@ -484,9 +482,8 @@ export default function JobDetailPage() {
       <Dialog open={publicationOpen} onOpenChange={open => { if (!publicationSaving) setPublicationOpen(open); }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader><DialogTitle className="text-lg">{publication.published ? 'Unpublish from website' : 'Publish to website'}</DialogTitle><DialogDescription>
-            {publication.published ? 'This job will stop appearing in the public jobs API and stop accepting website applications. Existing submissions are retained. Website caches may take time to refresh.' : 'Add a description approved for public visitors. Internal job descriptions are not copied automatically. The job will be visible to website clients with matching access scope.'}
+            {publication.published ? 'This job will stop appearing in the public jobs API and stop accepting website applications. Existing submissions are retained. Website caches may take time to refresh.' : 'The existing job description will be used on the careers website. The job will be visible to website clients with matching access scope.'}
           </DialogDescription></DialogHeader>
-          {!publication.published && <label className="space-y-2 text-xs font-semibold">Public job description<textarea rows={10} maxLength={30000} value={publicDescription} onChange={event => setPublicDescription(event.target.value)} disabled={publicationSaving} placeholder="Enter only information approved for your careers website…" className="w-full rounded-lg border border-neutral-300 bg-background p-3 text-xs font-normal dark:border-slate-700" /></label>}
           {publication.slug && <p className="break-all text-xs text-muted-foreground">Public slug: {publication.slug}</p>}
           {publicationError && <p role="alert" className="text-xs text-red-700">{publicationError}</p>}
           <DialogFooter><Button variant="outline" disabled={publicationSaving} onClick={() => setPublicationOpen(false)}>Cancel</Button><Button disabled={publicationSaving} onClick={() => void savePublication()} className="bg-[#1a4fa0] text-white hover:bg-[#154181]">{publicationSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{publication.published ? 'Unpublish job' : 'Publish job'}</Button></DialogFooter>
