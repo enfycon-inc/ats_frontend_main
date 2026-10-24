@@ -1,4 +1,37 @@
 import type { TrackerSubmission } from './submission-contract';
+
+export function compensationLabel(expected: boolean, jobType?: string | null, period?: string | null) {
+  const prefix = expected ? 'Expected' : 'Current';
+  const recordedPeriod = period?.trim().toUpperCase();
+  const monthly = recordedPeriod ? ['MONTH', 'MONTHLY'].includes(recordedPeriod) : compensationJobPeriod(jobType) === 'MONTH';
+  return `${prefix} ${monthly ? 'monthly pay' : 'CTC'}`;
+}
+
+/** Amounts in submission records and audit snapshots are stored in base currency units. */
+export function formatRecordedCompensation(amount: string | null | undefined, currency?: string | null, period?: string | null) {
+  if (amount == null || amount.trim() === '') return 'Not recorded';
+  const numeric = Number(amount.replaceAll(',', ''));
+  if (!Number.isFinite(numeric) || numeric < 0) return 'Not recorded';
+  const code = currency?.trim().toUpperCase();
+  const normalizedPeriod = period?.trim().toUpperCase();
+  const annual = ['YEAR', 'YEARLY', 'ANNUAL', 'ANNUALLY', 'LPA'].includes(normalizedPeriod || '');
+  const monthly = ['MONTH', 'MONTHLY'].includes(normalizedPeriod || '');
+  const lpa = code === 'INR' && annual;
+  const value = new Intl.NumberFormat(code === 'INR' ? 'en-IN' : 'en-US', { maximumFractionDigits: lpa ? 5 : 2 }).format(lpa ? numeric / 100000 : numeric);
+  const suffix = lpa ? ' LPA' : monthly ? ' / month' : annual ? ' / year' : ' (period not recorded)';
+  return `${code || 'Currency not recorded'} ${value}${suffix}`;
+}
+
+export function submissionCompensationValue(submission: TrackerSubmission, expected: boolean) {
+  const recordedAmount = expected ? submission.expectedCompensationAmount : submission.currentCompensationAmount;
+  if (recordedAmount != null || submission.compensationInputUnit) {
+    return formatRecordedCompensation(recordedAmount, submission.compensationCurrency, submission.compensationPeriod);
+  }
+  const pay = displaySubmissionCompensation(submission, expected);
+  // The legacy display helper has already converted LPA amounts to lakhs.
+  const baseAmount = pay.unit === 'LPA' && pay.amount != null ? String(Number(pay.amount) * 100000) : pay.amount;
+  return formatRecordedCompensation(baseAmount, pay.currency, pay.unit);
+}
 export function displaySubmissionCompensation(s: TrackerSubmission, expected: boolean) {
  const amount = expected ? s.expectedCompensationAmount : s.currentCompensationAmount;
  if (s.compensationInputUnit && amount == null) return { amount: null, currency: s.compensationCurrency, unit: s.compensationPeriod };

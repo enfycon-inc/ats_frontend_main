@@ -6,6 +6,7 @@ import { SubmissionActions } from "@/components/submissions/submission-actions";
 import { useTrackerColumns, TRACKER_COLUMN_WIDTHS, type TrackerColumn } from "@/components/submissions/tracker-columns";
 import { UpdateSubmissionDialog } from "@/components/submissions/update-submission-dialog";
 import { SubmissionHistory } from "@/components/submissions/submission-history";
+import { compensationLabel, submissionCompensationValue } from "@/lib/submission-compensation";
 import { ReviewWorkspace } from "@/components/submissions/review-workspace";
 import { stageRemarkSuggestions } from "@/lib/stage-remarks";
 import { USER_CITY_OPTIONS } from "@/lib/user-city-contract";
@@ -258,7 +259,8 @@ function SubmissionDetails({ submission, onReview }: { submission: TrackerSubmis
     ["Job code", submission.jobCode], ["Client", submission.clientName], ["End client", submission.endClientName],
     ["Recruiter", submission.recruiterName], ["Account manager", submission.accountManagerName],
     ["Email", submission.candidateEmail], ["Phone", submission.candidatePhone], ["Location", submission.candidateCurrentLocation],
-    ["Submitted rate", submission.submittedRate != null ? [submission.submittedRate, submission.submittedRateCurrency, submission.submittedRateTerm].filter(Boolean).join(" ") : null],
+    [compensationLabel(false, submission.jobType, submission.compensationPeriod), submissionCompensationValue(submission, false)],
+    [compensationLabel(true, submission.jobType, submission.compensationPeriod), submissionCompensationValue(submission, true)],
   ];
   return <div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
