@@ -3,7 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { CalendarDays, Loader2, X } from "lucide-react";
-import toast from "react-hot-toast";
+
 import { atsApi } from "@/lib/ats-api";
 import type { InterviewColor, RoundKey, TrackerSubmission, TrackerUpdate } from "@/lib/submission-contract";
 import { interviewInstant, localInterviewParts, ROUNDS, validTimezone } from "@/lib/submission-tracker";
@@ -114,7 +114,7 @@ export function CalendarInterviewDialog({
     : allowed.some(item => item.key === round);
   const existingStatus = submission[`${round}Status`];
   const existingInterview = Boolean(submission[`${round}Date`] && ["SCHEDULED", "AWAITING_FEEDBACK"].includes(existingStatus || ""));
-  const canEditInterview = Boolean(allowEdit && submission.capabilities?.schedule && existingInterview);
+  const canEditInterview = Boolean(allowEdit && (submission.capabilities?.schedule || submission.capabilities?.cancelInterview) && existingInterview);
   const roundLabel = round.toUpperCase();
   const remarkSuggestions = remarks.trim()
     ? stageRemarkSuggestions(remarkTemplates, round)
@@ -143,8 +143,14 @@ export function CalendarInterviewDialog({
         [`${round}Color`]: cancelMode ? submission[`${round}Color`] || null : color,
         meetingLink: meetingLink.trim() || null,
       };
+      if (cancelMode) {
+        delete payload[`${round}Date`];
+        delete payload[`${round}Interviewer`];
+        delete payload[`${round}Color`];
+        delete payload.meetingLink;
+      }
       await atsApi.submissions.update(submission.id, payload);
-      toast.success(cancelMode ? "Interview cancelled" : rescheduled ? "Interview rescheduled" : "Interview saved");
+
       onSaved();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Interview could not be saved. Reload and try again.");
@@ -181,11 +187,11 @@ export function CalendarInterviewDialog({
           {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
         </div>
         <DialogFooter className="flex-row items-center justify-between border-t border-border px-5 py-3">
-          {editMode && existingInterview && submission.capabilities?.schedule && !cancelMode ? <Button type="button" variant="ghost" className="mr-auto text-xs text-red-600" disabled={saving} onClick={() => { setCancelReason(""); setCancelMode(true); }}><X className="mr-1 h-3.5 w-3.5" />Cancel interview</Button> : <span />}
+          {editMode && existingInterview && submission.capabilities?.cancelInterview && !cancelMode ? <Button type="button" variant="ghost" className="mr-auto text-xs text-red-600" disabled={saving} onClick={() => { setCancelReason(""); setCancelMode(true); }}><X className="mr-1 h-3.5 w-3.5" />Cancel interview</Button> : <span />}
           {cancelMode && <Button type="button" variant="outline" size="sm" disabled={saving} onClick={() => { setCancelReason(""); setCancelMode(false); }}>Back</Button>}
           <Button type="button" variant="outline" size="sm" disabled={saving} onClick={onClose}>Close</Button>
-          {!editMode && canEditInterview && <Button type="button" size="sm" className="bg-[#1a4fa0] text-white hover:bg-[#154181]" onClick={() => setEditMode(true)}>Edit interview</Button>}
-          {editMode && <Button type="submit" size="sm" disabled={saving || !submission.capabilities?.schedule || (!cancelMode && !canScheduleSelectedRound)} className="bg-[#1a4fa0] text-white hover:bg-[#154181]">{saving && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}{cancelMode ? "Confirm cancellation" : existingInterview ? "Save interview" : "Schedule interview"}</Button>}
+          {!editMode && canEditInterview && <Button type="button" size="sm" className="bg-[#1a4fa0] text-white hover:bg-[#154181]" onClick={() => { setEditMode(true); if (submission.workflowPaused) setCancelMode(true); }}>{submission.workflowPaused ? "Cancel interview" : "Edit interview"}</Button>}
+          {editMode && <Button type="submit" size="sm" disabled={saving || !(cancelMode ? submission.capabilities?.cancelInterview : submission.capabilities?.schedule) || (!cancelMode && !canScheduleSelectedRound)} className="bg-[#1a4fa0] text-white hover:bg-[#154181]">{saving && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}{cancelMode ? "Confirm cancellation" : existingInterview ? "Save interview" : "Schedule interview"}</Button>}
         </DialogFooter>
       </form>
     </DialogContent>

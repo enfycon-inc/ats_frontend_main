@@ -96,6 +96,7 @@ export function JobTableRow({
   const canAssignDirectRecruiters = userPermissions.includes("job:assign_recruiter");
   const canAssignPods = userPermissions.includes("job:assign_pod");
 
+  const closedJob = ['closed', 'close'].includes(String(job.jobStatus).toLowerCase());
   const hasEditPermission = job.capabilities?.edit === true;
   const canChangeStatus = job.capabilities?.changeStatus === true;
   const canFindMatches = job.capabilities?.findMatches === true;
@@ -591,6 +592,8 @@ export function JobTableRow({
 
                   {hasSubmitCandidatePermission && (
                     <DropdownMenuItem
+                      disabled={closedJob}
+                      title={closedJob ? "This job is closed." : undefined}
                       onClick={() => onOpenSourceModal(job)}
                       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
                     >
@@ -601,7 +604,9 @@ export function JobTableRow({
                     </DropdownMenuItem>
                   )}
 
-                  {canFindMatches && <DropdownMenuItem
+                  {(canFindMatches || closedJob) && <DropdownMenuItem
+                    disabled={closedJob}
+                    title={closedJob ? "This job is closed." : undefined}
                     onClick={() => router.push(`/job-posting/${job.id}/matches`)}
                     className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/40 transition-colors"
                   >
@@ -624,7 +629,7 @@ export function JobTableRow({
               )}
 
               {/* Section 2: Management Actions */}
-              {(hasEditPermission || canChangeStatus ||
+              {(hasEditPermission || canChangeStatus || closedJob ||
                 hasCreatePermission ||
                 (hasDelegatePermission && job.branchId === currentUserBranchId)) && (
                 <>
@@ -702,8 +707,10 @@ export function JobTableRow({
                       </DropdownMenuItem>
                     )}
 
-                    {hasEditPermission && (
+                    {(hasEditPermission || closedJob) && (
                       <DropdownMenuItem
+                        disabled={closedJob}
+                        title={closedJob ? "Reopen this job before editing." : undefined}
                         onClick={() => router.push(`/job-posting/${job.id}/edit`)}
                         className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                       >

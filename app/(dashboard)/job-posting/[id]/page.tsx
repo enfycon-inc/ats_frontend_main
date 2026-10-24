@@ -101,7 +101,7 @@ export default function JobDetailPage() {
 
   const isAM = activeSystemRole === "ACCOUNT_MANAGER";
   const isPodLead = activeSystemRole === "POD_LEAD";
-  const canSubmitCandidate = useMemo(() => isAdmin || effectivePerms.includes("submission:create"), [isAdmin, effectivePerms]);
+  const canSubmitCandidate = useMemo(() => String(job?.jobStatus).toLowerCase() === "active" && (isAdmin || effectivePerms.includes("submission:create")), [job?.jobStatus, isAdmin, effectivePerms]);
 
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
@@ -446,9 +446,11 @@ export default function JobDetailPage() {
                 </Button>
               </>
             )}
-            {canSubmitCandidate && (
+            {(canSubmitCandidate || String(job?.jobStatus).toLowerCase() === "closed") && (
               <Button
                 size="sm"
+                disabled={!canSubmitCandidate}
+                title={!canSubmitCandidate ? "This job is closed." : undefined}
                 onClick={() => setUploadSubmitOpen(true)}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 text-xs cursor-pointer"
               >
@@ -461,6 +463,7 @@ export default function JobDetailPage() {
                 <Share2 className="mr-1.5 h-3.5 w-3.5" />{publication.published ? 'Unpublish from website' : 'Publish to website'}
               </Button>
             </div>}
+            {String(job?.jobStatus).toLowerCase() === "closed" && <Button size="sm" disabled title="Reopen this job before editing." className="h-9 text-xs"><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit Job</Button>}
             {hasEditPermission && (
               <Link href={`/job-posting/${job.id}/edit`}>
                 <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 cursor-pointer">

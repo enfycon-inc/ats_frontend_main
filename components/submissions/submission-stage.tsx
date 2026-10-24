@@ -14,7 +14,7 @@ export function StageBadge({ submission }: { submission: TrackerSubmission }) {
   const state = stage(submission);
   const date = statusDate(submission);
   const Icon = state.tone === "green" ? CheckCircle2 : state.tone === "red" ? XCircle : state.tone === "blue" ? CalendarDays : Clock3;
-  return <div className="flex flex-col items-center gap-1.5"><span className={cn("inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[10.5px] font-semibold max-w-full text-center", TONES[state.tone])}><Icon className="h-3.5 w-3.5" />{state.label}</span>{date && <time dateTime={date.value} title={date.label} className="text-[10.5px] leading-4 text-muted-foreground">{date.label === "Scheduled interview" ? "" : date.label + " "}{formatInterview(date.value, validTimezone(submission.timezone))}</time>}</div>;
+  return <div className="flex flex-col items-center gap-1.5">{submission.jobStatus?.toLowerCase() === "closed" && <span className="rounded bg-slate-100 px-2 py-1 text-[10.5px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">{submission.workflowPaused ? "Job closed - workflow paused" : "Job closed"}</span>}<span className={cn("inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[10.5px] font-semibold max-w-full text-center", TONES[state.tone])}><Icon className="h-3.5 w-3.5" />{state.label}</span>{date && <time dateTime={date.value} title={date.label} className="text-[10.5px] leading-4 text-muted-foreground">{date.label === "Scheduled interview" ? "" : date.label + " "}{formatInterview(date.value, validTimezone(submission.timezone))}</time>}</div>;
 }
 export function Pipeline({ submission }: { submission: TrackerSubmission }) {
   const state = stage(submission);
@@ -27,7 +27,7 @@ export function Pipeline({ submission }: { submission: TrackerSubmission }) {
   const activeKey = submission.finalStatus === "PENDING_APPROVAL" ? "review" : current || "final";
   return <div className="mx-auto w-full min-w-0 max-w-[300px]" aria-label={`Pipeline: ${state.label}`}><div className="grid grid-cols-5">{stages.map((item, index) => {
     const rejected = item.key === rejectedKey;
-    const active = !["NOT_SELECTED", "WITHDRAWN", "JOIN"].includes(submission.finalStatus) && !rejectedKey && item.key === activeKey && !item.complete;
+    const active = !submission.workflowPaused && !["NOT_SELECTED", "WITHDRAWN", "JOIN"].includes(submission.finalStatus) && !rejectedKey && item.key === activeKey && !item.complete;
     const skipped = terminal && ROUNDS.some(round => round.key === item.key) && !item.complete;
     return <div key={item.key} className="relative flex min-w-0 flex-col items-center gap-1.5">
       {index < stages.length - 1 && <span aria-hidden="true" className={cn("absolute left-[calc(50%+14px)] top-2.5 h-px w-[calc(100%-28px)]", item.complete ? "bg-[#008000]" : "bg-slate-200 dark:bg-slate-700")} />}
