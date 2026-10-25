@@ -19,6 +19,7 @@ import type {
 import { stage, validTimezone } from '@/lib/submission-tracker';
 import AddCandidateModal from '@/components/dashboard/AddCandidateModal';
 import { Skeleton } from '@/components/ui/skeleton';
+import { candidateProfileId } from '@/lib/candidate-profile-id';
 
 const panel =
   'rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900';
@@ -534,13 +535,6 @@ export default function RecruiterDashboardView({
     return () => window.removeEventListener('app:refresh', refresh);
   }, [dashboard.mutate, submissions.mutate, candidates.mutate]);
   const data = dashboard.data;
-  const daily = new Date().getDate();
-  const humour =
-    daily % 3 === 0
-      ? 'Coffee is optional; a great match is the goal.'
-      : daily % 3 === 1
-        ? 'Your next great match might be one CV away.'
-        : 'Your assigned jobs and candidate updates, in one place.';
   return (
     <div className="grid min-w-0 gap-5 text-slate-900 dark:text-slate-100 xl:grid-cols-[minmax(0,1.8fr)_minmax(300px,1fr)]">
       <div className="contents xl:block xl:min-w-0 xl:space-y-5">
@@ -557,7 +551,7 @@ export default function RecruiterDashboardView({
                 : 'Your sourcing overview'}
             </p>
             <p className="mt-1 max-w-sm text-xs leading-relaxed text-indigo-100">
-              {humour}
+              Your assigned jobs and candidate updates, in one place.
             </p>
           </div>
           <WelcomeArt />
@@ -910,12 +904,14 @@ export default function RecruiterDashboardView({
                         </p>
                       )}
                     </div>
-                    <Link
-                      href={`/applicants/${candidate.id}`}
-                      className={outline}
-                    >
-                      View<span className="sr-only"> {candidate.fullName}</span>
-                    </Link>
+                    {candidateProfileId(candidate.dbId || candidate.id) && (
+                      <Link
+                        href={`/applicants/${candidateProfileId(candidate.dbId || candidate.id)}`}
+                        className={outline}
+                      >
+                        View<span className="sr-only"> {candidate.fullName}</span>
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
