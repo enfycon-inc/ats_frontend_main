@@ -1,5 +1,6 @@
 // @ts-nocheck
 "use client";
+import { useJobAssignmentPolicy } from "../lib/use-job-assignment-policy";
 
 import { ContactDialog } from "../components/contact-dialog";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -520,11 +521,11 @@ const getInitialActiveBranchContext = () => {
   }, [selectedCountry, setValue, commissionType, customCommission]);
 
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
-  const assignmentPolicy = selectedUnitObj;
+  const { policy: assignmentPolicy, podsEnabled } = useJobAssignmentPolicy(currentUserProfile, selectedUnitId);
   const automaticPods = usesAutomaticPods(assignmentPolicy);
   const canAssignRecruiters = !!currentUserProfile?.permissions?.includes("job:assign_recruiter") && (!editJobId || !!currentUserProfile?.permissions?.includes("job:override_assignment"));
   const requiresAssignmentReason = !!editJobId && canAssignRecruiters && !currentUserProfile?.permissions?.includes("job:assignment_reason_optional");
-  const canAssignPods = !!currentUserProfile?.permissions?.includes("job:assign_pod");
+  const canAssignPods = podsEnabled && !!currentUserProfile?.permissions?.includes("job:assign_pod");
   const canAssignJob = canAssignRecruiters || canAssignPods;
   const assignmentRequired = assignmentPolicy?.allowUnassigned !== true;
   const assignmentValid = (automaticPods && canAssignPods && ["unassigned", "automatic"].includes(assignmentType)) || (assignmentType === "pod" && selectedPodIds.length > 0 && selectedPodIds.every(id => branchPods.some(p => p.id === id)) && canAssignPods && assignmentPolicy?.allowPods === true) ||
@@ -532,13 +533,14 @@ const getInitialActiveBranchContext = () => {
   useEffect(() => {
     let cancelled = false;
     setPodsList([]);
+    if (assignmentPolicy && !podsEnabled) { setSelectedPodIds([]); if (assignmentType === "pod" || assignmentType === "automatic") setAssignmentType("unassigned"); }
     if (automaticPods || !canAssignPods || !selectedUnitId) return;
     const unit = availableUnits.find(unit => unit.id === selectedUnitId);
     atsApi.jobs.podOptions({ branchId: unit?.branchId || currentUserProfile?.branchId, businessUnitId: selectedUnitId })
       .then(pods => { if (!cancelled) { setPodsList(pods); setSelectedPodIds(ids => ids.filter(id => pods.some(p => p.id === id))); } })
       .catch(error => { if (!cancelled) toast.error(error.message || "Could not load pods."); });
     return () => { cancelled = true; };
-  }, [selectedUnitId, canAssignPods, automaticPods, availableUnits, currentUserProfile]);
+  }, [selectedUnitId, canAssignPods, automaticPods, availableUnits, currentUserProfile, assignmentPolicy]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1340,7 +1342,7 @@ const getInitialActiveBranchContext = () => {
         respondBy: respondByType === "Date Option" ? (data.respondBy || undefined) : undefined,
         noticePeriod: data.noticePeriod || undefined,
         podId: canAssignPods ? resolvedPodId : undefined,
-        podIds: canAssignPods && assignmentType === "pod" && !automaticPods ? selectedPodIds : [],
+        podIds: canAssignPods ? (assignmentType === "pod" && !automaticPods ? selectedPodIds : []) : undefined,
         // @ts-ignore
         market: market,
         shiftTiming: data.shiftTiming || undefined,

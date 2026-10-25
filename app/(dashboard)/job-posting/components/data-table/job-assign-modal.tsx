@@ -1,5 +1,6 @@
 // @ts-nocheck
 "use client";
+import { useJobAssignmentPolicy } from "../../lib/use-job-assignment-policy";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -46,6 +47,8 @@ export function JobAssignModal({
   onClose,
   onSuccess,
 }: JobAssignModalProps) {
+  const assignmentUnitId = job?.businessUnitId || (job as any)?.business_unit_id || currentUser?.businessUnitId;
+  const { policy: assignmentPolicy, podsEnabled } = useJobAssignmentPolicy(isOpen ? currentUser : null, assignmentUnitId);
   const [assignTab, setAssignTab] = useState<"pods" | "users">("pods");
   const [assignSearch, setAssignSearch] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -105,8 +108,8 @@ export function JobAssignModal({
   // Load context data when modal is open
   useEffect(() => {
     if (!isOpen || !job) return;
-    if (lastLoadedJobIdRef.current === job.id) return;
-    lastLoadedJobIdRef.current = job.id;
+    if (lastLoadedJobIdRef.current === `${job.id}:${podsEnabled}`) return;
+    lastLoadedJobIdRef.current = `${job.id}:${podsEnabled}`;
     setStaffingLoaded(false);
     setUsersList([]);
 
@@ -127,7 +130,7 @@ export function JobAssignModal({
                 { silent: true }
               ).then(staff => { setStaffingLoaded(true); return staff; }).catch(error => { toast.error(error.message || 'Unable to load eligible recruiters for this job.'); return []; })
             : Promise.resolve([]),
-          atsApi.pods.list().catch(() => []),
+          podsEnabled && currentUser?.permissions?.includes('job:assign_pod') ? atsApi.jobs.podOptions({ branchId: targetBranchId, businessUnitId: targetUnitId, jobId: job.id }).catch(() => []) : Promise.resolve([]),
           atsApi.branches.list().catch(() => []),
           atsApi.auth.listRoles(undefined, true).catch(() => []),
         ]);
@@ -140,7 +143,7 @@ export function JobAssignModal({
       }
     }
     loadAssignmentData();
-  }, [isOpen, job?.id, currentUser, currentUserBranchId]);
+  }, [isOpen, job?.id, currentUser, currentUserBranchId, podsEnabled]);
 
   const getUserRoleLabel = useCallback(
     (u: any, branchId?: string): string => {
@@ -255,7 +258,7 @@ export function JobAssignModal({
 
   const isHigherRole = isSuperOrTenantAdmin || isBranchAdmin || isUnitAdmin || isDeliveryHead || userPerms.includes("job:assign");
 
-  const canAssignPods = userPerms.includes("job:assign_pod");
+  const canAssignPods = podsEnabled && userPerms.includes("job:assign_pod");
   const requiresAssignmentReason = userPerms.includes("job:override_assignment") && !userPerms.includes("job:assignment_reason_optional");
 
   // Pod Head role & active pod detection
@@ -296,18 +299,11 @@ export function JobAssignModal({
   }, [isHigherRole, userRoles, currentUser, podsList]);
 
   // â”€â”€â”€ UNIT / BRANCH POLICY ENFORCEMENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const branchAllowsPods = useMemo(() => {
-    if (!canAssignPods) return false;
-    const targetPolicy = targetUnit || targetBranch;
-    if (!targetPolicy) return true;
-    const allowNone = Boolean(targetPolicy.allowNone ?? targetPolicy.allow_none);
-    if (allowNone) return false; // allowNone = Direct Assignment Only
-    const allowPods = (targetPolicy.allowPods ?? targetPolicy.allow_pods) !== false;
-    return allowPods;
-  }, [canAssignPods, targetUnit, targetBranch]);
+  const branchAllowsPods = canAssignPods && assignmentPolicy?.allowPods === true;
 
   const branchAllowsDirectStaff = useMemo(() => {
-    if (!userPerms.includes('job:assign_recruiter')) return false;
+    if (!userPerms.includes('job:assign_recruiter') || !assignmentPolicy) return false;
+    if (!podsEnabled) return true;
     const actorId = currentUser?.dbId || currentUser?.id;
     const assignedPodIds = job?.podIds || (job?.podId ? [job.podId] : []);
     const leadsAssignedPod = !!actorId && podsList.some(pod => pod.podHeadId === actorId && assignedPodIds.includes(pod.id));
@@ -319,7 +315,7 @@ export function JobAssignModal({
     const allowDirectStaff = targetPolicy.allowDirectStaff ?? targetPolicy.allow_direct_staff;
     if (allowDirectStaff === false) return false;
     return true;
-  }, [targetUnit, targetBranch, userPerms, currentUser, job, podsList]);
+  }, [targetUnit, targetBranch, userPerms, currentUser, job, podsList, assignmentPolicy, podsEnabled]);
 
   const currentModeAllowed = assignTab === "pods" ? branchAllowsPods : branchAllowsDirectStaff;
 
@@ -388,7 +384,7 @@ export function JobAssignModal({
         }
       }
     }
-    setSelectedPodIds(initialPodIds);
+    setSelectedPodIds(podsEnabled ? initialPodIds : []);
 
     // Initial selected user IDs (recruiters) from job
     const initialSelected: string[] = [];
@@ -423,7 +419,7 @@ export function JobAssignModal({
 
     // Dedicated entry points stay on the requested assignment type.
     if (mode !== "combined") {
-      setAssignTab(mode);
+      setAssignTab(mode === "pods" && !podsEnabled ? "users" : mode);
       return;
     }
 
@@ -799,7 +795,7 @@ export function JobAssignModal({
         {/* Tab Selector: shown only from the combined context-menu action */}
         <div className="px-5 pt-3 pb-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div className="p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 inline-flex items-center gap-1 border border-slate-200/60 dark:border-slate-700/60">
-            <button
+            {branchAllowsPods && <button
               type="button"
               disabled={!branchAllowsPods}
               onClick={() => {
@@ -830,7 +826,7 @@ export function JobAssignModal({
                 {targetBranchPods.length}
               </span>
               {!branchAllowsPods && <Lock className="h-3 w-3 ml-0.5 text-slate-400" />}
-            </button>
+            </button>}
 
             <button
               type="button"

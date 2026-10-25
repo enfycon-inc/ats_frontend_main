@@ -11,6 +11,7 @@ const pairs = [
   ['auth/sign-in-policy.ts', 'lib/sign-in-policy.ts'],
   ['jobs/job-capabilities.ts', 'lib/job-capabilities.ts'],
   ['auth/job-access-grants.ts', 'lib/job-access-grants.ts'],
+  ['auth/job-assignment-policy.ts', 'lib/job-assignment-policy.ts'],
 ];
 const scripts = ['sync-notification-preferences.cjs', 'sync-tenant-branding.cjs', 'sync-sign-in-policy.cjs', 'sync-job-access.cjs'];
 function fixture(t, backend = false) {

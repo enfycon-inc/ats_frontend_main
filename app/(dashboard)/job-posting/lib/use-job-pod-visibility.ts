@@ -30,7 +30,7 @@ export function useJobPodVisibility(profile: any, activeRoleId?: string) {
       if (nextBranch !== branchId) setBranchId(nextBranch);
       else void mutate();
     };
-    const events = ['branchChanged', 'businessUnitChanged', 'workspaceSettingsChanged'];
+    const events = ['branchChanged', 'businessUnitChanged', 'workspaceSettingsChanged', 'atsWorkspaceSettingsChanged'];
     events.forEach(event => window.addEventListener(event, refresh));
     return () => events.forEach(event => window.removeEventListener(event, refresh));
   }, [branchId, mutate]);
