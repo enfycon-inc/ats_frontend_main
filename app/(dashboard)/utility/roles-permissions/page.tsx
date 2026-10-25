@@ -211,7 +211,10 @@ const SYSTEM_ARCHETYPES = [
       "placement:view", "placement:create", "report:view"
     ]
   }
-].map(template => ({ ...template, perms: [...new Set([...template.perms, ...jobAccessGrants(template.perms)])] }));
+].map(template => {
+  const profileGrants = (perms: string[]) => perms.some(key => ['tenant:settings', 'tenant:manage', 'platform:manage', 'branch_admin:manage', 'unit_admin:manage'].includes(key)) ? ['candidate:edit', 'candidate:change_market'] : [];
+  return { ...template, perms: [...new Set([...template.perms, ...jobAccessGrants(template.perms), ...profileGrants(template.perms)])], ...(template.defaultPerms ? { defaultPerms: [...new Set([...template.defaultPerms, ...profileGrants(template.defaultPerms)])] } : {}) };
+});
 
 export default function RolesPermissionsPage() {
   const [loading, setLoading] = useState(true);

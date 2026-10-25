@@ -59,6 +59,7 @@ export default function CandidateDetailPage() {
   // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({
+    market: "",
     fullName: "",
     email: "",
     phone: "",
@@ -71,6 +72,9 @@ export default function CandidateDetailPage() {
     noticePeriodDays: 0,
     servingNotice: false,
   });
+  const [marketOptions, setMarketOptions] = useState<{ code: string; name: string }[]>([]);
+  const [marketError, setMarketError] = useState(false);
+  useEffect(() => { if (editModalOpen && candidate?.capabilities?.changeMarket) { setMarketError(false); atsApi.marketSegments.list().then(options => setMarketOptions(options.filter(option => option.isActive !== false))).catch(() => setMarketError(true)); } }, [editModalOpen, candidate?.capabilities?.changeMarket]);
   const [updatingCandidate, setUpdatingCandidate] = useState(false);
 
   // Role override check (matches sidebar behavior)
@@ -111,6 +115,7 @@ export default function CandidateDetailPage() {
 
       // Initialize Edit Form values
       setEditForm({
+        market: details.market || "",
         fullName: details.fullName || "",
         email: details.email || "",
         phone: details.phone || "",
@@ -228,6 +233,7 @@ export default function CandidateDetailPage() {
     setUpdatingCandidate(true);
     try {
       const payload = {
+        ...(candidate?.capabilities?.changeMarket && editForm.market !== candidate.market ? { market: editForm.market } : {}),
         fullName: editForm.fullName.trim(),
         email: editForm.email.trim() || null,
         phone: editForm.phone.trim() || null,
@@ -324,7 +330,7 @@ export default function CandidateDetailPage() {
           <Button
             size="sm"
             onClick={() => setEditModalOpen(true)}
-            disabled={!can('candidate:edit')}
+            disabled={!candidate?.capabilities?.edit}
             className="bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-neutral-200 text-xs gap-1.5 border border-neutral-200 dark:border-slate-750 font-semibold"
           >
             <Edit className="h-3.5 w-3.5" /> Edit Profile
@@ -535,7 +541,7 @@ export default function CandidateDetailPage() {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={uploadingResume || !can('candidate:edit')}
+                disabled={uploadingResume || !candidate?.capabilities?.edit}
                 onClick={() => resumeInputRef.current?.click()}
                 className="text-neutral-600 border-neutral-250 hover:bg-neutral-200 dark:border-slate-700 dark:hover:bg-slate-700 hover:text-neutral-800 text-[10px] gap-1 h-7 font-bold cursor-pointer"
               >
@@ -568,6 +574,14 @@ export default function CandidateDetailPage() {
               Modify candidate profile information. Click Save changes to apply.
             </DialogDescription>
           </DialogHeader>
+          {candidate?.capabilities?.changeMarket && <div className="space-y-1">
+            <label htmlFor="candidate-market" className="text-xs font-semibold">Staffing market</label>
+            <select id="candidate-market" className="h-9 w-full rounded-md border bg-background px-2 text-xs" value={editForm.market} onChange={e => setEditForm({ ...editForm, market: e.target.value })}>
+              <option value={candidate.market}>{candidate.market} (current)</option>
+              {marketOptions.map(option => { const value = ['IN', 'IND', 'INDIA'].includes(option.code.toUpperCase()) ? 'IN' : ['US', 'USIT', 'USA'].includes(option.code.toUpperCase()) ? 'US' : option.code; return <option key={option.code} value={value}>{option.name} ({value})</option>; })}
+            </select>
+            {marketError && <p role="alert" className="text-xs text-red-600">Could not load staffing markets. Close and reopen to retry.</p>}
+          </div>}
 
           <div className="grid grid-cols-2 gap-3 py-3">
             <div className="flex flex-col gap-1">

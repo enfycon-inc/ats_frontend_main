@@ -225,6 +225,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
       const fullName = `${formData.firstName} ${formData.lastName}`.trim();
       const uploadResponse = existingCandidateId ? { candidate: { id: existingCandidateId } } : await atsApi.candidates.uploadCv(file!, formData.source, {
         fullName,
+        jobId: job.id,
         totalExperienceYears: formData.totalExperienceYears,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
