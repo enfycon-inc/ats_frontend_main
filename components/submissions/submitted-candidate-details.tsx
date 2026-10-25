@@ -8,13 +8,15 @@ export function SubmittedCandidateDetails({ submission }: { submission: TrackerS
   const text = (key: string) => typeof verified?.[key] === 'string' ? verified[key] as string : undefined;
   const s = verified ? { ...submission, candidateFirstName: text('firstName'), candidateLastName: text('lastName'), candidateEmail: text('email'), candidatePhone: text('phone'), candidateCurrentCompany: text('currentCompany'), candidateCurrentLocation: text('currentLocation'), candidateName: [text('firstName'), text('lastName')].filter(Boolean).join(' '), candidateExperience: Number(text('totalExperienceYears')), candidatePreferredLocations: text('preferredLocations')?.split(',').map(value => value.trim()) } : submission;
   const contract = /contract|c2h|freelance/i.test(s.jobType || '');
+  const preferredMode = text('preferredLocationMode') || s.candidatePreferredLocationMode;
+  const preferredModeLabel = preferredMode === 'REMOTE_ONLY' ? 'Remote only' : preferredMode === 'REMOTE_OR_LOCATIONS' ? 'Remote or selected locations' : preferredMode === 'SPECIFIC_LOCATIONS' ? 'Specific locations' : null;
   const currentPay = displaySubmissionCompensation(s, false);
   const expectedPay = displaySubmissionCompensation(s, true);
   const amount = (value: string | null | undefined, currency?: string | null, term?: string | null) => value != null && value !== '' ? [formatCandidateAmount(value), currency, term].filter(Boolean).join(' / ') : 'Not provided';
   const years = (value: number | null | undefined) => value != null ? `${value} years` : 'Not provided';
   const groups = [
     { title: 'Contact', fields: [['First name', s.candidateFirstName], ['Last name', s.candidateLastName], ['Email', s.candidateEmail], ['Mobile', s.candidatePhone]] },
-    { title: 'Experience & availability', fields: [['Current company', s.candidateCurrentCompany], ['Total experience', years(s.candidateExperience)], ['Relevant experience', years(s.candidateRelevantExperience)], ['Current location', s.candidateCurrentLocation], ['Preferred locations', s.candidatePreferredLocations?.join(', ')], ['Notice period', s.candidateNoticePeriod === 0 ? "Immediate" : s.candidateNoticePeriod != null ? `${s.candidateNoticePeriod} days` : null]] },
+    { title: 'Experience & availability', fields: [['Current company', s.candidateCurrentCompany], ['Total experience', years(s.candidateExperience)], ['Relevant experience', years(s.candidateRelevantExperience)], ['Current location', s.candidateCurrentLocation], ['Work location preference', preferredModeLabel], ['Preferred locations', s.candidatePreferredLocations?.join(', ')], ['Notice period', s.candidateNoticePeriod === 0 ? "Immediate" : s.candidateNoticePeriod != null ? `${s.candidateNoticePeriod} days` : null]] },
     { title: 'Compensation', fields: [[contract ? 'Current pay' : 'Current CTC', amount(currentPay.amount, currentPay.currency, currentPay.unit)], [contract ? 'Expected pay' : 'Expected CTC', amount(expectedPay.amount, expectedPay.currency, expectedPay.unit)]] },
     { title: 'Source & availability', fields: [['Source', s.sourceCategory || s.candidateSource], ['Source channel', s.sourceChannel], ['Source details', s.sourceDetail], ['Availability to start', s.availabilityToStart]] },
   ];

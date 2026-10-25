@@ -10,6 +10,7 @@ export function existingCandidateForm(candidate: any) {
     relevantExperienceYears: text(candidate.relevantExperienceYears),
     currentLocation: candidate.currentLocation || candidate.location || candidate.rawCurrentLocation || [candidate.city, candidate.state].filter(value => value && value !== 'Unknown').join(', '),
     preferredLocations: Array.isArray(candidate.preferredLocations) ? candidate.preferredLocations.join(', ') : candidate.preferredLocations || '',
+    preferredLocationMode: candidate.preferredLocationMode || 'SPECIFIC_LOCATIONS',
     source: bench ? 'Bench' : 'Market', sourceChannel: bench ? '' : 'Existing Talent Pool', sourceDetail: '',
     skills: Array.isArray(skills) ? skills.map((skill: any) => typeof skill === 'string' ? skill : skill.name || skill.skillName || '').filter(Boolean).join(', ') : text(skills),
     currentCtc: text(candidate.currentCtc ?? candidate.currentCTC), expectedCtc: text(candidate.expectedCtc ?? candidate.expectedCTC),

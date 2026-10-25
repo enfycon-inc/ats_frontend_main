@@ -1485,7 +1485,7 @@ const candidates = {
   async uploadCv(
     file: File, 
     source = 'CV Upload',
-    overrides?: { jobId?: string; totalExperienceYears?: string; firstName?: string; lastName?: string; fullName?: string; email?: string; phone?: string; relevantExperienceYears?: string; currentCompany?: string; availabilityToStart?: string; currentCtc?: string; expectedCtc?: string; noticePeriodDays?: string; skills?: string; currentLocation?: string; preferredLocations?: string }
+    overrides?: { jobId?: string; totalExperienceYears?: string; firstName?: string; lastName?: string; fullName?: string; email?: string; phone?: string; relevantExperienceYears?: string; currentCompany?: string; availabilityToStart?: string; currentCtc?: string; expectedCtc?: string; noticePeriodDays?: string; skills?: string; currentLocation?: string; preferredLocations?: string; preferredLocationMode?: 'SPECIFIC_LOCATIONS' | 'REMOTE_ONLY' | 'REMOTE_OR_LOCATIONS' }
   ): Promise<{ candidate: any; duplicate: boolean; parsed: boolean; updated?: boolean }> {
     const formData = new FormData();
     formData.append('file', file);
@@ -1506,7 +1506,8 @@ const candidates = {
       if (overrides.jobId) formData.append('jobId', overrides.jobId);
       if (overrides.skills) formData.append('skills', overrides.skills);
       if (overrides.currentLocation) formData.append('location', overrides.currentLocation);
-      if (overrides.preferredLocations) formData.append('preferredLocations', overrides.preferredLocations);
+      if (overrides.preferredLocations !== undefined) formData.append('preferredLocations', overrides.preferredLocations);
+      if (overrides.preferredLocationMode) formData.append('preferredLocationMode', overrides.preferredLocationMode);
     }
 
     const token = getToken();
@@ -1721,6 +1722,9 @@ const pods = {
 };
 
 const submissions = {
+  async previewAssessment(data: { jobId: string; candidateId?: string; skills: string[]; totalExperienceYears?: number; currentLocation?: string; preferredLocationMode: 'SPECIFIC_LOCATIONS' | 'REMOTE_ONLY' | 'REMOTE_OR_LOCATIONS'; preferredLocations?: string[]; noticePeriodDays?: number }): Promise<CandidateAssessment> {
+    return apiFetch<CandidateAssessment>('/api/recruiter-submissions/assessment-preview', { method: 'POST', body: JSON.stringify(data) });
+  },
   async downloadResume(id: string): Promise<{ blob: Blob; filename: string | null }> {
     const token = getToken();
     const headers: Record<string, string> = activeRoleHeaders();

@@ -14,6 +14,19 @@ import { CandidateForm } from "@/components/candidates/candidate-form";
 import { ResumePages } from '@/components/candidates/resume-pages';
 import { existingCandidateForm } from '@/lib/existing-candidate-submission';
 
+function MatchScoreCard({ assessment, state }: { assessment: Awaited<ReturnType<typeof atsApi.submissions.previewAssessment>> | null; state: 'idle' | 'updating' | 'ready' | 'unavailable' }) {
+  const scoreVisible = state === 'ready' && assessment?.score != null;
+  return <section aria-label="Job match evidence score" className="shrink-0 rounded-lg border border-blue-200 bg-blue-50/70 p-3 dark:border-blue-900 dark:bg-blue-950/30">
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-baseline gap-2"><h3 className="text-xs font-bold text-slate-800 dark:text-slate-100">Job match</h3><span className="text-[10px] text-slate-500">Evidence score</span></div>
+      <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-slate-900 dark:text-blue-300">{state === 'updating' ? 'Updating…' : scoreVisible ? 'Provisional' : state === 'unavailable' ? 'Unavailable' : 'No score yet'}</span>
+    </div>
+    <div className="mt-1 flex items-center gap-3"><strong className="text-2xl leading-none text-slate-900 dark:text-white">{scoreVisible ? `${assessment.score}%` : '—'}</strong><span className="text-[11px] text-slate-600 dark:text-slate-300">{scoreVisible ? `Evidence coverage ${assessment.coverage}%` : state === 'updating' ? 'Rechecking current form details' : 'Upload or select a candidate to begin'}</span></div>
+    {scoreVisible && <details className="mt-2 text-[11px]"><summary className="cursor-pointer font-semibold text-blue-700 dark:text-blue-300">View evidence breakdown</summary><div className="mt-2 space-y-1.5">{assessment.criteria.map((criterion, index) => <div key={`${criterion.key}:${index}`} className="rounded border border-blue-100 bg-white/80 p-2 dark:border-slate-700 dark:bg-slate-900/70"><div className="font-semibold">{criterion.requirement}: {criterion.finding.replaceAll('_', ' ').toLowerCase()}</div><div className="mt-0.5 text-slate-600 dark:text-slate-300">{criterion.evidence}</div></div>)}</div></details>}
+    <p className="mt-2 text-[10px] leading-relaxed text-slate-600 dark:text-slate-300">Calculated using rules and a skill dictionary, not an LLM. Results may be incomplete or incorrect. Review candidate details and evidence before submitting. This score is not a hiring recommendation.</p>
+  </section>;
+}
+
 export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, job, onSuccess, existingCandidateId }: { open: boolean; onOpenChange: (open: boolean) => void; job: any; onSuccess?: () => void; existingCandidateId?: string | number }) {
   const [candidateLoading, setCandidateLoading] = useState(false);
   const [candidateError, setCandidateError] = useState('');
@@ -24,6 +37,9 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   const [autoFilled, setAutoFilled] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [assessment, setAssessment] = useState<Awaited<ReturnType<typeof atsApi.submissions.previewAssessment>> | null>(null);
+  const [assessmentState, setAssessmentState] = useState<'idle' | 'updating' | 'ready' | 'unavailable'>('idle');
+  const assessmentRequest = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fileUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
@@ -42,6 +58,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
     totalExperienceYears: "",
     currentLocation: "",
     preferredLocations: "",
+    preferredLocationMode: "SPECIFIC_LOCATIONS",
     source: "Market", sourceChannel: "", sourceDetail: "",
     skills: "",
     relevantExperienceYears: "",
@@ -61,6 +78,8 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   useEffect(() => {
     if (!isOpen || !existingCandidateId) return;
     let cancelled = false;
+    assessmentRequest.current++;
+    setAssessment(null); setAssessmentState('idle');
     setCandidateLoading(true); setCandidateError(''); setUpdateProfile(false);
     atsApi.candidates.get(existingCandidateId).then(candidate => {
       if (!cancelled) {
@@ -76,9 +95,34 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
     return () => { cancelled = true; };
   }, [isOpen, existingCandidateId, isContractual]);
 
+  useEffect(() => {
+    if (!isOpen || (!file && !existingCandidateId) || parsing || candidateLoading || candidateError || !job?.id) return;
+    const skills = formData.skills.split(',').map(value => value.trim()).filter(Boolean);
+    if (!skills.length && !formData.totalExperienceYears && !formData.currentLocation) return;
+    const requestId = ++assessmentRequest.current;
+    setAssessmentState('updating');
+    const timer = window.setTimeout(() => {
+      atsApi.submissions.previewAssessment({
+        jobId: String(job.id),
+        ...(existingCandidateId ? { candidateId: String(existingCandidateId) } : {}),
+        skills,
+        ...(formData.totalExperienceYears ? { totalExperienceYears: Number(formData.totalExperienceYears) } : {}),
+        ...(formData.currentLocation ? { currentLocation: formData.currentLocation } : {}),
+        preferredLocationMode: formData.preferredLocationMode as 'SPECIFIC_LOCATIONS' | 'REMOTE_ONLY' | 'REMOTE_OR_LOCATIONS',
+        preferredLocations: formData.preferredLocationMode === 'REMOTE_ONLY' ? [] : formData.preferredLocations.split(',').map(value => value.trim()).filter(Boolean),
+        ...(formData.noticePeriodDays !== '' ? { noticePeriodDays: Number(formData.noticePeriodDays) } : {}),
+      }).then(result => {
+        if (requestId === assessmentRequest.current) { setAssessment(result); setAssessmentState(result.score == null ? 'unavailable' : 'ready'); }
+      }).catch(() => { if (requestId === assessmentRequest.current) setAssessmentState('unavailable'); });
+    }, 500);
+    return () => { window.clearTimeout(timer); };
+  }, [isOpen, file, existingCandidateId, parsing, candidateLoading, candidateError, job?.id, formData.skills, formData.totalExperienceYears, formData.currentLocation, formData.preferredLocations, formData.preferredLocationMode, formData.noticePeriodDays]);
+
   const handleFileSelect = async (selectedFile: File | null) => {
     if (!selectedFile) return;
 
+    assessmentRequest.current++;
+    setAssessment(null); setAssessmentState('idle');
     setFile(selectedFile);
     setParsing(true);
     setAutoFilled(false);
@@ -188,12 +232,15 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   const resetForm = () => {
     setFormData({ 
       firstName: "", lastName: "", email: "", phone: "",
-      totalExperienceYears: "", currentLocation: "", preferredLocations: "",
+      totalExperienceYears: "", currentLocation: "", preferredLocations: "", preferredLocationMode: "SPECIFIC_LOCATIONS",
       source: "Market", sourceChannel: "", sourceDetail: "", skills: "", relevantExperienceYears: "",
       currentCtc: "", expectedCtc: "", currentCompany: "", noticePeriodDays: "",
       availabilityToStart: ""
     });
     setFile(null);
+    assessmentRequest.current++;
+    setAssessment(null);
+    setAssessmentState('idle');
     setAutoFilled(false);
     setParsing(false);
     setRecruiterComment("");
@@ -219,7 +266,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
     if (!/^\d+$/.test(formData.noticePeriodDays) || !Number.isSafeInteger(Number(formData.noticePeriodDays))) { toast.error("Select Immediate or enter notice period days."); return; }
     if (formData.source === 'Market' && (!formData.sourceChannel || (['Job Portal', 'Other'].includes(formData.sourceChannel) && !formData.sourceDetail.trim()))) { toast.error('Select a source channel and enter any required source details.'); return; }
     if (!candidateAmountSchema.safeParse(formData.expectedCtc).success || Number(formData.expectedCtc) <= 0 || (formData.currentCtc && !candidateAmountSchema.safeParse(formData.currentCtc).success)) { toast.error('Enter valid current and expected compensation amounts.'); return; }
-    if (!/^\d+(?:\.\d+)?$/.test(formData.totalExperienceYears) || !formData.currentLocation.trim() || !formData.preferredLocations.trim()) { toast.error('Complete experience, locations and availability.'); return; }
+    if (!/^\d+(?:\.\d+)?$/.test(formData.totalExperienceYears) || !formData.currentLocation.trim() || (formData.preferredLocationMode !== 'REMOTE_ONLY' && !formData.preferredLocations.trim())) { toast.error('Complete experience, locations and availability.'); return; }
     const availabilityToStart = isContractual ? (formData.noticePeriodDays === "0" ? "Immediate" : `${Number(formData.noticePeriodDays)} days`) : formData.availabilityToStart;
     setLoading(true);
     try {
@@ -238,7 +285,8 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
         noticePeriodDays: formData.noticePeriodDays,
         skills: formData.skills,
         currentLocation: formData.currentLocation,
-        preferredLocations: formData.preferredLocations,
+        preferredLocations: formData.preferredLocationMode === 'REMOTE_ONLY' ? '' : formData.preferredLocations,
+        preferredLocationMode: formData.preferredLocationMode as 'SPECIFIC_LOCATIONS' | 'REMOTE_ONLY' | 'REMOTE_OR_LOCATIONS',
       });
 
       const candidate = uploadResponse.candidate as { id: string | number; dbId?: string };
@@ -264,7 +312,8 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
         availabilityToStart,
         candidateRelevantExperience: formData.relevantExperienceYears ? Number(formData.relevantExperienceYears) : undefined,
         candidateNoticePeriod: Number(formData.noticePeriodDays),
-        ...(existingCandidateId ? { verifiedCandidate: { ...formData, skills: formData.skills.split(',').map(skill => skill.trim()).filter(Boolean) }, updateCandidateSkills: updateProfile } : {})
+        preferredLocationMode: formData.preferredLocationMode,
+        ...(existingCandidateId ? { verifiedCandidate: { ...formData, preferredLocations: formData.preferredLocationMode === 'REMOTE_ONLY' ? '' : formData.preferredLocations, skills: formData.skills.split(',').map(skill => skill.trim()).filter(Boolean) }, updateCandidateSkills: updateProfile } : {})
       });
 
       resetForm();
@@ -309,13 +358,15 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
           
           {/* LEFT: Preview Pane (50%) */}
           {existingCandidateId ? (
-            <div className="w-full lg:w-1/2 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 flex flex-col gap-3 min-h-48">
+            <div className="w-full lg:w-1/2 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 flex flex-col gap-3 min-h-48 overflow-hidden">
+              <MatchScoreCard assessment={assessment} state={assessmentState} />
               <h3 className="text-sm font-semibold">Existing resume</h3>
               <p className="text-xs text-slate-500">Review the stored resume and verify the candidate details. No new upload required.</p>
-              <ResumePages candidateId={existingCandidateId} />
+              <div className="min-h-0 flex-1"><ResumePages candidateId={existingCandidateId} /></div>
             </div>
           ) : file ? (
             <div className="w-full lg:w-1/2 border-r border-slate-200 dark:border-slate-800 bg-slate-200/50 dark:bg-slate-900/50 p-4 shrink-0 overflow-hidden flex flex-col">
+              <MatchScoreCard assessment={assessment} state={assessmentState} />
               <div className="flex-1 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-300 dark:border-slate-700 overflow-hidden flex flex-col relative">
                 <iframe src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} className="w-full h-full border-0 absolute inset-0" title="Resume Preview" />
               </div>

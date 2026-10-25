@@ -11,7 +11,7 @@ import { TagInput } from "@/components/ui/tag-input";
 import { CityAutocomplete } from "@/components/city-autocomplete";
 
 export interface CandidateFormProps {
-  formData: Record<'firstName' | 'lastName' | 'email' | 'phone' | 'totalExperienceYears' | 'currentLocation' | 'preferredLocations' | 'source' | 'skills' | 'relevantExperienceYears' | 'currentCtc' | 'expectedCtc' | 'currentCompany' | 'noticePeriodDays' | 'availabilityToStart' | 'sourceChannel' | 'sourceDetail', string>;
+  formData: Record<'firstName' | 'lastName' | 'email' | 'phone' | 'totalExperienceYears' | 'currentLocation' | 'preferredLocations' | 'preferredLocationMode' | 'source' | 'skills' | 'relevantExperienceYears' | 'currentCtc' | 'expectedCtc' | 'currentCompany' | 'noticePeriodDays' | 'availabilityToStart' | 'sourceChannel' | 'sourceDetail', string>;
   setFormData: (data: CandidateFormProps['formData']) => void;
   recruiterComment: string;
   setRecruiterComment: (comment: string) => void;
@@ -113,17 +113,28 @@ export function CandidateForm({
                   className="[&_input]:h-10 [&_input]:bg-slate-50 dark:[&_input]:bg-slate-950"
               />
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Preferred Location <span className="text-red-500">*</span></Label>
-              <CityAutocomplete
+            <div className="space-y-3 sm:col-span-2">
+              <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Preferred location <span className="text-red-500">*</span></Label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  ['SPECIFIC_LOCATIONS', 'Specific locations'],
+                  ['REMOTE_ONLY', 'Remote only'],
+                  ['REMOTE_OR_LOCATIONS', 'Remote or selected locations'],
+                ].map(([value, label]) => <label key={value} className="flex items-start gap-2 rounded-md border border-slate-200 dark:border-slate-700 p-2.5 text-xs cursor-pointer">
+                  <input type="radio" name="preferredLocationMode" value={value} checked={formData.preferredLocationMode === value} onChange={() => setFormData({ ...formData, preferredLocationMode: value, preferredLocations: value === 'REMOTE_ONLY' ? '' : formData.preferredLocations })} className="mt-0.5 accent-blue-600" />
+                  <span>{label}</span>
+                </label>)}
+              </div>
+              {formData.preferredLocationMode !== 'REMOTE_ONLY' && <CityAutocomplete
                   value={formData.preferredLocations}
                   onChange={(city, state) => {
                     const fullLoc = [city, state].filter(Boolean).join(", ");
                     setFormData({ ...formData, preferredLocations: fullLoc || city });
                   }}
-                  placeholder="Search city..."
+                  placeholder={formData.preferredLocationMode === 'REMOTE_OR_LOCATIONS' ? 'Add preferred city...' : 'Search preferred city...'}
                   className="[&_input]:h-10 [&_input]:bg-slate-50 dark:[&_input]:bg-slate-950"
-              />
+              />}
+              <p className="text-[11px] text-slate-500">Remote work can have country or time-zone restrictions. Confirm eligibility with the candidate.</p>
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">{isContractual ? "Availability to Start" : "Notice Period"} <span className="text-red-500">*</span></Label>
