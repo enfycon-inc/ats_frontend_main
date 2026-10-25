@@ -25,6 +25,7 @@ import { stage, validTimezone } from '@/lib/submission-tracker';
 import AddCandidateModal from '@/components/dashboard/AddCandidateModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { candidateProfileId } from '@/lib/candidate-profile-id';
+import { jobPriorityPresentation, submissionStageToneClasses } from '@/lib/status-colors';
 
 const panel =
   'rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900';
@@ -593,8 +594,8 @@ export default function RecruiterDashboardView({
                     >
                       {job.jobTitle}
                     </Link>
-                    <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                      {label(job.priority)}
+                    <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${jobPriorityPresentation(job.priority).className}`}>
+                      {jobPriorityPresentation(job.priority).label}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-slate-500">{job.client}</p>
@@ -726,7 +727,7 @@ export default function RecruiterDashboardView({
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="rounded bg-indigo-50 px-2 py-1 text-[10px] text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">
+                          <span className={`inline-flex rounded border px-2 py-1 text-[10px] font-medium ${submissionStageToneClasses[stage(sub).tone]}`}>
                             {label(stage(sub).label)}
                           </span>
                         </td>

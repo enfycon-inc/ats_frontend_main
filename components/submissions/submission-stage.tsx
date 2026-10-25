@@ -3,17 +3,14 @@ import { CalendarDays, Check, CheckCircle2, Clock3, X, XCircle } from 'lucide-re
 import type { TrackerSubmission } from '@/lib/submission-contract';
 import { currentRound, formatInterview, rejectionStage, ROUNDS, stage, statusDate, validTimezone } from '@/lib/submission-tracker';
 import { cn } from '@/lib/utils';
+import { submissionStageToneClasses } from '@/lib/status-colors';
 const TONES = {
-  amber: "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  blue: "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  green: "bg-[#008000] text-white",
-  red: "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-300",
-  neutral: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  ...submissionStageToneClasses,
 };
 export function StageBadge({ submission }: { submission: TrackerSubmission }) {
   const state = stage(submission);
   const date = statusDate(submission);
-  const Icon = state.tone === "green" ? CheckCircle2 : state.tone === "red" ? XCircle : state.tone === "blue" ? CalendarDays : Clock3;
+  const Icon = state.tone === "green" ? CheckCircle2 : state.tone === "red" ? XCircle : ["blue", "violet", "teal"].includes(state.tone) ? CalendarDays : Clock3;
   return <div className="flex flex-col items-center gap-1.5">{submission.jobStatus?.toLowerCase() === "closed" && <span className="rounded bg-slate-100 px-2 py-1 text-[10.5px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">{submission.workflowPaused ? "Job closed - workflow paused" : submission.keepExistingSubmissionsOpen ? "Closed to new submissions" : "Job closed"}</span>}<span className={cn("inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[10.5px] font-semibold max-w-full text-center", TONES[state.tone])}><Icon className="h-3.5 w-3.5" />{state.label}</span>{date && <time dateTime={date.value} title={date.label} className="text-[10.5px] leading-4 text-muted-foreground">{date.label === "Scheduled interview" ? "" : date.label + " "}{formatInterview(date.value, validTimezone(submission.timezone))}</time>}</div>;
 }
 export function Pipeline({ submission }: { submission: TrackerSubmission }) {

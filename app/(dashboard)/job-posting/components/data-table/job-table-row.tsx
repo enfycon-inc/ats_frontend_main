@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
 import { Job } from "../../data/mock-jobs";
 import { jobLocationDisplay } from "@/lib/job-location";
+import { jobPriorityPresentation } from "@/lib/status-colors";
 import {
   getRecruiterDisplay,
   formatDateTimeDisplay,
@@ -106,6 +107,7 @@ export function JobTableRow({
   const canChangeStatus = job.capabilities?.changeStatus === true;
   const canFindMatches = job.capabilities?.findMatches === true;
   const router = useRouter();
+  const priorityPresentation = jobPriorityPresentation(job.priority);
 
   return (
     <tr
@@ -265,18 +267,10 @@ export function JobTableRow({
               <Badge
                 className={cn(
                   "text-[10px] font-medium px-2 py-0.5 rounded-md border shadow-none cursor-default select-none",
-                  job.priority === "Hot" || job.priority === "High" || job.priority === "Urgent"
-                    ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800/40"
-                    : job.priority === "Cold" || job.priority === "Low"
-                    ? "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-800/40"
-                    : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40"
+                  priorityPresentation.className
                 )}
               >
-                {job.priority === "Hot" || job.priority === "High" || job.priority === "Urgent"
-                  ? "Hot"
-                  : job.priority === "Cold" || job.priority === "Low"
-                  ? "Cold"
-                  : "Warm"}
+                {priorityPresentation.label}
               </Badge>
             ) : colId === "podName" ? (
               !podSystemEnabled ? <span className="text-muted-foreground">—</span> : isDelegatedView ? (
@@ -319,21 +313,6 @@ export function JobTableRow({
                   (job as any).isCoSourced ||
                   ((job as any).sharedBranchIds && (job as any).sharedBranchIds.length > 0);
 
-                const rawPriority = String(
-                  job.priority || (job as any).urgency || "Warm"
-                ).toUpperCase();
-                const isHot =
-                  rawPriority.includes("HOT") ||
-                  rawPriority.includes("HIGH") ||
-                  rawPriority.includes("URGENT");
-                const isCold = rawPriority.includes("COLD") || rawPriority.includes("LOW");
-                const priorityLabel = isHot ? "HOT" : isCold ? "COLD" : "WARM";
-                const priorityClasses = isHot
-                  ? "bg-rose-500/10 text-rose-600 border-rose-500/30 dark:bg-rose-500/20 dark:text-rose-400 dark:border-rose-500/40"
-                  : isCold
-                  ? "bg-sky-500/10 text-sky-600 border-sky-500/30 dark:bg-sky-500/20 dark:text-sky-400 dark:border-sky-500/40"
-                  : "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/40";
-
                 return (
                   <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <Link href={`/job-posting/${job.id}`}>
@@ -372,10 +351,10 @@ export function JobTableRow({
                     {!isClosed && <span
                       className={cn(
                         "inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border select-none leading-none shrink-0",
-                        priorityClasses
+                        priorityPresentation.className
                       )}
                     >
-                      {priorityLabel}
+                      {priorityPresentation.label.toUpperCase()}
                     </span>}
                     {job.agingDays > 30 && (
                       <Badge className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/30 text-[9px] scale-90 flex items-center gap-0.5 shadow-none px-1 py-0 font-medium shrink-0">

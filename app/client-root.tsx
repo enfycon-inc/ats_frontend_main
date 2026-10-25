@@ -188,7 +188,7 @@ export function ClientRoot({
             <NotificationListener />
             <PageHeaderProvider><SidebarProvider defaultOpen={defaultOpen}>
               <AppSidebar initialNavigation={initialNavigation} />
-              <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-y-auto max-h-screen h-screen">
+              <SidebarInset className="min-h-0 min-w-0">
                 <header className="sticky top-0 z-40 flex h-[46px] min-h-[46px] shrink-0 items-center gap-2 border-b border-[#1a4fa0] dark:border-[#0f2d6b] bg-[#1a4fa0] dark:bg-[#0f2d6b] px-4 shadow-sm">
                   <SidebarTrigger className="-ml-1 text-white hover:bg-white/10 hover:text-white" />
                   <div className="flex-1" />

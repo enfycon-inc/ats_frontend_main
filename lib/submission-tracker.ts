@@ -1,5 +1,6 @@
 import type { RoundKey, TrackerSubmission } from './submission-contract';
 import { ROUND_STATUS_LABELS, OUTCOME_LABELS, type InterviewRoundStatus, type SubmissionOutcome } from './submission-contract';
+import type { SubmissionStageTone } from './status-colors';
 
 // Labels describe workflow states, never candidate/client/role relationships.
 export const ROUNDS: { key: RoundKey; label: string }[] = [
@@ -48,7 +49,7 @@ export function rejectionStage(sub: TrackerSubmission): string | null {
   if (rejected) return rejected.key;
   return sub.finalStatus === 'NOT_SELECTED' ? null : sub.rejectionFromStatus === 'PENDING_APPROVAL' ? 'review' : 'final';
 }
-export function stage(sub: TrackerSubmission): { label: string; tone: 'amber' | 'blue' | 'green' | 'red' | 'neutral' } {
+export function stage(sub: TrackerSubmission): { label: string; tone: SubmissionStageTone } {
   if (sub.finalStatus === 'PENDING_APPROVAL') return { label: 'Needs internal review', tone: 'amber' };
   if (sub.finalStatus === 'REJECTED') {
     const rejected = rejectionStage(sub);
@@ -70,7 +71,8 @@ export function stage(sub: TrackerSubmission): { label: string; tone: 'amber' | 
   const status = sub[`${round.key}Status`];
   const label = round.label;
   if (status === 'REJECTED') return { label: `${label} rejected`, tone: 'red' };
-  return { label: `${label} ${(ROUND_STATUS_LABELS[status as InterviewRoundStatus] || 'Pending').toLowerCase()}`, tone: status === 'SCHEDULED' ? 'blue' : status === 'CANCELLED' ? 'neutral' : 'amber' };
+  const roundTone: Record<(typeof ROUNDS)[number]['key'], SubmissionStageTone> = { l1: 'blue', l2: 'violet', l3: 'teal' };
+  return { label: `${label} ${(ROUND_STATUS_LABELS[status as InterviewRoundStatus] || 'Pending').toLowerCase()}`, tone: status === 'CANCELLED' ? 'neutral' : roundTone[round.key] };
 }
 export function statusDate(sub: TrackerSubmission): { value: string; label: string } | null {
   const rejected = rejectionStage(sub);
