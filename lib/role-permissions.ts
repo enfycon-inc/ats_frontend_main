@@ -63,7 +63,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
   const perms = getActiveRolePermissions(input, roles, profile);
   const has = (...keys: string[]) => perms.includes('*') || keys.some(k => perms.includes(k));
   if (has("platform:manage")) return GLOBAL_ADMIN_NAV_ITEMS;
-  const activeRole = resolveActiveSystemRole(input, roles, profile);
+  const activeRole = resolveActiveSystemRole(input, [...(profile?.assignedRoles || []), ...roles], profile);
   const isAccountManagerRole = activeRole === "ACCOUNT_MANAGER";
   const canBrowseJobCatalog = has('tenant:manage', 'tenant:settings', 'platform:manage', 'branch_admin:manage', 'unit_admin:manage', 'job:create', 'job:override_assignment', 'job:view_all', 'job:view_all_branches');
   const canViewAllSubmissions = has("submission:view_all", "tenant:manage", "tenant:settings", "platform:manage", "branch_admin:manage", "unit_admin:manage");
@@ -74,8 +74,9 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
     interviews: canViewCalendar,
     "job-posting": has("job:view"), "applicants": has("candidate:view", "candidate:create"),
     "submissions-tracker": canAccessSubmissions, placements: has("placement:view"),
-    clients: has("client:view"), "talent-bench": has("candidate:view"),
-    vendors: has("vendor:view"), onboarding: has("onboarding:view"), reports: has("report:view"),
+    clients: activeRole !== "RECRUITER" && has("client:view"),
+    "talent-bench": !["RECRUITER", "ACCOUNT_MANAGER", "DELIVERY_HEAD"].includes(activeRole) && has("candidate:view"),
+    vendors: has("vendor:view"), onboarding: has("onboarding:view"), reports: !["ACCOUNT_MANAGER", "DELIVERY_HEAD"].includes(activeRole) && has("report:view"),
     "branch-units": has("tenant:settings", "tenant:manage", "branch:create", "unit_admin:manage", "branch_admin:manage", "unit:view"),
   };
   return PRIMARY_NAV_ITEMS.filter(item => allowed[item.id]).map(item => {
@@ -162,11 +163,12 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
   const perms = getActiveRolePermissions(input, roles, profile);
   const has = (...keys: string[]) => perms.includes('*') || keys.some(k => perms.includes(k));
   const isAccountManager = resolveActiveSystemRole(input, roles, profile) === "ACCOUNT_MANAGER";
-  const isDeliveryHead = resolveActiveSystemRole(input, [...(profile?.assignedRoles || []), ...roles], profile) === "DELIVERY_HEAD";
+  const activeRole = resolveActiveSystemRole(input, [...(profile?.assignedRoles || []), ...roles], profile);
+  const isDeliveryHead = activeRole === "DELIVERY_HEAD";
   if (has("platform:manage")) return GLOBAL_ADMIN_MORE_ITEMS;
   const company = has("tenant:settings", "tenant:manage");
   const allowed: Record<string, boolean> = {
-    developer: company, email: true, documents: true, settings: true, help: true,
+    developer: company, email: true, documents: !isDeliveryHead, settings: activeRole !== "RECRUITER", help: true,
     database: has("database:manage", "tenant:settings"), integrations: has("integration:manage", "tenant:settings"),
     "user-management": has("user:manage", "branch:assign_user", "unit_admin:manage"),
     "role-management": !isDeliveryHead && has("user:manage"),
