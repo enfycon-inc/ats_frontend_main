@@ -65,6 +65,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
   if (has("platform:manage")) return GLOBAL_ADMIN_NAV_ITEMS;
   const activeRole = resolveActiveSystemRole(input, roles, profile);
   const isAccountManagerRole = activeRole === "ACCOUNT_MANAGER";
+  const canBrowseJobCatalog = has('tenant:manage', 'tenant:settings', 'platform:manage', 'branch_admin:manage', 'unit_admin:manage', 'job:create', 'job:override_assignment', 'job:view_all', 'job:view_all_branches');
   const canViewAllSubmissions = has("submission:view_all", "tenant:manage", "tenant:settings", "platform:manage", "branch_admin:manage", "unit_admin:manage");
   const canAccessSubmissions = canViewAllSubmissions || has("submission:view", "submission:create");
   const canViewCalendar = has("submission:view", "submission:view_all", "tenant:manage", "tenant:settings", "platform:manage", "branch_admin:manage", "unit_admin:manage");
@@ -80,6 +81,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
   return PRIMARY_NAV_ITEMS.filter(item => allowed[item.id]).map(item => {
     if (!item.children) return item;
     const children = item.children.filter(child => {
+      if (child.href === '/job-posting/all' && !podsEnabled && !canBrowseJobCatalog) return false;
       if (child.href === '/job-posting/pod-jobs' && !(podsEnabled && has('job:view_pod_jobs', 'job:submit_pod_jobs'))) return false;
       if (child.href === '/utility/submissions?view=pod' && !podsEnabled) return false;
       if (child.href === "/utility/submissions?view=all" && !canViewAllSubmissions) return false;

@@ -27,16 +27,27 @@ test('disabled or unresolved pods hide every pod-only link while keeping persona
     assert.ok(!hrefs.includes('/utility/submissions?view=pod'));
     assert.ok(!policy.getFilteredMoreNav(undefined, [], value).some(item => item.id === 'pod-management'));
     assert.ok(hrefs.includes('/job-posting/my-jobs'));
+    assert.ok(!hrefs.includes('/job-posting/all'));
     assert.ok(hrefs.includes('/utility/submissions?view=my'));
   }
 });
 test('enabled pods still require granular permissions, not merely a role label', () => {
   const value = { ...profile, features: { podsEnabled: true } };
+  assert.ok(links(value).includes('/job-posting/all'));
   assert.ok(links(value).includes('/job-posting/pod-jobs'));
   assert.ok(links(value).includes('/utility/submissions?view=pod'));
   assert.ok(policy.getFilteredMoreNav(undefined, [], value).some(item => item.id === 'pod-management'));
   assert.ok(!links({ ...value, permissions: ['job:view', 'submission:view'] }).includes('/job-posting/pod-jobs'));
   assert.ok(!links({ ...value, permissions: ['job:view', 'submission:view'] }).includes('/utility/submissions?view=pod'));
+});
+
+test('disabled pods retain All Jobs for broader capabilities and ignore role labels', () => {
+  const value = { ...profile, features: { podsEnabled: false } };
+  for (const permission of ['tenant:manage', 'tenant:settings', 'branch_admin:manage', 'unit_admin:manage', 'job:create', 'job:override_assignment', 'job:view_all', 'job:view_all_branches']) {
+    assert.ok(links({ ...value, permissions: [...profile.permissions, permission] }).includes('/job-posting/all'), permission);
+  }
+  assert.ok(!links({ ...value, systemRole: 'TENANT_ADMIN' }).includes('/job-posting/all'));
+  assert.ok(links({ ...value, systemRole: 'CUSTOM_SOURCER' }).includes('/job-posting/my-jobs'));
 });
 test('direct pod-only URLs do not mount their child page when disabled or loading', () => {
   let state;
