@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -228,10 +229,7 @@ export default function EditUnitPage() {
 
   if (loading) {
     return (
-      <div className="py-20 text-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
-        <p className="text-xs text-neutral-500 mt-2 font-medium">Loading branch unit details...</p>
-      </div>
+      <PageLoadingSkeleton variant="form" />
     );
   }
 

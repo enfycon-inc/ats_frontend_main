@@ -214,12 +214,16 @@ export default function AdminDashboardView({ profile, jobs, activeJobs }: { prof
           </CardHeader>
           <CardContent className="flex-1 p-0 flex items-center justify-center">
             {isLoadingBranches ? (
-              <div className="w-full h-[320px] px-2 flex items-end justify-around pb-4">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <Skeleton key={"skel-chart-"+i} className="w-12 rounded-t-sm" style={{ height: Math.floor(Math.random() * 60 + 20) + "%" }} />
-                ))}
-              </div>
-            ) : branchMetrics.length > 0 ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <tr key={"skel-feed-"+i}>
+                    <td className="p-3"><Skeleton className="h-5 w-24 rounded-full" /></td>
+                    <td className="p-3"><Skeleton className="h-4 w-48" /></td>
+                    <td className="p-3"><Skeleton className="h-4 w-32" /></td>
+                    <td className="p-3"><Skeleton className="h-5 w-16 rounded-full" /></td>
+                    <td className="p-3"><Skeleton className="h-4 w-20" /></td>
+                  </tr>
+                ))
+              ) : branchMetrics.length > 0 ? (
               <div className="w-full h-[320px] px-2">
                 <Chart options={stackedChartOptions} series={stackedChartSeries} type="bar" height="100%" width="100%" />
               </div>

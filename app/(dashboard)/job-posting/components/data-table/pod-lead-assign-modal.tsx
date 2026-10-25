@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useMemo, useEffect } from "react";
 import { Check, X, Loader2, Sparkles } from "lucide-react";
 import { Icon } from "@iconify/react";
@@ -376,10 +377,7 @@ export function PodLeadAssignModal({
         {/* Recruiter List Area */}
         <div className="px-5 py-1 max-h-[340px] min-h-[180px] overflow-y-auto space-y-1.5">
           {isLoading ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-2 text-xs text-slate-400">
-              <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
-              <span>Loading pod recruiters...</span>
-            </div>
+            <PageLoadingSkeleton variant="table" />
           ) : errorMessage ? (
             <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
               <Icon icon="heroicons:exclamation-triangle" className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />

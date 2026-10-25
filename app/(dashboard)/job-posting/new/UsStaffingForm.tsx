@@ -1,5 +1,6 @@
 // @ts-nocheck
 "use client";
+import { jobFormContext } from "@/lib/job-form-context";
 import { useJobAssignmentPolicy } from "../lib/use-job-assignment-policy";
 
 import { ContactDialog } from "../components/contact-dialog";
@@ -61,7 +62,7 @@ import { usesAutomaticPods } from "@/lib/pod-strategy";
 import { JobAssignmentModal, AssignmentType } from "@/components/ui/job-assignment-modal";
 import { resolveActiveSystemRole, isRoleAdmin } from "@/lib/role-permissions";
 
-import { Country, State, City } from "country-state-city";
+import { useLocationData } from "@/hooks/use-location-data";
 import ReactCountryFlag from "react-country-flag";
 import { WORK_AUTHORIZATION_OPTIONS, INDIAN_WORK_AUTHORIZATION_OPTIONS, INDIA_STATES_CITIES, US_STATES_CITIES } from "@/lib/job-form-constants";
 
@@ -229,13 +230,7 @@ export function UsStaffingForm({ editJobId, onBehalfOfUserId }: { editJobId?: st
   const stateListRef = useRef<HTMLDivElement>(null);
   const cityListRef = useRef<HTMLDivElement>(null);
 
-  const sortedCountries = useMemo(() => {
-    const popularNames = ["India", "United States", "United Kingdom", "Canada", "Australia", "United Arab Emirates", "Singapore"];
-    const countries = Country.getAllCountries();
-    const popular = Country.getAllCountries().filter(c => popularNames.includes(c.name));
-    const others = Country.getAllCountries().filter(c => !popularNames.includes(c.name)).sort((a, b) => a.name.localeCompare(b.name));
-    return [...popular, ...others];
-  }, []);
+
 
   useEffect(() => {
     if (countryListRef.current) {
@@ -458,6 +453,15 @@ const getInitialActiveBranchContext = () => {
   });
 
   const selectedCountry = watch("country");
+  const locationData = useLocationData(selectedCountry, watch("states"));
+  const { Country, State, City } = locationData;
+  const sortedCountries = useMemo(() => {
+    const popularNames = ["India", "United States", "United Kingdom", "Canada", "Australia", "United Arab Emirates", "Singapore"];
+    const countries = Country.getAllCountries();
+    const popular = Country.getAllCountries().filter(c => popularNames.includes(c.name));
+    const others = Country.getAllCountries().filter(c => !popularNames.includes(c.name)).sort((a, b) => a.name.localeCompare(b.name));
+    return [...popular, ...others];
+  }, [locationData.countries]);
   const watchTaxTerms = watch("taxTerms");
 
   // Keep clientBillRate synced when market is IN and taxTerms is Permanent
@@ -554,7 +558,7 @@ const getInitialActiveBranchContext = () => {
 
     async function fetchProfile() {
       try {
-        const prof = await atsApi.auth.me();
+        const prof = await jobFormContext.profile();
         if (prof) {
           setCurrentUserProfile(prof);
           let tName = prof.tenant?.name || prof.tenantDomain || "";
@@ -588,8 +592,8 @@ const getInitialActiveBranchContext = () => {
           let matchedUnit = null;
           try {
             const [bList, unitsList] = await Promise.all([
-              atsApi.branches.list().catch(() => []),
-              atsApi.businessUnits.list().catch(() => []),
+              jobFormContext.branches().catch(() => []),
+              jobFormContext.units().catch(() => []),
             ]);
             branchesList = bList || [];
             
@@ -2305,6 +2309,7 @@ const getInitialActiveBranchContext = () => {
 
                     
                     {/* Location Block */}
+                    {locationData.error && <p role="alert" className="text-xs text-red-600">Location options could not load. <button type="button" className="underline" onClick={() => void locationData.retry()}>Retry</button></p>}
                     <div className="space-y-1 col-span-1 md:col-span-4 grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Country */}
                       <div className="space-y-1">

@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useEffect, useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -307,10 +308,7 @@ export default function PipelinePage() {
 
       {/* KANBAN BOARD COLUMNS */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center p-16 border border-default-150 bg-white dark:bg-slate-900 rounded-2xl">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-          <p className="mt-3 text-xs text-default-500 font-semibold">Loading interactive recruitment board...</p>
-        </div>
+        <PageLoadingSkeleton variant="table" />
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-4 pt-1 min-h-[600px] select-none">
           {stageCounts.map((stage) => {

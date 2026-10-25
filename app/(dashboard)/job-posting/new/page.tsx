@@ -1,4 +1,6 @@
 "use client";
+import { jobFormContext } from "@/lib/job-form-context";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 
 import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
@@ -7,18 +9,14 @@ import { atsApi } from "@/lib/ats-api";
 import { Loader2, Users } from "lucide-react";
 import { PeopleFinder } from "@/components/common/people-finder";
 
-const IndiaStaffingForm = dynamic(() => import("./IndiaStaffingForm").then(mod => mod.IndiaStaffingForm), { ssr: false, loading: () => <FormLoader /> });
-const UsStaffingForm = dynamic(() => import("./UsStaffingForm").then(mod => mod.UsStaffingForm), { ssr: false, loading: () => <FormLoader /> });
-const GlobalStandardForm = dynamic(() => import("./GlobalStandardForm").then(mod => mod.GlobalStandardForm), { ssr: false, loading: () => <FormLoader /> });
+const loadIndiaForm = () => import("./IndiaStaffingForm").then(mod => mod.IndiaStaffingForm);
+const loadUsForm = () => import("./UsStaffingForm").then(mod => mod.UsStaffingForm);
+const loadGlobalForm = () => import("./GlobalStandardForm").then(mod => mod.GlobalStandardForm);
+const IndiaStaffingForm = dynamic(loadIndiaForm, { ssr: false, loading: () => <FormLoader /> });
+const UsStaffingForm = dynamic(loadUsForm, { ssr: false, loading: () => <FormLoader /> });
+const GlobalStandardForm = dynamic(loadGlobalForm, { ssr: false, loading: () => <FormLoader /> });
 
-function FormLoader() {
-  return (
-    <div className="flex h-[calc(100vh-100px)] items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      <span className="ml-3 text-sm font-medium text-slate-500">Loading Job Requisition Form...</span>
-    </div>
-  );
-}
+function FormLoader() { return <PageLoadingSkeleton variant="form" label="Loading job form" />; }
 
 export default function NewJobPostingPage() {
   const [marketVariant, setMarketVariant] = useState<"USIT" | "INDIA" | "GLOBAL" | null>(null);
@@ -38,12 +36,17 @@ export default function NewJobPostingPage() {
   }, [onBehalf]);
 
   useEffect(() => {
+    const cached = atsApi.auth.getCurrentUser();
+    const market = String(cached?.defaultMarket || cached?.market || '').toUpperCase();
+    // Warm only the likely market chunk while the authoritative unit lookup runs.
+    if (['IN', 'IND', 'INDIA'].includes(market)) void loadIndiaForm().catch(() => undefined);
+    else if (['US', 'USIT', 'USA'].includes(market)) void loadUsForm().catch(() => undefined);
     async function determineMarket() {
 
       try {
         const [units, prof] = await Promise.all([
-          atsApi.businessUnits.list().catch(() => []),
-          atsApi.auth.me().catch(() => null)
+          jobFormContext.units().catch(() => []),
+          jobFormContext.profile().catch(() => null)
         ]);
         
         const activeBranchId = typeof window !== "undefined" ? localStorage.getItem("active_branch_id") : null;

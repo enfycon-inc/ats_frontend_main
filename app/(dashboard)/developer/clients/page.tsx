@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSession } from "next-auth/react";
 import { AlertTriangle, Clipboard, Code2, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
@@ -107,7 +108,7 @@ export default function PublicCareersApiPage() {
     catch { toast.error("Copy failed. Select and copy the key manually."); }
   }
 
-  if (status === "loading" || loading) return <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-indigo-600" aria-label="Loading" /></div>;
+  if (status === "loading" || loading) return <PageLoadingSkeleton variant="table" />;
   if (!canManage) return <Card className="max-w-2xl"><CardHeader><CardTitle className="text-base">Tenant administrator access required</CardTitle><CardDescription>Only users with tenant settings or tenant management permission can manage public careers API clients.</CardDescription></CardHeader></Card>;
 
   return (

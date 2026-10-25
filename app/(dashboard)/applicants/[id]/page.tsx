@@ -1,4 +1,5 @@
 "use client";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { ResumePages } from "@/components/candidates/resume-pages";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
@@ -286,10 +287,7 @@ export default function CandidateDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center min-h-[500px]">
-        <div className="h-10 w-10 border-4 border-t-primary border-neutral-200 dark:border-slate-800 rounded-full animate-spin"></div>
-        <p className="text-xs text-neutral-500 mt-4 font-medium">Loading candidate profile...</p>
-      </div>
+      <PageLoadingSkeleton variant="detail" />
     );
   }
 

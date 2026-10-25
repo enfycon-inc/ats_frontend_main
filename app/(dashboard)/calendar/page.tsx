@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -242,7 +243,7 @@ export default function CalendarPage() {
       {hasSchedulePermission && canViewCalendar && <Button onClick={() => void openSubmissionPicker()} className="h-9 bg-[#1a4fa0] text-xs text-white hover:bg-[#154181]"><Plus className="mr-1.5 h-4 w-4" />Schedule Interview</Button>}
     </div>
 
-    {statusLabel && <div role="status" className="rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground">{statusLabel}</div>}
+    {statusLabel && <PageLoadingSkeleton variant="compact" label={statusLabel} compact />}
     {error && <div role="alert" className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"><span>{error}</span><button type="button" aria-label="Dismiss" onClick={() => setError("")}><X className="h-4 w-4" /></button></div>}
 
     {workspaceStatus === "error" ? <div role="alert" className="rounded-xl border border-border bg-card p-10 text-center text-xs text-red-700">Calendar access could not be verified. Refresh to retry.</div> : !canViewCalendar ? <div role="alert" className="rounded-xl border border-border bg-card p-10 text-center text-xs text-red-700">You do not have permission to view interview submissions.</div> :
@@ -269,7 +270,7 @@ export default function CalendarPage() {
         <div className="px-5 py-3"><div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Search candidate or job" placeholder="Search candidate, job title, or code…" className="h-9 pl-9 text-xs" value={search} onChange={event => setSearch(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void openSubmissionPicker(); }} /></div></div>
         {selectionError && submissions.length > 0 && <p role="alert" className="px-5 pb-2 text-xs text-red-700">{selectionError}</p>}
         <div className="max-h-[52vh] overflow-y-auto border-t border-border">
-          {loadingSubmissions && !submissions.length ? <div role="status" className="flex items-center justify-center gap-2 p-10 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading eligible candidates…</div>
+          {loadingSubmissions && !submissions.length ? <PageLoadingSkeleton variant="table" />
             : selectionError && !submissions.length ? <div className="space-y-3 p-8 text-center"><p role="alert" className="text-xs text-red-700">{selectionError}</p><Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => void openSubmissionPicker()}>Retry</Button></div>
               : submissions.length ? <ul className="divide-y divide-border">{submissions.map(item => <li key={item.id}><button type="button" disabled={loadingSelection} onClick={() => void chooseSubmission(item)} className="flex w-full items-center justify-between gap-4 px-5 py-3 text-left hover:bg-muted/50 disabled:opacity-50"><span className="min-w-0"><span className="block truncate text-xs font-semibold">{item.candidateName || "Candidate"}</span><span className="mt-1 block truncate text-[10.5px] text-muted-foreground">{item.jobCode} · {item.jobTitle} · Next round: {item.eligibleRound?.toUpperCase()}</span></span><span className="shrink-0 text-[10.5px] text-[#1a4fa0]">Schedule interview →</span></button></li>)}</ul>
                 : <div className="p-10 text-center text-xs text-muted-foreground">No candidates are currently eligible for an interview. Complete internal review and clear each previous round to make the next round available.</div>}

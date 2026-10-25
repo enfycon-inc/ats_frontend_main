@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { City, State, Country } from "country-state-city";
+import { useCitySearchData } from "@/hooks/use-location-data";
 import { MapPin, Check, ChevronsUpDown, X } from "lucide-react";
 
 export interface CitySelection {
@@ -37,16 +37,8 @@ export function CityAutocomplete({
     setQuery(value || "");
   }, [value]);
 
-  // Pre-load common countries (India & US) + global search on demand
-  const primaryCities = useMemo(() => {
-    try {
-      const inCities = City.getCitiesOfCountry("IN") || [];
-      const usCities = City.getCitiesOfCountry("US") || [];
-      return [...inCities, ...usCities];
-    } catch {
-      return [];
-    }
-  }, []);
+  const locationData = useCitySearchData(isOpen && query.trim().length >= 2);
+  const primaryCities = locationData.cities;
 
   // Filter cities based on query
   const suggestions = useMemo(() => {
@@ -58,8 +50,8 @@ export function CityAutocomplete({
 
     for (const c of primaryCities) {
       if (c.name.toLowerCase().includes(trimmed)) {
-        const stateObj = State.getStateByCodeAndCountry(c.stateCode, c.countryCode);
-        const countryObj = Country.getCountryByCode(c.countryCode);
+        const stateObj = locationData.states.find(state => state.isoCode === c.stateCode && state.countryCode === c.countryCode);
+        const countryObj = locationData.countries.find(country => country.isoCode === c.countryCode);
         const stateName = stateObj?.name || c.stateCode || "";
         const countryName = countryObj?.name || (c.countryCode === "IN" ? "India" : "United States");
         const key = `${c.name}__${stateName}__${countryName}`;
@@ -79,7 +71,7 @@ export function CityAutocomplete({
     }
 
     return matches;
-  }, [query, primaryCities]);
+  }, [query, primaryCities, locationData.states, locationData.countries]);
 
   // Close dropdown on click outside
   useEffect(() => {

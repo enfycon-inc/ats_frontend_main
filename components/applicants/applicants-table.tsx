@@ -1,4 +1,5 @@
 "use client";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { candidateProfileId } from "@/lib/candidate-profile-id";
 
 import React, { useState, useMemo } from "react";
@@ -689,22 +690,7 @@ export default function ApplicantsTable({
           {/* ── BODY ────────────────────────────────────── */}
           <tbody>
             {loading ? (
-              <tr>
-                <td
-                  colSpan={selectedColumns.length + 2}
-                  className="text-center py-20 text-neutral-500 dark:text-neutral-400 text-sm"
-                >
-                  <div className="flex flex-col items-center justify-center gap-3">
-                    <Loader2 className="h-7 w-7 animate-spin text-blue-600 dark:text-blue-400" />
-                    <span className="text-xs font-semibold tracking-wide text-neutral-700 dark:text-neutral-200">
-                      Loading candidate profiles...
-                    </span>
-                    <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
-                      Retrieving verified talent records
-                    </span>
-                  </div>
-                </td>
-              </tr>
+              <tr><td colSpan={100}><PageLoadingSkeleton variant="table" compact /></td></tr>
             ) : paginatedData.length === 0 ? (
               <tr>
                 <td

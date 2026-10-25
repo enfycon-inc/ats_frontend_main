@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { JobSubmissions } from "@/components/submissions/job-submissions";
 import { jobLocationDisplay } from "@/lib/job-location";
 import type { TrackerResponse, TrackerSubmission } from "@/lib/submission-contract";
@@ -357,10 +358,7 @@ export default function JobDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center min-h-[400px] gap-2">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-        <span className="text-xs text-neutral-500 font-semibold">Loading job details...</span>
-      </div>
+      <PageLoadingSkeleton variant="detail" />
     );
   }
 

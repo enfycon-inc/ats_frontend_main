@@ -1,8 +1,9 @@
 "use client";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 
 import React, { useId, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { Country, State, City } from 'country-state-city';
+import { useLocationData } from '@/hooks/use-location-data';
 import { LockKeyhole, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { atsApi, activeRoleHeaders } from '@/lib/ats-api';
@@ -38,6 +39,8 @@ export function ClientForm({ initialClientName = '', expectedMarket, onSaved, on
   // Keep the successful response if updating the parent fails: retries cannot create a second account.
   const savedClient = useRef<CreatedClient | null>(null);
   const countryIso = country ?? (context?.market === 'INDIA' ? 'IN' : context?.market === 'US' ? 'US' : '');
+  const locationData = useLocationData(countryIso, stateIso);
+  const { Country, State, City } = locationData;
   const mismatch = !!context && !!expectedMarket && context.market !== expectedMarket;
   const set = (key: keyof ClientCreationRequest, value: unknown) => setDraft(prev => ({ ...prev, [key]: value }));
   const field = (key: keyof ClientCreationRequest, label: string, type = 'text', placeholder = '') => (
@@ -97,7 +100,7 @@ export function ClientForm({ initialClientName = '', expectedMarket, onSaved, on
     } finally { busy.current = false; setSaving(false); }
   }
 
-  if (isLoading) return <p className="flex items-center gap-2 text-xs" role="status"><Loader2 className="h-4 w-4 animate-spin" />Loading staffing context…</p>;
+  if (isLoading) return <PageLoadingSkeleton variant="form" label="Loading client form" compact />;
   if (error || !context || mismatch) return <div className="space-y-3" role="alert"><p className="text-xs text-red-600">{mismatch ? 'This job market does not match your staffing unit. Select the correct staffing context.' : error?.message || 'Staffing context is unavailable.'}</p><Button variant="outline" onClick={() => void mutate()}>Retry</Button><Button variant="ghost" onClick={onCancel}>Cancel</Button></div>;
 
   return <form onSubmit={submit} className="space-y-5 text-xs">
@@ -105,6 +108,7 @@ export function ClientForm({ initialClientName = '', expectedMarket, onSaved, on
       <p className="text-neutral-500">Branch: {context.branchName}{context.businessUnitName ? ` · Unit: ${context.businessUnitName}` : ''}</p>
       <span className="inline-flex items-center gap-1 rounded-md bg-neutral-100 px-2 py-1 font-semibold dark:bg-slate-800"><LockKeyhole className="h-3 w-3" />{context.market === 'INDIA' ? 'India Domestic Market (₹)' : 'US IT Staffing Market ($)'}</span>
     </div>
+    {locationData.error && <p role="alert" className="text-xs text-red-600">Location options could not load. <button type="button" className="underline" onClick={() => void locationData.retry()}>Retry</button></p>}
     <fieldset disabled={saving} className="space-y-5">
       {existingClient && <div className="rounded-lg bg-neutral-100 p-3 dark:bg-slate-800"><p>Using existing client: <strong>{existingClient.client_name}</strong></p><Button type="button" variant="ghost" onClick={() => setExistingClient(null)}>Create a new client instead</Button></div>}
       <fieldset disabled={!!existingClient}>

@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { atsApi } from "@/lib/ats-api";
@@ -46,7 +47,7 @@ export default function CompanySettingsPage() {
       fallback={
         <div className="flex-1 flex flex-col items-center justify-center min-h-[300px] bg-neutral-100 dark:bg-[#1e2734]">
           <RefreshCw className="animate-spin h-8 w-8 text-primary mb-3" />
-          <p className="text-sm text-neutral-500">Loading settings...</p>
+          <PageLoadingSkeleton variant="form" />
         </div>
       }
     >
@@ -428,15 +429,7 @@ function CompanySettingsContent() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col min-h-0 bg-neutral-100 dark:bg-[#1e2734]">
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-neutral-800 dark:text-neutral-200">Settings</h2>
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center min-h-[300px] bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded shadow-sm">
-          <RefreshCw className="animate-spin h-8 w-8 text-primary mb-3" />
-          <p className="text-sm text-neutral-500">Loading role settings...</p>
-        </div>
-      </div>
+      <PageLoadingSkeleton variant="form" />
     );
   }
 

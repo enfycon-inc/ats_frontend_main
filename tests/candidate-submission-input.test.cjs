@@ -4,10 +4,14 @@ const fs = require('node:fs');
 const ts = require('typescript');
 const mod = { exports: {} };
 new Function('exports', 'require', ts.transpileModule(fs.readFileSync('lib/candidate-submission-input.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mod.exports, require);
-test('library normalizes unique city names without inventing unknown locations', () => {
-  assert.equal(mod.exports.normalizeCandidateLocation('Kolkata', 'IN'), 'Kolkata, West Bengal');
-  assert.equal(mod.exports.normalizeCandidateLocation('Unknown city', 'IN'), 'Unknown city');
-  assert.equal(mod.exports.normalizeCandidateLocation('Kolkata, West Bengal', 'IN'), 'Kolkata, West Bengal');
+test('scoped library data normalizes unique city names without inventing unknown locations', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async url => ({ ok: true, json: async () => JSON.parse(fs.readFileSync('public' + url, 'utf8')) });
+  try {
+  assert.equal(await mod.exports.normalizeCandidateLocation('Kolkata', 'IN'), 'Kolkata, West Bengal');
+  assert.equal(await mod.exports.normalizeCandidateLocation('Unknown city', 'IN'), 'Unknown city');
+  assert.equal(await mod.exports.normalizeCandidateLocation('Kolkata, West Bengal', 'IN'), 'Kolkata, West Bengal');
+  } finally { global.fetch = originalFetch; }
 });
 test('amount formatting preserves zeros and decimal places', () => {
   assert.equal(mod.exports.formatCandidateAmount('120000'), '120,000');

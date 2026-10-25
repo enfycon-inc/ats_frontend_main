@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
@@ -706,7 +707,7 @@ export default function UnitsManagementPage() {
     <Suspense fallback={
       <div className="py-20 text-center">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
-        <p className="text-xs text-neutral-500 mt-2 font-medium">Loading units...</p>
+        <PageLoadingSkeleton variant="table" />
       </div>
     }>
       <UnitsContent />

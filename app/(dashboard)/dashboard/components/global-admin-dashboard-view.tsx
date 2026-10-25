@@ -1,4 +1,5 @@
 "use client";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { warnIfEmailFailed } from "@/lib/email-notification";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -115,10 +116,7 @@ function GlobalAdminDashboardView({ profile }: { profile: any }) {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[300px] border border-default-150 bg-white dark:bg-slate-900 rounded-2xl p-8">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-        <p className="mt-3 text-xs text-default-500 font-semibold">Initializing Platform Command Center...</p>
-      </div>
+      <PageLoadingSkeleton variant="table" />
     );
   }
 
@@ -470,10 +468,7 @@ function GlobalAdminDashboardView({ profile }: { profile: any }) {
           </DialogHeader>
 
           {loadingTenantDetail ? (
-            <div className="p-12 text-center text-xs text-default-400 flex flex-col items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
-              Loading tenant users...
-            </div>
+            <PageLoadingSkeleton variant="detail" />
           ) : selectedTenantDetail ? (
             <div className="space-y-5 py-2">
               {/* Tenant Header Info */}

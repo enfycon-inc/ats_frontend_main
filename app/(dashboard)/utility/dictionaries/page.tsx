@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -250,12 +251,7 @@ export default function DictionariesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-2">
-          <RefreshCw className="h-6 w-6 text-primary animate-spin" />
-          <span className="text-xs text-neutral-500 font-medium">Loading Dictionaries...</span>
-        </div>
-      </div>
+      <PageLoadingSkeleton variant="table" />
     );
   }
 
@@ -752,10 +748,7 @@ export default function DictionariesPage() {
               </div>
 
               {loadingActive ? (
-                <div className="p-12 text-center text-xs text-neutral-400">
-                  <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2 text-primary" />
-                  Updating category view...
-                </div>
+                <PageLoadingSkeleton variant="detail" />
               ) : (
                 <div className="border border-neutral-200 dark:border-slate-800 rounded-sm divide-y divide-neutral-100 dark:divide-slate-800 max-h-[420px] overflow-y-auto">
                   {filteredActive.length === 0 ? (

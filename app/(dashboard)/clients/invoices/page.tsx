@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useEffect, useCallback } from "react";
 import { atsApi } from "@/lib/ats-api";
 import { Button } from "@/components/ui/button";
@@ -107,10 +108,7 @@ export default function ClientInvoicesPage() {
 
         {/* INVOICES TABLE */}
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center min-h-[40vh] gap-3">
-            <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
-            <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">Loading invoices tracker...</p>
-          </div>
+          <PageLoadingSkeleton variant="table" />
         ) : (
           <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">

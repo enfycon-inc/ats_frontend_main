@@ -12,6 +12,8 @@ function load(file, selectedContext = context, failure) {
   const exports = {};
   const localRequire = name => {
     if (name === 'swr') return { default: key => ({ data: key?.[0] === 'client-creation-context' ? selectedContext : undefined, error: failure, mutate: async () => selectedContext }) };
+    if (name === '@/hooks/use-location-data') return load('hooks/use-location-data.ts');
+    if (name === '@/components/page-loading-skeleton') return { PageLoadingSkeleton: () => React.createElement('div', { role: 'status' }, 'Loading') };
     if (name === '@/lib/ats-api') return { atsApi: {}, activeRoleHeaders: () => ({}) };
     if (name === '@/components/clients/client-poc-fields') return load('components/clients/client-poc-fields.tsx');
     if (name === '@/components/ui/phone-input') return { PhoneInput: props => React.createElement('input', { id: props.id, type: 'tel', value: props.value, readOnly: true, 'data-country': props.defaultCountry }) };

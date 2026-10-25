@@ -1,13 +1,20 @@
-import { City, State } from 'country-state-city';
 import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
 import { z } from 'zod';
 
-export function normalizeCandidateLocation(value: string, country: string) {
-  const pieces = value.split(',').map(part => part.trim());
-  const matches = (City.getCitiesOfCountry(country) || []).filter(city => city.name.toLowerCase() === pieces[0]?.toLowerCase() && (!pieces[1] || State.getStateByCodeAndCountry(city.stateCode, country)?.name.toLowerCase() === pieces[1].toLowerCase()));
-  if (matches.length !== 1) return value;
-  const city = matches[0];
-  return [city.name, State.getStateByCodeAndCountry(city.stateCode, country)?.name].filter(Boolean).join(', ');
+const locationLookups = new Map<string, Promise<{ cities: { name: string; stateCode: string }[]; states: { name: string; isoCode: string }[] }>>();
+export async function normalizeCandidateLocation(value: string, country: string) {
+  if (!/^[A-Z]{2}$/.test(country)) return value;
+  try {
+    if (!locationLookups.has(country)) {
+      const load = async (path: string) => { const result = await fetch(path); if (!result.ok) throw new Error('Location data unavailable'); return result.json(); };
+      locationLookups.set(country, Promise.all([load(`/locations/search/${country}.json`), load(`/locations/states/${country}.json`)]).then(([cities, states]) => ({ cities, states })).catch(error => { locationLookups.delete(country); throw error; }));
+    }
+    const { cities, states } = await locationLookups.get(country)!;
+    const pieces = value.split(',').map(part => part.trim());
+    const matches = cities.filter(city => city.name.toLowerCase() === pieces[0]?.toLowerCase() && (!pieces[1] || states.find(state => state.isoCode === city.stateCode)?.name.toLowerCase() === pieces[1].toLowerCase()));
+    if (matches.length !== 1) return value;
+    return [matches[0].name, states.find(state => state.isoCode === matches[0].stateCode)?.name].filter(Boolean).join(', ');
+  } catch { return value; }
 }
 export function formatCandidateAmount(value: string) {
   const [whole, decimal] = value.replaceAll(',', '').split('.');

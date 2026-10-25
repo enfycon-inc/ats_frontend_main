@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Camera, Building2, MapPin, Mail, Save, UserRound, Loader2, Users } from 'lucide-react';
@@ -67,7 +68,7 @@ export default function ViewProfilePage() {
     finally { setPhotoBusy(false); }
   }
 
-  if (loading && !profile) return <div className="p-6 text-xs text-slate-500 flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Loading your profile…</div>;
+  if (loading && !profile) return <PageLoadingSkeleton variant="detail" />;
   if (!profile) return <div className="p-6 space-y-3"><p className="text-sm">{error?.message || 'Your profile could not be loaded.'}</p><Button variant="outline" onClick={() => mutate()}>Try again</Button></div>;
   const roleNames = [...new Set((profile.assignedRoles || []).map(role => role.name).filter(Boolean))];
   return <div className="w-full bg-slate-50 dark:bg-slate-950 p-4 md:p-6 space-y-5">

@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { atsApi } from "@/lib/ats-api";
@@ -20,7 +21,7 @@ import {
   CreditCard
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { Country, State, City } from "country-state-city";
+
 
 export default function EditClientCRMPage() {
   const params = useParams();
@@ -191,10 +192,7 @@ export default function EditClientCRMPage() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
-        <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">Loading Client CRM Editor...</p>
-      </div>
+      <PageLoadingSkeleton variant="form" />
     );
   }
 

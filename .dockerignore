@@ -8,3 +8,6 @@ out
 .env
 .env.local
 .env.*.local
+
+# Generated inside the builder by prebuild
+public/locations

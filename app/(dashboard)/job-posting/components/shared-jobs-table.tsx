@@ -1,3 +1,4 @@
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -71,7 +72,7 @@ export default function SharedJobsTable({ onRefresh, branchUsesPods }: { onRefre
   }, []);
 
   if (loading) {
-    return <div className="p-8 text-center text-sm text-slate-500">Loading shared jobs...</div>;
+    return <PageLoadingSkeleton variant="table" />;
   }
 
   return (

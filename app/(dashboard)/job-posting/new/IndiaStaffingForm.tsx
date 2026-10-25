@@ -1,5 +1,7 @@
 // @ts-nocheck
 "use client";
+import { jobFormContext } from "@/lib/job-form-context";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { useJobAssignmentPolicy } from "../lib/use-job-assignment-policy";
 
 import { ContactDialog } from "../components/contact-dialog";
@@ -62,7 +64,7 @@ import { usesAutomaticPods } from "@/lib/pod-strategy";
 import { JobAssignmentModal, AssignmentType } from "@/components/ui/job-assignment-modal";
 import { resolveActiveSystemRole, isRoleAdmin } from "@/lib/role-permissions";
 
-import { Country, State, City } from "country-state-city";
+import { useLocationData } from "@/hooks/use-location-data";
 import ReactCountryFlag from "react-country-flag";
 import { WORK_AUTHORIZATION_OPTIONS, INDIAN_WORK_AUTHORIZATION_OPTIONS, INDIA_STATES_CITIES, US_STATES_CITIES } from "@/lib/job-form-constants";
 
@@ -299,13 +301,7 @@ export function IndiaStaffingForm({ editJobId, onBehalfOfUserId }: { editJobId?:
   const stateListRef = useRef<HTMLDivElement>(null);
   const cityListRef = useRef<HTMLDivElement>(null);
 
-  const sortedCountries = useMemo(() => {
-    const popularNames = ["India", "United States", "United Kingdom", "Canada", "Australia", "United Arab Emirates", "Singapore"];
-    const countries = Country.getAllCountries();
-    const popular = Country.getAllCountries().filter(c => popularNames.includes(c.name));
-    const others = Country.getAllCountries().filter(c => !popularNames.includes(c.name)).sort((a, b) => a.name.localeCompare(b.name));
-    return [...popular, ...others];
-  }, []);
+
 
   useEffect(() => {
     if (countryListRef.current) {
@@ -485,7 +481,7 @@ const getInitialActiveBranchContext = () => {
       hoursPerWeek: undefined,
       jobStatus: "Active",
       priority: "Warm",
-      workAuthorization: "",
+      workAuthorization: "Indian Citizen",
       jobType: "Full Time",
       taxTerms: "Permanent",
       expMin: undefined,
@@ -502,6 +498,15 @@ const getInitialActiveBranchContext = () => {
   });
 
   const selectedCountry = watch("country");
+  const locationData = useLocationData(selectedCountry, watch("states"));
+  const { Country, State, City } = locationData;
+  const sortedCountries = useMemo(() => {
+    const popularNames = ["India", "United States", "United Kingdom", "Canada", "Australia", "United Arab Emirates", "Singapore"];
+    const countries = Country.getAllCountries();
+    const popular = Country.getAllCountries().filter(c => popularNames.includes(c.name));
+    const others = Country.getAllCountries().filter(c => !popularNames.includes(c.name)).sort((a, b) => a.name.localeCompare(b.name));
+    return [...popular, ...others];
+  }, [locationData.countries]);
   const watchTaxTerms = watch("taxTerms");
 
   // Clear clientBillRate if it switches from Permanent to something else and contains %
@@ -632,7 +637,7 @@ const getInitialActiveBranchContext = () => {
       if (profileInitialized.current) return;
       profileInitialized.current = true;
       try {
-        const prof = await atsApi.auth.me();
+        const prof = await jobFormContext.profile();
         if (prof) {
           setCurrentUserProfile(prof);
           let tName = prof.tenant?.name || prof.tenantDomain || "";
@@ -666,8 +671,8 @@ const getInitialActiveBranchContext = () => {
           let matchedUnit = null;
           try {
             const [bList, unitsList] = await Promise.all([
-              atsApi.branches.list().catch(() => []),
-              atsApi.businessUnits.list().catch(() => []),
+              jobFormContext.branches().catch(() => []),
+              jobFormContext.units().catch(() => []),
             ]);
             branchesList = bList || [];
             
@@ -817,7 +822,7 @@ const getInitialActiveBranchContext = () => {
         if (sourceJob.expMin != null) setValue("expMin", sourceJob.expMin);
         if (sourceJob.expMax != null) setValue("expMax", sourceJob.expMax);
         if (sourceJob.taxTerms) setValue("taxTerms", sourceJob.taxTerms);
-        if ((sourceJob as any).workAuthorization || sourceJob.visaType) setValue("workAuthorization", (sourceJob as any).workAuthorization || sourceJob.visaType);
+        setValue("workAuthorization", (sourceJob as any).workAuthorization || sourceJob.visaType || "");
         if (sourceJob.clientBillRate) setValue("clientBillRate", sourceJob.clientBillRate);
         if (sourceJob.payRate) setValue("payRate", sourceJob.payRate);
         if (sourceJob.description) {
@@ -2300,7 +2305,7 @@ const getInitialActiveBranchContext = () => {
                             />
                             <CommandList className="max-h-[240px] overflow-y-auto">
                               {(() => {
-                                if (clientsLoading) return <div className="py-4 px-3 text-xs text-neutral-500" role="status">Loading clients...</div>;
+                                if (clientsLoading) return <PageLoadingSkeleton variant="compact" compact />;
                                 if (clientsError) return <div className="py-4 px-3 text-xs" role="alert"><p>{clientsError}</p><button type="button" onClick={fetchClients} className="mt-2 text-primary underline">Try again</button></div>;
                                 const query = clientSearchText.trim().toLowerCase();
                                 const filtered = clientList.filter((cl: any) => {
@@ -2715,7 +2720,7 @@ const getInitialActiveBranchContext = () => {
                             />
                             <CommandList className="max-h-[240px] overflow-y-auto">
                               {(() => {
-                                if (clientsLoading) return <div className="py-4 px-3 text-xs text-neutral-500" role="status">Loading clients...</div>;
+                                if (clientsLoading) return <PageLoadingSkeleton variant="compact" compact />;
                                 if (clientsError) return <div className="py-4 px-3 text-xs" role="alert"><p>{clientsError}</p><button type="button" onClick={fetchClients} className="mt-2 text-primary underline">Try again</button></div>;
                                 const query = endClientSearchText.trim().toLowerCase();
                                 const filtered = clientList.filter((cl: any) => {
@@ -2946,6 +2951,7 @@ const getInitialActiveBranchContext = () => {
                     <input type="hidden" {...register("jobStatus")} value="Active" />
 
               {/* -------------------- JOB LOCATION SECTION -------------------- */}
+              {locationData.error && <p role="alert" className="text-xs text-red-600">Location options could not load. <button type="button" className="underline" onClick={() => void locationData.retry()}>Retry</button></p>}
               <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
                 <SectionHeader title="JOB LOCATION" sectionKey="location" />
                 {!collapsedSections.location && (

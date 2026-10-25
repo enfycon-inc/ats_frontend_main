@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useEffect, useMemo } from "react";
 
 import { 
@@ -232,10 +233,7 @@ export default function GlobalRemarksPage() {
 
       {/* Stage remarks shared by both outcomes */}
       {loading ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-16 text-center">
-          <div className="h-7 w-7 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-xs text-slate-500 font-medium">Loading templates...</p>
-        </div>
+        <PageLoadingSkeleton variant="table" />
       ) : (
         <div className="grid grid-cols-1 gap-5 items-start">
           {/* ── STAGE REMARKS ── */}

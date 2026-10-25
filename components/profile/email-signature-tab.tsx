@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import useSWR from 'swr';
@@ -11,7 +12,7 @@ import { atsApi } from '@/lib/ats-api';
 import type { EmailSignature, StaffProfile } from '@/lib/profile-contract';
 import 'react-quill-new/dist/quill.snow.css';
 
-const Quill = dynamic(() => import('react-quill-new'), { ssr: false, loading: () => <p className="p-4 text-xs text-slate-500">Loading editor…</p> });
+const Quill = dynamic(() => import('react-quill-new'), { ssr: false, loading: () => <PageLoadingSkeleton variant="detail" compact /> });
 const escape = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
 function professionalTemplate(profile: StaffProfile) {
   const lines = [profile.designation, profile.tenant?.name, profile.phone, profile.email].filter((value): value is string => !!value);
@@ -123,7 +124,7 @@ export function EmailSignatureTab({ profile }: { profile: StaffProfile }) {
     } catch { toast.error('Enter a valid HTTPS image URL.'); }
   }
 
-  if (isLoading) return <p className="text-xs text-slate-500 p-5">Loading your signatures…</p>;
+  if (isLoading) return <PageLoadingSkeleton variant="detail" compact />;
   if (error || !data) return <div className="p-5 space-y-3 text-xs"><p>Signatures could not be loaded.</p><Button variant="outline" onClick={() => mutate()}>Try again</Button></div>;
   const selectClass = 'h-9 w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 text-xs';
   const previewDocument = `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>body{font-family:Arial,sans-serif;font-size:12px;color:#334155;padding:16px;line-height:1.5}p{margin:0 0 4px}img{max-width:100%;height:auto}a{color:#1a4fa0}</style></head><body><p>Hi,</p><p>This is how your signature will appear in an email.</p><br>${preview}</body></html>`;

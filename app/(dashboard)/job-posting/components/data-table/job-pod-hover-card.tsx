@@ -1,3 +1,4 @@
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useEffect } from 'react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -101,9 +102,7 @@ export function JobPodHoverCard({
 
           <main className="p-2 max-h-96 overflow-y-auto custom-scrollbar">
             {isLoading ? (
-              <div className="flex items-center justify-center py-6 text-slate-400">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
+              <PageLoadingSkeleton variant="detail" />
             ) : (
               <div className="flex flex-col gap-2">
                 {pods.length > 0 && pods.map((pod) => {

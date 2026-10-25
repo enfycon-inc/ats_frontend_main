@@ -7,7 +7,7 @@ const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 function load(file, imports = {}) {
   const exports = {};
-  new Function('exports', 'require', ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText)(exports, name => name in imports ? imports[name] : require(name));
+  new Function('exports', 'require', ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText)(exports, name => name === '@/components/page-loading-skeleton' ? { PageLoadingSkeleton: () => React.createElement('div', { role: 'status' }) } : name in imports ? imports[name] : require(name));
   return exports;
 }
 const contract = load('lib/notification-preferences.ts');

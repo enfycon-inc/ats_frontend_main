@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
+import Link from "next/link";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { atsApi } from "@/lib/ats-api";
 import DataTable from "@/components/shared/data-table";
@@ -656,21 +658,17 @@ export default function ClientDashboard() {
   };
 
   const topRightActions = (
-    <button
-      onClick={() => router.push("/clients/new")}
+    <Link href="/clients/new" prefetch={true}
       className="flex items-center gap-1 px-2.5 py-1 rounded bg-primary hover:bg-primary/95 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
     >
       <Plus className="h-3 w-3" /> New Client
-    </button>
+    </Link>
   );
 
   return (
     <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
       {isLoading ? (
-        <div className="flex-1 flex flex-col items-center justify-center min-h-[40vh] gap-3">
-          <Loader2 className="h-8 w-8 text-primary animate-spin" />
-          <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">Loading clients...</p>
-        </div>
+        <PageLoadingSkeleton variant="table" />
       ) : (
         <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none overflow-hidden relative font-sans">
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-neutral-200 dark:border-slate-800 bg-white dark:bg-slate-900">

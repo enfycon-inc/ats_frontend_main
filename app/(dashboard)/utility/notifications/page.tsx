@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { activeRoleHeaders } from "@/lib/ats-api";
@@ -488,10 +489,7 @@ export default function AdminNotificationsPage() {
         </div>
 
         {isLoading ? (
-          <div className="py-20 flex flex-col items-center justify-center gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-[#1a4fa0]" />
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">Loading notification audit stream...</p>
-          </div>
+          <PageLoadingSkeleton variant="table" />
         ) : notifications.length === 0 ? (
           <div className="py-16 text-center text-neutral-400 space-y-2">
             <Bell className="w-10 h-10 mx-auto opacity-40 text-neutral-400" />

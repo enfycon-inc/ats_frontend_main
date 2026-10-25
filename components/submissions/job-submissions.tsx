@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
@@ -49,7 +50,7 @@ export function JobSubmissions({ jobId, jobType, market, initialResponse, onSave
     </div>
     {showStageFilters && <div role="group" aria-label="Submission stage" className="flex flex-wrap gap-2">{buckets.map(item => <Button key={item.key} variant={activeBucket === item.key ? 'secondary' : 'outline'} className="h-8 text-xs" aria-pressed={activeBucket === item.key} onClick={() => { setBucket(item.key); setPage(1); }}>{item.label} · {data?.counts[item.key] ?? initialResponse.counts[item.key]}</Button>)}</div>}
     {error ? <div role="alert" className="text-xs">Unable to load candidate submissions. <Button variant="outline" className="text-xs" onClick={() => void mutate()}>Retry</Button></div>
-      : isLoading || !data ? <p role="status" className="py-6 text-xs">Loading submissions…</p>
+      : isLoading || !data ? <PageLoadingSkeleton variant="detail" />
       : <>
         {board && showBoard ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">{buckets.filter(item => item.key !== 'all' && (activeBucket === 'all' || activeBucket === item.key)).map(item => {
           const rows = data.data.filter(sub => submissionBucket(sub) === item.key);

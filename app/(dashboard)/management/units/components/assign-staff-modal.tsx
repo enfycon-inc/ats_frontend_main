@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useEffect, useMemo } from "react";
 import { 
   Users, UserPlus, Search, Check, X, 
@@ -295,12 +296,7 @@ export function AssignStaffModal({
         {/* CANDIDATE STAFF LIST */}
         <div className="flex-1 overflow-y-auto p-4 divide-y divide-neutral-100 dark:divide-slate-800/80">
           {loading ? (
-            <div className="py-16 text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
-              <p className="text-xs text-neutral-500 mt-2 font-medium">
-                Loading candidate staff members...
-              </p>
-            </div>
+            <PageLoadingSkeleton variant="table" />
           ) : filteredCandidates.length === 0 ? (
             <div className="py-16 text-center text-neutral-400">
               <Users className="h-10 w-10 text-neutral-300 dark:text-neutral-600 mx-auto mb-2" />

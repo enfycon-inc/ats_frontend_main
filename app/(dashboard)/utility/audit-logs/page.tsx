@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
@@ -114,28 +115,7 @@ export default function AuditLogsPage() {
   // ─── ACCESS DENIED STATE FOR NORMAL RECRUITERS ────────────────────────────
   if (!loading && !canViewAuditLogs) {
     return (
-      <div className="w-full space-y-6 pb-12">
-
-
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-neutral-200 dark:border-slate-800 p-12 text-center shadow-sm space-y-4 max-w-2xl mx-auto mt-8">
-          <div className="w-14 h-14 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto border border-rose-200 dark:border-rose-800">
-            <Lock className="w-7 h-7" />
-          </div>
-          <div className="space-y-1.5">
-            <h2 className="text-lg font-bold text-neutral-900 dark:text-white">
-              Access Restricted to Administrators
-            </h2>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-              Security and governance audit logs contain confidential system-wide logs, user role assignments, IP history, and compliance records.
-            </p>
-          </div>
-          <div className="pt-2">
-            <Badge variant="outline" className="text-xs text-neutral-500 font-mono py-1 px-3">
-              Required Permission: tenant:audit_logs or ADMIN role
-            </Badge>
-          </div>
-        </div>
-      </div>
+      <PageLoadingSkeleton variant="table" />
     );
   }
 
@@ -231,10 +211,7 @@ export default function AuditLogsPage() {
         </div>
 
         {loading ? (
-          <div className="py-20 flex flex-col items-center justify-center gap-3">
-            <RefreshCw className="w-8 h-8 animate-spin text-[#1a4fa0]" />
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">Loading security audit records...</p>
-          </div>
+          <PageLoadingSkeleton variant="table" />
         ) : filteredLogs.length === 0 ? (
           <div className="py-16 text-center text-neutral-400 space-y-2">
             <ShieldAlert className="w-10 h-10 mx-auto opacity-40 text-neutral-400" />

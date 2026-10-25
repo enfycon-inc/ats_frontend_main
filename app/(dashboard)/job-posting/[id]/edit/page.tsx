@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -14,7 +15,7 @@ function FormLoader() {
   return (
     <div className="flex h-[calc(100vh-100px)] w-full items-center justify-center flex-col gap-3 font-sans bg-slate-50/50 dark:bg-slate-900/10">
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      <span className="text-sm font-bold text-neutral-600 dark:text-neutral-400">Loading Job Requisition...</span>
+      <PageLoadingSkeleton variant="form" />
     </div>
   );
 }

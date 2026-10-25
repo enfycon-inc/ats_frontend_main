@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "prebuild": "node scripts/sync-tenant-branding.cjs --check && node scripts/sync-sign-in-policy.cjs --check && node scripts/sync-job-access.cjs --check && node scripts/sync-notification-preferences.cjs --check"
+    "prebuild": "node scripts/sync-tenant-branding.cjs --check && node scripts/sync-sign-in-policy.cjs --check && node scripts/sync-job-access.cjs --check && node scripts/sync-notification-preferences.cjs --check && node scripts/generate-location-data.cjs",
+    "predev": "node scripts/generate-location-data.cjs"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.19",

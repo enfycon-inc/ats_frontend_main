@@ -1,4 +1,5 @@
 "use client";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { PodFeatureGate } from "@/components/shared/pod-feature-gate";
 
 import { StageBadge, Pipeline } from "@/components/submissions/submission-stage";
@@ -86,7 +87,7 @@ function PersonProfileDialog({ target, onClose }: { target: ProfileTarget; onClo
         <DialogTitle className="text-lg font-bold">{candidate ? "Candidate profile" : "User profile"}</DialogTitle>
         <DialogDescription>{candidate ? "Candidate details for this submission" : "Team member details for this submission"}</DialogDescription>
       </DialogHeader>
-      {loading ? <div role="status" className="p-10 text-center text-sm text-muted-foreground"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading profile…</div> : <div className="space-y-6 px-6 py-6">
+      {loading ? <PageLoadingSkeleton variant="table" /> : <div className="space-y-6 px-6 py-6">
         {error && <div role="alert" className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">{error}</div>}
         <div className="flex items-center gap-4">
           {avatar ? <img src={avatar} alt="" className="h-16 w-16 rounded-full border border-border object-cover" /> : <div aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-blue-50 text-lg font-semibold text-[#1a4fa0]">{fullName.split(/\s+/).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase()}</div>}
@@ -224,7 +225,7 @@ function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
           <span className="block mt-1">{[current?.jobTitle || submission.jobTitle, current?.clientName || submission.clientName].filter(Boolean).join(" · ") || "Job details unavailable"}</span>
         </DialogDescription>
       </DialogHeader>
-      {loadError ? <div role="alert" className="px-6 pb-6 text-xs text-red-700">{loadError}<Button variant="outline" className="ml-2 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : !current ? <div role="status" className="p-8 text-center text-xs text-muted-foreground"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading submission…</div> : !permitted ? <div className="px-6 pb-6 text-xs" role="alert">This action is no longer available. The submission or your permissions may have changed.</div> :
+      {loadError ? <div role="alert" className="px-6 pb-6 text-xs text-red-700">{loadError}<Button variant="outline" className="ml-2 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : !current ? <PageLoadingSkeleton variant="table" /> : !permitted ? <div className="px-6 pb-6 text-xs" role="alert">This action is no longer available. The submission or your permissions may have changed.</div> :
       <form onSubmit={event => { event.preventDefault(); if (action !== "review") void save(); }}>
         <fieldset disabled={saving} className="space-y-4 px-6 pb-6">
           {(action === "schedule" || action === "result" || action === "reject") && round && <div className="space-y-1.5"><Label htmlFor="update-round" className="text-xs">Round</Label><Input id="update-round" readOnly value={round.label} className="text-xs h-9" /></div>}
@@ -394,7 +395,7 @@ function SubmissionsPageContent() {
       <div className="overflow-x-auto">
         <table className="w-full table-fixed border-collapse text-xs [&_th]:border-r [&_th]:border-border [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border [&_td:last-child]:border-r-0 [&_td]:align-middle" style={{ minWidth: columns.reduce((width, column) => width + TRACKER_COLUMN_WIDTHS[column], 0) }}><colgroup>{columns.map(column => <col key={column} style={{ width: TRACKER_COLUMN_WIDTHS[column] }} />)}</colgroup><thead className="select-none border-y border-border"><tr>{headers(() => setPage(1))}</tr></thead>
           <tbody className="divide-y divide-border">
-            {loading || workspaceStatus !== "ready" ? <tr><td colSpan={columns.length} className="py-16 text-center text-muted-foreground" role="status"><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading submissions…</td></tr> : error ? <tr><td colSpan={columns.length} className="py-12 text-center" role="alert">{error}{!error.includes("permission") && <Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button>}</td></tr> : !response?.data.length ? <tr><td colSpan={columns.length} className="py-16 text-center text-muted-foreground">No submissions match these filters.</td></tr> : !groupByJob ? response.data.map(sub => {
+            {loading || workspaceStatus !== "ready" ? <tr><td colSpan={100}><PageLoadingSkeleton variant="compact" /></td></tr> : error ? <tr><td colSpan={columns.length} className="py-12 text-center" role="alert">{error}{!error.includes("permission") && <Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button>}</td></tr> : !response?.data.length ? <tr><td colSpan={columns.length} className="py-16 text-center text-muted-foreground">No submissions match these filters.</td></tr> : !groupByJob ? response.data.map(sub => {
 
               return <tr key={sub.id} className="hover:bg-muted/25">
                 {columns.map(column => renderCell(sub, column))}
@@ -416,7 +417,7 @@ function SubmissionsPageContent() {
         <nav aria-label="Submission pages" className="flex items-center gap-1"><Button variant="outline" size="icon" className="h-8 w-8" aria-label="Previous page" disabled={loading || page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>{response && Array.from({ length: Math.min(5, response.totalPages) }, (_, i) => Math.max(1, Math.min(page - 2, response.totalPages - 4)) + i).map(p => <Button key={p} variant={p === page ? "default" : "outline"} className={cn("h-8 min-w-8 px-2 text-xs", p === page && PRIMARY)} aria-label={`Page ${p}`} aria-current={p === page ? "page" : undefined} disabled={loading} onClick={() => setPage(p)}>{p}</Button>)}<Button variant="outline" size="icon" className="h-8 w-8" aria-label="Next page" disabled={loading || !response || page >= response.totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button></nav>
       </div>
     </section>}
-    {submissionId && (loading ? <div role="status" className="p-12 text-center text-xs">Loading submission…</div> : error ? <div role="alert" className="text-xs">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : detail && <SubmissionDetails submission={detail} onReview={() => setEditor({ submission: detail, action: "review" })} />)}
+    {submissionId && (loading ? <PageLoadingSkeleton variant="table" /> : error ? <div role="alert" className="text-xs">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : detail && <SubmissionDetails submission={detail} onReview={() => setEditor({ submission: detail, action: "review" })} />)}
     {editor && !["review", "notes", "rate"].includes(editor.action) && <UpdateSubmissionDialog key={editor.submission.id} submission={editor.submission} href={detailHref(editor.submission.id)} onReview={() => {
       const targetSub = editor.submission;
       setEditor(null);
@@ -433,4 +434,4 @@ function ScopedSubmissionsPage() {
   const search = useSearchParams();
   return search.get('view') === 'pod' ? <PodFeatureGate><SubmissionsPageContent /></PodFeatureGate> : <SubmissionsPageContent />;
 }
-export default function SubmissionsPage() { return <Suspense fallback={<p role="status" className="p-4 text-xs">Loading submissions…</p>}><ScopedSubmissionsPage /></Suspense>; }
+export default function SubmissionsPage() { return <Suspense fallback={<PageLoadingSkeleton variant="table" />}><ScopedSubmissionsPage /></Suspense>; }

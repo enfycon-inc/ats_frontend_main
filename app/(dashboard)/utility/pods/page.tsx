@@ -1,4 +1,5 @@
 "use client";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { PodFeatureGate } from "@/components/shared/pod-feature-gate";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -563,10 +564,7 @@ function PodsContent() {
   // ── Loading & Guard States ───────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[350px]">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600" />
-        <p className="mt-3 text-xs text-neutral-500 font-semibold tracking-wide">Loading Recruitment Pods…</p>
-      </div>
+      <PageLoadingSkeleton variant="table" />
     );
   }
 

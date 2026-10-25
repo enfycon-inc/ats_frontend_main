@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UnitsContent } from "@/app/(dashboard)/management/units/page";
@@ -1054,57 +1055,42 @@ function BranchManagementPageContent() {
     { key: "DELIVERY_HEAD", label: "Delivery Head", desc: "Monitors overall branch delivery metrics" },
   ];
 
-  if (loading) {
-    return (
-      <div className="p-6 w-full max-w-full space-y-6">
-        <div className="animate-pulse">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-xl border border-neutral-200 dark:border-slate-800 shadow-sm mb-6">
-            <div className="space-y-2">
-              <div className="h-7 w-64 bg-slate-200 dark:bg-slate-700 rounded"></div>
-              <div className="h-4 w-96 bg-slate-100 dark:bg-slate-800 rounded"></div>
-            </div>
-            <div className="flex gap-2">
-              <div className="h-9 w-24 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
-              <div className="h-9 w-32 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
-            </div>
-          </div>
-          
-          <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl overflow-hidden mt-6">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead className="bg-neutral-50/50 dark:bg-slate-850/50 text-neutral-500 font-bold uppercase tracking-wider border-b border-neutral-200 dark:border-slate-800">
-                  <tr>
-                    <th className="py-3.5 px-4 w-10"><div className="h-4 w-4 bg-slate-200 dark:bg-slate-700 rounded mx-auto"></div></th>
-                    <th className="py-3.5 px-4"><div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
-                    <th className="py-3.5 px-4"><div className="h-3 w-16 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
-                    <th className="py-3.5 px-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
-                    <th className="py-3.5 px-4"><div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
-                    <th className="py-3.5 px-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
-                    <th className="py-3.5 px-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
-                    <th className="py-3.5 px-4 text-right"><div className="h-3 w-12 bg-slate-200 dark:bg-slate-700 rounded ml-auto"></div></th>
+  if (loading) (
+        <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl overflow-hidden mt-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs whitespace-nowrap">
+              <thead className="bg-neutral-50/50 dark:bg-slate-850/50 text-neutral-500 dark:text-neutral-400 font-bold uppercase tracking-wider border-b border-neutral-200 dark:border-slate-800">
+                <tr>
+                  <th className="py-3.5 px-4 w-10"><div className="h-4 w-4 bg-slate-200 dark:bg-slate-700 rounded mx-auto"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-16 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4"><div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded"></div></th>
+                  <th className="py-3.5 px-4 text-right"><div className="h-3 w-12 bg-slate-200 dark:bg-slate-700 rounded ml-auto"></div></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100 dark:divide-slate-800">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="py-4 px-4 text-center"><div className="h-4 w-4 bg-slate-200 dark:bg-slate-700 rounded mx-auto"></div></td>
+                    <td className="py-4 px-4"><div className="flex items-center gap-2"><div className="h-6 w-6 rounded-md bg-slate-200 dark:bg-slate-700"></div><div className="h-4 w-28 bg-slate-200 dark:bg-slate-700 rounded"></div></div></td>
+                    <td className="py-4 px-4"><div className="h-5 w-12 bg-blue-100 dark:bg-blue-900/40 rounded"></div></td>
+                    <td className="py-4 px-4"><div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
+                    <td className="py-4 px-4"><div className="h-6 w-16 bg-slate-200 dark:bg-slate-700 rounded-full border border-slate-300 dark:border-slate-600"></div></td>
+                    <td className="py-4 px-4"><div className="h-4 w-28 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
+                    <td className="py-4 px-4"><div className="flex items-center gap-1"><div className="h-4 w-4 rounded-full bg-slate-200 dark:bg-slate-700"></div><div className="h-4 w-12 bg-slate-200 dark:bg-slate-700 rounded"></div></div></td>
+                    <td className="py-4 px-4"><div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
+                    <td className="py-4 px-4 text-right"><div className="h-6 w-6 bg-slate-200 dark:bg-slate-700 rounded ml-auto"></div></td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100 dark:divide-slate-800">
-                  {Array.from({ length: 6 }).map((_, idx) => (
-                    <tr key={idx}>
-                      <td className="py-4 px-4 text-center"><div className="h-4 w-4 bg-slate-200 dark:bg-slate-700 rounded mx-auto"></div></td>
-                      <td className="py-4 px-4"><div className="flex items-center gap-2"><div className="h-6 w-6 rounded-md bg-slate-200 dark:bg-slate-700"></div><div className="h-4 w-28 bg-slate-200 dark:bg-slate-700 rounded"></div></div></td>
-                      <td className="py-4 px-4"><div className="h-5 w-12 bg-blue-100 dark:bg-blue-900/40 rounded"></div></td>
-                      <td className="py-4 px-4"><div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
-                      <td className="py-4 px-4"><div className="h-6 w-16 bg-slate-200 dark:bg-slate-700 rounded-full border border-slate-300 dark:border-slate-600"></div></td>
-                      <td className="py-4 px-4"><div className="h-4 w-28 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
-                      <td className="py-4 px-4"><div className="flex items-center gap-1"><div className="h-4 w-4 rounded-full bg-slate-200 dark:bg-slate-700"></div><div className="h-4 w-12 bg-slate-200 dark:bg-slate-700 rounded"></div></div></td>
-                      <td className="py-4 px-4 text-right"><div className="h-6 w-6 bg-slate-200 dark:bg-slate-700 rounded ml-auto"></div></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
-    );
-  }
+      )
 
   return (
     <div className="p-6 w-full max-w-full space-y-6">
@@ -1114,7 +1100,7 @@ function BranchManagementPageContent() {
           {selectedBranch && canEditBranchFunc(selectedBranch.id) && <Button variant="outline" onClick={() => openBranchRemarksModal(selectedBranch)}><MessageSquare className="h-4 w-4 mr-2" />Add / Manage Remarks</Button>}
         </div>
       )}
-      {loading && <p className="text-xs text-neutral-500">Loading branch settings...</p>}
+      {loading && <PageLoadingSkeleton variant="form" />}
       {!loading && ownBranchSettings && !selectedBranch && <p role="alert" className="text-sm text-neutral-600">{formError || 'No branch is assigned to your account.'}</p>}
       {!loading && isTenantManager && <>
       
@@ -2423,10 +2409,7 @@ function BranchManagementPageContent() {
             {/* MODAL BODY */}
             <div className="p-6 space-y-4 overflow-y-auto flex-1">
               {membersLoading ? (
-                <div className="flex flex-col items-center justify-center py-12 text-neutral-400 gap-2">
-                  <Loader2 className="h-6 w-6 animate-spin text-[#1a4fa0]" />
-                  <span className="text-xs font-medium">Loading staff members...</span>
-                </div>
+                <PageLoadingSkeleton variant="form" />
               ) : branchMembers.filter((u: any) => u.isActive !== false && u.is_active !== false).length === 0 ? (
                 <div className="text-center py-12 border border-dashed border-neutral-200 dark:border-slate-800 rounded-xl bg-neutral-50/50 dark:bg-slate-850/40 p-6 space-y-2">
                   <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-slate-800 text-neutral-400 mx-auto flex items-center justify-center">
@@ -2676,7 +2659,7 @@ function BranchManagementPageContent() {
               )}
 
               {membersLoading ? (
-                <div className="text-center py-8 text-xs text-neutral-400">Loading user list...</div>
+                <PageLoadingSkeleton variant="form" />
               ) : (() => {
                 const belongsToBranch = (u: any) => {
                   const perms: string[] = Array.isArray(u.permissions) ? u.permissions : [];
@@ -3194,10 +3177,7 @@ function BranchManagementPageContent() {
             {/* Modal Body - 2 Columns */}
             <div className="p-6 overflow-y-auto flex-1 bg-slate-50/40 dark:bg-slate-900/40">
               {loadingRemarks ? (
-                <div className="p-12 text-center text-xs text-slate-400 italic">
-                  <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  Loading templates...
-                </div>
+                <PageLoadingSkeleton variant="form" />
               ) : (
                 <div className="grid grid-cols-1 gap-5 items-start">
                   
@@ -4410,7 +4390,7 @@ export default function BranchManagementPage() {
       fallback={
         <div className="p-12 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="text-xs text-neutral-500 mt-2 font-medium">Loading branch management...</p>
+          <PageLoadingSkeleton variant="form" />
         </div>
       }
     >

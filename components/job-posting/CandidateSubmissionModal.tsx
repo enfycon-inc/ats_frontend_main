@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -103,7 +104,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
       let parsedLocation = typeof parsedLocationObj === 'object' && parsedLocationObj !== null && !Array.isArray(parsedLocationObj)
         ? (parsedLocationObj.raw || parsedLocationObj.canonical)
         : (Array.isArray(parsedLocationObj) && parsedLocationObj.length > 0 ? (parsedLocationObj[0]?.raw || parsedLocationObj[0]?.canonical) : '');
-      parsedLocation = normalizeCandidateLocation(parsed?.location || parsedLocation || "", job?.market?.toUpperCase() === "US" ? "US" : "IN");
+      parsedLocation = await normalizeCandidateLocation(parsed?.location || parsedLocation || "", job?.market?.toUpperCase() === "US" ? "US" : "IN");
 
       let parsedSkills = parsed.skills ? parsed.skills.join(", ") : "";
       
@@ -372,7 +373,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
 
           {/* RIGHT: Componentized Form Pane (50%) */}
           <div className="w-full lg:w-1/2 p-0 bg-white dark:bg-slate-900 relative">
-            {candidateLoading && <p role="status" className="p-4">Loading candidate details…</p>}
+            {candidateLoading && <PageLoadingSkeleton variant="detail" compact />}
             {candidateError && <p role="alert" className="p-4 text-red-700">{candidateError}. Close and reopen to retry.</p>}
             <SubmissionForm
               formData={formData} 

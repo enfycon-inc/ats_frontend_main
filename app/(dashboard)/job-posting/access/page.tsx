@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Pencil, Shield, UserPlus, X } from "lucide-react";
 import toast from "react-hot-toast";
@@ -193,7 +194,7 @@ export default function JobCreationAccessPage() {
         <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white">Authorized colleagues</h2>
         </div>
-        {loading ? <div className="flex h-28 items-center justify-center text-sm text-slate-500"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading access</div> : grants.length ? (
+        {loading ? <PageLoadingSkeleton variant="table" /> : grants.length ? (
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {grants.map((grant) => {
               const expired = !!grant.expiresAt && new Date(grant.expiresAt) <= new Date();

@@ -1,3 +1,4 @@
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -75,7 +76,7 @@ export function CrossBranchApprovalsView() {
       </CardHeader>
       <CardContent className="p-0">
         {loading ? (
-          <div className="p-16 text-center text-sm text-default-500">Loading requests...</div>
+          <PageLoadingSkeleton variant="table" />
         ) : pendingRequests.length === 0 ? (
           <div className="p-16 text-center flex flex-col items-center justify-center">
             <div className="inline-flex h-16 w-16 rounded-full bg-slate-50 dark:bg-slate-900 text-slate-400 items-center justify-center text-3xl mb-4">

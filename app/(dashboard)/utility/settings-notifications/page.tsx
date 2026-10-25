@@ -1,4 +1,5 @@
 "use client";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { useEffect, useState } from 'react';
 
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -27,7 +28,7 @@ export default function NotificationSettingsPage() {
   };
   const row = (label: string, checked: boolean, onChange: (value: boolean) => void) => <div className="flex items-center justify-between gap-4 border-b border-neutral-100 py-3 last:border-0 dark:border-slate-800"><span className="text-xs font-medium">{label}</span><Switch aria-label={label} checked={checked} onCheckedChange={onChange} disabled={saving} /></div>;
   if (settingsError) return <p role="alert" className="p-4 text-xs">Could not load notification preferences. Refresh to retry.</p>;
-  if (settingsLoading) return <p role="status" className="p-4 text-xs">Loading your notification preferences...</p>;
+  if (settingsLoading) return <PageLoadingSkeleton variant="form" />;
   return <div className="space-y-4 pb-8">
 
     <div className="flex items-center justify-between gap-4"><div><p className="text-xs text-neutral-500">Personal settings for emails, notification sounds and in-app popups.</p></div><Button className="h-9 bg-[#1a4fa0] text-xs" onClick={save} disabled={saving || !dirty}>{saving ? 'Saving...' : 'Save Preferences'}</Button></div>

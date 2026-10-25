@@ -60,3 +60,6 @@ desktop.ini
 
 # Temporary validation/scratch folders
 .contact-validation/
+
+# Generated from country-state-city before dev/build
+/public/locations/

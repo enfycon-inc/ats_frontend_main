@@ -1,4 +1,5 @@
 "use client";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { warnIfEmailFailed } from "@/lib/email-notification";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -378,12 +379,7 @@ export default function ApprovalsPage() {
 
   if (loading) {
     return (
-      <div>
-        <div className="flex flex-col items-center justify-center min-h-[300px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          <p className="mt-4 text-sm text-default-500">Loading configurations...</p>
-        </div>
-      </div>
+      <PageLoadingSkeleton variant="table" />
     );
   }
 
@@ -902,10 +898,7 @@ export default function ApprovalsPage() {
               </h4>
 
               {usersLoading ? (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                  <p className="mt-3 text-xs text-slate-500">Retrieving workspace staff members...</p>
-                </div>
+                <PageLoadingSkeleton variant="detail" />
               ) : tenantUsers.length === 0 ? (
                 <div className="text-center py-16 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
                   <div className="inline-flex h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 items-center justify-center text-xl mb-3">

@@ -1,4 +1,5 @@
 'use client';
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -106,7 +107,7 @@ function ResumePagesContent({ candidateId }: { candidateId: string | number }) {
         </Button>
       </div>
     ) : !pages ? (
-      <p role="status" className="p-4 text-sm">Loading resume…</p>
+      <PageLoadingSkeleton variant="detail" compact />
     ) : <>
       {firstPage > 0 && <div aria-hidden="true" style={{ height: offsets[firstPage] }} />}
       {Array.from({ length: endPage - firstPage }, (_, offset) => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useEffect, useState, useMemo } from "react";
 import SiteBreadcrumb from "@/components/site-breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -209,7 +210,7 @@ function PodLeadDashboardView({ profile, jobs, activeJobs }: { profile: any; job
         </CardHeader>
         <CardContent className="p-0">
           {loadingSubs ? (
-            <div className="p-8 text-center text-xs text-default-400">Loading pod submissions...</div>
+            <PageLoadingSkeleton variant="table" />
           ) : podSubmissions.length === 0 ? (
             <div className="p-8 text-center text-xs text-default-400">No candidate submissions recorded for your pod yet.</div>
           ) : (
@@ -488,7 +489,7 @@ function RecruiterDashboardView({ profile, jobs, activeJobs }: { profile: any; j
             </CardHeader>
             <CardContent className="p-0 flex-1">
               {loadingSubs ? (
-                <div className="p-6 text-center text-xs text-default-400">Loading submissions...</div>
+                <PageLoadingSkeleton variant="table" />
               ) : mySubmissions.length === 0 ? (
                 <div className="p-8 text-center text-xs text-default-400">No candidate submissions recorded yet.</div>
               ) : (
