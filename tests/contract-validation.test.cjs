@@ -6,12 +6,13 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const pairs = [
+  ['notifications/notification-preferences.ts', 'lib/notification-preferences.ts'],
   ['auth/tenant-branding-contract.ts', 'lib/tenant-branding-contract.ts'],
   ['auth/sign-in-policy.ts', 'lib/sign-in-policy.ts'],
   ['jobs/job-capabilities.ts', 'lib/job-capabilities.ts'],
   ['auth/job-access-grants.ts', 'lib/job-access-grants.ts'],
 ];
-const scripts = ['sync-tenant-branding.cjs', 'sync-sign-in-policy.cjs', 'sync-job-access.cjs'];
+const scripts = ['sync-notification-preferences.cjs', 'sync-tenant-branding.cjs', 'sync-sign-in-policy.cjs', 'sync-job-access.cjs'];
 function fixture(t, backend = false) {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'ats-contract-validation-'));
   t.after(() => {
@@ -41,7 +42,7 @@ test('each contract fails standalone validation when modified', t => {
   pairs.forEach(([, target], i) => {
     const file = path.join(f.frontend, target), original = fs.readFileSync(file, 'utf8');
     fs.writeFileSync(file, original + '// changed\n');
-    const result = f.run(scripts[Math.min(i, 2)], '--check');
+    const result = f.run(scripts[Math.min(i, 3)], '--check');
     assert.notEqual(result.status, 0); assert.match(result.stderr, /checksum mismatch/);
     fs.writeFileSync(file, original);
   });
@@ -57,11 +58,11 @@ test('canonical validation detects drift and synchronization updates its checksu
   const f = fixture(t, true);
   for (const script of scripts) assert.equal(f.run(script, '--check-backend').status, 0);
   fs.appendFileSync(path.join(f.temp, 'ats_backend/src/auth/sign-in-policy.ts'), '// new canonical policy\n');
-  const changed = f.run(scripts[1], '--check-backend');
+  const changed = f.run(scripts[2], '--check-backend');
   assert.notEqual(changed.status, 0); assert.match(changed.stderr, /Canonical backend contract differs/);
-  assert.equal(f.run(scripts[1]).status, 0);
-  assert.equal(f.run(scripts[1], '--check').status, 0);
-  assert.equal(f.run(scripts[1], '--check-backend').status, 0);
+  assert.equal(f.run(scripts[2]).status, 0);
+  assert.equal(f.run(scripts[2], '--check').status, 0);
+  assert.equal(f.run(scripts[2], '--check-backend').status, 0);
 });
 test('line endings do not cause cross-platform false failures', t => {
   const f = fixture(t, true);

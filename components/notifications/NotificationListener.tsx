@@ -1,5 +1,6 @@
 "use client";
 
+import { activityEnabled } from '@/lib/notification-preferences';
 import React, { useEffect } from "react";
 import { useSocket } from "@/contexts/SocketContext";
 import { useNotifications, NotificationItem } from "@/contexts/NotificationContext";
@@ -14,10 +15,10 @@ export default function NotificationListener() {
   const seenIds = React.useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!socket || !isConnected) return;
+    if (typeof window === 'undefined') return;
 
     const handleToastNotification = (notif: NotificationItem) => {
-      if (!settings.toastEnabled) return;
+      if (!settings.toastEnabled || !activityEnabled(notif.type, settings)) return;
 
       // 1. Deduplicate by notification ID
       if (notif.id) {
@@ -136,12 +137,13 @@ export default function NotificationListener() {
       );
     };
 
-    socket.on("notification", handleToastNotification);
+    const incoming = (event: Event) => handleToastNotification((event as CustomEvent<NotificationItem>).detail);
+    window.addEventListener('atsNotificationReceived', incoming);
 
     return () => {
-      socket.off("notification", handleToastNotification);
+      window.removeEventListener('atsNotificationReceived', incoming);
     };
-  }, [socket, isConnected, settings.toastEnabled, markAsRead, router]);
+  }, [settings, markAsRead, router]);
 
   return null;
 }

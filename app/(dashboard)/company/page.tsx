@@ -68,6 +68,8 @@ function CompanySettingsContent() {
   const [companyName, setCompanyName] = useState("");
     const [siteTitle, setSiteTitle] = useState("");
     const [logoUrl, setLogoUrl] = useState("");
+    const [companyProfileFeedback, setCompanyProfileFeedback] = useState<{ message: string; error: boolean } | null>(null);
+    const [compactLogoUrl, setCompactLogoUrl] = useState("");
     const [loginLogoUrl, setLoginLogoUrl] = useState("");
     const [savingCompanyProfile, setSavingCompanyProfile] = useState(false);
   const [podSystemEnabled, setPodSystemEnabled] = useState(true);
@@ -153,6 +155,7 @@ function CompanySettingsContent() {
           setCompanyName(profileData.tenant.name || "");
           setSiteTitle(profileData.tenant.siteTitle || "");
           setLogoUrl(profileData.tenant.logoUrl || "");
+          setCompactLogoUrl(profileData.tenant.compactLogoUrl || "");
           setLoginLogoUrl(profileData.tenant.loginLogoUrl || "");
           setSubdomain(profileData.tenant.domain || "");
           setOriginalSubdomain(profileData.tenant.domain || "");
@@ -244,19 +247,22 @@ function CompanySettingsContent() {
   const handleSaveCompanyProfile = async () => {
     try {
       setSavingCompanyProfile(true);
+      setCompanyProfileFeedback(null);
       const saved = await atsApi.auth.updateMySettings({
         name: companyName,
         siteTitle: siteTitle,
         logoUrl: logoUrl,
+        compactLogoUrl,
         loginLogoUrl: loginLogoUrl
       });
       
       setLogoUrl(saved.logo_url || '');
+      setCompactLogoUrl(saved.compact_logo_url || '');
       setLoginLogoUrl(saved.login_logo_url || '');
-      updateBranding({ name: saved.name, siteTitle: saved.site_title || '', logoUrl: saved.logo_url || '', loginLogoUrl: saved.login_logo_url || '' });
-      toast.success("Company profile saved successfully!");
+      updateBranding({ name: saved.name, siteTitle: saved.site_title || '', logoUrl: saved.logo_url || '', loginLogoUrl: saved.login_logo_url || '', compactLogoUrl: saved.compact_logo_url || '' });
+      setCompanyProfileFeedback({ message: "Company profile saved successfully.", error: false });
     } catch (err: any) {
-      toast.error(err.message || "Failed to save company profile");
+      setCompanyProfileFeedback({ message: err.message || "Failed to save company profile", error: true });
     } finally {
       setSavingCompanyProfile(false);
     }
@@ -451,6 +457,9 @@ function CompanySettingsContent() {
           setSiteTitle={setSiteTitle}
           logoUrl={logoUrl}
           setLogoUrl={setLogoUrl}
+          companyProfileFeedback={companyProfileFeedback}
+          compactLogoUrl={compactLogoUrl}
+          setCompactLogoUrl={setCompactLogoUrl}
           loginLogoUrl={loginLogoUrl}
           setLoginLogoUrl={setLoginLogoUrl}
           savingCompanyProfile={savingCompanyProfile}
@@ -602,6 +611,9 @@ function TenantAdminSettingsView(props: any) {
             setSiteTitle={props.setSiteTitle}
             logoUrl={props.logoUrl}
             setLogoUrl={props.setLogoUrl}
+            companyProfileFeedback={props.companyProfileFeedback}
+            compactLogoUrl={props.compactLogoUrl}
+            setCompactLogoUrl={props.setCompactLogoUrl}
             loginLogoUrl={props.loginLogoUrl}
             setLoginLogoUrl={props.setLoginLogoUrl}
             savingCompanyProfile={props.savingCompanyProfile}

@@ -3,13 +3,8 @@
  * Synthesizes crisp notification tones in real-time without requiring any external mp3/wav files.
  */
 
-export type SoundPreset = 
-  | 'CLASSIC_CHIME'
-  | 'GENTLE_BELL'
-  | 'DIGITAL_PING'
-  | 'SUBTLE_POP'
-  | 'ZEN_GONG'
-  | 'MUTE';
+import { SOUND_PRESETS } from './notification-preferences';
+export type SoundPreset = typeof SOUND_PRESETS[number];
 
 export interface SoundOption {
   id: SoundPreset;

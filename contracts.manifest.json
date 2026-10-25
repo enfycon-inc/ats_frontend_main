@@ -1,9 +1,10 @@
 {
   "version": 1,
   "files": {
-    "lib/tenant-branding-contract.ts": "16edfc983c0ec327b2c594710756f434dc73423f674de6202ae8d521d0a0e0db",
+    "lib/tenant-branding-contract.ts": "72c2651343f41dc47d0ebc65ab8d103343e2ffb983763dce2516a7b0cd32747d",
     "lib/sign-in-policy.ts": "b7a4984fd2cb62e6e0814739cda9fc57ee144326ca2f3c8ccb3ed2db8ea193fb",
     "lib/job-capabilities.ts": "278defd70b11ca0541716843010a98b6d98f896812ac5346da8c0cd752105593",
-    "lib/job-access-grants.ts": "20adc3c38d10e7e09f03b39473330fff3d5e4a00e0bcd4a4584c1acedb1610c2"
+    "lib/job-access-grants.ts": "20adc3c38d10e7e09f03b39473330fff3d5e4a00e0bcd4a4584c1acedb1610c2",
+    "lib/notification-preferences.ts": "9657021b4788f6f68a216a90ed04df3a03090c0795a52cfcd940bae406865a25"
   }
 }

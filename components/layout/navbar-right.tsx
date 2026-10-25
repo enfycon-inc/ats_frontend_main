@@ -127,6 +127,8 @@ function NotificationDropdownNav() {
     markAllAsRead,
     settings,
     setSoundEnabled,
+    settingsLoading,
+    settingsError,
   } = useNotifications();
   const { isConnected } = useSocket();
 
@@ -349,6 +351,7 @@ function NotificationDropdownNav() {
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
+                disabled={settingsLoading || settingsError}
                 onClick={() => setSoundEnabled(!settings.soundEnabled)}
                 title={settings.soundEnabled ? "Mute notification sounds" : "Enable notification sounds"}
                 className="p-1 rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors"

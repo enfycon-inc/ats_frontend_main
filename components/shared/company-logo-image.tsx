@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useState, type SyntheticEvent, type ReactNode } from 'react';
 import { visibleLogoBounds } from '@/lib/logo-bounds';
 
 type Dimensions = { width: number; height: number };
 
 // Fit the visible artwork into its slot, without altering the uploaded file.
-export function CompanyLogoImage({ src, alt, className, onDimensions }: {
-  src: string; alt: string; className?: string; onDimensions?: (size: Dimensions) => void;
+export function CompanyLogoImage({ src, alt, className, onDimensions, fallback }: {
+  src: string; alt: string; className?: string; onDimensions?: (size: Dimensions) => void; fallback?: ReactNode;
 }) {
   const [measured, setMeasured] = useState<{ src: string; size: Dimensions; viewBox: string; intrinsic?: Dimensions } | null>(null);
   const [failure, setFailure] = useState({ src, attempts: 0 });
@@ -66,7 +66,7 @@ export function CompanyLogoImage({ src, alt, className, onDimensions }: {
   function measure(event: SyntheticEvent<HTMLImageElement>) { measureImage(event.currentTarget); }
 
 
-  if (attempts > 2 || attempts > retryCount) return <span role="img" aria-label={alt} className={`${className || ''} flex items-center text-xs`}>{alt}</span>;
+  if (attempts > 2 || attempts > retryCount) return fallback ? <>{fallback}</> : <span role="img" aria-label={alt} className={`${className || ''} flex items-center text-xs`}>{alt}</span>;
   if (!measured || measured.src !== src) {
     // Keep artwork visible while measuring; failures must never leave a hidden slot.
     return <img key={imageSrc} ref={imageRef} src={imageSrc} alt={alt} onLoad={measure} onError={failed} className={`${className || ''} object-contain object-left`} />;

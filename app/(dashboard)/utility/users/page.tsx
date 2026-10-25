@@ -1079,6 +1079,8 @@ export default function UserManagementPage() {
       });
       if (approval?.emailNotification?.status === "failed") {
         toast.error(approval.emailNotification.message || "User approved, but the welcome email could not be sent.");
+      } else if (approval?.emailNotification?.status === "queued") {
+        toast.success("User approved. Notification emails queued.");
       } else if (approval?.emailNotification?.status === "accepted") {
         toast.success(`User ${reviewUser.fullName || reviewUser.email} approved. Welcome email sent.`);
       } else {

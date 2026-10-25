@@ -3,6 +3,7 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 
 const contracts = {
+  notifications: [['notifications/notification-preferences.ts', 'lib/notification-preferences.ts']],
   branding: [['auth/tenant-branding-contract.ts', 'lib/tenant-branding-contract.ts']],
   signIn: [['auth/sign-in-policy.ts', 'lib/sign-in-policy.ts']],
   jobAccess: [['jobs/job-capabilities.ts', 'lib/job-capabilities.ts'], ['auth/job-access-grants.ts', 'lib/job-access-grants.ts']],
