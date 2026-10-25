@@ -12,7 +12,7 @@ export default function DocumentsPage() {
           <FileText className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Documents Center</h1>
+
           <p className="text-xs text-slate-500">Manage tenant onboarding documents, contracts, and templates</p>
         </div>
       </div>

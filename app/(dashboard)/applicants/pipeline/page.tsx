@@ -258,7 +258,7 @@ export default function PipelinePage() {
             <Icon icon="heroicons:view-columns" className="h-3.5 w-3.5" />
             Candidate Pipeline Tracking
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Interactive Drag-and-Drop Pipeline Board</h1>
+
           <p className="text-slate-300 text-sm mt-1 max-w-xl">
             Drag candidates across stages. Account Managers, BDMs, and Team Leads can log L1, L2, L3 interviewer feedback and client comments.
           </p>

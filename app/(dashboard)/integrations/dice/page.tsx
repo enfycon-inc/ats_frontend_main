@@ -143,10 +143,7 @@ export default function DiceIntegrationPage() {
               {mode === "LIVE" ? "Live OAuth 2.0 API Active" : "Sandbox / Demo Mode"}
             </Badge>
           </div>
-          <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-            <Database className="h-6 w-6 text-red-500" />
-            Dice.com Talent Sourcing & Job Syndication
-          </h1>
+
           <p className="text-xs text-slate-300 max-w-xl">
             Search Dice’s premier US IT resume database, view profile details, and 1-click import candidates directly into your ATS pool with automated de-duplication.
           </p>

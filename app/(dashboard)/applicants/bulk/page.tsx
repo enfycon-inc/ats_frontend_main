@@ -203,12 +203,9 @@ export default function BulkUploadPage() {
               <Zap className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-neutral-900 dark:text-white flex items-center gap-2 tracking-tight">
-                Batch Resume Parsing Engine
-                <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 text-[10px] font-bold px-2 py-0.5 border border-indigo-200 dark:border-indigo-800">
+              <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 text-[10px] font-bold px-2 py-0.5 border border-indigo-200 dark:border-indigo-800">
                   HIGH-SCALE PARSER
                 </Badge>
-              </h1>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 font-medium">
                 High-throughput bulk CV parsing, deduplication, and candidate entity extraction queue
               </p>

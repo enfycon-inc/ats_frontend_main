@@ -1628,9 +1628,7 @@ const getInitialActiveBranchContext = () => {
       {activeWorkflow === "landing" && (
         <div className="flex-1 flex flex-col items-center justify-center p-8">
           <div className="text-center max-w-xl space-y-2 mb-8 animate-fadeIn">
-            <h1 className="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">
-              Create New Job Requirement
-            </h1>
+
             <p className="text-sm text-neutral-500 font-medium">
               Select a requirement sourcing method below to begin the job posting workflow.
             </p>

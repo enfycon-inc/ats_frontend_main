@@ -208,9 +208,7 @@ export default function EditClientCRMPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-                <Building className="h-5 w-5 text-indigo-600" /> Edit Client Account CRM
-              </h1>
+
               <p className="text-xs text-neutral-500">Updating master account record for <strong className="text-neutral-800 dark:text-white">{formData.client_name}</strong></p>
             </div>
           </div>

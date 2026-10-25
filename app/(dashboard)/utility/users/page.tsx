@@ -1736,9 +1736,7 @@ export default function UserManagementPage() {
       {/* STANDARD PAGE HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-default-200">
         <div>
-          <h1 className="text-xl font-bold text-default-900 flex items-center gap-2">
-            <Users className="h-5 w-5 text-indigo-600" /> Users & Teams
-          </h1>
+
           <p className="text-xs text-default-500 mt-1">
             Manage employee profiles, branch office assignments, and seat licensing for <span className="font-semibold text-default-800">{profile?.tenant?.name || "your company workspace"}</span>.
           </p>

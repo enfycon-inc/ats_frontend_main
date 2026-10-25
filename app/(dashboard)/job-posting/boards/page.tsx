@@ -14,7 +14,7 @@ export default function JobBoardsPage() {
       <div className="p-4 bg-purple-50 dark:bg-purple-955/20 text-purple-600 dark:text-purple-400 rounded-full">
         <Globe className="h-10 w-10" />
       </div>
-      <h1 className="text-xl font-bold text-neutral-800 dark:text-neutral-100">External Job Boards Integration</h1>
+
       <p className="text-neutral-500 dark:text-neutral-400 text-sm max-w-sm">
         Connect and post job requirements to external portals like LinkedIn, Indeed, and ZipRecruiter.
       </p>

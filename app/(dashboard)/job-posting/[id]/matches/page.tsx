@@ -174,9 +174,9 @@ export default function JobMatchesPage() {
                 </span>
               )}
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
+            <h2 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
               {job ? job.jobTitle : "Candidate Matches"}
-            </h1>
+            </h2>
             {job && (
               <p className="text-xs font-medium text-neutral-500 mt-0.5">
                 {job.jobCode} · {job.client} · {job.location}

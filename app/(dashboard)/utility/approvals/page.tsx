@@ -409,10 +409,7 @@ export default function ApprovalsPage() {
     <div>
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-default-900 flex items-center gap-2">
-            <Icon icon="heroicons:shield-check" className="text-indigo-600 h-7 w-7" />
-            Platform Tenant & Markets Panel
-          </h1>
+
           <p className="text-sm text-default-600 mt-1">
             Approve pending user accounts, view active tenants, and configure their operating recruitment markets.
           </p>

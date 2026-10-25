@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import DashboardBreadcrumb from "@/components/layout/dashboard-breadcrumb";
+
 import { 
   Shield, 
   RefreshCw, 
@@ -115,7 +115,7 @@ export default function AuditLogsPage() {
   if (!loading && !canViewAuditLogs) {
     return (
       <div className="w-full space-y-6 pb-12">
-        <DashboardBreadcrumb title="Security Audit Logs" text="Operations & Logs" />
+
 
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-neutral-200 dark:border-slate-800 p-12 text-center shadow-sm space-y-4 max-w-2xl mx-auto mt-8">
           <div className="w-14 h-14 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto border border-rose-200 dark:border-rose-800">
@@ -141,7 +141,7 @@ export default function AuditLogsPage() {
 
   return (
     <div className="w-full space-y-6 pb-12">
-      <DashboardBreadcrumb title="Security Audit Logs" text="Operations & Logs" />
+
 
       {/* ─── ENTERPRISE HEADER ──────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-xl border border-neutral-200 dark:border-slate-800 shadow-sm">
@@ -151,9 +151,7 @@ export default function AuditLogsPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-neutral-900 dark:text-white">
-                Security & Compliance Audit Logs
-              </h1>
+
               <Badge variant="outline" className="text-[11px] font-normal border-blue-200 dark:border-blue-900/50 text-[#1a4fa0] dark:text-blue-300">
                 Immutable Log
               </Badge>

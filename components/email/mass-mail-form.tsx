@@ -396,9 +396,7 @@ export function MassMailForm() {
       {/* STANDARD PAGE HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-default-200 dark:border-slate-800">
         <div>
-          <h1 className="text-xl font-bold text-default-900 dark:text-white flex items-center gap-2">
-            <Mail className="h-5 w-5 text-indigo-600" /> Mass Email Campaigns
-          </h1>
+
           <p className="text-xs text-default-500 dark:text-neutral-400 mt-1">
             Send personalized bulk emails to candidates and track engagement.
           </p>

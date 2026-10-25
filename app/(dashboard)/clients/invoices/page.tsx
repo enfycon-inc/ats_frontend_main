@@ -80,9 +80,7 @@ export default function ClientInvoicesPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-xl font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-indigo-600" /> Placement Billing &amp; Invoices Tracker
-              </h1>
+
               <p className="text-xs text-neutral-500 mt-0.5">
                 Track placement billing records, due dates, revenue collection, and payment statuses across client accounts.
               </p>

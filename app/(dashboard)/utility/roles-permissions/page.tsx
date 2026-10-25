@@ -988,9 +988,7 @@ export default function RolesPermissionsPage() {
       {/* ─── PAGE HEADER & TOOLBAR ─────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-default-150 pb-5">
         <div>
-          <h1 className="text-xl font-bold text-neutral-900 dark:text-white">
-            Custom Staffing Roles
-          </h1>
+
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
             Build and manage branch operational staffing roles, permission policies, and user assignments.
           </p>

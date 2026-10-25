@@ -163,7 +163,7 @@ export default function JobCreationAccessPage() {
       <header className="flex items-start gap-3">
         <span className="rounded-lg bg-blue-50 p-2.5 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"><Shield className="h-5 w-5" /></span>
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Job creation access</h1>
+
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Authorize a colleague to create jobs for an account manager. You can revoke access at any time.</p>
         </div>
       </header>

@@ -238,7 +238,7 @@ export default function CalendarPage() {
 
   return <main className="space-y-4 p-5 text-foreground sm:p-6">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h1 className="text-lg font-bold tracking-tight">Interview Calendar</h1><p className="text-xs text-muted-foreground">View and manage scheduled interviews across submissions visible to you.</p></div>
+      <div><p className="text-xs text-muted-foreground">View and manage scheduled interviews across submissions visible to you.</p></div>
       {hasSchedulePermission && canViewCalendar && <Button onClick={() => void openSubmissionPicker()} className="h-9 bg-[#1a4fa0] text-xs text-white hover:bg-[#154181]"><Plus className="mr-1.5 h-4 w-4" />Schedule Interview</Button>}
     </div>
 

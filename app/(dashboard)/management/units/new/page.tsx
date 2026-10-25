@@ -240,9 +240,7 @@ function CreateUnitContent() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 dark:border-slate-800 pb-5">
         <div className="space-y-1">
-          <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
-            <Layers className="h-5 w-5 text-blue-600" /> Create Branch Unit
-          </h1>
+
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             Establish a new branch unit, configure operating shifts, market segment, and unit-isolated job routing policies.
           </p>

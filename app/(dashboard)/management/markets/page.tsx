@@ -95,9 +95,7 @@ export default function MarketsManagementPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-lg font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-            <Globe className="h-5 w-5 text-indigo-600" /> Market Segments
-          </h1>
+
           <p className="text-xs text-neutral-500 mt-1">
             Standard platform market segments. Enable or disable markets globally to control which markets are available for Tenant Admins when creating Business Units.
           </p>

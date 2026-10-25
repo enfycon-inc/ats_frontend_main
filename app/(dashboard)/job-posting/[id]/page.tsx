@@ -411,9 +411,9 @@ export default function JobDetailPage() {
                   🔥 {job.priority || "Warm"}
                 </Badge>
               </div>
-              <h1 className="text-xl font-black text-neutral-900 dark:text-white mb-2">
+              <h2 className="text-xl font-black text-neutral-900 dark:text-white mb-2">
                 {job.jobTitle}
-              </h1>
+              </h2>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-neutral-500 font-medium">
                 <span className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-neutral-400" /> {job.client} {job.clientJobId !== "N/A" ? `→ ${job.clientJobId}` : ""}</span>
                 <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-neutral-400" /> {jobLocationDisplay(job)}</span>

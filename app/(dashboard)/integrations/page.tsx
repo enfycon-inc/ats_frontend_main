@@ -90,10 +90,7 @@ export default function IntegrationsHubPage() {
               SaaS Ecosystem Hub
             </span>
           </div>
-          <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-            <Cpu className="h-6 w-6 text-indigo-400" />
-            Integrations & Partner Marketplace
-          </h1>
+
           <p className="text-xs text-slate-300 max-w-2xl">
             Connect your ATS workspace with job boards, identity providers, video interviewing suites, and mass outreach tools.
           </p>

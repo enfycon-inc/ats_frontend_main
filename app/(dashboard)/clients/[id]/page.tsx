@@ -332,9 +332,9 @@ export default function ClientDetailPage() {
                 </Badge>
               </div>
 
-              <h1 className="text-2xl font-black text-neutral-900 dark:text-white mt-1">
+              <h2 className="text-2xl font-black text-neutral-900 dark:text-white mt-1">
                 {clientData.client_name}
-              </h1>
+              </h2>
 
               <div className="flex items-center gap-4 text-xs text-neutral-500 mt-1.5 flex-wrap">
                 <span>Business Unit: <strong className="text-neutral-700 dark:text-neutral-300">{clientData.business_unit || "Default"}</strong></span>

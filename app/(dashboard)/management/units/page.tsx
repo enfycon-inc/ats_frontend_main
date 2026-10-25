@@ -207,9 +207,7 @@ export function UnitsContent({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-200 dark:border-slate-800 pb-5">
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
-                <Layers className="h-5 w-5 text-blue-600" /> Branch Units &amp; Branch Units
-              </h1>
+
             </div>
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
               Configure market segments, work shifts, recruitment pods, and isolated job routing policies across branch locations.

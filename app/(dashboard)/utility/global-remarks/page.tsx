@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import DashboardBreadcrumb from "@/components/layout/dashboard-breadcrumb";
+
 import { 
   Plus, 
   Trash2, 
@@ -142,7 +142,7 @@ export default function GlobalRemarksPage() {
   if (!canManageGlobalRemarks) {
     return (
       <div className="p-6 max-w-4xl mx-auto space-y-6">
-        <DashboardBreadcrumb title="Global Stage Remarks Templates" text="Settings" />
+
         <Card className="border-rose-200 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-950/20 shadow-xs">
           <CardContent className="p-8 text-center space-y-4">
             <div className="h-12 w-12 rounded-full bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
@@ -167,7 +167,7 @@ export default function GlobalRemarksPage() {
 
   return (
     <div className="w-full max-w-full p-6 space-y-5">
-      <DashboardBreadcrumb title="Global Remarks Templates" text="Settings" />
+
 
       {!isGlobalAdmin && (
         <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs text-amber-800 dark:text-amber-300">

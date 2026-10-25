@@ -115,7 +115,7 @@ export default function PublicCareersApiPage() {
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
           <p className="text-xs text-neutral-500">Developer / API Clients</p>
-          <h1 className="mt-2 text-xl font-bold tracking-tight text-neutral-900 dark:text-white">API Clients</h1>
+
           <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Manage website access to published jobs and candidate applications.</p>
         </div>
         <Button onClick={() => { setCreatedSecret(""); setShowForm((value) => !value); }} className="h-9 bg-indigo-600 text-xs hover:bg-indigo-700">

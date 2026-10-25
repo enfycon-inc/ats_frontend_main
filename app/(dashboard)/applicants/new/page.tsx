@@ -736,9 +736,7 @@ export default function NewApplicantPage() {
       {/* ── Page Title Header ─────────────────────────────── */}
       <div className="flex items-center justify-between mb-6 pb-3 border-b border-neutral-200 dark:border-slate-800">
         <div>
-          <h1 className="text-lg font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-            <User className="h-5 w-5 text-blue-600 dark:text-blue-400" /> Add New Candidate Profile
-          </h1>
+
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
             Add a structured candidate profile to your talent database
           </p>

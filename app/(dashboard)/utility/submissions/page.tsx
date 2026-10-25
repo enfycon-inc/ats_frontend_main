@@ -267,7 +267,7 @@ function SubmissionDetails({ submission, onReview }: { submission: TrackerSubmis
     {submission.keepExistingSubmissionsOpen && submission.jobStatus?.toLowerCase() === "closed" && <p role="status" className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:bg-blue-950 dark:text-blue-200">Closed to new submissions. Existing candidates remain in progress.</p>}
     {submission.workflowPaused && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">Job closed - workflow paused. Activate the job to edit submission status. Recorded outcomes and interview history are preserved.</p>}
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h1 className="text-xl font-bold tracking-tight">{submission.candidateName || "Name unavailable"}</h1><p className="mt-1 text-xs text-muted-foreground">{[submission.jobTitle, submission.clientName].filter(Boolean).join(" · ") || "Job details unavailable"}</p></div>
+      <div><h2 className="text-xl font-bold tracking-tight">{submission.candidateName || "Name unavailable"}</h2><p className="mt-1 text-xs text-muted-foreground">{[submission.jobTitle, submission.clientName].filter(Boolean).join(" · ") || "Job details unavailable"}</p></div>
       <ResumeDownloadButton submission={submission} />
     </div>
     <div className="rounded-xl border border-border bg-card p-5">
@@ -379,7 +379,7 @@ function SubmissionsPageContent() {
   if (workspaceStatus === "error") return <div role="alert" className="text-sm text-red-700">Unable to load workspace access. Refresh the page to retry.</div>;
   if (editor?.action === "review" && workspaceStatus === "ready") return <ReviewWorkspace key={editor.submission.id} submissionId={editor.submission.id} onClose={() => setEditor(null)} onSaved={saved => { setEditor(null); setDetail(saved); setRevision(r => r + 1); }} />;
   return <main className="space-y-5 min-w-0 text-foreground">
-    {submissionId ? <Button variant="ghost" size="sm" className="text-xs -ml-2" onClick={backToTracker}><ArrowLeft className="h-3.5 w-3.5" />Back to submissions</Button> : <div><h1 className="text-xl font-bold tracking-tight">{view === "my" ? "My submissions" : view === "pod" ? "Pod submissions" : "Submissions"}</h1><p className="mt-1 text-xs text-muted-foreground">Track progress. Take the next action.</p></div>}
+    {submissionId ? <Button variant="ghost" size="sm" className="text-xs -ml-2" onClick={backToTracker}><ArrowLeft className="h-3.5 w-3.5" />Back to submissions</Button> : <div><p className="mt-1 text-xs text-muted-foreground">Track progress. Take the next action.</p></div>}
     {!submissionId && <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs" aria-label="Submission tracker">
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-5">
         <div role="group" aria-label="Submission stage" className="flex flex-wrap gap-0">{FILTERS.map(filter => <button type="button" aria-pressed={bucket === filter.key} key={filter.key} onClick={() => { setBucket(filter.key); setPage(1); }} className={cn("flex items-center gap-2 border border-border px-3 py-2 text-xs font-medium first:rounded-l-md last:rounded-r-md focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-blue-500 -ml-px first:ml-0", bucket === filter.key ? "border-blue-300 bg-blue-50 text-[#1a4fa0] dark:bg-blue-950 dark:text-blue-200" : "hover:bg-muted")}>

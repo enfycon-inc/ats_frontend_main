@@ -279,10 +279,7 @@ export default function DictionariesPage() {
       {/* ── Breadcrumb & Header ────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-extrabold text-neutral-800 dark:text-neutral-100 flex items-center gap-2 mt-1">
-            <Database className="h-5 w-5 text-primary" />
-            Master Dictionary & Normalization Manager
-          </h1>
+
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
             Resolve parsing raw terms, map them to canonical entities, and maintain clean lookup databases.
           </p>

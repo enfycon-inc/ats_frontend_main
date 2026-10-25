@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
-import DashboardBreadcrumb from '@/components/layout/dashboard-breadcrumb';
+
 import { useNotifications } from '@/contexts/NotificationContext';
 import { EMAIL_OPTIONS, type NotificationPreferences } from '@/lib/notification-preferences';
 import { SOUND_OPTIONS, playPresetSound } from '@/lib/audio-synthesizer';
@@ -29,8 +29,8 @@ export default function NotificationSettingsPage() {
   if (settingsError) return <p role="alert" className="p-4 text-xs">Could not load notification preferences. Refresh to retry.</p>;
   if (settingsLoading) return <p role="status" className="p-4 text-xs">Loading your notification preferences...</p>;
   return <div className="space-y-4 pb-8">
-    <DashboardBreadcrumb title="Notification Preferences" text="Settings" />
-    <div className="flex items-center justify-between gap-4"><div><h1 className="text-xl font-bold">Notification Preferences</h1><p className="text-xs text-neutral-500">Personal settings for emails, notification sounds and in-app popups.</p></div><Button className="h-9 bg-[#1a4fa0] text-xs" onClick={save} disabled={saving || !dirty}>{saving ? 'Saving...' : 'Save Preferences'}</Button></div>
+
+    <div className="flex items-center justify-between gap-4"><div><p className="text-xs text-neutral-500">Personal settings for emails, notification sounds and in-app popups.</p></div><Button className="h-9 bg-[#1a4fa0] text-xs" onClick={save} disabled={saving || !dirty}>{saving ? 'Saving...' : 'Save Preferences'}</Button></div>
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="rounded-xl border bg-white p-5 dark:bg-slate-900"><h2 className="text-sm font-bold">System email notifications</h2><p className="mt-1 text-xs text-neutral-500">Only options available to your current permissions are shown. Turning an option on does not grant access.</p>
         {EMAIL_OPTIONS.filter(option => settings.eligibleEmails.includes(option.key)).map(option => <div key={option.key}>{row(option.label, draft.emailPreferences[option.key] !== false, value => change({ emailPreferences: { ...draft.emailPreferences, [option.key]: value } }))}</div>)}

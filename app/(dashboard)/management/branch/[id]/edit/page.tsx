@@ -141,9 +141,7 @@ export default function EditBranchPage() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 dark:border-slate-800 pb-5">
         <div className="space-y-1">
-          <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-indigo-600" /> Edit Branch
-          </h1>
+
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             Configure branch details and local office governance. Operating branch units, shifts, and job routing are managed in the Units module.
           </p>

@@ -43,6 +43,21 @@ export function getRouteBreadcrumbInfo(
     };
   }
 
+  // Explicit routes must precede record-detail patterns (for example /job-posting/:id).
+  const pageRoutes: Record<string, { title: string; parent: string; parentHref: string }> = {
+    "/job-posting/access": { title: "Job Creation Access", parent: "Job Posting", parentHref: "/job-posting/all" },
+    "/developer/clients": { title: "API Clients", parent: "Developer", parentHref: "/developer/clients" },
+    "/developer/reference": { title: "Careers API Reference", parent: "Developer", parentHref: "/developer/clients" },
+    "/settings/client-access": { title: "Client & POC Access", parent: "Settings", parentHref: "/company" },
+  };
+  const page = pageRoutes[cleanPath];
+  if (page) return {
+    pageTitle: page.title,
+    breadcrumbs: [{ label: "ATS", href: "/dashboard" }, { label: page.parent, href: page.parentHref }, { label: page.title, isCurrent: true }],
+    showBackButton: true,
+    backHref: page.parentHref,
+  };
+
   // 2. Job Postings
   if (cleanPath === "/job-posting") {
     const filter = searchParams?.get("filter");
@@ -845,7 +860,7 @@ export function getRouteBreadcrumbInfo(
 
   if (cleanPath === "/utility/settings-notifications") {
     return {
-      pageTitle: "Sound & Tone Preferences",
+      pageTitle: "Notification Preferences",
       breadcrumbs: [
         { label: "ATS", href: "/dashboard" },
         { label: "Settings", href: "/company" },

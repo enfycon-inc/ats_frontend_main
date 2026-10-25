@@ -609,12 +609,7 @@ function PodsContent() {
       {/* HEADER TOOLBAR */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 dark:border-slate-800 pb-4">
         <div>
-          <h1 className="text-lg font-bold text-neutral-900 dark:text-white flex items-center gap-2 tracking-tight">
-            <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 flex items-center justify-center">
-              <Icon icon="heroicons:users" className="h-5 w-5" />
-            </div>
-            Recruitment Pods Management
-          </h1>
+
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
             Unit-level recruitment pods, Pod Lead coordination, and automated round-robin requisition distribution.
           </p>

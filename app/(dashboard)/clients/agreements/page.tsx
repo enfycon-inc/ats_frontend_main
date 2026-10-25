@@ -75,9 +75,7 @@ export default function ClientAgreementsPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-xl font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <FileCheck className="h-5 w-5 text-indigo-600" /> Contracts &amp; MSA Management Hub
-              </h1>
+
               <p className="text-xs text-neutral-500 mt-0.5">
                 Centralized hub for Master Service Agreements (MSA), Fee Percentages, Payment Terms, and Compliance Verification.
               </p>

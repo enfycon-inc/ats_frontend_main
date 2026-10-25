@@ -192,9 +192,7 @@ export default function UsItSearchPage() {
             <ChevronRight className="h-3 w-3" />
             <span className="text-primary">US IT Segment</span>
           </div>
-          <h1 className="text-base font-bold text-neutral-800 dark:text-neutral-100 flex items-center gap-2">
-            <Search className="h-4 w-4 text-primary" /> Internal Resume Database Search
-          </h1>
+
         </div>
         
         <div className="flex items-center gap-3">

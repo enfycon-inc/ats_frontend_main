@@ -1110,7 +1110,7 @@ function BranchManagementPageContent() {
     <div className="p-6 w-full max-w-full space-y-6">
       {ownBranchSettings && (
         <div className="flex items-center justify-between gap-4">
-          <div><h1 className="text-xl font-bold">Branch Settings</h1><p className="text-xs text-neutral-500 mt-1">{selectedBranch?.name || 'Your assigned branch'} — operating hours, job routing, and stage remarks.</p></div>
+          <div><p className="text-xs text-neutral-500 mt-1">{selectedBranch?.name || 'Your assigned branch'} — operating hours, job routing, and stage remarks.</p></div>
           {selectedBranch && canEditBranchFunc(selectedBranch.id) && <Button variant="outline" onClick={() => openBranchRemarksModal(selectedBranch)}><MessageSquare className="h-4 w-4 mr-2" />Add / Manage Remarks</Button>}
         </div>
       )}
@@ -1122,9 +1122,7 @@ function BranchManagementPageContent() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-xl border border-neutral-200 dark:border-slate-800 shadow-sm">
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold text-neutral-900 dark:text-white">
-              Branch &amp; Office Locations
-            </h1>
+
           </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             Configure dynamic branch structures, branch admins, staff allocations, and branch units.

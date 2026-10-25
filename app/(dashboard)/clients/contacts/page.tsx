@@ -83,9 +83,7 @@ export default function ClientContactsPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-xl font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <Users className="h-5 w-5 text-indigo-600" /> Client Contacts Directory
-              </h1>
+
               <p className="text-xs text-neutral-500 mt-0.5">
                 Master directory of all Hiring Managers, VMS Leads, and Points of Contact across client accounts.
               </p>
