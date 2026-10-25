@@ -1,6 +1,6 @@
 "use client";
 import { isAutomaticPodLeadRole } from "@/lib/pod-lead-role-policy";
-import { warnIfEmailFailed } from "@/lib/email-notification";
+import { notifyAccountSaved } from "@/lib/email-notification";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
@@ -753,7 +753,6 @@ export default function UserManagementPage() {
         sendEmailInvite: true,
       });
 
-      warnIfEmailFailed(createdAccount);
 
       // Synchronize full profile & branch roles
       try {
@@ -774,7 +773,7 @@ export default function UserManagementPage() {
         return;
       }
 
-      toast.success(`Successfully added ${trimmedName} (${fullEmail})!`);
+      notifyAccountSaved(createdAccount, `Successfully added ${trimmedName} (${fullEmail})!`);
       setIsAddModalOpen(false);
       setAddForm({
         firstName: "",

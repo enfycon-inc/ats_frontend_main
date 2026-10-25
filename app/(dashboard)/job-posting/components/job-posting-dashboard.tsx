@@ -551,7 +551,6 @@ export default function JobPostingDashboard({
     setActiveView(defaultViewLabel);
     setIsLoading(true);
     fetchJobs();
-    toast.success("Jobs list reloaded.");
   }, [fetchJobs, defaultViewLabel]);
 
   useEffect(() => {

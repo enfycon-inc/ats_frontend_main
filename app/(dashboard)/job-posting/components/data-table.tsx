@@ -67,7 +67,7 @@ export interface DataTableProps {
   activeView?: string;
   defaultViewLabel?: string;
   onSelectView?: (viewName: string) => void;
-  onUpdateJob?: (jobId: string, updatedFields: Partial<Job>) => void;
+  onUpdateJob?: (jobId: string, updatedFields: Partial<Job> & { _alreadySaved?: boolean }) => void;
   onReorderColumns?: (newColumns: string[]) => void;
 }
 
@@ -384,7 +384,7 @@ export default function DataTable({
         {/* Global actions */}
         <div className="flex items-center gap-1.5">
           <button
-            onClick={onRefresh}
+            onClick={() => { onRefresh(); toast.success("Jobs list reloaded."); }}
             className="p-1.5 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
             title="Refresh Table"
           >
@@ -690,6 +690,7 @@ export default function DataTable({
             try {
               const saved = await atsApi.jobs.setPublication(publicationJob.id, !publicationJob.isPubliclyPublished);
               onUpdateJob?.(publicationJob.id, { isPubliclyPublished: saved.isPubliclyPublished, publicSlug: saved.publicSlug, _alreadySaved: true } as Partial<Job>);
+              toast.success(saved.isPubliclyPublished ? "Job published to website." : "Job unpublished from website.");
               onRefresh?.(); setPublicationJob(null);
             } catch (error) { setPublicationError(error instanceof Error ? error.message : 'Unable to update website publication.'); }
             finally { setPublicationSaving(false); }
@@ -710,6 +711,7 @@ export default function DataTable({
           try {
             const saved = await atsApi.jobs.changeStatus(statusModalJob.id, { status: statusModalValue, expectedStatus: statusModalJob.jobStatus, ...closure });
             onUpdateJob?.(statusModalJob.id, { jobStatus: saved.status, _alreadySaved: true } as Partial<Job>);
+            toast.success("Job status updated.");
             onRefresh?.(); setStatusModalJob(null);
           } catch (error) { setStatusError(error instanceof Error ? error.message : 'Unable to change status.'); }
           finally { setStatusSaving(false); }
@@ -743,6 +745,7 @@ export default function DataTable({
             onUpdateJob(jobId, {
               jobStatus: "Active",
               approvalStatus: "APPROVED" as any,
+              _alreadySaved: true,
             });
           }
           if (onRefresh) onRefresh();
@@ -760,6 +763,7 @@ export default function DataTable({
               jobStatus: "Draft" as any,
               approvalStatus: "REJECTED" as any,
               rejectionReason: finalReason,
+              _alreadySaved: true,
             });
           }
           if (onRefresh) onRefresh();

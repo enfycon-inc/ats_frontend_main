@@ -64,7 +64,7 @@ export interface JobTableRowProps {
   onOpenSourceModal: (job: Job) => void;
   onOpenDelegateModal: (job: Job) => void;
   onOpenStatusModal: (job: Job, status?: string) => void;
-  onUpdateJob?: (jobId: string, updatedFields: Partial<Job>) => void;
+  onUpdateJob?: (jobId: string, updatedFields: Partial<Job> & { _alreadySaved?: boolean }) => void;
   onRefresh?: () => void;
   onOpenPublicationModal: (job: Job) => void;
 }
@@ -656,7 +656,7 @@ export function JobTableRow({
                               try {
                                 await atsApi.jobs.approve(job.id);
                                 toast.success(`Job ${job.jobCode} approved & activated!`);
-                                if (onUpdateJob) onUpdateJob(job.id, { jobStatus: "Active" });
+                                if (onUpdateJob) onUpdateJob(job.id, { jobStatus: "Active", _alreadySaved: true });
                               } catch (e: any) {
                                 toast.error("Failed to approve job: " + e.message);
                               }
@@ -682,7 +682,7 @@ export function JobTableRow({
                               try {
                                 await atsApi.jobs.reject(job.id, reason.trim());
                                 toast.success(`Job ${job.jobCode} rejected.`);
-                                if (onUpdateJob) onUpdateJob(job.id, { jobStatus: "Draft" });
+                                if (onUpdateJob) onUpdateJob(job.id, { jobStatus: "Draft", _alreadySaved: true });
                               } catch (e: any) {
                                 toast.error("Failed to reject job: " + e.message);
                               }
