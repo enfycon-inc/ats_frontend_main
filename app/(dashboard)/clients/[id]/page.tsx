@@ -523,6 +523,10 @@ export default function ClientDetailPage() {
 
                   <div className="grid grid-cols-2 gap-3 pt-2">
                     <div>
+                      <span className="text-neutral-400 block text-[11px]">Company phone number</span>
+                      <p className="font-semibold text-neutral-800 dark:text-neutral-200">{clientData.contact_number || "N/A"}</p>
+                    </div>
+                    <div>
                       <span className="text-neutral-400 block text-[11px]">Industry</span>
                       <p className="font-semibold text-neutral-800 dark:text-neutral-200">{clientData.industry || "N/A"}</p>
                     </div>

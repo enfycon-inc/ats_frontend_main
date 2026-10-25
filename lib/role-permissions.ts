@@ -73,7 +73,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
     dashboard: true,
     interviews: canViewCalendar,
     "job-posting": has("job:view"), "applicants": has("candidate:view", "candidate:create"),
-    "submissions-tracker": canAccessSubmissions, placements: has("placement:view"),
+    "submissions-tracker": canAccessSubmissions, placements: false,
     clients: activeRole !== "RECRUITER" && has("client:view"),
     "talent-bench": !["RECRUITER", "ACCOUNT_MANAGER", "DELIVERY_HEAD"].includes(activeRole) && has("candidate:view"),
     vendors: has("vendor:view"), onboarding: has("onboarding:view"), reports: !["ACCOUNT_MANAGER", "DELIVERY_HEAD"].includes(activeRole) && has("report:view"),
@@ -168,7 +168,7 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
   if (has("platform:manage")) return GLOBAL_ADMIN_MORE_ITEMS;
   const company = has("tenant:settings", "tenant:manage");
   const allowed: Record<string, boolean> = {
-    developer: company, email: true, documents: !isDeliveryHead, settings: activeRole !== "RECRUITER", help: true,
+    developer: company, email: true, documents: false, settings: activeRole !== "RECRUITER", help: true,
     database: has("database:manage", "tenant:settings"), integrations: has("integration:manage", "tenant:settings"),
     "user-management": has("user:manage", "branch:assign_user", "unit_admin:manage"),
     "role-management": !isDeliveryHead && has("user:manage"),

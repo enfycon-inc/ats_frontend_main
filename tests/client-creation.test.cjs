@@ -78,3 +78,10 @@ test('POC fields show separate names, common titles, and a country-aware mobile 
   assert.match(other, /data-country="US"/);
   assert.match(other, /Invalid mobile number/);
 });
+
+test('company phone is visible separately from the optional primary contact', () => {
+  const { ClientForm } = load('components/clients/client-form.tsx');
+  const html = renderToStaticMarkup(React.createElement(ClientForm, { onCancel() {}, onSaved() {} }));
+  assert.match(html, /Company phone number/);
+  assert.match(html, /type="tel"/);
+});

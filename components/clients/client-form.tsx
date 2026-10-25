@@ -86,7 +86,7 @@ export function ClientForm({ initialClientName = '', expectedMarket, onSaved, on
         branch_id: current.branchId, business_unit_id: current.businessUnitId, market: current.market, currency: current.currency,
         country: countryIso, state: stateIso ? State.getStateByCodeAndCountry(stateIso, countryIso)?.name : '',
         gstin: draft.gstin?.trim().toUpperCase(), pan_number: draft.pan_number?.trim().toUpperCase(),
-        email_id: draft.email_id?.trim(), contact: addContact ? contact : undefined,
+        contact_number: draft.contact_number?.trim(), email_id: draft.email_id?.trim(), contact: addContact ? contact : undefined,
       } as ClientCreationRequest;
       const validation = clientCreationErrors(payload);
       setErrors(validation);
@@ -114,6 +114,7 @@ export function ClientForm({ initialClientName = '', expectedMarket, onSaved, on
       <fieldset disabled={!!existingClient}>
       <section className="space-y-3"><h3 className="text-sm font-bold">Client details</h3><div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {field('client_name', 'Legal company name *')}{select('category', 'Client category *', CLIENT_CATEGORIES)}
+        {field('contact_number', 'Company phone number', 'tel', '+91 98765 43210')}
         {field('client_short_name', 'Display name (optional)')}{field('email_id', 'Company email', 'email')}
         {field('website', 'Website', 'url', 'https://company.com')}{select('industry', 'Industry', ['Information Technology', 'Banking & Financial Services', 'Healthcare & Pharma', 'Manufacturing', 'Telecommunications', 'Retail & eCommerce', 'Other'])}
         <div className="space-y-1"><label htmlFor={`${id}-country`} className="font-semibold">Country</label><select id={`${id}-country`} className={control} value={countryIso} onChange={e => { setCountry(e.target.value); setStateIso(''); set('city', ''); }}><option value="">Select country</option>{Country.getAllCountries().map(c => <option key={c.isoCode} value={c.isoCode}>{c.name}</option>)}</select></div>
@@ -140,7 +141,7 @@ export function ClientForm({ initialClientName = '', expectedMarket, onSaved, on
         {select('tier_rating', 'Client tier', ['TIER_1', 'TIER_2', 'TIER_3'])}{select('credit_check_status', 'Credit check', ['PENDING_CHECK', 'APPROVED', 'HIGH_RISK'])}{select('fillability_score', 'Fillability', ['HIGH', 'MEDIUM', 'LOW'])}
       </div>{field('vetting_notes', 'Internal qualification notes')}</details>}
       {!existingClient && <div className="space-y-1"><label htmlFor={`${id}-about`} className="font-semibold">About company</label><textarea id={`${id}-about`} rows={3} className={`${control} h-auto py-2`} value={draft.about_company || ''} onChange={e => set('about_company', e.target.value)} /></div>}
-      {Object.entries(errors).filter(([key]) => !key.startsWith('contact.') && !['client_name', 'category', 'email_id', 'website', 'commission_percentage', 'gstin', 'pan_number', 'contact'].includes(key)).map(([key, message]) => <p role="alert" key={key} className="text-red-600">{message}</p>)}
+      {Object.entries(errors).filter(([key]) => !key.startsWith('contact.') && !['client_name', 'category', 'contact_number', 'email_id', 'website', 'commission_percentage', 'gstin', 'pan_number', 'contact'].includes(key)).map(([key, message]) => <p role="alert" key={key} className="text-red-600">{message}</p>)}
     </fieldset>
     <div className="flex justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-slate-800"><Button type="button" variant="outline" disabled={saving} onClick={onCancel}>Cancel</Button><Button type="submit" disabled={saving} className="bg-indigo-600 text-xs text-white hover:bg-indigo-700">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{existingClient ? addContact ? 'Add contact' : 'Use existing client' : context.canDirectAdd ? 'Add Client' : 'Submit for approval'}</Button></div>
   </form>;

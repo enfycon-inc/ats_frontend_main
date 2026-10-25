@@ -371,7 +371,7 @@ export function getRouteBreadcrumbInfo(
       pageTitle: "Clients Directory",
       breadcrumbs: [
         { label: "ATS", href: "/dashboard" },
-        { label: "Clients", href: "/clients" },
+        { label: "Clients", href: "/clients/all" },
         { label: "All Clients", isCurrent: true },
       ],
       showBackButton: true,
@@ -384,11 +384,11 @@ export function getRouteBreadcrumbInfo(
       pageTitle: "Client Contacts",
       breadcrumbs: [
         { label: "ATS", href: "/dashboard" },
-        { label: "Clients", href: "/clients" },
+        { label: "Clients", href: "/clients/all" },
         { label: "Contacts", isCurrent: true },
       ],
       showBackButton: true,
-      backHref: "/clients",
+      backHref: "/clients/all",
     };
   }
 
@@ -397,11 +397,11 @@ export function getRouteBreadcrumbInfo(
       pageTitle: "Client Agreements & MSAs",
       breadcrumbs: [
         { label: "ATS", href: "/dashboard" },
-        { label: "Clients", href: "/clients" },
+        { label: "Clients", href: "/clients/all" },
         { label: "Agreements", isCurrent: true },
       ],
       showBackButton: true,
-      backHref: "/clients",
+      backHref: "/clients/all",
     };
   }
 
@@ -410,11 +410,11 @@ export function getRouteBreadcrumbInfo(
       pageTitle: "Client Invoices & Billing",
       breadcrumbs: [
         { label: "ATS", href: "/dashboard" },
-        { label: "Clients", href: "/clients" },
+        { label: "Clients", href: "/clients/all" },
         { label: "Invoices", isCurrent: true },
       ],
       showBackButton: true,
-      backHref: "/clients",
+      backHref: "/clients/all",
     };
   }
 
@@ -423,11 +423,11 @@ export function getRouteBreadcrumbInfo(
       pageTitle: "Add New Client Account",
       breadcrumbs: [
         { label: "ATS", href: "/dashboard" },
-        { label: "Clients", href: "/clients" },
+        { label: "Clients", href: "/clients/all" },
         { label: "New Client", isCurrent: true },
       ],
       showBackButton: true,
-      backHref: "/clients",
+      backHref: "/clients/all",
     };
   }
 
@@ -441,7 +441,7 @@ export function getRouteBreadcrumbInfo(
         pageTitle: "Edit Client Account",
         breadcrumbs: [
           { label: "ATS", href: "/dashboard" },
-          { label: "Clients", href: "/clients" },
+          { label: "Clients", href: "/clients/all" },
           { label: "Client Account", href: `/clients/${id}` },
           { label: "Edit", isCurrent: true },
         ],
@@ -454,11 +454,11 @@ export function getRouteBreadcrumbInfo(
       pageTitle: "Client Account",
       breadcrumbs: [
         { label: "ATS", href: "/dashboard" },
-        { label: "Clients", href: "/clients" },
+        { label: "Clients", href: "/clients/all" },
         { label: "Client Account", isCurrent: true },
       ],
       showBackButton: true,
-      backHref: "/clients",
+      backHref: "/clients/all",
     };
   }
 
