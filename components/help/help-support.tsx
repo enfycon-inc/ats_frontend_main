@@ -129,7 +129,8 @@ function MarkedScreenshot({ page, selected, onSelect }: { page: HelpPage; select
   const [failed, setFailed] = useState(false);
   if (failed) return <div role="status" className="rounded-lg bg-slate-100 p-6 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">The reference screenshot could not load. The numbered instructions and detailed task guide remain available below.</div>;
   return <figure className="relative isolate bg-white" aria-label={`${page.title} with numbered annotations`}>
-    <Image src={page.image.src} width={page.image.width} height={page.image.height} sizes="(min-width: 1280px) 70vw, 100vw" alt={`${page.title}. ${page.caption}. Use the corresponding numbered instructions for an accessible explanation.`} className="block h-auto w-full" onError={() => setFailed(true)} />
+    {/* The optimizer's internal request has no session; load these authenticated assets directly. */}
+    <Image unoptimized src={page.image.src} width={page.image.width} height={page.image.height} sizes="(min-width: 1280px) 70vw, 100vw" alt={`${page.title}. ${page.caption}. Use the corresponding numbered instructions for an accessible explanation.`} className="block h-auto w-full" onError={() => setFailed(true)} />
     {page.markers.map((marker, index) => <button key={index} type="button" aria-label={`Step ${index + 1}: ${marker.title}`} aria-pressed={selected === index} onClick={() => onSelect(index)} className={cn(focus, "absolute rounded-md border-2 border-orange-600", selected === index && "border-[3px] bg-orange-100/25")} style={{ left: `${marker.x}%`, top: `${marker.y}%`, width: `${marker.width}%`, height: `${marker.height}%` }}><span aria-hidden="true" className="absolute -left-3 -top-3 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-orange-700 text-[11px] font-bold text-white">{index + 1}</span></button>)}
   </figure>;
 }

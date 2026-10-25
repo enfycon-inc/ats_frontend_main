@@ -1758,6 +1758,9 @@ const submissions = {
     const query = new URLSearchParams(cleanFilters).toString();
     return apiFetch<TrackerResponse>(`/api/recruiter-submissions${query ? `?${query}` : ''}`);
   },
+  async recruiterDashboard(month: string, rangeDays: number): Promise<import('./submission-contract').RecruiterDashboardData> {
+    return apiFetch(`/api/recruiter-submissions/dashboard?${new URLSearchParams({ month, rangeDays: String(rangeDays) })}`);
+  },
   async calendarEvents(start: string, end: string): Promise<Array<{
     id: string; submissionId: string; title: string; start: string; status: string; round: string;
     candidateName: string; jobId: string; jobCode: string; jobTitle: string; recruiterName: string;

@@ -1,6 +1,7 @@
 "use client";
 
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
+import { useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -45,6 +46,9 @@ function eligibleRound(submission: TrackerSubmission): RoundKey | null {
 }
 
 export default function CalendarPage() {
+  const query = useSearchParams();
+  const requestedDate = query.get('date');
+  const initialDate = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) && !Number.isNaN(Date.parse(requestedDate)) ? requestedDate : undefined;
   const calendarRef = useRef<FullCalendar>(null);
   const loadedRangeRef = useRef("");
   const eventRequestRef = useRef(0);
@@ -259,7 +263,7 @@ export default function CalendarPage() {
             {loadingEvents && <span role="status" className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Updating</span>}
           </div>
           {calendarView === "agenda" ? <div className="min-h-[570px] divide-y divide-border rounded-lg border border-border">{visibleEvents.length ? visibleEvents.slice().sort((a, b) => a.start.localeCompare(b.start)).map(event => <button key={event.id} type="button" onClick={() => void openEvent(event)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40"><span className="w-28 shrink-0 text-[11px] text-muted-foreground">{dateLabel(event.start, { dateStyle: "medium", timeStyle: "short" })}</span><span className="h-9 w-1 shrink-0 rounded-full" style={{ backgroundColor: eventColor(event) }} /><span className="min-w-0"><span className="block truncate text-xs font-semibold">{event.candidateName} · {event.jobTitle || event.jobCode}</span><span className="text-[10px] text-muted-foreground">{event.round} · {event.interviewer || "Interviewer not assigned"}</span></span></button>) : <p className="p-10 text-center text-xs text-muted-foreground">No interviews in this period.</p>}</div> : null}
-          <div className={`interview-calendar text-xs ${calendarView === "agenda" ? "hidden" : ""}`}><FullCalendar ref={calendarRef} plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]} initialView="dayGridMonth" headerToolbar={false} height="auto" nowIndicator timeZone="local" events={calendarItems} datesSet={handleDatesSet} eventContent={renderEvent} eventClick={handleEventClick} eventDisplay="block" dayMaxEvents={4} navLinks selectable={false} /></div>
+          <div className={`interview-calendar text-xs ${calendarView === "agenda" ? "hidden" : ""}`}><FullCalendar ref={calendarRef} plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]} initialDate={initialDate} initialView="dayGridMonth" headerToolbar={false} height="auto" nowIndicator timeZone="local" events={calendarItems} datesSet={handleDatesSet} eventContent={renderEvent} eventClick={handleEventClick} eventDisplay="block" dayMaxEvents={4} navLinks selectable={false} /></div>
         </div>
         <aside className="rounded-lg border border-border bg-card" aria-label="Upcoming interviews"><div className="flex items-center justify-between border-b border-border px-3 py-3"><h2 className="text-xs font-bold">Upcoming interviews</h2><button type="button" className="text-[10px] font-medium text-[#1a4fa0] hover:underline" onClick={() => setCalendarView("agenda")}>View all</button></div><div className="max-h-[620px] divide-y divide-border overflow-y-auto">{upcomingEvents.length ? upcomingEvents.map(event => <button key={event.id} type="button" onClick={() => void openEvent(event)} className="flex w-full gap-2.5 px-3 py-3 text-left hover:bg-muted/40"><span className="mt-0.5 h-10 w-1 shrink-0 rounded-full" style={{ backgroundColor: eventColor(event) }} /><span className="min-w-0"><span className="block text-[10px] font-medium text-muted-foreground">{dateLabel(event.start, { weekday: "short", month: "short", day: "numeric" })} · {dateLabel(event.start, { timeStyle: "short" })}</span><span className="mt-1 block truncate text-[11px] font-semibold">{event.candidateName}</span><span className="block truncate text-[10px] text-muted-foreground">{event.jobTitle || event.jobCode} · {event.round} · {event.interviewer || "Interviewer TBD"}</span></span></button>) : <p className="p-8 text-center text-[11px] text-muted-foreground">No upcoming interviews in this period.</p>}</div></aside>
       </section>}

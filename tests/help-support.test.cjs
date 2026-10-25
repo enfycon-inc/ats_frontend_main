@@ -74,10 +74,10 @@ test('the real help component renders every guide with its selected screenshot a
   for (const guide of content.HELP_GUIDES) {
     const Component = load('components/help/help-support.tsx', {
       'next/navigation': { useSearchParams: () => new URLSearchParams({ guide: guide.id }) },
-      'next/image': { __esModule: true, default: ({ src, alt, width, height }) => React.createElement('img', { src, alt, width, height }) },
     }).default;
     const html = renderToStaticMarkup(React.createElement(Component));
     assert.ok(html.includes(guide.pages[0].image.src));
+    assert.ok(!html.includes('/_next/image'), 'authenticated screenshots must bypass the sessionless optimizer');
     assert.match(html, /aria-label="Choose role guide"/);
     assert.match(html, /id="help-task-search"/);
     assert.match(html, /id="help-faq-search"/);
