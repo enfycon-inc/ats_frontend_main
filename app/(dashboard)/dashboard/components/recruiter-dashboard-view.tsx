@@ -10,6 +10,11 @@ import {
   Plus,
   X,
   ExternalLink,
+  BriefcaseBusiness,
+  FileText,
+  CircleX,
+  UserRoundCheck,
+  UsersRound,
 } from 'lucide-react';
 import { atsApi, activeRoleHeaders } from '@/lib/ats-api';
 import type {
@@ -776,22 +781,71 @@ export default function RecruiterDashboardView({
             <LoadingRows />
           ) : (
             <>
-              <dl className="my-4 grid grid-cols-2 gap-3 border-y border-slate-100 py-3 sm:grid-cols-5 dark:border-slate-800">
+              <ul className="my-4 grid list-none grid-cols-1 gap-3 border-y border-slate-100 py-3 sm:grid-cols-2 xl:grid-cols-5 dark:border-slate-800">
                 {[
-                  ['Assigned jobs', data.metrics.jobs],
-                  ['Submissions', data.metrics.submissions],
-                  ['Rejected', data.metrics.rejected],
-                  ['Selected', data.metrics.selected],
-                  ['In interview', data.metrics.interviews],
-                ].map(([name, n]) => (
-                  <div key={name}>
-                    <dt className="text-[10px] text-slate-500">{name}</dt>
-                    <dd className="mt-1 text-lg font-bold text-indigo-700 dark:text-indigo-300">
-                      {n}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
+                  {
+                    name: 'Assigned jobs',
+                    value: data.metrics.jobs,
+                    icon: BriefcaseBusiness,
+                    href: permissions.includes('job:view') ? '/job-posting/my-jobs' : undefined,
+                    color: 'text-blue-700 dark:text-blue-300',
+                    iconColor: 'text-blue-700 bg-blue-50 dark:text-blue-300 dark:bg-blue-950/50',
+                  },
+                  {
+                    name: 'Submissions',
+                    value: data.metrics.submissions,
+                    icon: FileText,
+                    href: canViewSubs ? '/utility/submissions' : undefined,
+                    color: 'text-violet-700 dark:text-violet-300',
+                    iconColor: 'text-violet-700 bg-violet-50 dark:text-violet-300 dark:bg-violet-950/50',
+                  },
+                  {
+                    name: 'Rejected',
+                    value: data.metrics.rejected,
+                    icon: CircleX,
+                    color: 'text-rose-700 dark:text-rose-300',
+                    iconColor: 'text-rose-700 bg-rose-50 dark:text-rose-300 dark:bg-rose-950/50',
+                  },
+                  {
+                    name: 'Selected',
+                    value: data.metrics.selected,
+                    icon: UserRoundCheck,
+                    color: 'text-emerald-700 dark:text-emerald-300',
+                    iconColor: 'text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-950/50',
+                  },
+                  {
+                    name: 'In interview',
+                    value: data.metrics.interviews,
+                    icon: UsersRound,
+                    color: 'text-amber-700 dark:text-amber-300',
+                    iconColor: 'text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-950/50',
+                  },
+                ].map(({ name, value, icon: MetricIcon, href, color, iconColor }) => {
+                  const tile = (
+                    <>
+                      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconColor}`}>
+                        <MetricIcon aria-hidden="true" className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">{name}</span>
+                        <span className={`mt-1 block text-2xl font-bold tabular-nums ${color}`}>{value}</span>
+                      </span>
+                    </>
+                  );
+                  const className = 'flex min-h-24 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none dark:border-slate-800 dark:bg-slate-900';
+                  return href ? (
+                    <li key={name}>
+                      <Link href={href} aria-label={`${name}: ${value}`} className={className}>
+                        {tile}
+                      </Link>
+                    </li>
+                  ) : (
+                    <li key={name}>
+                      <div className={className}>{tile}</div>
+                    </li>
+                  );
+                })}
+              </ul>
               <p className="mb-3 text-[10px] text-slate-500">
                 Jobs: assignments in period. Submissions: created in period,
                 grouped by current stage. Interviews: rounds dated in period.

@@ -255,7 +255,7 @@ export default function DashboardPage() {
   const highPriorityJobs = activeJobs.filter(j => j.priority === "Hot" || j.priority === "High" || j.priority === "Urgent");
 
   return (
-    <div className="space-y-6">
+    <div className="dashboard-interactions space-y-6">
       {!isRecruiterDashboard && <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
