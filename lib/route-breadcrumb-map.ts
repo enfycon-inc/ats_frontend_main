@@ -44,6 +44,12 @@ export function getRouteBreadcrumbInfo(
   }
 
   // Explicit routes must precede record-detail patterns (for example /job-posting/:id).
+  if (cleanPath === "/help") return {
+    pageTitle: "Help & Support",
+    breadcrumbs: [{ label: "ATS", href: "/dashboard" }, { label: "Help & Support", isCurrent: true }],
+    showBackButton: false,
+  };
+
   const pageRoutes: Record<string, { title: string; parent: string; parentHref: string }> = {
     "/job-posting/access": { title: "Job Creation Access", parent: "Job Posting", parentHref: "/job-posting/all" },
     "/developer/clients": { title: "API Clients", parent: "Developer", parentHref: "/developer/clients" },
