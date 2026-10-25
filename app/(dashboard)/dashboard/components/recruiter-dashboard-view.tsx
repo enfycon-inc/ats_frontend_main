@@ -80,10 +80,9 @@ function RecruiterDashboardView({ profile, activeJobs }: { profile: RecruiterPro
       .sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime())[0];
     return scheduledRound ? [{ submission, round: scheduledRound.round, date: scheduledRound.date! }] : [];
   }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 4);
-  const canCreateCandidates = profile?.permissions?.includes("candidate:create");
   const canViewCandidates = profile?.permissions?.includes("candidate:view");
+  const canCreateCandidates = profile?.permissions?.includes("candidate:create");
   const canViewSubmissions = profile?.permissions?.includes("submission:view") || profile?.permissions?.includes("submission:create");
-  const dateLabel = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(new Date());
   const formatInterviewDate = (value: string, timezone?: string | null) => {
     const date = new Date(value);
     return new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: validTimezone(timezone) }).format(date);
@@ -92,19 +91,6 @@ function RecruiterDashboardView({ profile, activeJobs }: { profile: RecruiterPro
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Recruiter workspace</p>
-          <h2 className="mt-1 text-lg font-bold tracking-tight text-neutral-900 dark:text-white">Your hiring activity</h2>
-          <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{dateLabel} · Focus on priority roles and candidate progress.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canViewCandidates && <Link href="/applicants"><Button size="sm" variant="outline" className="h-9 gap-1.5 text-xs"><Icon icon="heroicons:magnifying-glass" className="h-4 w-4 text-indigo-600" />Search candidates</Button></Link>}
-          {canCreateCandidates && activeJobs.length > 0 && <Button size="sm" className="h-9 gap-1.5 bg-indigo-600 text-xs text-white hover:bg-indigo-700" onClick={() => setSelectedJobForCV(priorityJobs[0])}><Icon icon="heroicons:plus" className="h-4 w-4" />Add candidate</Button>}
-          {canViewSubmissions && <Link href="/utility/submissions"><Button size="sm" variant="outline" className="h-9 gap-1.5 text-xs"><Icon icon="heroicons:clipboard-document-list" className="h-4 w-4" />My submissions</Button></Link>}
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: "Active requisitions", value: activeCount, icon: "heroicons:briefcase", tone: "blue" },
