@@ -12,7 +12,7 @@ import { useEffect } from "react";
  *   2. Injects padding-right / margin-right on both <html> and <body>
  *      equal to that scrollbar width so content doesn't jump.
  *
- * In a SidebarInset layout the real scrollbar belongs to <main>, not <body>,
+ * In the dashboard layout the real scrollbar belongs to the page, not <body>,
  * so these compensations create phantom whitespace on the right.
  *
  * Strategy:

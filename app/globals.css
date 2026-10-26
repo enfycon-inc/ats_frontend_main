@@ -543,7 +543,7 @@ html[layout="helium"] .dashboard-sidebar-container {
 
 /* === Radix UI Scroll-Lock Fix ===
    Radix injects padding-right onto <body> to compensate for a scrollbar
-   that doesn't exist on body (SidebarInset is the real scroll container).
+   that doesn't exist on body (the dashboard page owns its scroll container).
    This creates phantom whitespace on the right. Block it entirely. */
 body,
 body[style],
