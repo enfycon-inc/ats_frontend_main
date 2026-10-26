@@ -3,7 +3,7 @@ import { ResumePages } from '@/components/candidates/resume-pages';
 import { SubmittedCandidateDetails } from './submitted-candidate-details';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Download, Loader2, Maximize2, Minimize2, Home, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Loader2, Maximize2, Minimize2, Home, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { atsApi } from '@/lib/ats-api';
 import type { CandidateAssessment, TrackerSubmission, TrackerUpdate } from '@/lib/submission-contract';
@@ -68,7 +68,13 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
       setSubmission({ ...fresh, jobDescription: document.body.textContent || null }); setLoadError(''); setNotes(fresh.reviewFeedback || ''); setChecks({});
       void atsApi.submissions.getCustomRemarks(fresh.branchId || undefined).then(data => { if (active) setTemplates(data); }).catch(() => { if (active) setTemplates([]); });
 
-    }).catch(() => { if (active) setLoadError('Unable to load the submission. Retry to check your access and the latest state.'); });
+    }).catch(cause => {
+      if (!active) return;
+      const message = cause instanceof Error ? cause.message : '';
+      setLoadError(/permission|forbidden|403|not visible|not found/i.test(message)
+        ? 'You may not have access to review this submission. Ask an administrator to check your active role permission and branch or unit scope.'
+        : 'Unable to load the submission. Retry to check the latest state.');
+    });
     return () => { active = false; };
   }, [submissionId, revision]);
   useEffect(() => {
@@ -80,7 +86,11 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
     }
   }, []);
   const retry = () => { setSubmission(null); setAssessment(null); setLoadError(''); setError(''); setRevision(r => r + 1); };
-  const permitted = submission?.capabilities?.review && submission.finalStatus === 'PENDING_APPROVAL';
+  const isPendingReview = submission?.finalStatus === 'PENDING_APPROVAL';
+  const permitted = submission?.capabilities?.review === true && isPendingReview;
+  const unavailableMessage = !isPendingReview
+    ? 'This submission is no longer pending internal review. Its current status is shown above.'
+    : 'Your active role or submission scope does not include internal review access. Ask an administrator to check the submission:internal_screening permission and your branch or unit assignment.';
   const criteria = assessment?.criteria || [];
   async function save(decision: 'SUBMITTED' | 'REJECTED') {
     if (!submission || !assessment || !permitted || lock.current) return;
@@ -106,7 +116,7 @@ export function ReviewWorkspace({ submissionId, onClose, onSaved }: {
       </div></>} right={<>
       <section aria-label="Resume viewer" className={`min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card ${expandedResume || panel === 'resume' ? 'flex' : 'hidden lg:flex'}`}><div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5"><h2 className="text-xs font-bold">Resume</h2><div className="flex items-center gap-2"><Button variant="ghost" size="sm" className="h-7 text-xs" aria-pressed={expandedResume} onClick={() => setExpandedResume(value => !value)}>{expandedResume ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}{expandedResume ? 'Split view' : 'Expand resume'}</Button></div></div><ResumePages candidateId={submission.candidateId} /></section>
     </>} />
-    {permitted ? <div aria-label="Review decision" className="absolute bottom-3 right-3 z-20 flex gap-2 rounded-lg border border-border bg-background p-2 shadow-lg"><Button disabled={saving} className="h-8 bg-[#1a4fa0] text-xs text-white hover:bg-[#154181]" onClick={() => { setError(''); setDecision('SUBMITTED'); }}>Approve submission</Button><Button variant="outline" disabled={saving} className="h-8 border-red-500 text-xs text-red-700" onClick={() => { setError(''); setDecision('REJECTED'); }}>Reject</Button></div> : <p role="alert" className="shrink-0 text-xs">This submission is no longer pending review, or your review permission is unavailable.</p>}
+    {permitted ? <div aria-label="Review decision" className="absolute bottom-3 right-3 z-20 flex gap-2 rounded-lg border border-border bg-background p-2 shadow-lg"><Button disabled={saving} className="h-8 bg-[#1a4fa0] text-xs text-white hover:bg-[#154181]" onClick={() => { setError(''); setDecision('SUBMITTED'); }}>Approve submission</Button><Button variant="outline" disabled={saving} className="h-8 border-red-500 text-xs text-red-700" onClick={() => { setError(''); setDecision('REJECTED'); }}>Reject</Button></div> : <p role="alert" className="shrink-0 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:bg-amber-950/40 dark:text-amber-100">{unavailableMessage}</p>}
     <Dialog open={decision !== null} onOpenChange={open => { if (!open && !saving) setDecision(null); }}><DialogContent className="sm:max-w-[480px]" onEscapeKeyDown={event => { if (saving) event.preventDefault(); }} onInteractOutside={event => { if (saving) event.preventDefault(); }}><DialogHeader><DialogTitle className="text-sm">{decision === 'REJECTED' ? 'Reject submission' : 'Approve submission'}</DialogTitle><DialogDescription className="text-xs">{submission.candidateName} · {submission.jobTitle}. Your decision and remarks are recorded in the timeline.</DialogDescription></DialogHeader><div className="space-y-2"><label htmlFor="review-notes" className="text-xs font-semibold">Remarks {decision === 'REJECTED' ? '(required)' : '(optional)'}</label><Textarea id="review-notes" maxLength={4000} rows={3} value={notes} disabled={saving} onChange={event => setNotes(event.target.value)} placeholder="Type remarks to see suggestions…" className="text-xs" />{notes.trim() && <div aria-label="Remark suggestions" className="max-h-40 space-y-1 overflow-y-auto">{stageRemarkSuggestions(templates, 'review').filter(template => template.remarkText.toLowerCase().includes(notes.trim().toLowerCase()) && template.remarkText.trim().toLowerCase() !== notes.trim().toLowerCase()).slice(0, 5).map(template => <button key={template.id} type="button" disabled={saving} className="block w-full rounded border border-border px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => setNotes(template.remarkText)}>{template.remarkText}</button>)}</div>}{error && <div role="alert" className="text-xs text-red-700">{error}<Button variant="outline" className="ml-2 text-xs" disabled={saving} onClick={() => { setDecision(null); retry(); }}>Reload latest submission</Button></div>}</div><DialogFooter><Button variant="outline" disabled={saving} className="text-xs" onClick={() => setDecision(null)}>Cancel</Button><Button disabled={saving || !permitted || (decision === 'REJECTED' && !notes.trim())} className={decision === 'REJECTED' ? 'bg-red-600 text-xs text-white hover:bg-red-700' : 'bg-[#1a4fa0] text-xs text-white hover:bg-[#154181]'} onClick={() => { if (decision) void save(decision); }}>{saving && <Loader2 className="h-3 w-3 animate-spin" />}{decision === 'REJECTED' ? 'Confirm rejection' : 'Confirm approval'}</Button></DialogFooter></DialogContent></Dialog>
   </main>;
 }

@@ -12,6 +12,7 @@ import { compensationLabel, submissionCompensationValue } from "@/lib/submission
 import { ReviewWorkspace } from "@/components/submissions/review-workspace";
 import { stageRemarkSuggestions } from "@/lib/stage-remarks";
 import { USER_CITY_OPTIONS } from "@/lib/user-city-contract";
+import { closeSubmissionReviewHref, submissionReviewHref } from "@/lib/submission-review-navigation";
 
 import { Suspense, Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -279,7 +280,7 @@ function SubmissionDetails({ submission, onReview }: { submission: TrackerSubmis
           aria-label={`Review submission for ${submission.candidateName || "candidate"}`}
           onClick={onReview}
           className="inline-flex min-h-6 items-center justify-center gap-1 rounded px-2 text-xs font-medium text-[#1a4fa0] hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300"
-        >Review <span aria-hidden="true">→</span></button>}
+        >Review submission <span aria-hidden="true">→</span></button>}
       </div>
       <dl className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{detail.map(([label, value]) => <div key={label}><dt className="text-[11px] text-muted-foreground">{label}</dt><dd className="mt-1 text-xs break-words">{value || "—"}</dd></div>)}</dl>
     </div>
@@ -294,6 +295,7 @@ function SubmissionsPageContent() {
   const isAccountManager = resolveActiveSystemRole(selection.active.id, roles, profile) === "ACCOUNT_MANAGER";
   const view = params.get("view") || (isAccountManager ? "my" : "all");
   const submissionId = params.get("submission");
+  const reviewRequested = Boolean(submissionId && params.get("review") === "1");
   const [bucket, setBucket] = useState<TrackerBucket>("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -354,6 +356,13 @@ function SubmissionsPageContent() {
   }, [view, submissionId, bucket, jobFilter?.id, debouncedSearch, startDate, endDate, page, sort.key, sort.direction, revision, workspaceStatus, selection.active.id, profile?.branchId]);
   const detailHref = useCallback((id: string) => { const query = new URLSearchParams(params.toString()); query.set("submission", id); return `/utility/submissions?${query}`; }, [params]);
   function backToTracker() { const query = new URLSearchParams(params.toString()); query.delete("submission"); router.push(`/utility/submissions?${query}`); }
+  function openReview(id: string, returnToTracker = false) {
+    setEditor(null);
+    router.push(submissionReviewHref(params, id, returnToTracker));
+  }
+  function closeReview() {
+    router.push(closeSubmissionReviewHref(params));
+  }
   function renderCell(sub: TrackerSubmission, column: TrackerColumn): ReactNode {
     switch (column) {
       case "job": return <td key="job" className="px-5 py-5"><div className="space-y-1.5"><Link href={detailHref(sub.id)} className="block text-sm font-semibold leading-5 text-slate-900 hover:text-[#1a4fa0] hover:underline dark:text-slate-100">{sub.jobTitle || "Title unavailable"}</Link><p className="whitespace-nowrap font-medium text-muted-foreground">{sub.jobCode || "Code unavailable"}</p><div className="flex items-center gap-2 whitespace-nowrap text-[10.5px] leading-5">{sub.jobUrgency && <span className="rounded bg-amber-50 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{sub.jobUrgency}</span>}<button type="button" className="border-l border-border pl-2 font-medium text-[#1a4fa0] dark:text-blue-300 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => { setJobFilter({ id: sub.jobId, label: sub.jobCode || sub.jobTitle || "Selected job", previousPage: jobFilter?.previousPage ?? page }); setPage(1); }}>{sub.submissionNumber ? `${submissionOrdinal(sub.submissionNumber)} submission` : "Submission"}</button><span className="border-l border-border pl-2 text-muted-foreground">{sub.jobSubmissionRequired ?? "—"} required</span></div>{sub.jobIsCoSourced && <span className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[10.5px] text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Co-sourced</span>}</div></td>;
@@ -369,16 +378,16 @@ function SubmissionsPageContent() {
           {sub.capabilities?.review && sub.finalStatus === "PENDING_APPROVAL" && <button
             type="button"
             aria-label={`Review submission for ${sub.candidateName || "candidate"}`}
-            onClick={() => setEditor({ submission: sub, action: "review" })}
+            onClick={() => openReview(sub.id, true)}
             className="inline-flex min-h-6 items-center justify-center gap-1 rounded px-2 text-xs font-medium text-[#1a4fa0] hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300"
-          >Review <span aria-hidden="true">→</span></button>}
+          >Review submission <span aria-hidden="true">→</span></button>}
         </div>
       </td>;
-      case "actions": return <td key="actions" className="sticky right-0 z-10 bg-white dark:bg-slate-950 pl-3 pr-6 py-3 text-center shadow-[-1px_0_0_0_var(--border)]"><SubmissionActions submission={sub} href={detailHref(sub.id)} onAction={action => setEditor({ submission: sub, action })} /></td>;
+      case "actions": return <td key="actions" className="sticky right-0 z-10 bg-white dark:bg-slate-950 pl-3 pr-6 py-3 text-center shadow-[-1px_0_0_0_var(--border)]"><SubmissionActions submission={sub} href={detailHref(sub.id)} onAction={action => action === "review" ? openReview(sub.id, true) : setEditor({ submission: sub, action })} /></td>;
     }
   }
   if (workspaceStatus === "error") return <div role="alert" className="text-sm text-red-700">Unable to load workspace access. Refresh the page to retry.</div>;
-  if (editor?.action === "review" && workspaceStatus === "ready") return <ReviewWorkspace key={editor.submission.id} submissionId={editor.submission.id} onClose={() => setEditor(null)} onSaved={saved => { setEditor(null); setDetail(saved); setRevision(r => r + 1); }} />;
+  if (reviewRequested && workspaceStatus === "ready") return <ReviewWorkspace key={submissionId} submissionId={submissionId!} onClose={closeReview} onSaved={saved => { setDetail(saved); setRevision(r => r + 1); closeReview(); }} />;
   return <main className="space-y-5 min-w-0 text-foreground">
     {submissionId ? <Button variant="ghost" size="sm" className="text-xs -ml-2" onClick={backToTracker}><ArrowLeft className="h-3.5 w-3.5" />Back to submissions</Button> : <div><p className="mt-1 text-xs text-muted-foreground">Track progress. Take the next action.</p></div>}
     {!submissionId && <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs" aria-label="Submission tracker">
@@ -417,13 +426,9 @@ function SubmissionsPageContent() {
         <nav aria-label="Submission pages" className="flex items-center gap-1"><Button variant="outline" size="icon" className="h-8 w-8" aria-label="Previous page" disabled={loading || page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>{response && Array.from({ length: Math.min(5, response.totalPages) }, (_, i) => Math.max(1, Math.min(page - 2, response.totalPages - 4)) + i).map(p => <Button key={p} variant={p === page ? "default" : "outline"} className={cn("h-8 min-w-8 px-2 text-xs", p === page && PRIMARY)} aria-label={`Page ${p}`} aria-current={p === page ? "page" : undefined} disabled={loading} onClick={() => setPage(p)}>{p}</Button>)}<Button variant="outline" size="icon" className="h-8 w-8" aria-label="Next page" disabled={loading || !response || page >= response.totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button></nav>
       </div>
     </section>}
-    {submissionId && (loading ? <PageLoadingSkeleton variant="table" /> : error ? <div role="alert" className="text-xs">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : detail && <SubmissionDetails submission={detail} onReview={() => setEditor({ submission: detail, action: "review" })} />)}
+    {submissionId && !reviewRequested && (loading ? <PageLoadingSkeleton variant="table" /> : error ? <div role="alert" className="text-xs">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : detail && <SubmissionDetails submission={detail} onReview={() => openReview(detail.id)} />)}
     {editor && !["review", "notes", "rate"].includes(editor.action) && <UpdateSubmissionDialog key={editor.submission.id} submission={editor.submission} href={detailHref(editor.submission.id)} onReview={() => {
-      const targetSub = editor.submission;
-      setEditor(null);
-      setTimeout(() => {
-        setEditor({ submission: targetSub, action: "review" });
-      }, 50);
+      openReview(editor.submission.id, true);
     }} onClose={() => setEditor(null)} onSaved={saved => { setEditor(null); setDetail(saved); setRevision(r => r + 1); }} />}
     {editor && ["notes", "rate"].includes(editor.action) && <UpdateDialog key={`${editor.submission.id}-${editor.action}`} submission={editor.submission} action={editor.action} onClose={() => setEditor(null)} onSaved={saved => { setEditor(null); setDetail(saved); setRevision(r => r + 1); }} />}
     {profileTarget && <PersonProfileDialog key={`${profileTarget.kind}-${profileTarget.submission.id}`} target={profileTarget} onClose={() => setProfileTarget(null)} />}
