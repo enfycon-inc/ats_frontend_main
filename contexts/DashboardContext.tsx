@@ -101,6 +101,32 @@ export function DashboardProvider({ initialNavigation = null, children }: {
     return () => window.removeEventListener("branchChanged", reload);
   }, [reload]);
 
+  useEffect(() => {
+    let lastRecoveryAt = 0;
+    const refreshWorkspace = () => reload();
+    const recoverWhenAvailable = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      // Focus and online events often arrive together; avoid duplicate reloads.
+      if (now - lastRecoveryAt < 15000) return;
+      lastRecoveryAt = now;
+      window.dispatchEvent(new Event("app:refresh"));
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") recoverWhenAvailable();
+    };
+    window.addEventListener("app:refresh", refreshWorkspace);
+    window.addEventListener("focus", recoverWhenAvailable);
+    window.addEventListener("online", recoverWhenAvailable);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("app:refresh", refreshWorkspace);
+      window.removeEventListener("focus", recoverWhenAvailable);
+      window.removeEventListener("online", recoverWhenAvailable);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [reload]);
+
   const selection = useMemo(() => getDashboardRoleSelection(profile, roles, overrideRole, false), [profile, roles, overrideRole]);
   const selectRole = useCallback((roleId: string | null) => {
     if (!profile || (roleId && !selection.options.some(role => role.id === roleId))) return;

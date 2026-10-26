@@ -96,7 +96,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <SessionProvider session={session} refetchInterval={120} refetchOnWindowFocus={true}>
+    <SessionProvider session={session} refetchInterval={0} refetchOnWindowFocus={false}>
       <ClientRoot initialNavigation={initialNavigation} defaultOpen={cookieStore.get("sidebar_state")?.value !== "false"}>{children}</ClientRoot>
     </SessionProvider>
   );

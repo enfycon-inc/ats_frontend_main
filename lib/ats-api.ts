@@ -167,7 +167,9 @@ function getCurrentUser(): any | null {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-async function fetchSessionToken(): Promise<string | null> {
+let pendingSessionToken: Promise<string | null> | null = null;
+
+async function fetchSessionTokenRequest(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
   try {
     const res = await fetch('/api/auth/session', { cache: 'no-store' });
@@ -216,72 +218,26 @@ async function fetchSessionToken(): Promise<string | null> {
   return null;
 }
 
+async function fetchSessionToken(): Promise<string | null> {
+  if (pendingSessionToken) return pendingSessionToken;
+  const request = () => typeof navigator !== 'undefined' && navigator.locks
+    ? navigator.locks.request('ats_authjs_session_refresh', fetchSessionTokenRequest)
+    : fetchSessionTokenRequest();
+  pendingSessionToken = request();
+  try { return await pendingSessionToken; } finally { pendingSessionToken = null; }
+}
+
 async function getOrFetchToken(): Promise<string | null> {
   let token = getToken();
   if (token) return token;
-
-  // No valid stored token — attempt to recover via refresh token
-  if (getRefreshToken()) {
-    const refreshed = await tryAutoRefresh();
-    if (refreshed) return refreshed;
-  }
-
-  // Fetch fresh token from NextAuth session
+  // Auth.js is the single source of truth for rotating refresh credentials.
   return await fetchSessionToken();
 }
-
-let pendingRefresh: Promise<string | null> | null = null;
 
 class SessionRenewalUnavailable extends Error {
   constructor() { super('Session renewal is temporarily unavailable. Please try again.'); }
 }
 
-async function tryAutoRefresh(): Promise<string | null> {
-  if (pendingRefresh) return pendingRefresh;
-  const run = async () => {
-    if (typeof navigator !== 'undefined' && navigator.locks) {
-      const previous = getToken();
-      return navigator.locks.request('ats_token_refresh', async () => {
-        const current = getToken();
-        if (current && current !== previous) return current;
-        return refreshStoredToken();
-      });
-    }
-    return refreshStoredToken();
-  };
-  pendingRefresh = run();
-  try { return await pendingRefresh; } finally { pendingRefresh = null; }
-}
-
-async function refreshStoredToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
-
-  try {
-    const apiBase = getApiBase();
-    const res = await fetch(`${apiBase}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    if (res.status !== 401 && !res.ok) throw new SessionRenewalUnavailable();
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.accessToken) {
-        setToken(data.accessToken);
-        if (data.refreshToken) setRefreshToken(data.refreshToken);
-        return data.accessToken;
-      }
-    }
-  } catch (e) {
-    console.error('Auto token refresh failed:', e);
-    throw new SessionRenewalUnavailable();
-  }
-
-  clearToken();
-  return null;
-}
 
 // ─── HTTP Helper ────────────────────────────────────────────────────
 async function apiFetch<T = any>(
@@ -367,14 +323,9 @@ async function apiFetch<T = any>(
     const body = await res.json().catch(() => ({ message: res.statusText }));
     const isExpired = res.status === 401 || (body.message && body.message.toLowerCase().includes('expired'));
 
-    // Attempt automatic token refresh / session recovery if token expired and retry once
+    // Recover an expired access token through Auth.js, which owns the rotating
+    // refresh credential, and retry this request once.
     if (isExpired && !isRetry && !skipsSessionRecovery) {
-      if (getRefreshToken()) {
-        const refreshed = await tryAutoRefresh();
-        if (refreshed) return apiFetch<T>(path, options, true, roleRecoveryRetry, omitActiveRole);
-      }
-
-      // If no refresh token or refresh failed, fetch a fresh session token from NextAuth
       if (typeof window !== 'undefined') {
         clearToken();
         const freshToken = await fetchSessionToken();

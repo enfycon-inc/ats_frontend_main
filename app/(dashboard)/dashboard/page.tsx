@@ -120,6 +120,7 @@ export default function DashboardPage() {
         if (!Array.isArray(jobsData)) throw new Error("Invalid jobs response");
         if (!cancelled) setJobs(jobsData);
       } catch (err) {
+        console.error("Dashboard jobs request failed:", err);
         if (!cancelled) setJobsError("The dashboard's job data could not be loaded. Please try again.");
       } finally {
         if (!cancelled) setLoading(false);
@@ -131,12 +132,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const handleAppRefresh = () => {
-      reload();
       setJobsRequest((v) => v + 1);
     };
     window.addEventListener("app:refresh", handleAppRefresh);
     return () => window.removeEventListener("app:refresh", handleAppRefresh);
-  }, [reload]);
+  }, []);
 
   const handleUpdateJob = async (jobId: string, updatedFields: Partial<any>) => {
     // Status changes are confirmed and persisted through the dedicated endpoint.

@@ -81,7 +81,7 @@ test('absolute session expiry is logged separately from a rejected refresh token
   app.advance(24 * 60 * 60 * 1000);
   token = await app.config.callbacks.jwt({ token });
   assert.equal(token, null);
-  assert.ok(app.warnings.some(message => message.includes('24-hour absolute limit')));
+  assert.ok(app.warnings.some(message => message.includes('12 hours without a successful token refresh')));
 
   const rejected = auth(); let rejectedToken = await login(rejected);
   rejected.advance(6 * 60 * 1000); rejected.fail(401);
@@ -130,7 +130,7 @@ test('API requests use the exact selected role ID and do not forward legacy role
   assert.deepEqual(api(async () => {}, 'Tenant Admin').activeRoleHeaders(), {});
 });
 
-test('concurrent API calls share one refresh; outage settles all callers and keeps credentials', async () => {
+test('concurrent API calls share one Auth.js session recovery; outage settles callers and keeps credentials', async () => {
   let calls = 0;
   const app = api(async () => { calls++; await new Promise(resolve => setImmediate(resolve)); return new Response('{}', { status: 503 }); });
   const results = await Promise.allSettled([app.api.auth.me(), app.api.auth.me(), app.api.auth.me()]);
@@ -138,6 +138,31 @@ test('concurrent API calls share one refresh; outage settles all callers and kee
   assert.ok(results.every(r => r.status === 'rejected'));
   assert.equal(app.storage.get('ats_refresh_token'), 'valid-refresh');
   assert.equal(app.browser.location.href, '');
+});
+
+test('expired API access recovers through Auth.js instead of redeeming the browser refresh token', async () => {
+  const requests = [];
+  const renewedAccess = `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')}.signature`;
+  const app = api(async (url, options) => {
+    requests.push(String(url));
+    if (url === '/api/auth/session') {
+      return new Response(JSON.stringify({ user: { accessToken: renewedAccess, id: 'user', tenantId: 'tenant' } }));
+    }
+    if (String(url).endsWith('/api/auth/me')) {
+      if (requests.filter(value => value.endsWith('/api/auth/me')).length === 1) {
+        return new Response(JSON.stringify({ message: 'Access token expired' }), { status: 401 });
+      }
+      assert.equal(options.headers.Authorization, `Bearer ${renewedAccess}`);
+      return new Response(JSON.stringify({ id: 'user' }));
+    }
+    throw new Error(`Unexpected request ${url}`);
+  });
+  app.browser.dispatchEvent = () => {};
+  app.storage.set('ats_access_token', `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')}.signature`);
+
+  assert.deepEqual(await app.api.auth.me(), { id: 'user' });
+  assert.equal(requests.filter(url => url === '/api/auth/session').length, 1);
+  assert.equal(requests.some(url => url.endsWith('/api/auth/refresh')), false);
 });
 
 test('expired NextAuth access during outage does not redirect to login', async () => {
