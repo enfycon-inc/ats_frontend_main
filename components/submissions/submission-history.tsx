@@ -39,7 +39,7 @@ function isCalendarColorField(field: string) {
 }
 function activity(event: SubmissionHistoryEvent) {
   if (event.kind === 'BASELINE') return 'Existing record captured';
-  if (event.kind === 'CREATED') return 'Submission created';
+  if (event.kind === 'CREATED') return event.details.automaticInternalReview ? 'Submission created · internal review automatically approved' : 'Submission created';
   const changes = event.details.changes || {};
   const names: string[] = [];
   if (changes.finalStatus) names.push(changes.finalStatus.before === 'PENDING_APPROVAL' && changes.finalStatus.after === 'SUBMITTED' ? 'Submission approved' : statusLabel(changes.finalStatus.after || '') || 'Final status updated');
@@ -55,6 +55,7 @@ function activity(event: SubmissionHistoryEvent) {
   return names.join(' · ') || 'Submission details updated';
 }
 function presentation(event: SubmissionHistoryEvent) {
+  if (event.details.automaticInternalReview) return { Icon: CheckCircle2, color: 'text-green-700 dark:text-green-400' };
   const values = Object.entries(event.details.changes || {}).filter(([field]) => field.endsWith('Status')).map(([, change]) => change.after);
   if (event.details.correctionReason) return { Icon: Pencil, color: 'text-amber-600 dark:text-amber-400' };
   if (values.includes('OFFER')) return { Icon: FileText, color: 'text-green-700 dark:text-green-400' };
@@ -80,6 +81,7 @@ function EventDetails({ event, zone, jobType }: { event: SubmissionHistoryEvent;
   const changes = Object.entries(event.details.changes || {}).filter(([field]) => !isCalendarColorField(field) && !compensationMetadata.has(field));
   const snapshot = Object.entries(event.details.snapshot || {}).filter(([field, value]) => !isCalendarColorField(field) && !compensationMetadata.has(field) && value != null);
   return <div className="space-y-3 rounded-lg bg-blue-50/70 px-5 py-4 dark:bg-blue-950/30">
+    {event.details.automaticInternalReview && <p className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs dark:bg-blue-950/30">Internal review was automatically approved at submission using {event.details.automaticInternalReview.activeRoleName || 'the active role'} permissions. The candidate entered L1 pending. No manual review decision was recorded.</p>}
     {event.kind === 'BASELINE' && <p className="text-xs text-muted-foreground">Earlier updates are unavailable. This captures the existing record, not when its decisions were made.</p>}
     {changes.length > 0 && <dl className="space-y-3">{changes.filter(([field, change]) => !(/remarks|feedback/i.test(field) && change.after && [event.details.bypassReason, event.details.correctionReason].includes(change.after))).map(([field, change]) => <div key={field} className="grid grid-cols-[100px_1fr] gap-4 text-xs sm:grid-cols-[120px_1fr]"><dt className="font-semibold text-slate-600 dark:text-slate-300">{/Status$/.test(field) && changes.filter(([name]) => /Status$/.test(name)).length === 1 ? 'Status' : fieldLabel(field)}</dt><dd className="whitespace-pre-wrap [overflow-wrap:anywhere]"><span className="text-muted-foreground">{fieldValue(field, change.before, 'before')}</span><span aria-label="changed to"> → </span>{fieldValue(field, change.after)}</dd></div>)}</dl>}
     {snapshot.length > 0 && <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">{snapshot.map(([field, value]) => <div key={field} className="min-w-0 text-xs"><dt className="text-[10.5px] text-muted-foreground">{fieldLabel(field)}</dt><dd className="mt-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{fieldValue(field, value)}</dd></div>)}</dl>}

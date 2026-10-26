@@ -1,4 +1,5 @@
 "use client";
+import { SUBMISSION_AUTO_APPROVAL_PERMISSION } from '@/lib/submission-auto-approval';
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { jobAccessGrants } from '@/lib/job-access-grants';
 
@@ -1885,7 +1886,7 @@ export default function RolesPermissionsPage() {
                                   return (
                                     <label
                                       key={perm.id}
-                                      className={`flex items-start gap-2 p-2 rounded-lg border transition select-none text-xs ${
+                                      className={`${perm.id === SUBMISSION_AUTO_APPROVAL_PERMISSION ? "md:col-span-2 " : ""}flex items-start gap-2 p-2 rounded-lg border transition select-none text-xs ${
                                         !isAllowed
                                           ? "opacity-45 bg-neutral-100/60 dark:bg-slate-850/40 border-dashed border-neutral-250 dark:border-slate-800 cursor-not-allowed text-neutral-400 dark:text-neutral-500"
                                           : isChecked
@@ -1916,7 +1917,7 @@ export default function RolesPermissionsPage() {
                                           )}
                                         </div>
                                         {perm.description && (
-                                          <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
+                                          <span className={`text-[9.5px] text-neutral-400 block ${perm.id === SUBMISSION_AUTO_APPROVAL_PERMISSION ? "leading-snug mt-1" : "line-clamp-1"}`}>{perm.description}</span>
                                         )}
                                       </div>
                                     </label>
@@ -2259,7 +2260,7 @@ export default function RolesPermissionsPage() {
                                   return (
                                     <label
                                       key={perm.id}
-                                      className={`flex items-start gap-2 p-2 rounded-lg border transition select-none text-xs ${
+                                      className={`${perm.id === SUBMISSION_AUTO_APPROVAL_PERMISSION ? "md:col-span-2 " : ""}flex items-start gap-2 p-2 rounded-lg border transition select-none text-xs ${
                                         !isAllowed
                                           ? "opacity-45 bg-neutral-100/60 dark:bg-slate-850/40 border-dashed border-neutral-250 dark:border-slate-800 cursor-not-allowed text-neutral-400 dark:text-neutral-500"
                                           : isChecked
@@ -2290,7 +2291,7 @@ export default function RolesPermissionsPage() {
                                           )}
                                         </div>
                                         {perm.description && (
-                                          <span className="text-[9.5px] text-neutral-400 block line-clamp-1">{perm.description}</span>
+                                          <span className={`text-[9.5px] text-neutral-400 block ${perm.id === SUBMISSION_AUTO_APPROVAL_PERMISSION ? "leading-snug mt-1" : "line-clamp-1"}`}>{perm.description}</span>
                                         )}
                                       </div>
                                     </label>
@@ -2762,7 +2763,7 @@ export default function RolesPermissionsPage() {
                             return (
                               <label
                                 key={perm.id}
-                                className={`flex items-start gap-2.5 p-3 rounded-lg border transition select-none ${
+                                className={`${perm.id === SUBMISSION_AUTO_APPROVAL_PERMISSION ? "md:col-span-2 " : ""}flex items-start gap-2.5 p-3 rounded-lg border transition select-none ${
                                   !isAllowed
                                     ? "opacity-45 bg-neutral-100/60 dark:bg-slate-850/40 border-dashed border-neutral-250 dark:border-slate-800 cursor-not-allowed text-neutral-400 dark:text-neutral-500"
                                     : isChecked

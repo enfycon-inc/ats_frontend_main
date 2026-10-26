@@ -84,6 +84,7 @@ interface ClientData {
 }
 
 import { getUserColumnPreferences, saveUserColumnPreferences } from "@/utils/user-column-preferences";
+import { canDeleteClients } from "@/lib/client-access";
 
 const DEFAULT_CLIENT_COLUMNS = [
   "clientId",
@@ -112,6 +113,7 @@ export default function ClientDashboard() {
 
   const userRoles = (currentUser?.roles || []).map((r: string) => String(r).toUpperCase().replace(/[\s-_]+/g, ''));
   const userPermissions = currentUser?.permissions || [];
+  const canDeleteClient = canDeleteClients(currentUser);
   const isSuperOrAdmin = userRoles.includes('TENANT_ADMIN') || userRoles.includes('SUPERADMIN') || userRoles.includes('SUPER_ADMIN');
   const canApproveRejectClient = 
     userPermissions.includes('client:approve') || 
@@ -646,12 +648,14 @@ export default function ClientDashboard() {
               </DropdownMenuItem>
             </>
           )}
-          <DropdownMenuItem
-            onClick={() => setClientToDelete(row)}
-            className="cursor-pointer text-xs py-1.5 px-2.5 font-medium flex items-center gap-2 text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950/40"
-          >
-            <Trash2 className="h-3.5 w-3.5" /> Delete
-          </DropdownMenuItem>
+          {canDeleteClient && (
+            <DropdownMenuItem
+              onClick={() => setClientToDelete(row)}
+              className="cursor-pointer text-xs py-1.5 px-2.5 font-medium flex items-center gap-2 text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950/40"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -697,7 +701,8 @@ export default function ClientDashboard() {
             savedViews={savedViews}
             activeView={activeView}
             onSelectView={handleSelectView}
-            onBulkDelete={handleBulkDelete}
+            onBulkDelete={canDeleteClient ? handleBulkDelete : undefined}
+            showExport={false}
             searchFilterOptions={[
               { label: "Search Any", value: "All" },
               { label: "Client ID", value: "clientId" },

@@ -1829,8 +1829,8 @@ const branches = {
   async delegationTargets(): Promise<any[]> {
     return apiFetch<any[]>('/api/branches/delegation-targets');
   },
-  async list(): Promise<any[]> {
-    return apiFetch<any[]>('/api/branches');
+  async list(options?: Pick<RequestInit, 'signal'>): Promise<any[]> {
+    return apiFetch<any[]>('/api/branches', options);
   },
   async get(id: string): Promise<any> {
     return apiFetch<any>(`/api/branches/${id}`);
@@ -1936,9 +1936,9 @@ const businessUnits = {
   async onboardingOptions(): Promise<{ id: string; name: string; branchId: string | null }[]> {
     return apiFetch('/api/business-units/onboarding-options');
   },
-  async list(branchId?: string): Promise<any[]> {
+  async list(branchId?: string, options?: Pick<RequestInit, 'signal'>): Promise<any[]> {
     const q = branchId ? `?branchId=${encodeURIComponent(branchId)}` : '';
-    return apiFetch<any[]>(`/api/business-units${q}`);
+    return apiFetch<any[]>(`/api/business-units${q}`, options);
   },
   async get(id: string): Promise<any> {
     return apiFetch<any>(`/api/business-units/${id}`);
@@ -2140,7 +2140,7 @@ const publicJobsApiKeys = {
 
 export type CareerOauthClient = Omit<PublicJobsApiKey, 'keyPrefix' | 'expiresAt'> & { expiresAt: string | null };
 const careerOauthClients = {
- list: () => apiFetch<CareerOauthClient[]>('/api/developer/clients'),
+ list: (options?: Pick<RequestInit, 'signal'>) => apiFetch<CareerOauthClient[]>('/api/developer/clients', options),
  create: (input: { name: string; scope: CareerOauthClient['scope']; branchId?: string; businessUnitId?: string; allowedOrigins: string[]; expiryMonths: number | null }) => apiFetch<CareerOauthClient & { client_id: string; client_secret: string }>('/api/developer/clients', { method: 'POST', body: JSON.stringify(input) }),
  revoke: (id: string) => apiFetch('/api/developer/clients/' + encodeURIComponent(id), { method: 'DELETE' }),
 };

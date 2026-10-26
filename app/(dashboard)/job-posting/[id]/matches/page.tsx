@@ -8,15 +8,14 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   ArrowLeft, Sparkles, RefreshCw, MapPin, Briefcase, GraduationCap,
   Mail, Phone, Check, X, Zap, ZapOff, Users, AlertCircle, UserPlus,
 } from "lucide-react";
 import { atsApi, type JobMatchesResponse, type CandidateMatch } from "@/lib/ats-api";
-import { Button } from "@/components/ui/button";
 
 import { CandidateSubmissionModal } from "@/components/job-posting/CandidateSubmissionModal";
+import { MatchedCandidateProfileDialog } from "@/components/job-posting/matched-candidate-profile-dialog";
 
 const TIER_STYLES: Record<CandidateMatch["matchTier"], { ring: string; text: string; chip: string; label: string }> = {
   Strong: { ring: "#10b981", text: "text-emerald-600 dark:text-emerald-400", chip: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900", label: "Strong match" },
@@ -72,6 +71,7 @@ export default function JobMatchesPage() {
   // Submit Modal States
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateMatch | null>(null);
+  const [profileCandidateId, setProfileCandidateId] = useState<string | number | null>(null);
   // Existing submissions Set to prevent double submission
   const [submittedIds, setSubmittedIds] = useState<Set<number>>(new Set());
 
@@ -316,6 +316,7 @@ export default function JobMatchesPage() {
                 job={job}
                 submittedIds={submittedIds}
                 onSubmitClick={() => handleOpenSubmitModal(m)}
+                onProfileClick={() => setProfileCandidateId(m.candidateId)}
               />
             ))}
           </div>
@@ -335,6 +336,7 @@ export default function JobMatchesPage() {
         existingCandidateId={selectedCandidate.candidateId}
         onSuccess={() => { setSubmittedIds(prev => new Set([...prev, selectedCandidate.candidateId])); load(); }}
       />}
+      <MatchedCandidateProfileDialog open={profileCandidateId !== null} candidateId={profileCandidateId} jobTitle={job?.jobTitle || "this job"} onOpenChange={open => { if (!open) setProfileCandidateId(null); }} onSubmitProfile={candidateId => { setProfileCandidateId(null); const candidate = matches.find(match => String(match.candidateId) === String(candidateId)); if (candidate) void handleOpenSubmitModal(candidate); }} />
     </div>
   );
 }
@@ -366,7 +368,7 @@ function StatTile({ label, value, tone }: { label: string; value: number; tone: 
   );
 }
 
-function MatchCard({ rank, m, job, submittedIds, onSubmitClick }: { rank: number; m: CandidateMatch; job: any; submittedIds?: Set<number>; onSubmitClick?: () => void }) {
+function MatchCard({ rank, m, job, submittedIds, onSubmitClick, onProfileClick }: { rank: number; m: CandidateMatch; job: any; submittedIds?: Set<number>; onSubmitClick?: () => void; onProfileClick?: () => void }) {
   const tier = TIER_STYLES[m.matchTier];
 
   const isDomestic = job?.market === "IN" || job?.market === "DOMESTIC" || (job?.country && job.country.toLowerCase() !== "united states");
@@ -416,12 +418,9 @@ function MatchCard({ rank, m, job, submittedIds, onSubmitClick }: { rank: number
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-bold text-neutral-900 dark:text-white truncate">
-              <Link
-                href={`/applicants/CAN-${String(m.candidateId).padStart(6, '0')}`}
-                className="hover:text-violet-650 dark:hover:text-violet-400 hover:underline transition-colors"
-              >
+              <button type="button" onClick={onProfileClick} className="text-left hover:text-violet-650 dark:hover:text-violet-400 hover:underline transition-colors" aria-label={`View latest profile and resume for ${m.fullName}`}>
                 {m.fullName || "Unnamed candidate"}
-              </Link>
+              </button>
             </h3>
             <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${tier.chip}`}>{tier.label}</span>
             <span className="rounded-md bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">{m.source}</span>

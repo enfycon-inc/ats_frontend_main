@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import Link from 'next/link';
 import { atsApi } from '@/lib/ats-api';
 import type { TrackerBucket, TrackerResponse, TrackerSubmission } from '@/lib/submission-contract';
-import { submissionBucket, canMaintainSubmission } from '@/lib/submission-tracker';
+import { submissionBucket, canMaintainSubmission, type TrackerAction } from '@/lib/submission-tracker';
 import { expectedCompensationLabel, expectedSubmissionCompensation } from '@/lib/submission-compensation';
 import { Button } from '@/components/ui/button';
 import { Pipeline, StageBadge } from './submission-stage';
@@ -40,7 +40,7 @@ export function JobSubmissions({ jobId, jobType, market, initialResponse, onSave
   const href = (sub: TrackerSubmission) => `/utility/submissions?submission=${encodeURIComponent(sub.id)}`;
   const saved = () => { setEditor(null); setReview(null); void mutate(); onSaved(); };
   function actions(sub: TrackerSubmission) {
-    return <SubmissionActions submission={sub} href={href(sub)} canEdit={canMaintainSubmission(sub)} onAction={() => setEditor(sub)} />;
+    return <SubmissionActions submission={sub} href={href(sub)} canEdit={canMaintainSubmission(sub)} onAction={(action: TrackerAction) => action === 'review' ? setReview(sub.id) : setEditor(sub)} />;
   }
   if (review) return <ReviewWorkspace submissionId={review} onClose={() => setReview(null)} onSaved={saved} />;
   return <section aria-label="Job candidate submissions" className="min-w-0 space-y-3">
@@ -81,7 +81,7 @@ export function JobSubmissions({ jobId, jobType, market, initialResponse, onSave
                       {compensation.note && <p className="mt-1 text-[10.5px] text-muted-foreground">{compensation.note}</p>}
                     </td>
                     <td className="min-w-[260px] px-4 py-4"><Pipeline submission={sub} /></td>
-                    <td className="min-w-[160px] px-4 py-4"><StageBadge submission={sub} /></td>
+                    <td className="min-w-[160px] px-4 py-4"><div className="flex flex-col items-center gap-2"><StageBadge submission={sub} />{sub.capabilities?.review && sub.finalStatus === 'PENDING_APPROVAL' && <Button variant="outline" size="sm" className="h-7 border-[#1a4fa0]/30 px-2.5 text-[10.5px] text-[#1a4fa0] hover:bg-blue-50" onClick={() => setReview(sub.id)}>Review</Button>}</div></td>
                     <td className="w-[72px] px-4 py-4">{actions(sub)}</td>
                   </tr>;
                 })}

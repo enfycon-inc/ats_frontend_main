@@ -6,6 +6,7 @@
     "lib/job-capabilities.ts": "278defd70b11ca0541716843010a98b6d98f896812ac5346da8c0cd752105593",
     "lib/job-access-grants.ts": "20adc3c38d10e7e09f03b39473330fff3d5e4a00e0bcd4a4584c1acedb1610c2",
     "lib/notification-preferences.ts": "9657021b4788f6f68a216a90ed04df3a03090c0795a52cfcd940bae406865a25",
-    "lib/job-assignment-policy.ts": "0128f6504abc8ffc0f02b2956f7e388c40e8b9b79e676ee5ab99b9fcf5314025"
+    "lib/job-assignment-policy.ts": "0128f6504abc8ffc0f02b2956f7e388c40e8b9b79e676ee5ab99b9fcf5314025",
+    "lib/submission-auto-approval.ts": "626135020e5600ee8243927ed062492ec63c0932f7269084fa4266ea8b03f65e"
   }
 }

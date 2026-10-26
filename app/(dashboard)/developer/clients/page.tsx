@@ -1,8 +1,10 @@
 "use client";
 
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { useSession } from "next-auth/react";
+import { useMemo, useState, type FormEvent } from "react";
+import useSWR from "swr";
+import { useDashboardContext } from "@/contexts/DashboardContext";
+import { loadCareerClientSettings } from "@/lib/career-client-loading";
 import { AlertTriangle, Clipboard, Code2, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,14 +19,17 @@ function scopeLabel(scope: Scope) {
 }
 
 export default function PublicCareersApiPage() {
-  const { data: session, status } = useSession();
-  const user = session?.user as { permissions?: string[] } | undefined;
-  const permissions = Array.isArray(user?.permissions) ? user.permissions : [];
+  const { profile, status, reload, selection } = useDashboardContext();
+  const permissions: string[] = Array.isArray(profile?.permissions) ? profile.permissions : [];
   const canManage = permissions.includes("tenant:settings") || permissions.includes("tenant:manage");
-  const [keys, setKeys] = useState<CareerOauthClient[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
-  const [units, setUnits] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  if (status === "loading") return <PageLoadingSkeleton variant="form" />;
+  if (status === "error" || !profile) return <Card><CardHeader><CardTitle className="text-base">Unable to verify workspace access</CardTitle><CardDescription>Please retry loading your workspace permissions.</CardDescription></CardHeader><CardContent><Button variant="outline" onClick={reload}>Retry</Button></CardContent></Card>;
+  if (!canManage) return <Card className="max-w-2xl"><CardHeader><CardTitle className="text-base">Tenant administrator access required</CardTitle><CardDescription>Only users with tenant settings or tenant management permission can manage public careers API clients.</CardDescription></CardHeader></Card>;
+  const identity = [profile.id, profile.tenantId, selection.active.id, [...permissions].sort().join(",")].join(":");
+  return <ClientSettings key={identity} identity={identity} />;
+}
+
+function ClientSettings({ identity }: { identity: string }) {
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(true);
   const [createdSecret, setCreatedSecret] = useState("");
@@ -36,28 +41,17 @@ export default function PublicCareersApiPage() {
   const [expiryMonths, setExpiryMonths] = useState("12");
   const [clientId, setClientId] = useState("");
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [keyList, branchList, unitList] = await Promise.all([
-        atsApi.careerOauthClients.list(),
-        atsApi.branches.list(),
-        atsApi.businessUnits.list(),
-      ]);
-      setKeys(keyList);
-      setBranches(Array.isArray(branchList) ? branchList : []);
-      setUnits(Array.isArray(unitList) ? unitList : []);
-    } catch (error: any) {
-      toast.error(error?.message || "Could not load public careers API settings.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (status === "authenticated" && canManage) void loadPage();
-    else if (status === "unauthenticated" || (status === "authenticated" && !canManage)) setLoading(false);
-  }, [status, canManage, loadPage]);
+  const readOptions = { shouldRetryOnError: false, dedupingInterval: 15000 };
+  const clients = useSWR(["career-clients", identity], () => loadCareerClientSettings(signal => atsApi.careerOauthClients.list({ signal })), readOptions);
+  const keys = clients.data || [];
+  const needBranches = scope !== "TENANT" || keys.some(key => key.scope !== "TENANT");
+  const needUnitNames = keys.some(key => key.scope === "BUSINESS_UNIT");
+  const needUnits = needUnitNames || (scope === "BUSINESS_UNIT" && Boolean(branchId));
+  const unitBranch = needUnitNames ? undefined : branchId || undefined;
+  const branchOptions = useSWR(needBranches ? ["career-branches", identity] : null, () => loadCareerClientSettings(signal => atsApi.branches.list({ signal })), readOptions);
+  const unitOptions = useSWR(needUnits ? ["career-units", identity, unitBranch] : null, () => loadCareerClientSettings(signal => atsApi.businessUnits.list(unitBranch, { signal })), readOptions);
+  const branches = branchOptions.data || [];
+  const units = unitOptions.data || [];
 
   const selectedUnits = useMemo(() => units.filter((unit) => branchId && unit.branchId === branchId), [units, branchId]);
   const branchNames = useMemo(() => new Map(branches.map((branch) => [branch.id, branch.name || branch.branchName || branch.label || "Branch"])), [branches]);
@@ -84,7 +78,7 @@ export default function PublicCareersApiPage() {
       setClientId(created.client_id);
       setShowForm(false);
       resetForm();
-      await loadPage();
+      void clients.mutate().catch(() => {});
     } catch (error: any) {
       toast.error(error?.message || "Could not create client credentials.");
     } finally {
@@ -97,7 +91,7 @@ export default function PublicCareersApiPage() {
     try {
       await atsApi.careerOauthClients.revoke(key.id);
       toast.success("client credentials revoked.");
-      await loadPage();
+      void clients.mutate().catch(() => {});
     } catch (error: any) {
       toast.error(error?.message || "Could not revoke client credentials.");
     }
@@ -107,9 +101,6 @@ export default function PublicCareersApiPage() {
     try { await navigator.clipboard.writeText(createdSecret); toast.success("client credentials copied."); }
     catch { toast.error("Copy failed. Select and copy the key manually."); }
   }
-
-  if (status === "loading" || loading) return <PageLoadingSkeleton variant="table" />;
-  if (!canManage) return <Card className="max-w-2xl"><CardHeader><CardTitle className="text-base">Tenant administrator access required</CardTitle><CardDescription>Only users with tenant settings or tenant management permission can manage public careers API clients.</CardDescription></CardHeader></Card>;
 
   return (
     <div className="mx-auto w-full space-y-5 pb-10">
@@ -138,8 +129,8 @@ export default function PublicCareersApiPage() {
         <CardContent><form onSubmit={createKey} className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-1.5 text-xs font-semibold">Client name<Input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Main careers website" required className="h-9 text-xs"/></label>
           <label className="space-y-1.5 text-xs font-semibold">Access scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setBranchId(""); setBusinessUnitId(""); }} className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-900"><option value="TENANT">Entire tenant</option><option value="BRANCH">One branch</option><option value="BUSINESS_UNIT">Branch, then one business unit</option></select></label>
-          {scope !== "TENANT" && <label className="space-y-1.5 text-xs font-semibold">Branch<select value={branchId} onChange={(event) => { setBranchId(event.target.value); setBusinessUnitId(""); }} required className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-900"><option value="">Select branch</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name || branch.branchName || branch.label || branch.id}</option>)}</select></label>}
-          {scope === "BUSINESS_UNIT" && <label className="space-y-1.5 text-xs font-semibold">Business unit<select value={businessUnitId} disabled={!branchId} onChange={(event) => setBusinessUnitId(event.target.value)} required className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-900"><option value="">Select business unit</option>{selectedUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.name || unit.businessUnitName || unit.label || unit.id}</option>)}</select></label>}
+          {scope !== "TENANT" && <label className="space-y-1.5 text-xs font-semibold">Branch<select value={branchId} onChange={(event) => { setBranchId(event.target.value); setBusinessUnitId(""); }} required disabled={branchOptions.isLoading || Boolean(branchOptions.error)} className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-900"><option value="">{branchOptions.isLoading ? "Loading branches…" : branchOptions.error ? "Branches unavailable" : "Select branch"}</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name || branch.branchName || branch.label || branch.id}</option>)}</select>{branchOptions.error && <button type="button" onClick={() => void branchOptions.mutate()} className="mt-1 text-xs font-normal text-indigo-600 hover:underline">Could not load branches. Retry</button>}</label>}
+          {scope === "BUSINESS_UNIT" && <label className="space-y-1.5 text-xs font-semibold">Business unit<select value={businessUnitId} disabled={!branchId || unitOptions.isLoading || Boolean(unitOptions.error)} onChange={(event) => setBusinessUnitId(event.target.value)} required className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-900"><option value="">{!branchId ? "Select a branch first" : unitOptions.isLoading ? "Loading business units…" : unitOptions.error ? "Business units unavailable" : "Select business unit"}</option>{selectedUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.name || unit.businessUnitName || unit.label || unit.id}</option>)}</select>{unitOptions.error && <button type="button" onClick={() => void unitOptions.mutate()} className="mt-1 text-xs font-normal text-indigo-600 hover:underline">Could not load business units. Retry</button>}</label>}
           <label className="space-y-1.5 text-xs font-semibold">Client expiration<select value={expiryMonths} onChange={event => setExpiryMonths(event.target.value)} className="h-9 w-full rounded-md border px-3 text-xs dark:bg-slate-900"><option value="none">No expiry</option><option value="1">1 month</option><option value="6">6 months</option><option value="12">1 year</option><option value="24">2 years</option></select></label>
           <label className="space-y-1.5 text-xs font-semibold sm:col-span-2">Allowed website origins <span className="font-normal text-neutral-500">(optional; enter HTTPS origins or * for any origin, separated by commas or new lines)</span><textarea value={originText} onChange={(event) => setOriginText(event.target.value)} placeholder={'https://careers.example.com'} rows={2} className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-xs font-normal dark:border-slate-700 dark:bg-slate-900"/><span className="block font-normal text-neutral-500">Origin checks are an additional browser control, not a substitute for keeping the key server-side.</span></label>
           <div className="flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</Button><Button type="submit" disabled={saving} className="bg-indigo-600 hover:bg-indigo-700">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Generate client credentials</Button></div>
@@ -150,7 +141,9 @@ export default function PublicCareersApiPage() {
         <CardHeader className="border-b border-neutral-100 dark:border-slate-800"><CardTitle className="text-sm">API clients</CardTitle><CardDescription>Secrets are never stored in recoverable form. Only the client ID and configuration are shown here.</CardDescription></CardHeader>
         <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="bg-neutral-50 text-[10.5px] uppercase tracking-wider text-neutral-600 dark:bg-slate-800/40 dark:text-neutral-400"><tr>{["Name", "Scope", "Allowed origins", "Client ID", "Expires", "Status", ""].map((label) => <th key={label} className="px-4 py-3 font-bold">{label}</th>)}</tr></thead><tbody className="divide-y divide-neutral-100 dark:divide-slate-800">
           {keys.map((key) => { const expired = Boolean(key.expiresAt && new Date(key.expiresAt) <= new Date()); const revoked = Boolean(key.revokedAt); const active = !expired && !revoked; const scopeDetail = key.scope === "BRANCH" ? branchNames.get(key.branchId || "") : key.scope === "BUSINESS_UNIT" ? unitNames.get(key.businessUnitId || "") : "All tenant jobs"; return <tr key={key.id} className="hover:bg-neutral-50/60 dark:hover:bg-slate-800/20"><td className="px-4 py-3 font-semibold text-neutral-900 dark:text-white">{key.name}</td><td className="px-4 py-3"><span className="font-semibold">{scopeLabel(key.scope)}</span><span className="mt-0.5 block text-[10px] text-neutral-500">{scopeDetail || "Scoped access"}</span></td><td className="max-w-48 truncate px-4 py-3 text-neutral-600">{key.allowedOrigins.length ? key.allowedOrigins.join(", ") : "Any origin"}</td><td className="px-4 py-3 font-mono text-[10px] text-neutral-600">{key.id}</td><td className="whitespace-nowrap px-4 py-3">{key.expiresAt ? new Date(key.expiresAt).toLocaleDateString() : "No expiry"}</td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${active ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"}`}>{revoked ? "Revoked" : expired ? "Expired" : "Active"}</span></td><td className="px-4 py-3">{active && <Button variant="outline" size="sm" onClick={() => void revokeKey(key)} className="h-7 border-red-200 px-2 text-[10px] text-red-700 hover:bg-red-50"><Trash2 className="mr-1 h-3 w-3"/>Revoke</Button>}</td></tr>; })}
-          {!keys.length && <tr><td colSpan={7} className="px-4 py-10 text-center text-neutral-500">No API clients created yet.</td></tr>}
+          {clients.isLoading && !clients.data && <tr><td colSpan={7} className="px-4 py-10 text-center text-neutral-500"><span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin"/>Loading API clients…</span></td></tr>}
+          {clients.error && !clients.data && <tr><td colSpan={7} className="px-4 py-8 text-center text-neutral-600"><p>Could not load API clients. {clients.error.message || "Please retry."}</p><Button variant="outline" size="sm" className="mt-3" onClick={() => void clients.mutate()}>Retry</Button></td></tr>}
+          {!clients.isLoading && !clients.error && !keys.length && <tr><td colSpan={7} className="px-4 py-10 text-center text-neutral-500">No API clients created yet.</td></tr>}
         </tbody></table></div></CardContent>
       </Card>
 

@@ -3,6 +3,7 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 
 const contracts = {
+  submissionAutoApproval: [['recruiter-submissions/submission-auto-approval.ts', 'lib/submission-auto-approval.ts']],
   notifications: [['notifications/notification-preferences.ts', 'lib/notification-preferences.ts']],
   branding: [['auth/tenant-branding-contract.ts', 'lib/tenant-branding-contract.ts']],
   signIn: [['auth/sign-in-policy.ts', 'lib/sign-in-policy.ts']],

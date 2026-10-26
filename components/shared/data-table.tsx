@@ -42,6 +42,7 @@ export interface DataTableProps<TData> {
   onSelectView: (viewName: string) => void;
   onUpdateRecord?: (recordId: string, updatedFields: Partial<TData>) => void;
   onBulkDelete?: (selectedIds: string[]) => Promise<void> | void;
+  showExport?: boolean;
   
   // Generic Configuration
   getRowId?: (row: TData) => string;
@@ -88,6 +89,7 @@ export default function DataTable<TData extends Record<string, any>>({
   onSelectView,
   onUpdateRecord,
   onBulkDelete,
+  showExport = true,
   getRowId = (row) => row.id,
   searchFilterOptions = [{ label: "Search Any", value: "All" }],
   defaultSearchFilter = "All",
@@ -387,12 +389,14 @@ export default function DataTable<TData extends Record<string, any>>({
               <span className="text-[10px] font-bold text-primary">
                 {selectedRowIds.length} Selected
               </span>
-              <button
-                onClick={exportToCSV}
-                className="text-[10px] text-primary font-bold flex items-center gap-1 hover:underline ml-1 cursor-pointer"
-              >
-                <Download className="h-3 w-3" /> Export
-              </button>
+              {showExport && (
+                <button
+                  onClick={exportToCSV}
+                  className="text-[10px] text-primary font-bold flex items-center gap-1 hover:underline ml-1 cursor-pointer"
+                >
+                  <Download className="h-3 w-3" /> Export
+                </button>
+              )}
               {onBulkDelete && (
                 <button
                   onClick={() => setIsDeleteConfirmOpen(true)}
@@ -418,12 +422,14 @@ export default function DataTable<TData extends Record<string, any>>({
             <RefreshCw className="h-3 w-3" />
           </button>
 
-          <button
-            onClick={exportToCSV}
-            className="flex items-center gap-1 px-2 py-1 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
-          >
-            <Download className="h-3 w-3" /> Export CSV
-          </button>
+          {showExport && (
+            <button
+              onClick={exportToCSV}
+              className="flex items-center gap-1 px-2 py-1 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
+            >
+              <Download className="h-3 w-3" /> Export CSV
+            </button>
+          )}
 
           {topRightActions}
 

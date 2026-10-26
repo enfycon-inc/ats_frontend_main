@@ -6,14 +6,16 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const pairs = [
+  // Entries retain their original indices for existing script mapping.
   ['notifications/notification-preferences.ts', 'lib/notification-preferences.ts'],
   ['auth/tenant-branding-contract.ts', 'lib/tenant-branding-contract.ts'],
   ['auth/sign-in-policy.ts', 'lib/sign-in-policy.ts'],
   ['jobs/job-capabilities.ts', 'lib/job-capabilities.ts'],
   ['auth/job-access-grants.ts', 'lib/job-access-grants.ts'],
   ['auth/job-assignment-policy.ts', 'lib/job-assignment-policy.ts'],
+  ['recruiter-submissions/submission-auto-approval.ts', 'lib/submission-auto-approval.ts'],
 ];
-const scripts = ['sync-notification-preferences.cjs', 'sync-tenant-branding.cjs', 'sync-sign-in-policy.cjs', 'sync-job-access.cjs'];
+const scripts = ['sync-notification-preferences.cjs', 'sync-tenant-branding.cjs', 'sync-sign-in-policy.cjs', 'sync-job-access.cjs', 'sync-submission-auto-approval.cjs'];
 function fixture(t, backend = false) {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'ats-contract-validation-'));
   t.after(() => {
@@ -43,7 +45,7 @@ test('each contract fails standalone validation when modified', t => {
   pairs.forEach(([, target], i) => {
     const file = path.join(f.frontend, target), original = fs.readFileSync(file, 'utf8');
     fs.writeFileSync(file, original + '// changed\n');
-    const result = f.run(scripts[Math.min(i, 3)], '--check');
+    const result = f.run(scripts[i === 6 ? 4 : Math.min(i, 3)], '--check');
     assert.notEqual(result.status, 0); assert.match(result.stderr, /checksum mismatch/);
     fs.writeFileSync(file, original);
   });

@@ -8,10 +8,9 @@ import type { TrackerResponse, TrackerSubmission } from "@/lib/submission-contra
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Pencil, Sparkles, DollarSign, Briefcase, MapPin, CreditCard, Building2, Clock, Zap, AlertCircle, User, UserPlus, ClipboardList, RefreshCw, Loader2, FileText, CheckCircle, XCircle, Upload, Share2 } from "lucide-react";
+import { ChevronLeft, Pencil, Sparkles, DollarSign, Briefcase, MapPin, CreditCard, Building2, Clock, Zap, AlertCircle, User, ClipboardList, RefreshCw, Loader2, FileText, CheckCircle, XCircle, Upload, Share2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { JobDescriptionView } from "@/components/ui/job-description-view";
@@ -21,6 +20,7 @@ import { JobDescriptionView } from "@/components/ui/job-description-view";
 
 import { atsApi } from "@/lib/ats-api";
 import { CandidateSubmissionModal } from "@/components/job-posting/CandidateSubmissionModal";
+import { MatchedCandidateProfileDialog } from "@/components/job-posting/matched-candidate-profile-dialog";
 import { mapApiJobToJob, type Job } from "../data/mock-jobs";
 import toast from "react-hot-toast";
 import { DelegateJobModal } from "@/components/shared/delegate-job-modal";
@@ -109,7 +109,6 @@ export default function JobDetailPage() {
     return job?.capabilities?.edit === true;
   }, [currentUser, job]);
 
-  const [submitting, setSubmitting] = useState(false);
   const [publication, setPublication] = useState({ published: false, slug: null as string | null, description: '', eligible: false, visible: false });
   const [publicationOpen, setPublicationOpen] = useState(false);
   const [publicationSaving, setPublicationSaving] = useState(false);
@@ -161,11 +160,9 @@ export default function JobDetailPage() {
     );
   }, [currentUser, roles, job]);
 
-  // AI Matches Submission modal states
-  const [matchSubmitOpen, setMatchSubmitOpen] = useState(false);
-  const [selectedMatch, setSelectedMatch] = useState<any>(null);
-  const [matchRate, setMatchRate] = useState("");
-  const [matchComment, setMatchComment] = useState("");
+  // AI-match profile preview and existing-candidate submission form state.
+  const [profileCandidateId, setProfileCandidateId] = useState<string | number | null>(null);
+  const [submissionCandidateId, setSubmissionCandidateId] = useState<string | number | undefined>();
 
   // Direct Upload & Submit Candidate modal state
   const [uploadSubmitOpen, setUploadSubmitOpen] = useState(false);
@@ -274,30 +271,6 @@ export default function JobDetailPage() {
       toast.error("Failed to reject job: " + err.message);
     } finally {
       setActionLoading(false);
-    }
-  };
-
-  const handleConfirmSubmitMatch = async () => {
-    if (!selectedMatch || !job) return;
-    setSubmitting(true);
-    try {
-      await atsApi.submissions.create({
-        candidateId: selectedMatch.candidateId,
-        jobId: job.id,
-        recruiterId: currentUser?.dbId || currentUser?.keycloakId || "system",
-        finalStatus: "PENDING_APPROVAL",
-        submittedRate: matchRate.trim() || null,
-        recruiterComment: matchComment.trim() || null,
-      });
-
-      toast.success(`Submitted ${selectedMatch.fullName || "candidate"} to this pipeline!`);
-      setMatchSubmitOpen(false);
-      setSelectedMatch(null);
-      loadData();
-    } catch (err: any) {
-      toast.error(`Failed to submit: ${err.message}`);
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -449,7 +422,7 @@ export default function JobDetailPage() {
                 size="sm"
                 disabled={!canSubmitCandidate}
                 title={!canSubmitCandidate ? "This job is closed." : undefined}
-                onClick={() => setUploadSubmitOpen(true)}
+                onClick={() => { setSubmissionCandidateId(undefined); setUploadSubmitOpen(true); }}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-sm rounded-lg h-9 text-xs cursor-pointer"
               >
                 <Upload className="h-3.5 w-3.5" /> Submit New Candidate
@@ -785,9 +758,9 @@ export default function JobDetailPage() {
 
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-bold text-sm text-neutral-800 dark:text-neutral-250 truncate">
+                            <button type="button" onClick={() => setProfileCandidateId(match.candidateId)} className="max-w-full truncate text-left font-bold text-sm text-neutral-800 hover:text-[#1a4fa0] hover:underline dark:text-neutral-250" aria-label={`View latest profile and resume for ${match.fullName}`}>
                               {match.fullName}
-                            </span>
+                            </button>
                             <span className={`text-[9px] font-bold uppercase tracking-wide border px-1.5 py-0.2 rounded-full ${styles.chip}`}>
                               {styles.label}
                             </span>
@@ -823,18 +796,7 @@ export default function JobDetailPage() {
                             Submitted
                           </Button>
                         ) : canSubmitCandidate ? (
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setSelectedMatch(match);
-                              setMatchRate("");
-                              setMatchComment("");
-                              setMatchSubmitOpen(true);
-                            }}
-                            className="h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold"
-                          >
-                            Submit Profile
-                          </Button>
+                          <Button size="sm" onClick={() => { setSubmissionCandidateId(match.candidateId); setUploadSubmitOpen(true); }} className="h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold">Submit Profile</Button>
                         ) : null}
                       </div>
                     </div>
@@ -848,54 +810,8 @@ export default function JobDetailPage() {
 
       </div>
 
-      {/* AI MATCH SUBMISSION FORM DIALOG */}
-      <Dialog open={matchSubmitOpen} onOpenChange={setMatchSubmitOpen}>
-        <DialogContent className="sm:max-w-[400px] font-sans">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-bold text-neutral-800 dark:text-white">Submit Ranked Candidate</DialogTitle>
-            <DialogDescription className="text-xs text-neutral-500">
-              Submit candidate <strong>{selectedMatch?.fullName}</strong> to the requisition pipeline <strong>{job.jobTitle}</strong>.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3.5 text-xs py-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-neutral-450 uppercase">Expected / Submitted Rate</label>
-              <Input
-                placeholder="e.g. $65/hr or 12 LPA"
-                value={matchRate}
-                onChange={(e) => setMatchRate(e.target.value)}
-                className="h-9 text-xs"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-neutral-450 uppercase">Submission Note / Comments</label>
-              <textarea
-                placeholder="Recruiter screening feedback comments..."
-                value={matchComment}
-                onChange={(e) => setMatchComment(e.target.value)}
-                className="min-h-16 border border-neutral-300 dark:border-slate-700 rounded p-2 text-xs bg-transparent outline-none focus:border-indigo-500"
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setMatchSubmitOpen(false)} className="text-xs">
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmSubmitMatch}
-              disabled={submitting}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer"
-            >
-              {submitting ? "Submitting..." : "Confirm Submission"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <CandidateSubmissionModal open={uploadSubmitOpen} onOpenChange={setUploadSubmitOpen} job={job} onSuccess={loadData} />
+      <MatchedCandidateProfileDialog open={profileCandidateId !== null} candidateId={profileCandidateId} jobTitle={job?.jobTitle || "this job"} onOpenChange={open => { if (!open) setProfileCandidateId(null); }} onSubmitProfile={candidateId => { setProfileCandidateId(null); setSubmissionCandidateId(candidateId); setUploadSubmitOpen(true); }} />
+      <CandidateSubmissionModal open={uploadSubmitOpen} onOpenChange={open => { setUploadSubmitOpen(open); if (!open) setSubmissionCandidateId(undefined); }} job={job} existingCandidateId={submissionCandidateId} onSuccess={loadData} />
         {/* APPROVE JOB CONFIRMATION MODAL */}
       <Dialog open={approveModalOpen} onOpenChange={setApproveModalOpen}>
         <DialogContent className="max-w-md">

@@ -29,6 +29,7 @@ import {
   CreditCard
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { canDeleteClients } from "@/lib/client-access";
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -53,6 +54,7 @@ export default function ClientDetailPage() {
 
   const userRoles = (currentUser?.roles || []).map((r: string) => String(r).toUpperCase().replace(/[\s-_]+/g, ''));
   const userPermissions = currentUser?.permissions || [];
+  const canDeleteClient = canDeleteClients(currentUser);
   const isSuperOrAdmin = userRoles.includes('TENANT_ADMIN') || userRoles.includes('SUPERADMIN') || userRoles.includes('SUPER_ADMIN');
   const canApproveRejectClient = 
     userPermissions.includes('client:approve') || 
@@ -371,23 +373,25 @@ export default function ClientDetailPage() {
                   <Edit className="h-3.5 w-3.5 text-indigo-600" /> Edit CRM Profile
                 </Button>
 
-                <Button
-                  variant="outline"
-                  onClick={async () => {
-                    if (window.confirm(`Are you sure you want to soft-delete '${clientData.client_name}'? This client will be archived.`)) {
-                      try {
-                        await atsApi.clients.delete(clientId);
-                        toast.success(`Client '${clientData.client_name}' soft-deleted.`);
-                        router.push("/clients/all");
-                      } catch (err) {
-                        toast.error("Failed to delete client.");
+                {canDeleteClient && (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      if (window.confirm(`Are you sure you want to soft-delete '${clientData.client_name}'? This client will be archived.`)) {
+                        try {
+                          await atsApi.clients.delete(clientId);
+                          toast.success(`Client '${clientData.client_name}' soft-deleted.`);
+                          router.push("/clients/all");
+                        } catch (err) {
+                          toast.error("Failed to delete client.");
+                        }
                       }
-                    }
-                  }}
-                  className="text-xs font-bold border-red-200 text-red-600 hover:bg-red-50"
-                >
-                  Soft Delete
-                </Button>
+                    }}
+                    className="text-xs font-bold border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    Soft Delete
+                  </Button>
+                )}
               </>
             )}
           </div>
