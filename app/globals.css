@@ -523,20 +523,9 @@ html[layout="helium"] .dashboard-sidebar-container {
 }
 /* Helium layout css End */
 
-/* Boron layout css start */
-html[layout="boron"] .dashboard-header-wrapper {
-  @apply fixed w-full start-0 top-0;
-}
-
-html[layout="boron"] .dashboard-sidebar-inner,
-html[layout="boron"] .dashboard-body {
-  @apply mt-[72px];
-}
-
-html[layout="boron"] .dashboard-sidebar-container {
-  height: calc(100vh - 72px);
-}
-/* Boron layout css End */
+/* The shared dashboard shell owns viewport sizing and scrolling. Older Boron
+   overrides positioned the content outside that flex shell and added a second
+   72px top offset, creating an additional page-height scroll range. */
 
 
 .gradient-bg-chart::before {

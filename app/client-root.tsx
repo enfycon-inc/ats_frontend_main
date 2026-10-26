@@ -46,15 +46,15 @@ function MainContentLayout({ children, isViewportLocked }: { children: ReactNode
   return lockToViewport ? (
     <div
       className="flex min-w-0 max-w-full flex-col overflow-hidden"
-      style={{ height: pageHeaderHidden ? 'calc(100dvh - 46px)' : 'calc(100vh - 96px)', maxHeight: pageHeaderHidden ? 'calc(100dvh - 46px)' : 'calc(100vh - 96px)' }}
+      style={{ height: pageHeaderHidden ? 'calc(100dvh - 46px)' : 'calc(100dvh - 96px)', maxHeight: pageHeaderHidden ? 'calc(100dvh - 46px)' : 'calc(100dvh - 96px)' }}
     >
       <div className="dashboard-body flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-neutral-50 p-2 dark:bg-[#1e2734] md:p-3">
         {children}
       </div>
     </div>
   ) : (
-    <div className="flex min-h-[calc(100vh-96px)] min-w-0 max-w-full flex-col overflow-x-hidden bg-neutral-50 dark:bg-[#1e2734]">
-      <div className="dashboard-body flex min-w-0 flex-1 flex-col p-4 md:p-6">
+    <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-x-hidden bg-neutral-50 dark:bg-[#1e2734]">
+      <div className="dashboard-body flex min-h-0 min-w-0 flex-1 flex-col p-4 md:p-6">
         {children}
       </div>
       <Footer />
