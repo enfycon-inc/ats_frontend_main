@@ -17,6 +17,9 @@ appropriate synchronization command from the frontend directory:
 node scripts/sync-tenant-branding.cjs
 node scripts/sync-sign-in-policy.cjs
 node scripts/sync-job-access.cjs
+node scripts/sync-notification-preferences.cjs
+node scripts/sync-submission-auto-approval.cjs
+node scripts/sync-user-management-contract.cjs
 ```
 
 Commit the changed frontend contracts and manifest together. Publish the backend
