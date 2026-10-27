@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   ChevronUp,
@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { QUICK_CHANGE_JOB_STATUSES, normalizeJobStatus } from "@/lib/job-status-contract";
-import { atsApi, apiFetch } from "@/lib/ats-api";
+import { atsApi } from "@/lib/ats-api";
 import { getActiveRolePermissions, resolveActiveSystemRole } from "@/lib/role-permissions";
 import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 import { Job } from "../data/mock-jobs";
@@ -86,8 +86,6 @@ export default function DataTable({
   onReorderColumns,
 }: DataTableProps) {
   const router = useRouter();
-  const pathname = usePathname();
-  const [exporting, setExporting] = useState(false);
 
   // User details & permission controls
   const [currentUser, setCurrentUser] = useState(() => atsApi.auth.getCurrentUser());
@@ -259,27 +257,6 @@ export default function DataTable({
 
   // Selection State
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
-  const canExport = useMemo(() => {
-    const { active } = getDashboardRoleSelection(currentUser, currentUser?.assignedRoles || []);
-    const permissions = getActiveRolePermissions(active.id, currentUser?.assignedRoles || [], currentUser);
-    return permissions.some(p => ['job:export', '*', 'platform:manage'].includes(p));
-  }, [currentUser]);
-  const exportSelectedJobs = async () => {
-    setExporting(true);
-    try {
-      const result = await apiFetch<{ filename: string; content: string }>('/api/jobs/export', {
-        method: 'POST', body: JSON.stringify({ jobIds: selectedRowIds }),
-      });
-      const bytes = Uint8Array.from(atob(result.content), c => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-      const link = document.createElement('a'); link.href = url; link.download = result.filename;
-      document.body.appendChild(link); link.click(); link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast.success('Jobs and submissions exported.');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to export jobs.');
-    } finally { setExporting(false); }
-  };
 
   // Table Data Hook
   const {
@@ -422,12 +399,6 @@ export default function DataTable({
 
         {/* Global actions */}
         <div className="flex items-center gap-1.5">
-          {canExport && ['/job-posting', '/job-posting/all'].includes(pathname) && (
-            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={exporting || !selectedRowIds.length || selectedRowIds.length > 500}
-              title="Select up to 500 jobs to export job details and candidate submissions" onClick={() => void exportSelectedJobs()}>
-              {exporting ? 'Exporting…' : 'Export selected jobs'}
-            </Button>
-          )}
           <button
             onClick={() => { onRefresh(); toast.success("Jobs list reloaded."); }}
             className="p-1.5 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"

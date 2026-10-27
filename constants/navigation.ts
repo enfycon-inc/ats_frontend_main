@@ -182,13 +182,6 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
     label: "Reports",
     href: "/reports",
     icon: BarChart3,
-    children: [
-      { label: "Recruitment Analytics", href: "/reports/recruitment" },
-      { label: "Pipeline Reports", href: "/reports/pipeline" },
-      { label: "Client Reports", href: "/reports/clients" },
-      { label: "Revenue Reports", href: "/reports/revenue" },
-      { label: "Activity Reports", href: "/reports/activity" },
-    ],
   },
   {
     id: "branch-units",

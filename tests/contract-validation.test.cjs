@@ -15,6 +15,7 @@ const pairs = [
   ['auth/job-assignment-policy.ts', 'lib/job-assignment-policy.ts'],
   ['recruiter-submissions/submission-auto-approval.ts', 'lib/submission-auto-approval.ts'],
   ['user-management/user-management.contract.ts', 'lib/user-management.contract.ts'],
+  ['jobs/job-export-contract.ts', 'lib/job-export-contract.ts'],
 ];
 const scripts = ['sync-notification-preferences.cjs', 'sync-tenant-branding.cjs', 'sync-sign-in-policy.cjs', 'sync-job-access.cjs', 'sync-submission-auto-approval.cjs', 'sync-user-management-contract.cjs'];
 function fixture(t, backend = false) {
@@ -46,7 +47,7 @@ test('each contract fails standalone validation when modified', t => {
   pairs.forEach(([, target], i) => {
     const file = path.join(f.frontend, target), original = fs.readFileSync(file, 'utf8');
     fs.writeFileSync(file, original + '// changed\n');
-    const result = f.run(scripts[i >= 6 ? i - 2 : Math.min(i, 3)], '--check');
+    const result = f.run(scripts[i === 8 ? 3 : i >= 6 ? i - 2 : Math.min(i, 3)], '--check');
     assert.notEqual(result.status, 0); assert.match(result.stderr, /checksum mismatch/);
     fs.writeFileSync(file, original);
   });

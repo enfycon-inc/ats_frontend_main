@@ -76,7 +76,7 @@ export function getFilteredPrimaryNav(input: any, roles: CustomRoleDefinition[] 
     "submissions-tracker": canAccessSubmissions, placements: false,
     clients: activeRole !== "RECRUITER" && has("client:view"),
     "talent-bench": !["RECRUITER", "ACCOUNT_MANAGER", "DELIVERY_HEAD"].includes(activeRole) && has("candidate:view"),
-    vendors: has("vendor:view"), onboarding: has("onboarding:view"), reports: !["ACCOUNT_MANAGER", "DELIVERY_HEAD"].includes(activeRole) && has("report:view"),
+    vendors: has("vendor:view"), onboarding: has("onboarding:view"), reports: has("job:export"),
     "branch-units": has("tenant:settings", "tenant:manage", "branch:create", "unit_admin:manage", "branch_admin:manage", "unit:view"),
   };
   return PRIMARY_NAV_ITEMS.filter(item => allowed[item.id]).map(item => {

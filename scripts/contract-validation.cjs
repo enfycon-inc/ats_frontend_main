@@ -8,7 +8,7 @@ const contracts = {
   notifications: [['notifications/notification-preferences.ts', 'lib/notification-preferences.ts']],
   branding: [['auth/tenant-branding-contract.ts', 'lib/tenant-branding-contract.ts']],
   signIn: [['auth/sign-in-policy.ts', 'lib/sign-in-policy.ts']],
-  jobAccess: [['auth/job-assignment-policy.ts', 'lib/job-assignment-policy.ts'], ['jobs/job-capabilities.ts', 'lib/job-capabilities.ts'], ['auth/job-access-grants.ts', 'lib/job-access-grants.ts']],
+  jobAccess: [['auth/job-assignment-policy.ts', 'lib/job-assignment-policy.ts'], ['jobs/job-capabilities.ts', 'lib/job-capabilities.ts'], ['auth/job-access-grants.ts', 'lib/job-access-grants.ts'], ['jobs/job-export-contract.ts', 'lib/job-export-contract.ts']],
 };
 const normalize = text => text.replace(/\r\n/g, '\n');
 const digest = text => createHash('sha256').update(normalize(text)).digest('hex');

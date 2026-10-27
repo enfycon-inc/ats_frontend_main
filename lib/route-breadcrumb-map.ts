@@ -629,7 +629,18 @@ export function getRouteBreadcrumbInfo(
   }
 
   // 10. Reports
-  if (cleanPath === "/reports" || cleanPath === "/reports/recruitment") {
+  if (cleanPath === "/reports") {
+    return {
+      pageTitle: "Reports",
+      breadcrumbs: [
+        { label: "ATS", href: "/dashboard" },
+        { label: "Reports", isCurrent: true },
+      ],
+      showBackButton: true,
+      backHref: "/dashboard",
+    };
+  }
+  if (cleanPath === "/reports/recruitment") {
     return {
       pageTitle: "Recruitment Analytics",
       breadcrumbs: [

@@ -1,4 +1,5 @@
 import type { TenantBrandingUpdate, TenantBrandingSettingsResponse } from './tenant-branding-contract';
+import type { JobExportRequest, JobExportResponse, JobExportManager } from './job-export-contract';
 import type { SignInPolicy, SignInPolicyUpdate } from "./sign-in-policy";
 import type { ClientCreationContext, ClientCreationRequest, CreatedClient } from './client-creation-contract';
 import type { TenantEmailSettings, EmailDispatchMode, EmailDispatchResult } from './system-email.types';
@@ -1147,6 +1148,8 @@ export interface JobPodOption {
 const staffingRequests = new Map<string, Promise<JobStaffOption[]>>();
 
 const jobs = {
+  exportManagers: () => apiFetch<JobExportManager[]>('/api/jobs/export/managers'),
+  exportReport: (input: JobExportRequest) => apiFetch<JobExportResponse>('/api/jobs/export', { method: 'POST', body: JSON.stringify(input) }),
   setPublication(id: string, published: boolean, publicDescription?: string) {
     return apiFetch<{ id: string; publicSlug: string | null; isPubliclyPublished: boolean }>(`/api/jobs/${encodeURIComponent(id)}/publication`, {
       method: 'PATCH', body: JSON.stringify({ published, ...(publicDescription !== undefined ? { publicDescription } : {}) }),

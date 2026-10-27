@@ -13,7 +13,7 @@ function load(file, imports = {}) {
   }).outputText)(exports, name => name in imports ? imports[name] : require(name));
   return exports;
 }
-const navigation = load('constants/navigation.ts');
+const navigation = load('constants/navigation.ts', { '../lib/user-management-navigation': load('lib/user-management-navigation.ts') });
 const policy = load('lib/role-permissions.ts', { '@/constants/navigation': navigation });
 const profile = { id: 'member', systemRole: 'RECRUITER', permissions: ['job:view', 'candidate:view', 'submission:create', 'submission:view', 'pod:view', 'job:view_pod_jobs'] };
 function links(value) {
