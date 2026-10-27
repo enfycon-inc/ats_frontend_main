@@ -1,12 +1,11 @@
 import { APP_BRAND } from "@/lib/app-brand";
 import { LoadingProvider } from "@/contexts/LoadingContext";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-});
+// next/font/google (Inter) removed: it makes a live HTTPS call to fonts.googleapis.com
+// at build time, which is blocked in the GitHub Actions docker-container buildx environment.
+// The active app font is Geist Sans, applied via --font-geist-sans in globals.css
+// and surfaced through the Tailwind --font-sans CSS variable. Inter was unused scaffold code.
 
 export const metadata: Metadata = {
   title: `${APP_BRAND.name} - Recruitment Platform`,
@@ -44,7 +43,7 @@ export default async function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className="overflow-x-hidden overflow-y-hidden">
-      <body suppressHydrationWarning className={`${inter.className} antialiased overflow-x-hidden overflow-y-hidden`}>
+      <body suppressHydrationWarning className="antialiased overflow-x-hidden overflow-y-hidden">
         <LoadingProvider>
           {children}
         </LoadingProvider>
