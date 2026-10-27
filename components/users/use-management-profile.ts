@@ -12,5 +12,5 @@ export function useManagementProfile() {
     return () => { ['atsProfileChanged', 'overrideRoleChanged', 'storage'].forEach(event => window.removeEventListener(event, refresh)); };
   }, []);
   const result = useSWR(scope ? ['user-management-profile', scope] : null, () => atsApi.auth.me(), { refreshInterval: 60_000, revalidateOnFocus: true });
-  return { ...result, scope, permissions: (result.data?.permissions || []) as string[] };
+  return { ...result, scope, permissions: (result.data?.permissions || []) as string[], systemRole: result.data?.systemRole || result.data?.roleName || null };
 }
