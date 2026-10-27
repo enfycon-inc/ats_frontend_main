@@ -191,7 +191,7 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
         { label: "Hiring & Pod Rules", href: "/company?tab=hiring" },
         { label: "Global Remarks Templates", href: "/utility/global-remarks" },
       );
-      if (!company && has("branch_admin:manage", "branch:edit", "branch:view", "branch:network:manage", "unit:geofence:manage")) children.push({ label: "Branch Settings", href: "/settings/branch" });
+      if (has("tenant:settings", "tenant:manage", "branch_admin:manage", "branch:edit", "branch:view", "branch:network:manage", "unit:geofence:manage")) children.push({ label: "Branch Settings", href: "/settings/branch" });
       if (has("job:grant_creation_delegate", "job:manage_creation_access")) children.push({ label: "Delegated Access", href: "/job-posting/access" });
       children.push({ label: "Sound & Tone Preferences", href: "/utility/settings-notifications" });
       return { ...item, children };

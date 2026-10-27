@@ -97,7 +97,7 @@ const LoginForm = ({ heading, afterForm, footer }: { heading?: React.ReactNode; 
   React.useEffect(() => {
     const isExpired = searchParams.get("expired");
     if (isExpired === "true") {
-      toast.error("We couldnâ€™t verify your sign-in. Please sign in again to continue.", {
+      toast.error("We couldn't verify your sign-in. Please sign in again to continue.", {
         id: "session-expired",
         duration: 5000,
       });
