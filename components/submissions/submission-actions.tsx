@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import { PermanentDeleteMenuItem } from '@/components/shared/permanent-delete-menu-item';
 import { ClipboardCheck, Eye, MoreHorizontal, Pencil } from 'lucide-react';
 import type { TrackerSubmission } from '@/lib/submission-contract';
 import type { TrackerAction } from '@/lib/submission-tracker';
@@ -28,6 +29,7 @@ export function SubmissionActions({ submission, href, onAction, canEdit }: {
         {editable && <DropdownMenuItem onSelect={() => { setTimeout(() => onAction('rounds'), 50); }}><Pencil className="h-4 w-4" />Edit status</DropdownMenuItem>}
         <DropdownMenuItem asChild><Link href={href}><Eye className="h-4 w-4" />View details</Link></DropdownMenuItem>
         <ResumeDownloadMenuItem submission={submission} />
+        <PermanentDeleteMenuItem kind="submission" id={submission.id} />
       </DropdownMenuContent>
     </DropdownMenu>
   </div>;

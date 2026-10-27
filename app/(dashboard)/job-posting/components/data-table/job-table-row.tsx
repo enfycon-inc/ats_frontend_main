@@ -2,6 +2,7 @@
 
 
 import React from "react";
+import { PermanentDeleteMenuItem } from "@/components/shared/permanent-delete-menu-item";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -676,6 +677,7 @@ export function JobTableRow({
                         </>
                       )}
 
+                    <PermanentDeleteMenuItem kind="job" id={job.id} onDeleted={onRefresh} />
                     {canChangeStatus && job.jobStatus !== 'Pending Approval' && (!job.approvalStatus || job.approvalStatus === 'APPROVED') && <DropdownMenuItem onSelect={() => onOpenStatusModal(job)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><div className="h-6 w-6 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0 shadow-2xs"><Pencil className="h-3.5 w-3.5" /></div><span className="font-semibold">Edit Status</span></DropdownMenuItem>}
                     {hasEditPermission && job.jobStatus === "Draft" && (
                       <DropdownMenuItem
