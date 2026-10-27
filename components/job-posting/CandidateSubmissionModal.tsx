@@ -41,6 +41,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   const [assessmentState, setAssessmentState] = useState<'idle' | 'updating' | 'ready' | 'unavailable'>('idle');
   const assessmentRequest = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isBusy = parsing || loading;
 
   const fileUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
 
@@ -327,6 +328,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   };
 
   const handleClose = () => {
+    if (isBusy) return;
     resetForm();
     onClose(false);
     if (typeof document !== "undefined") {
@@ -338,8 +340,13 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent className="max-w-[98vw] lg:max-w-[1400px] h-[95vh] w-full p-0 overflow-hidden border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl bg-white dark:bg-slate-900 font-sans flex flex-col">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isBusy) handleClose(); }}>
+      <DialogContent
+        aria-busy={isBusy}
+        onEscapeKeyDown={(event) => { if (isBusy) event.preventDefault(); }}
+        onInteractOutside={(event) => { if (isBusy) event.preventDefault(); }}
+        className="max-w-[98vw] lg:max-w-[1400px] h-[95vh] w-full p-0 overflow-hidden border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl bg-white dark:bg-slate-900 font-sans flex flex-col"
+      >
         {/* Header */}
         <div className="px-6 py-4 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
           <div>
@@ -444,7 +451,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
             Please ensure all <span className="text-red-500 font-bold">*</span> required fields are filled.
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={handleClose} className="h-10 px-6 font-semibold text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">
+            <Button variant="outline" disabled={isBusy} onClick={handleClose} className="h-10 px-6 font-semibold text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={loading || parsing || candidateLoading || !!candidateError || (!file && !existingCandidateId)} className="h-10 px-8 bg-[#1a4fa0] hover:bg-[#163f80] text-white font-bold text-sm shadow-md disabled:opacity-50 transition-all">
