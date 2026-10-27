@@ -8,7 +8,7 @@
     "lib/notification-preferences.ts": "9657021b4788f6f68a216a90ed04df3a03090c0795a52cfcd940bae406865a25",
     "lib/job-assignment-policy.ts": "0128f6504abc8ffc0f02b2956f7e388c40e8b9b79e676ee5ab99b9fcf5314025",
     "lib/submission-auto-approval.ts": "626135020e5600ee8243927ed062492ec63c0932f7269084fa4266ea8b03f65e",
-    "lib/user-management.contract.ts": "55126fd6ae576b7e661d24a2d1acbe74c2064e7d81d8fb8a7539af037c7329c5",
+    "lib/user-management.contract.ts": "38e8508286a0606d15fc9a879ef64479253dbaf54ced8ee5cfb0839226bfa0c4",
     "lib/job-export-contract.ts": "65bddd40e0ef9fc97a87182684c2fb74d192016bbb0b72a6b31deeab398a7942"
   }
 }
