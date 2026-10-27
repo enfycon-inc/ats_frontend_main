@@ -94,7 +94,13 @@ export function useRadixScrollLockFix() {
       childList: true,
     });
 
-    const handleFocus = () => cleanupBodyLocks();
+    const handleFocus = () => {
+      // Only clean up body locks on focus if no dialog is currently open.
+      // When the OS file-picker closes it returns focus to the page;
+      // aggressively clearing locks at that moment can confuse Radix
+      // DismissableLayer into firing its onDismiss handler.
+      if (!hasActiveModal()) cleanupBodyLocks();
+    };
     window.addEventListener("focus", handleFocus);
 
     return () => {

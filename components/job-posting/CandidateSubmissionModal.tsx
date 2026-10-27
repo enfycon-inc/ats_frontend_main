@@ -43,6 +43,12 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isBusy = parsing || loading;
   const expectedClose = useRef(false);
+  // filePickerOpen: true while the OS file-picker dialog is open.
+  // The browser fires window.focus when the picker closes — BEFORE the
+  // file input's onChange fires and before setParsing(true) runs.
+  // We dispatch custom suppression events so DashboardContext and
+  // data-table focus handlers can skip their side-effects during this window.
+  const filePickerOpen = useRef(false);
   const lifecycle = useRef({ open: isOpen, busy: isBusy, phase: parsing ? 'parsing' : loading ? 'submitting' : 'idle' });
   lifecycle.current = { open: isOpen, busy: isBusy, phase: parsing ? 'parsing' : loading ? 'submitting' : 'idle' };
 
@@ -436,7 +442,20 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
                     accept=".pdf,.doc,.docx"
                     className="hidden"
                     id="resume-upload"
-                    onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+                    onClick={() => {
+                      // Signal that the OS file-picker is opening.
+                      // DashboardContext + data-table focus handlers check
+                      // for the filePicker:open event and skip side-effects.
+                      filePickerOpen.current = true;
+                      window.dispatchEvent(new CustomEvent('filePicker:open'));
+                    }}
+                    onChange={(e) => {
+                      // Picker closed, file selected — clear suppression BEFORE
+                      // handleFileSelect so setParsing(true) takes effect cleanly.
+                      filePickerOpen.current = false;
+                      window.dispatchEvent(new CustomEvent('filePicker:close'));
+                      handleFileSelect(e.target.files?.[0] || null);
+                    }}
                   />
                   <Label htmlFor="resume-upload" className="cursor-pointer flex flex-col items-center justify-center gap-5 w-full h-full">
                     {parsing ? (

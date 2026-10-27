@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown,
@@ -96,7 +96,14 @@ export default function DataTable({
 
   useEffect(() => {
     let disposed = false;
+    const onFilePickerOpen = () => { filePickerActiveRef.current = true; };
+    const onFilePickerClose = () => { filePickerActiveRef.current = false; };
     const refreshAccess = () => {
+      // Skip while the OS file-picker is open: the returning focus event
+      // must not trigger a re-render that could close the submission modal.
+      if (filePickerActiveRef.current) return;
+      // Skip if the submission/sourcing modal is currently mounted.
+      if (sourceModalOpenRef.current) return;
       setActiveBranchId(localStorage.getItem("active_branch_id"));
       atsApi.auth
         .me()
@@ -108,10 +115,14 @@ export default function DataTable({
     refreshAccess();
     window.addEventListener("focus", refreshAccess);
     window.addEventListener("branchChanged", refreshAccess);
+    window.addEventListener('filePicker:open', onFilePickerOpen);
+    window.addEventListener('filePicker:close', onFilePickerClose);
     return () => {
       disposed = true;
       window.removeEventListener("focus", refreshAccess);
       window.removeEventListener("branchChanged", refreshAccess);
+      window.removeEventListener('filePicker:open', onFilePickerOpen);
+      window.removeEventListener('filePicker:close', onFilePickerClose);
     };
   }, []);
 
@@ -322,6 +333,11 @@ export default function DataTable({
   // Sourcing & Delegation Modals
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
   const [selectedJobForSourcing, setSelectedJobForSourcing] = useState<Job | null>(null);
+  // Ref shadows for use inside stable event-handler closures.
+  // Plain state cannot be read reliably inside a closure registered once.
+  const sourceModalOpenRef = useRef(false);
+  const filePickerActiveRef = useRef(false);
+  useEffect(() => { sourceModalOpenRef.current = sourceModalOpen; }, [sourceModalOpen]);
   const [delegateModalJob, setDelegateModalJob] = useState<Job | null>(null);
 
   // Context Menu state

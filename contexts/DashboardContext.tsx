@@ -104,8 +104,18 @@ export function DashboardProvider({ initialNavigation = null, children }: {
   useEffect(() => {
     let lastRecoveryAt = 0;
     const refreshWorkspace = () => reload();
+    let filePickerActive = false;
+    const onFilePickerOpen = () => { filePickerActive = true; };
+    const onFilePickerClose = () => { filePickerActive = false; };
+    window.addEventListener('filePicker:open', onFilePickerOpen);
+    window.addEventListener('filePicker:close', onFilePickerClose);
     const recoverWhenAvailable = () => {
       if (document.visibilityState !== "visible") return;
+      // Skip if the OS file-picker is open — the returning focus event
+      // must not trigger a workspace reload while a modal is in use.
+      if (filePickerActive) return;
+      // Also skip if a Radix dialog is currently mounted in the DOM.
+      if (document.querySelector('[data-slot="dialog-content"]')) return;
       const now = Date.now();
       // Focus and online events often arrive together; avoid duplicate reloads.
       if (now - lastRecoveryAt < 15000) return;
@@ -124,6 +134,8 @@ export function DashboardProvider({ initialNavigation = null, children }: {
       window.removeEventListener("focus", recoverWhenAvailable);
       window.removeEventListener("online", recoverWhenAvailable);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener('filePicker:open', onFilePickerOpen);
+      window.removeEventListener('filePicker:close', onFilePickerClose);
     };
   }, [reload]);
 
