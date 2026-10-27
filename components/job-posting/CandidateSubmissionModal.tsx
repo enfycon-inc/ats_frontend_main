@@ -42,6 +42,22 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   const assessmentRequest = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isBusy = parsing || loading;
+  const expectedClose = useRef(false);
+  const lifecycle = useRef({ open: isOpen, busy: isBusy, phase: parsing ? 'parsing' : loading ? 'submitting' : 'idle' });
+  lifecycle.current = { open: isOpen, busy: isBusy, phase: parsing ? 'parsing' : loading ? 'submitting' : 'idle' };
+
+  useEffect(() => {
+    if (isOpen) expectedClose.current = false;
+  }, [isOpen]);
+
+  useEffect(() => () => {
+    if (lifecycle.current.open && !expectedClose.current) {
+      console.warn('[candidate-submission] unexpected modal unmount', {
+        busy: lifecycle.current.busy,
+        phase: lifecycle.current.phase,
+      });
+    }
+  }, []);
 
   const fileUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
 
@@ -127,6 +143,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
     setFile(selectedFile);
     setParsing(true);
     setAutoFilled(false);
+    console.info('[candidate-submission] resume parsing started');
 
     try {
       const parsed = await atsApi.candidates.parseResume(selectedFile);
@@ -217,6 +234,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
       toast("Resume attached. Please verify or enter details manually.");
     } finally {
       setParsing(false);
+      console.info('[candidate-submission] resume parsing finished');
     }
   };
 
@@ -319,6 +337,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
 
       resetForm();
       toast.success("Candidate CV submitted successfully!");
+      expectedClose.current = true;
       onClose(false); if (onSuccess) onSuccess();
     } catch (err: any) {
       toast.error("Failed to submit candidate: " + err.message);
@@ -329,6 +348,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
 
   const handleClose = () => {
     if (isBusy) return;
+    expectedClose.current = true;
     resetForm();
     onClose(false);
     if (typeof document !== "undefined") {
@@ -340,11 +360,30 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isBusy) handleClose(); }}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open && isBusy) {
+        console.warn('[candidate-submission] blocked dialog close request', { phase: lifecycle.current.phase });
+        return;
+      }
+      if (!open) handleClose();
+    }}>
       <DialogContent
         aria-busy={isBusy}
-        onEscapeKeyDown={(event) => { if (isBusy) event.preventDefault(); }}
-        onInteractOutside={(event) => { if (isBusy) event.preventDefault(); }}
+        onEscapeKeyDown={(event) => {
+          if (isBusy) {
+            console.warn('[candidate-submission] blocked Escape dismissal', { phase: lifecycle.current.phase });
+            event.preventDefault();
+          }
+        }}
+        onInteractOutside={(event) => {
+          if (isBusy) {
+            console.warn('[candidate-submission] blocked outside dismissal', {
+              phase: lifecycle.current.phase,
+              interaction: event.detail.originalEvent.type,
+            });
+            event.preventDefault();
+          }
+        }}
         className="max-w-[98vw] lg:max-w-[1400px] h-[95vh] w-full p-0 overflow-hidden border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl bg-white dark:bg-slate-900 font-sans flex flex-col"
       >
         {/* Header */}
