@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { Activity, ChevronLeft, ChevronRight, Loader2, RefreshCw, Search, ShieldAlert, X } from 'lucide-react';
@@ -25,6 +24,7 @@ export function UsersDirectory({ view }: { view: UserView }) {
   const pathname = usePathname();
   const [search, setSearch] = useState(params.get('search') || '');
   const [selected, setSelected] = useState<ManagementRow | null>(null);
+  const [editing, setEditing] = useState<ManagementRow | null>(null);
   const [decision, setDecision] = useState<ManagementRow | null>(null);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
@@ -54,7 +54,7 @@ export function UsersDirectory({ view }: { view: UserView }) {
   };
   if (profile.error) return <div role="alert" className="p-6 text-sm text-red-600">Unable to verify your access. Refresh to try again.</div>;
   const title = USER_PAGES.find(item => item.key === view)?.label || 'Users';
-  const columns = ['Staff member', 'Work email', 'Assigned role(s)', 'Branch name', 'Branch unit', 'Manager', 'Status',
+  const columns = ['Staff member', 'Assigned role(s)', 'Branch name', 'Branch unit', 'Manager', 'Status',
     ...(has('user:presence:view') ? ['Presence', 'Last seen'] : []),
     ...(view === 'activity' && has('user:sessions:view') ? ['Sessions'] : []),
     ...(view === 'activity' && has('user:login_logs:view') ? ['Last login'] : []), 'Actions'];
@@ -78,19 +78,18 @@ export function UsersDirectory({ view }: { view: UserView }) {
           {isLoading && <tr><td colSpan={columns.length} className="p-8 text-center text-neutral-500">Loading users…</td></tr>}
           {!isLoading && !error && !data?.items.length && <tr><td colSpan={columns.length} className="p-10 text-center text-neutral-500">{search ? 'No users match your search.' : 'No users in this view.'}</td></tr>}
           {data?.items.map(user => <tr key={`${user.kind}:${user.id}`} className="transition-colors hover:bg-neutral-50/70 dark:hover:bg-slate-800/20">
-            <td className="whitespace-nowrap px-3 py-2.5"><div className="flex items-center gap-2.5"><Avatar className="size-8 border border-blue-100 dark:border-slate-700"><AvatarImage src={user.avatar || undefined} alt="" /><AvatarFallback className="bg-blue-50 text-[10px] font-semibold text-[#1a4fa0] dark:bg-blue-950/50 dark:text-blue-300">{initials(user.fullName)}</AvatarFallback></Avatar><div className="min-w-0"><span className="block font-semibold text-neutral-800 dark:text-neutral-100">{user.fullName}</span>{user.city && <span className="mt-0.5 inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[9px] font-medium text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">⌖ {cityName[user.city] || user.city}</span>}</div></div></td>
-            <td className="whitespace-nowrap px-3 py-2.5 text-neutral-700 dark:text-neutral-300">{user.email}</td>
-            <td className="px-3 py-2.5"><div className="flex max-w-56 flex-wrap gap-1">{(user.assignedRoles?.length ? user.assignedRoles : user.roleName ? [user.roleName] : []).map(role => <span key={role} className="rounded border border-indigo-200 bg-indigo-50 px-1.5 py-1 text-[9.5px] font-semibold text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">{role}</span>)}</div></td>
+            <td className="whitespace-nowrap px-3 py-2.5"><div className="flex items-center gap-2.5"><Avatar className="size-8 border border-blue-100 dark:border-slate-700"><AvatarImage src={user.avatar || undefined} alt="" /><AvatarFallback className="bg-blue-50 text-[10px] font-semibold text-[#1a4fa0] dark:bg-blue-950/50 dark:text-blue-300">{initials(user.fullName)}</AvatarFallback></Avatar><div className="min-w-0"><span className="block font-semibold text-neutral-800 dark:text-neutral-100">{user.fullName}</span><span className="block text-[10.5px] text-neutral-500">{user.email}</span>{user.city && <span className="mt-0.5 inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[9px] font-medium text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">⌖ {cityName[user.city] || user.city}</span>}</div></div></td>
+            <td className="px-3 py-2.5"><div className="flex max-w-56 flex-wrap items-center gap-1">{(user.assignedRoles?.length ? user.assignedRoles : user.roleName ? [user.roleName] : []).map(role => <span key={role} className="rounded border border-indigo-200 bg-indigo-50 px-1.5 py-1 text-[9.5px] font-semibold text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">{role}</span>)}{user.kind === 'user' && user.allowedActions?.edit && <button type="button" onClick={() => setEditing(user)} aria-label={`Assign roles to ${user.fullName}`} className="rounded border border-neutral-200 px-1.5 text-xs text-neutral-600 hover:bg-neutral-50">+</button>}</div></td>
             <td className="whitespace-nowrap px-3 py-2.5">{user.branchName || 'Unassigned'}</td>
             <td className="whitespace-nowrap px-3 py-2.5">{user.businessUnitName || '—'}</td>
-            <td className="whitespace-nowrap px-3 py-2.5">{user.managerName ? <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">{user.managerName}</span> : <span className="text-neutral-400">Unassigned</span>}</td>
+            <td className="whitespace-nowrap px-3 py-2.5">{user.managerName ? <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">{user.managerName}</span> : <span className="text-neutral-400">Unassigned</span>}{user.kind === 'user' && user.allowedActions?.edit && <button type="button" onClick={() => setEditing(user)} className="ml-2 text-[10px] font-semibold text-indigo-700 hover:underline">Assign</button>}</td>
             <td className="whitespace-nowrap px-3 py-2.5">{view === 'pending' ? <span className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">{user.invitationStatus === 'expired' ? 'Invite expired' : user.invitationStatus ? 'Invited' : 'Awaiting approval'}</span> : <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold ${user.isActive ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'}`}><span className={`h-1.5 w-1.5 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-red-500'}`} />{user.isActive ? 'Active' : 'Blocked'}</span>}{view === 'blocked' && <span className="mt-1 block max-w-48 whitespace-normal text-[10px] text-neutral-500">{user.blockReason || 'Reason not recorded'}</span>}</td>
             {has('user:presence:view') && <><td className="whitespace-nowrap px-3 py-2.5">{user.kind === 'user' ? <><PresenceBadge value={user.presence || 'unknown'} />{user.officeNetwork && <span className="mt-1 block max-w-44 text-[9.5px] text-neutral-500">{user.officeNetwork}<span className="block">Seen {date(user.officeObservedAt)}</span></span>}</> : <span className="text-neutral-400">—</span>}</td><td className="whitespace-nowrap px-3 py-2.5 text-[10.5px] text-neutral-500">{user.kind === 'user' ? date(user.lastSeenAt) : '—'}</td></>}
             {view === 'activity' && has('user:sessions:view') && <td className="px-3 py-2.5">{user.sessions ?? '—'}</td>}
             {view === 'activity' && has('user:login_logs:view') && <td className="whitespace-nowrap px-3 py-2.5 text-[10.5px]">{date(user.lastLoginAt)}</td>}
             <td className="whitespace-nowrap px-3 py-2.5"><div className="flex items-center gap-2">
               {user.kind === 'user' && view === 'activity' && has('user:sessions:view', 'user:login_logs:view') && <button aria-label={`View activity for ${user.fullName}`} onClick={() => setSelected(user)} className="font-semibold text-indigo-700 hover:underline dark:text-indigo-300">Details</button>}
-              {view !== 'activity' && (view === 'pending' ? user.allowedActions?.review : user.allowedActions?.edit) && <Link className="font-semibold text-indigo-700 hover:underline dark:text-indigo-300" href={view === 'pending' ? `/utility/users?requestId=${user.id}` : `/utility/users?editUser=${user.id}`}>{view === 'pending' ? 'Review' : 'Edit'}</Link>}
+              {view !== 'activity' && (view === 'pending' ? user.allowedActions?.review : user.allowedActions?.edit) && <button type="button" className="font-semibold text-indigo-700 hover:underline dark:text-indigo-300" onClick={() => view === 'pending' ? router.push(`/utility/users?requestId=${user.id}`) : setEditing(user)}>{view === 'pending' ? 'Review' : 'Edit'}</button>}
               {user.allowedActions?.resendInvitation && view === 'pending' && <button className="text-indigo-700 hover:underline" disabled={saving} onClick={async () => { setSaving(true); try { const result = await atsApi.auth.resendInvitation(user.id); toast.success(result.message); await mutate(); } catch (e) { toast.error(e instanceof Error ? e.message : 'Invitation could not be sent.'); } finally { setSaving(false); } }}>Resend</button>}
               {user.allowedActions?.changeAccess && view !== 'pending' && <button title={user.isActive ? 'Block user' : 'Unblock user'} aria-label={`${user.isActive ? 'Block' : 'Unblock'} ${user.fullName}`} onClick={() => { setDecision(user); setReason(''); }} className={`relative h-5 w-9 rounded-full transition-colors ${user.isActive ? 'bg-indigo-600' : 'bg-neutral-300 dark:bg-slate-600'}`}><span className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform ${user.isActive ? 'translate-x-4' : 'translate-x-0.5'}`} /></button>}
             </div></td>
@@ -100,6 +99,7 @@ export function UsersDirectory({ view }: { view: UserView }) {
       <footer className="flex items-center justify-between text-xs text-neutral-500"><span>{data?.total ? `${(page - 1) * 25 + 1}–${Math.min(page * 25, data.total)} of ${data.total}` : '0 users'}</span><div className="flex items-center gap-2"><Button aria-label="Previous page" variant="outline" size="sm" disabled={page <= 1} onClick={() => changePage(page - 1)}><ChevronLeft className="h-4 w-4" /></Button><span>Page {page}</span><Button aria-label="Next page" variant="outline" size="sm" disabled={!data || page * 25 >= data.total} onClick={() => changePage(page + 1)}><ChevronRight className="h-4 w-4" /></Button></div></footer>
     </>}
     {selected && <UserActivityDrawer user={selected} scope={profile.scope} has={has} onClose={() => setSelected(null)} onChanged={() => void mutate()} />}
+    {editing && <DirectoryMemberEditor user={editing} permissions={permissions} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void mutate(); }} />}
     {decision && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><section role="dialog" aria-modal="true" aria-labelledby="access-title" className="w-full max-w-md space-y-4 rounded-xl border bg-white p-5 dark:bg-slate-900"><h2 id="access-title" className="text-sm font-bold">{decision.isActive ? 'Block' : 'Unblock'} {decision.fullName}?</h2><p className="text-xs text-neutral-500">{decision.isActive ? 'This ends access to this workspace. Business records are preserved.' : 'The user will need to sign in again. Previously ended sessions remain revoked.'}</p><label className="block text-xs font-semibold">Reason<Input value={reason} maxLength={500} onChange={e => setReason(e.target.value)} className="mt-2 text-xs" /></label><div className="flex justify-end gap-2"><Button variant="outline" disabled={saving} onClick={() => setDecision(null)}>Cancel</Button><Button disabled={saving || reason.trim().length < 3} onClick={() => void changeAccess()}>{saving ? 'Saving…' : 'Confirm'}</Button></div></section></div>}
   </div>;
 }
@@ -140,4 +140,68 @@ function UserActivityDrawer({ user, scope, has, onClose, onChanged }: { user: Ma
     <div className="flex justify-between text-xs"><Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</Button><span>Page {page}</span><Button variant="outline" size="sm" disabled={(current.data?.length || 0) < 50} onClick={() => setPage(page + 1)}>Next</Button></div>
     <p className="text-[11px] text-neutral-500">Presence measures application activity. It does not establish attendance or physical location.</p>
   </SheetContent></Sheet>;
+}
+
+function DirectoryMemberEditor({ user, permissions, onClose, onSaved }: { user: ManagementRow; permissions: string[]; onClose: () => void; onSaved: () => void }) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [roles, setRoles] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
+  const [fullName, setFullName] = useState(user.fullName);
+  const [email, setEmail] = useState(user.email);
+  const [city, setCity] = useState(user.city || '');
+  const [roleIds, setRoleIds] = useState<string[]>(user.assignedRoleIds || []);
+  const [managerId, setManagerId] = useState(user.jobReviewerId || '');
+  const canAdmin = permissions.some(p => ['*', 'platform:manage', 'tenant:settings', 'tenant:manage', 'branch_admin:manage', 'unit_admin:manage'].includes(p));
+  useEffect(() => {
+    let live = true;
+    Promise.all([atsApi.auth.listUsers(), atsApi.auth.listRoles('ALL', true)]).then(([userList, roleList]) => {
+      if (!live) return;
+      const target = userList.find((item: any) => item.id === user.id);
+      setMembers(userList);
+      setRoles(roleList || []);
+      if (target) {
+        setFullName(target.fullName || user.fullName);
+        setEmail(target.email || user.email);
+        setCity(target.city || user.city || '');
+        setRoleIds(target.assignedRoleIds || (target.roleId ? [target.roleId] : user.assignedRoleIds || []));
+        setManagerId(target.jobReviewerId || user.jobReviewerId || '');
+      }
+    }).catch(e => { if (live) setError(e instanceof Error ? e.message : 'Unable to load user details.'); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [user.id]);
+  const eligibleRoles = roles.filter(role => {
+    const unitId = role.businessUnitId || role.business_unit_id;
+    const branchId = role.branchId || role.branch_id;
+    if (unitId && unitId !== user.businessUnitId) return false;
+    if (branchId && branchId !== user.branchId) return false;
+    const adminRole = ['TENANT_ADMIN', 'SUPER_ADMIN', 'BRANCH_ADMIN', 'UNIT_ADMIN', 'DELIVERY_HEAD'].includes(String(role.systemRole || role.system_role || '').toUpperCase());
+    const rolePermissions = Array.isArray(role.permissions) ? role.permissions : [];
+    return canAdmin || (!adminRole && !rolePermissions.some((p: string) => ['*', 'platform:manage', 'tenant:settings', 'tenant:manage', 'branch_admin:manage', 'unit_admin:manage'].includes(p)));
+  });
+  const managers = members.filter(member => {
+    if (!member.isActive || member.id === user.id) return false;
+    const values = [member.roleName, ...(member.roles || [])].map((value: string) => String(value).toUpperCase().replace(/[\s_-]/g, ''));
+    return member.canReview || (member.permissions || []).some((p: string) => ['submission:internal_screening', 'job:approve', 'job:reject', 'job:publish_direct', 'branch_admin:manage', 'tenant:settings'].includes(p)) || values.some((value: string) => ['TENANTADMIN', 'SUPERADMIN', 'BRANCHADMIN', 'DELIVERYHEAD', 'ACCOUNTMANAGER', 'PODLEAD', 'BDM'].includes(value));
+  });
+  const save = async () => {
+    if (fullName.trim().length < 2 || !email.trim() || !roleIds.length) { setError('Name, email, and at least one role are required.'); return; }
+    setSaving(true); setError('');
+    try {
+      await atsApi.auth.updateUserDetail(user.id, { fullName: fullName.trim(), email: email.trim(), city: city || null, assignedRoleIds: roleIds, jobReviewerId: managerId || null });
+      toast.success('User details updated.'); onSaved();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to update user.'); }
+    finally { setSaving(false); }
+  };
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><section role="dialog" aria-modal="true" aria-labelledby="member-editor-title" className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+    <header className="flex items-start justify-between"><div><h2 id="member-editor-title" className="text-sm font-bold">Edit user · {user.fullName}</h2><p className="mt-1 text-xs text-neutral-500">Profile, business roles, and designated manager</p></div><button type="button" onClick={onClose} aria-label="Close editor"><X className="h-4 w-4" /></button></header>
+    {loading ? <p className="flex items-center gap-2 py-8 text-xs text-neutral-500"><Loader2 className="h-4 w-4 animate-spin" />Loading current assignments…</p> : <>
+      <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1 text-xs font-semibold">Full name<Input value={fullName} onChange={e => setFullName(e.target.value)} className="h-9 text-xs" /></label><label className="space-y-1 text-xs font-semibold">Email<Input type="email" value={email} onChange={e => setEmail(e.target.value)} className="h-9 text-xs" /></label><label className="space-y-1 text-xs font-semibold">City<select value={city} onChange={e => setCity(e.target.value)} className="h-9 w-full rounded-md border bg-white px-2 text-xs dark:bg-slate-800"><option value="">No city assigned</option>{[['BBSR','Bhubaneswar'],['PUNE','Pune'],['BENGALURU','Bengaluru'],['VIZAG','Vizag'],['HYDERABAD','Hyderabad']].map(([id,label]) => <option key={id} value={id}>{label}</option>)}</select></label><label className="space-y-1 text-xs font-semibold">Designated manager<select value={managerId} onChange={e => setManagerId(e.target.value)} className="h-9 w-full rounded-md border bg-white px-2 text-xs dark:bg-slate-800"><option value="">Auto (Hierarchy)</option>{managers.map(member => <option key={member.id} value={member.id}>{member.fullName} · {member.roleName || 'Manager'}</option>)}</select></label></div>
+      <fieldset className="space-y-2"><legend className="text-xs font-semibold">Assign role(s)</legend><div className="grid max-h-52 gap-2 overflow-y-auto sm:grid-cols-2">{eligibleRoles.map(role => <label key={role.id} className="flex items-center gap-2 rounded-md border border-neutral-200 p-2 text-xs dark:border-slate-700"><input type="checkbox" checked={roleIds.includes(role.id)} onChange={e => setRoleIds(current => e.target.checked ? [...current, role.id] : current.filter(id => id !== role.id))} />{role.name}</label>)}{!eligibleRoles.length && <p className="text-xs text-neutral-500">No eligible roles are configured for this branch or unit.</p>}</div></fieldset>
+    </>}
+    {error && <p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{error}</p>}
+    <footer className="flex justify-end gap-2"><Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button><Button type="button" size="sm" disabled={loading || saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save changes'}</Button></footer>
+  </section></div>;
 }
