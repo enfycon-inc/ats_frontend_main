@@ -1070,7 +1070,7 @@ function ProfileDropdownNav() {
     try {
       setLogoutLoading(true);
       try {
-        atsApi.auth.logout();
+        await atsApi.auth.logout();
       } catch (logoutErr) {
         console.error("Local token clear failed:", logoutErr);
       }

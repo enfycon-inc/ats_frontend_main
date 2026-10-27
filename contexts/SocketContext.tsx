@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { useSession } from "next-auth/react";
+import { activeRoleHeaders, apiFetch, atsApi, getApiBase, isJwtExpired } from '@/lib/ats-api';
+import { getTenantIdentifier } from '@/utils/subdomain-helper';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -24,6 +26,14 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const socketRef = useRef<Socket | null>(null);
+  const [roleVersion, setRoleVersion] = useState(0);
+  useEffect(() => {
+    const changed = () => setRoleVersion(value => value + 1);
+    window.addEventListener('overrideRoleChanged', changed);
+    window.addEventListener('atsProfileChanged', changed);
+    window.addEventListener('atsAccessTokenChanged', changed);
+    return () => { window.removeEventListener('overrideRoleChanged', changed); window.removeEventListener('atsProfileChanged', changed); window.removeEventListener('atsAccessTokenChanged', changed); };
+  }, []);
 
   const sessionUser = session?.user as any;
   const currentUserId = sessionUser?.id || sessionUser?.dbId;
@@ -52,20 +62,18 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     // Resolve base WebSocket URL (strip /api from NEXT_PUBLIC_API_URL)
-    const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    token = atsApi.auth.getToken() || token;
+    if (!token || isJwtExpired(token)) return;
+    const rawApiUrl = getApiBase();
     const serverUrl = rawApiUrl.replace(/\/api\/?$/, "");
 
     console.log(`[SocketContext] Initializing WebSocket client connection to ${serverUrl}...`);
 
     const newSocket = io(serverUrl, {
       auth: {
-        userId,
-        email: userEmail,
         token,
-      },
-      query: {
-        userId,
-        email: userEmail,
+        tenantDomain: user?.tenantDomain || getTenantIdentifier(),
+        activeRoleId: activeRoleHeaders()['x-active-role-id'],
       },
       transports: ["websocket", "polling"],
       reconnection: true,
@@ -77,11 +85,24 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
     socketRef.current = newSocket;
     setSocket(newSocket);
+    let activitySinceHeartbeat = true;
+    const interaction = () => { activitySinceHeartbeat = true; };
+    const heartbeat = () => {
+      if (!newSocket.connected) return;
+      newSocket.emit('presence_heartbeat', { active: document.visibilityState === 'visible' && activitySinceHeartbeat });
+      activitySinceHeartbeat = false;
+    };
+    ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(event => window.addEventListener(event, interaction, { passive: true }));
+    const timer = setInterval(heartbeat, 30_000);
+    const recoveryTimer = setInterval(() => {
+      if (!newSocket.connected) void apiFetch('/api/user-management/presence/heartbeat', { method: 'POST', body: JSON.stringify({ tabId: 'recovery', active: false }) }).catch(() => {});
+    }, 30_000);
 
     newSocket.on("connect", () => {
       console.log(`[SocketContext] Connected to WebSocket gateway (id: ${newSocket.id})`);
       setIsConnected(true);
       newSocket.emit("get_online_users");
+      heartbeat();
     });
 
     newSocket.on("online_users_list", (users: string[]) => {
@@ -93,30 +114,35 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     newSocket.on("disconnect", (reason) => {
       console.log(`[SocketContext] Disconnected from WebSocket gateway: ${reason}`);
       setIsConnected(false);
+      setOnlineUsers([]);
     });
 
     newSocket.on("connect_error", (error) => {
       console.warn(`[SocketContext] WebSocket connection warning:`, error.message);
       setIsConnected(false);
+      setOnlineUsers([]);
     });
 
     return () => {
       console.log("[SocketContext] Cleaning up WebSocket connection...");
       newSocket.removeAllListeners();
+      clearInterval(timer);
+      clearInterval(recoveryTimer);
+      ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(event => window.removeEventListener(event, interaction));
       newSocket.disconnect();
       socketRef.current = null;
       setSocket(null);
       setIsConnected(false);
     };
-  }, [currentUserId, currentUserEmail, currentToken]);
+  }, [currentUserId, currentUserEmail, currentToken, roleVersion]);
 
   const isUserOnline = (userIdOrEmail?: string): boolean => {
     if (!userIdOrEmail) return false;
     const target = String(userIdOrEmail).toLowerCase().trim();
     
     // If it's the currently logged in user in this browser session, they are online
-    if (currentUserId && String(currentUserId).toLowerCase() === target) return true;
-    if (currentUserEmail && String(currentUserEmail).toLowerCase() === target) return true;
+    if (isConnected && currentUserId && String(currentUserId).toLowerCase() === target) return true;
+    if (isConnected && currentUserEmail && String(currentUserEmail).toLowerCase() === target) return true;
 
     return onlineUsers.includes(target);
   };

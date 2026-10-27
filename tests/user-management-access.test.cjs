@@ -16,7 +16,7 @@ function load(file, imports = {}) {
 }
 const policy = load('lib/user-management-policy.ts');
 const rolePermissions = load('lib/role-permissions.ts', { '@/constants/navigation': {}, '../constants/navigation': {} });
-const page = fs.readFileSync(path.join(__dirname, '../app/(dashboard)/utility/users/page.tsx'), 'utf8');
+const page = fs.readFileSync(path.join(__dirname, '../components/users/user-management-editor.tsx'), 'utf8');
 const permissionsSection = page.slice(page.indexOf('  const sessionPerms:'), page.indexOf('  // The branches'));
 const rowSection = page.slice(page.indexOf('  const isUnitAdmin ='), page.indexOf('  const getDomainSuffix'));
 const common = ['user:manage', 'unit_admin:manage', 'job:approve'];

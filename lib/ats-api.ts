@@ -130,7 +130,9 @@ function getToken(): string | null {
 
 function setToken(token: string) {
   if (typeof window !== 'undefined') {
+    const changed = localStorage.getItem(TOKEN_KEY) !== token;
     localStorage.setItem(TOKEN_KEY, token);
+    if (changed) window.dispatchEvent(new Event('atsAccessTokenChanged'));
   }
 }
 
@@ -240,7 +242,7 @@ class SessionRenewalUnavailable extends Error {
 
 
 // ─── HTTP Helper ────────────────────────────────────────────────────
-async function apiFetch<T = any>(
+export async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {},
   isRetry = false,
@@ -406,8 +408,13 @@ const auth = {
   },
 
   async logout() {
+    let localSessionRevoked = false;
+    try {
+      const result = await apiFetch<{ localSessionRevoked: boolean }>('/api/user-management/me/logout', { method: 'POST' });
+      localSessionRevoked = result.localSessionRevoked;
+    } catch { /* Local browser sign-out must remain available during a backend outage. */ }
     const refreshToken = getRefreshToken();
-    if (refreshToken) {
+    if (refreshToken && !localSessionRevoked) {
       try {
         await fetch(getApiBase() + '/api/auth/logout', {
           method: 'POST',
@@ -576,11 +583,15 @@ const auth = {
     return apiFetch<any[]>('/api/auth/users', { headers });
   },
 
-  async setUserStatus(userId: string, isActive: boolean): Promise<any> {
+  async setUserStatus(userId: string, isActive: boolean, reason?: string): Promise<any> {
     return apiFetch<any>(`/api/auth/users/${userId}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ isActive }),
+      body: JSON.stringify({ isActive, reason }),
     });
+  },
+
+  async resendInvitation(userId: string): Promise<{ success: boolean; message: string }> {
+    return apiFetch(`/api/auth/users/${encodeURIComponent(userId)}/resend-invitation`, { method: 'POST' });
   },
 
   async deleteUser(userId: string): Promise<any> {

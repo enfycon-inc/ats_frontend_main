@@ -203,7 +203,7 @@ export default function ProfileDropdown() {
     try {
       setLogoutLoading(true);
       try {
-        atsApi.auth.logout();
+        await atsApi.auth.logout();
       } catch (logoutErr) {
         console.error("Local token clear failed:", logoutErr);
       }
@@ -365,6 +365,7 @@ export default function ProfileDropdown() {
               </div>
               <span>My Profile</span>
             </Link>
+            <Link href="/view-profile/security" role="menuitem" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-2.5 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><ShieldCheck className="h-4 w-4" />My Sessions</Link>
 
             <Link
               href="/utility/roles-permissions"

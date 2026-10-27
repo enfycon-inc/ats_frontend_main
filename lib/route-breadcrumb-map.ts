@@ -758,6 +758,11 @@ export function getRouteBreadcrumbInfo(
     };
   }
 
+  if (cleanPath.startsWith('/utility/users/')) {
+    const names: Record<string, string> = { create: 'Create Users', active: 'Active Users', pending: 'Pending Users', blocked: 'Blocked Users', activity: 'Users Activity' };
+    const title = names[cleanPath.split('/').pop() || ''] || 'Users';
+    return { pageTitle: title, breadcrumbs: [{ label: 'ATS', href: '/dashboard' }, { label: 'Users', href: '/utility/users/active' }, { label: title, isCurrent: true }], showBackButton: true, backHref: '/utility/users/active' };
+  }
   if (cleanPath === "/utility/users") {
     return {
       pageTitle: "Users & Teams Directory",

@@ -31,6 +31,7 @@ import toast from "react-hot-toast";
 import { useSocket } from "@/contexts/SocketContext";
 import { CityAutocomplete } from "@/components/city-autocomplete";
 import { getDynamicTimezoneOptions } from "@/lib/timezone-helper";
+import { OfficePolicySettings, UnitGeofenceSettings } from "@/components/users/office-evidence";
 
 const SYSTEM_INTERNAL_ROLES = new Set([
   "default_roles_enfycon_ats",
@@ -1101,6 +1102,8 @@ function BranchManagementPageContent() {
         </div>
       )}
       {loading && <PageLoadingSkeleton variant="form" />}
+      {!loading && userPermissions.includes('branch:network:manage') && <OfficePolicySettings scope={String(sessionUser?.activeRoleId || sessionUser?.tenantId || '')} />}
+      {!loading && userPermissions.includes('unit:geofence:manage') && <UnitGeofenceSettings scope={String(sessionUser?.activeRoleId || sessionUser?.tenantId || '')} />}
       {!loading && ownBranchSettings && !selectedBranch && <p role="alert" className="text-sm text-neutral-600">{formError || 'No branch is assigned to your account.'}</p>}
       {!loading && isTenantManager && <>
       

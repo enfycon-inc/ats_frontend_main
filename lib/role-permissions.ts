@@ -170,12 +170,16 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
   const allowed: Record<string, boolean> = {
     developer: company, email: true, documents: false, settings: activeRole !== "RECRUITER", help: true,
     database: has("database:manage", "tenant:settings"), integrations: has("integration:manage", "tenant:settings"),
-    "user-management": has("user:manage", "branch:assign_user", "unit_admin:manage"),
+    "user-management": has("user:manage", "user:view", "user:presence:view", "user:sessions:view", "user:login_logs:view"),
     "role-management": !isDeliveryHead && has("user:manage"),
     "pod-management": podsEnabled && !isAccountManager && has("pod:view", "pod:manage"), dictionaries: has("tenant:settings"),
     "operations-logs": has("notification:broadcast", "notification:view_all", "audit:view", "tenant:audit_logs"),
   };
   return MORE_NAV_ITEMS.filter(item => allowed[item.id]).map(item => {
+    if (item.id === 'user-management') {
+      const children = (item.children || []).filter(child => child.href.endsWith('/create') ? has('user:manage') : child.href.endsWith('/activity') ? has('user:presence:view', 'user:sessions:view', 'user:login_logs:view') : has('user:manage', 'user:view'));
+      return { ...item, href: children[0]?.href || item.href, children };
+    }
     if (item.id === "settings") {
       const children = [];
       if (company) children.push(
@@ -187,7 +191,7 @@ export function getFilteredMoreNav(input: any, roles: CustomRoleDefinition[] = [
         { label: "Hiring & Pod Rules", href: "/company?tab=hiring" },
         { label: "Global Remarks Templates", href: "/utility/global-remarks" },
       );
-      if (!company && has("branch_admin:manage", "branch:edit", "branch:view")) children.push({ label: "Branch Settings", href: "/settings/branch" });
+      if (!company && has("branch_admin:manage", "branch:edit", "branch:view", "branch:network:manage", "unit:geofence:manage")) children.push({ label: "Branch Settings", href: "/settings/branch" });
       if (has("job:grant_creation_delegate", "job:manage_creation_access")) children.push({ label: "Delegated Access", href: "/job-posting/access" });
       children.push({ label: "Sound & Tone Preferences", href: "/utility/settings-notifications" });
       return { ...item, children };

@@ -1,3 +1,4 @@
+import { USER_PAGE_LINKS } from '../lib/user-management-navigation';
 import {
   LayoutDashboard,
   Briefcase,
@@ -216,7 +217,7 @@ export const MORE_NAV_ITEMS: NavItem[] = [
   { id: "database", label: "Database", href: "/database", icon: Database },
   { id: "integrations", label: "Integrations", href: "/integrations", icon: Globe },
   { id: "tenant-management", label: "Tenant Management", href: "/utility/approvals", icon: Building2 },
-  { id: "user-management", label: "Users & Teams", href: "/utility/users", icon: Users },
+  { id: "user-management", label: "Users", href: "/utility/users/active", icon: Users, children: USER_PAGE_LINKS.map(({ label, href }) => ({ label, href })) },
   { id: "role-management", label: "Role Management", href: "/utility/roles-permissions", icon: UserCheck },
   { id: "pod-management", label: "Recruitment Pods", href: "/utility/pods", icon: Users },
   { id: "dictionaries", label: "Master Dictionaries", href: "/utility/dictionaries", icon: Database },
