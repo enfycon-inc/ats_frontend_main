@@ -13,6 +13,7 @@ import {
   Mail, Phone, Check, X, Zap, ZapOff, Users, AlertCircle, UserPlus,
 } from "lucide-react";
 import { atsApi, type JobMatchesResponse, type CandidateMatch } from "@/lib/ats-api";
+import { annualizedCompensation, formatCandidateCompensation } from "@/lib/candidate-compensation";
 
 import { CandidateSubmissionModal } from "@/components/job-posting/CandidateSubmissionModal";
 import { MatchedCandidateProfileDialog } from "@/components/job-posting/matched-candidate-profile-dialog";
@@ -201,14 +202,20 @@ export default function JobMatchesPage() {
               <Meta icon={<GraduationCap className="h-3.5 w-3.5" />} label="Visa / Work Auth" value={job.visaType || "Any"} />
               <Meta icon={<Users className="h-3.5 w-3.5" />} label="Positions" value={String(job.noOfPositions ?? 1)} />
             </div>
-            {(job.skillsRequired?.length > 0) && (
+            {(job.skillsRequired?.length > 0 || job.secondarySkills?.length > 0) && (
               <div className="mt-3 pt-3 border-t border-neutral-100 dark:border-slate-800">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Required skills</span>
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {job.skillsRequired.map((s) => (
-                    <span key={s} className="rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900 px-2 py-0.5 text-[11px] font-medium">{s}</span>
-                  ))}
-                </div>
+                {job.skillsRequired?.length > 0 && <>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Primary skills</span>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {job.skillsRequired.map((s) => <span key={`primary-${s}`} className="rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900 px-2 py-0.5 text-[11px] font-medium">{s}</span>)}
+                  </div>
+                </>}
+                {job.secondarySkills?.length > 0 && <>
+                  <span className="mt-2 block text-[10px] font-bold uppercase tracking-wider text-neutral-500">Secondary skills</span>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {job.secondarySkills.map((s) => <span key={`secondary-${s}`} className="rounded-md bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-900 px-2 py-0.5 text-[11px] font-medium">{s}</span>)}
+                  </div>
+                </>}
               </div>
             )}
           </div>
@@ -375,10 +382,14 @@ function MatchCard({ rank, m, job, submittedIds, onSubmitClick, onProfileClick }
   const isSubmitted = submittedIds?.has(m.candidateId) || false;
   
   // Helpers
-  const parseNum = (val: any): number => {
-    if (!val) return 0;
-    const num = parseFloat(String(val).replace(/[^0-9.]/g, ""));
-    return isNaN(num) ? 0 : num;
+  const parseBudget = (value: unknown) => {
+    const text = String(value ?? '').replace(/,/g, '');
+    const match = /^(?:(INR|USD|CAD|GBP|EUR)\s*-?\s*)?\$?([\d.]+)(?:\s+to\s+\$?([\d.]+))?(?:\s*(LPA|\/mo|Monthly|\/yr|Yearly|\/hr|Hourly))?$/i.exec(text.trim());
+    if (!match) return null;
+    const amount = Number(match[3] || match[2]);
+    const term = (match[4] || job?.payTerm || '').toUpperCase();
+    const normalizedTerm = term === 'LPA' ? 'LPA' : term === '/MO' || term === 'MONTHLY' ? 'MONTH' : term === '/YR' || term === 'YEARLY' ? 'YEAR' : term === '/HR' || term === 'HOURLY' ? 'Hourly' : null;
+    return Number.isFinite(amount) && normalizedTerm ? { amount, currency: (match[1] || job?.payCurrency || '').toUpperCase(), term: normalizedTerm } : null;
   };
 
   const parseDays = (val: any): number => {
@@ -389,10 +400,10 @@ function MatchCard({ rank, m, job, submittedIds, onSubmitClick, onProfileClick }
   };
 
   // CTC Matching
-  const expectedCTC = m.expectedCTC ?? 0;
-  const currentCTC = m.currentCTC ?? 0;
-  const maxJobBudget = parseNum(job?.payRate);
-  const exceedsBudget = expectedCTC > 0 && maxJobBudget > 0 && expectedCTC > maxJobBudget;
+  const candidateAnnual = annualizedCompensation(m.expectedCTC, m.ctcCurrency, m.ctcTerm);
+  const budget = parseBudget(job?.payRate);
+  const budgetAnnual = budget ? annualizedCompensation(budget.amount, budget.currency, budget.term) : null;
+  const exceedsBudget = !!candidateAnnual && !!budgetAnnual && candidateAnnual.currency === budgetAnnual.currency && candidateAnnual.amount > budgetAnnual.amount;
 
   // Notice Period Matching
   const noticeDays = m.noticePeriodDays ?? 0;
@@ -437,13 +448,18 @@ function MatchCard({ rank, m, job, submittedIds, onSubmitClick, onProfileClick }
           {isDomestic && (
             <div className="mt-3 p-2.5 rounded-lg bg-neutral-50 dark:bg-slate-800/40 border border-neutral-100 dark:border-slate-800 flex flex-wrap gap-x-6 gap-y-2 text-xs">
               <div>
-                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Compensation (CTC)</span>
+                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Latest profile compensation</span>
                 <span className="font-semibold text-neutral-850 dark:text-neutral-200">
-                  Current: {currentCTC ? `₹${currentCTC} LPA` : "—"} | Expected: {expectedCTC ? `₹${expectedCTC} LPA` : "—"}
+                  Current: {formatCandidateCompensation(m.currentCTC, m.ctcCurrency, m.ctcTerm)} | Expected: {formatCandidateCompensation(m.expectedCTC, m.ctcCurrency, m.ctcTerm)}
                 </span>
                 {exceedsBudget && (
                   <span className="ml-2 inline-flex items-center gap-0.5 text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 px-1.5 py-0.25 rounded border border-rose-100 dark:border-rose-900">
                     <AlertCircle className="h-3 w-3 shrink-0" /> Over Budget
+                  </span>
+                )}
+                {exceedsBudget && candidateAnnual && (
+                  <span className="ml-1 text-[10px] text-neutral-500 dark:text-neutral-400">
+                    (≈ {new Intl.NumberFormat(undefined, { style: 'currency', currency: candidateAnnual.currency, maximumFractionDigits: 0 }).format(candidateAnnual.amount / 12)}/month)
                   </span>
                 )}
               </div>

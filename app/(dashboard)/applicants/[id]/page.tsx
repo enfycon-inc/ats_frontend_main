@@ -32,6 +32,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { atsApi } from "@/lib/ats-api";
+import { formatCandidateCompensation } from "@/lib/candidate-compensation";
 import toast from "react-hot-toast";
 import { candidateProfileId } from "@/lib/candidate-profile-id";
 
@@ -438,7 +439,7 @@ export default function CandidateDetailPage() {
                 <div className="p-2 bg-neutral-50 dark:bg-slate-955/20 border border-neutral-100 dark:border-slate-850 rounded">
                   <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider block">CTC (Curr / Exp)</span>
                   <span className="font-bold text-neutral-750 dark:text-neutral-350">
-                    {candidate.currentCTC ? `₹${candidate.currentCTC} LPA` : "—"} / {candidate.expectedCTC ? `₹${candidate.expectedCTC} LPA` : "—"}
+                    {formatCandidateCompensation(candidate.currentCTC, candidate.ctcCurrency, candidate.ctcTerm)} / {formatCandidateCompensation(candidate.expectedCTC, candidate.ctcCurrency, candidate.ctcTerm)}
                   </span>
                 </div>
 
@@ -659,7 +660,7 @@ export default function CandidateDetailPage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="font-semibold text-neutral-700 dark:text-neutral-300">Current CTC (LPA)</label>
+              <label className="font-semibold text-neutral-700 dark:text-neutral-300">Current CTC ({candidate?.ctcTerm || 'unit unavailable'})</label>
               <Input
                 type="number"
                 value={editForm.currentCTC}
@@ -669,7 +670,7 @@ export default function CandidateDetailPage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="font-semibold text-neutral-700 dark:text-neutral-300">Expected CTC (LPA)</label>
+              <label className="font-semibold text-neutral-700 dark:text-neutral-300">Expected CTC ({candidate?.ctcTerm || 'unit unavailable'})</label>
               <Input
                 type="number"
                 value={editForm.expectedCTC}

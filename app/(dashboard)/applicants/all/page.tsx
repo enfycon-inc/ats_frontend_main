@@ -17,6 +17,7 @@ import ColumnManager from "@/components/applicants/column-manager";
 import UploadCvModal from "@/components/applicants/upload-cv-modal";
 import { mockApplicants, Applicant } from "../data/mock-applicants";
 import { atsApi } from "@/lib/ats-api";
+import { formatCandidateCompensation } from "@/lib/candidate-compensation";
 import { useSession } from "next-auth/react";
 import { CheckCircle2, AlertCircle, Users, FileText, UploadCloud, Database } from "lucide-react";
 import { getCurrentUserStorageKey, getUserColumnPreferences, saveUserColumnPreferences } from "@/utils/user-column-preferences";
@@ -149,9 +150,9 @@ export default function AllApplicantsPage() {
       assignedJobCount: c.assignedJobCount,
       assignedJobCode: c.assignedJobs?.map(job => `${job.jobCode} · ${job.jobTitle}`).join('; ') || '',
       currentCTC: c.currentCTC,
-      currentSalary: c.currentCTC == null ? '—' : ['IN', 'INDIA'].includes(c.market?.toUpperCase() || '')
-        ? `₹${c.currentCTC.toLocaleString('en-IN', { maximumFractionDigits: 2 })} LPA`
-        : `${c.currentCTC.toLocaleString('en-IN', { maximumFractionDigits: 2 })} (unit unavailable)`,
+      ctcCurrency: c.ctcCurrency,
+      ctcTerm: c.ctcTerm,
+      currentSalary: formatCandidateCompensation(c.currentCTC, c.ctcCurrency, c.ctcTerm),
       applicantId: c.applicantId || `APP-${c.id}`,
       applicantName: c.fullName,
       email: c.email,
