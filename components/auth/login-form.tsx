@@ -137,7 +137,8 @@ const LoginForm = ({ heading, afterForm, footer }: { heading?: React.ReactNode; 
           const data = await response.json();
           const result = await signIn('token-handoff', {
             token: data.accessToken, refreshToken: data.refreshToken,
-            expiresIn: data.expiresIn, userJson: JSON.stringify(data.user), redirect: false,
+            expiresIn: data.expiresIn, userJson: JSON.stringify(data.user),
+            officeLoginReceipt: data.officeLoginReceipt || '', redirect: false,
           });
           if (!result?.ok) throw new Error('Workspace sign-in failed.');
           localStorage.removeItem('ats_refresh_token');
@@ -261,7 +262,7 @@ const LoginForm = ({ heading, afterForm, footer }: { heading?: React.ReactNode; 
           const callbackUrlParam = searchParams.get("callbackUrl");
           const handoff = await fetch('/api/auth/handoff', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ accessToken: syncRes.accessToken, refreshToken: syncRes.refreshToken, destination: userTenantDomain }),
+            body: JSON.stringify({ accessToken: syncRes.accessToken, refreshToken: syncRes.refreshToken, destination: userTenantDomain, officeLoginReceipt: syncRes.officeLoginReceipt || '' }),
           });
           if (!handoff.ok) throw new Error('Unable to transfer your workspace session. Please try again.');
           localStorage.removeItem('ats_refresh_token');
@@ -276,6 +277,7 @@ const LoginForm = ({ heading, afterForm, footer }: { heading?: React.ReactNode; 
           refreshToken: syncRes.refreshToken,
           expiresIn: syncRes.expiresIn,
           userJson: JSON.stringify(syncRes.user),
+          officeLoginReceipt: syncRes.officeLoginReceipt || '',
           callbackUrl: "/dashboard",
         });
 

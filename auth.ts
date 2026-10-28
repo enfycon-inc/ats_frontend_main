@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import GitHub from "next-auth/providers/github"
@@ -70,6 +71,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         expiresIn: {},
         userJson: {},
         rememberMe: {},
+        officeLoginReceipt: {},
       },
       authorize: async (credentials) => {
         if (!credentials?.token) return null;
@@ -87,6 +89,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   permissions: u.permissions || [],
                   roles: u.roles || [],
                   accessToken: credentials.token as string,
+                  officeLoginReceipt: typeof credentials.officeLoginReceipt === "string" ? credentials.officeLoginReceipt : null,
                   refreshToken: typeof credentials.refreshToken === "string" ? credentials.refreshToken : null,
                   expiresIn: Math.min(Number(credentials.expiresIn) || 300, 300),
                   rememberMe: credentials.rememberMe === true || credentials.rememberMe === "true",
@@ -124,6 +127,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 permissions: u.permissions || [],
                 roles: u.roles || [],
                 accessToken: credentials.token as string,
+                officeLoginReceipt: typeof credentials.officeLoginReceipt === "string" ? credentials.officeLoginReceipt : null,
                 refreshToken: typeof credentials.refreshToken === "string" ? credentials.refreshToken : null,
                 expiresIn: Math.min(Number(credentials.expiresIn) || 300, 300),
                 rememberMe: credentials.rememberMe === true || credentials.rememberMe === "true",
@@ -161,7 +165,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const timeoutId = setTimeout(() => controller.abort(), 6000);
           const res = await fetchBackend(`/api/auth/login`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "x-office-login-request": randomUUID() },
             body: JSON.stringify({ email, password, subdomain }),
             signal: controller.signal,
           }).catch(() => null);
@@ -179,6 +183,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 permissions: u.permissions || [],
                 roles: u.roles || [],
                 accessToken: data.accessToken,
+                officeLoginReceipt: data.officeLoginReceipt || null,
                 refreshToken: data.refreshToken || null,
                 expiresIn: Math.min(data.expiresIn || 300, 300),
                 tenantDomain: u.tenantDomain || u.tenant_domain || "",
@@ -246,7 +251,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
           const res = await fetchBackend(`/api/auth/sso-login`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "x-office-login-request": randomUUID() },
             body: JSON.stringify({
               provider,
               subdomain,
@@ -276,6 +281,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               (user as any).permissions = data.user.permissions || [];
               (user as any).roles = data.user.roles || [];
               (user as any).accessToken = data.accessToken;
+              (user as any).officeLoginReceipt = data.officeLoginReceipt || null;
               (user as any).refreshToken = refreshToken;
               (user as any).expiresIn = data.expiresIn;
               (user as any).tenantDomain = data.user.tenantDomain || "";
@@ -307,6 +313,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // ── First login: populate token from user object returned by authorize() ──
       if (user) {
         token.id = user.id
+        token.officeLoginReceipt = (user as any).officeLoginReceipt || null
         token.permissions = (user as any).permissions || []
         token.roles = (user as any).roles || []
         token.accessToken = (user as any).accessToken
@@ -398,6 +405,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.id;
+        (session.user as any).officeLoginReceipt = token.officeLoginReceipt || null;
         (session.user as any).permissions = token.permissions || [];
         (session.user as any).roles = token.roles || [];
         (session.user as any).accessToken = token.accessToken;

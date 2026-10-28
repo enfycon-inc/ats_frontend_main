@@ -1,5 +1,6 @@
 "use client";
 import { syncAssignedOffice } from "@/lib/assigned-office";
+import { OfficeLocationConsentCoordinator } from "@/components/users/office-location-consent";
 
 import Footer from "@/components/layout/footer";
 import { TenantBrandingProvider } from "@/contexts/tenant-branding";
@@ -187,6 +188,7 @@ export function ClientRoot({
         <SocketProvider>
           <NotificationProvider>
             <NotificationListener />
+            <OfficeLocationConsentCoordinator />
             <PageHeaderProvider><SidebarProvider defaultOpen={defaultOpen}>
               <AppSidebar initialNavigation={initialNavigation} />
               <SidebarInset className="min-h-0 min-w-0">

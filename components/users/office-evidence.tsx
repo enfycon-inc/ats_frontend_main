@@ -1,4 +1,5 @@
 "use client";
+import { OfficeLocationConsentControls } from "./office-location-consent";
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
@@ -85,21 +86,5 @@ export function UnitGeofenceSettings({ scope }: { scope: string }) {
 }
 
 export function VerifyOfficeLocation({ scope }: { scope: string }) {
-  const context = useSWR(['my-office-context', scope], () => apiFetch<{ enabled: boolean; configured: boolean }>('/api/user-management/me/office-context'));
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-  const verify = async () => {
-    setBusy(true); setMessage('');
-    try {
-      if (!navigator.geolocation || !window.isSecureContext) throw new Error('Location checks require a supported browser and a secure connection.');
-      const { challenge } = await apiFetch<{ challenge: string }>('/api/user-management/me/location-challenge', { method: 'POST' });
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }));
-      const result = await apiFetch<{ result: string; checkedAt: string; accuracyMetres: number }>('/api/user-management/me/location-checks', { method: 'POST', body: JSON.stringify({ challenge, latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, timestamp: position.timestamp }) });
-      const label = result.result === 'within' ? 'Within office area' : result.result === 'outside' ? 'Outside office area' : 'Location uncertain';
-      setMessage(`${label} · Checked ${new Date(result.checkedAt).toLocaleString()} · Reported accuracy ±${Math.round(result.accuracyMetres)} m`);
-    } catch (e: any) { setMessage(e?.code === 1 ? 'Location permission denied. You can continue using your account.' : e?.message || 'Location is unavailable. Please try again.'); }
-    finally { setBusy(false); }
-  };
-  if (!context.data?.configured) return null;
-  return <section className="space-y-3 rounded-xl border p-4 text-xs"><h2 className="text-sm font-semibold">Office area verification</h2><p className="text-neutral-500">Checks your browser-reported location once with your permission. The result is a timestamped estimate, not continuous tracking or attendance proof. Exact coordinates are not retained.</p><Button size="sm" disabled={busy} onClick={() => void verify()}>{busy ? 'Checking…' : 'Verify office location'}</Button>{message && <p role="status">{message}</p>}</section>;
+  return <OfficeLocationConsentControls scope={scope} />;
 }

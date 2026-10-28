@@ -3,6 +3,7 @@
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Camera, Building2, MapPin, Mail, Save, UserRound, Loader2, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { EmailIntegrationTab } from '@/components/profile/email-integration-tab';
@@ -88,7 +89,7 @@ export default function ViewProfilePage() {
         </div>
       </div>
     </section>
-    <nav aria-label="Profile sections" className="flex gap-4 border-b border-slate-200 dark:border-slate-800 overflow-x-auto">{tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={activeTab === id ? 'page' : undefined} onClick={() => router.replace(`/view-profile?tab=${id}`)} className={`shrink-0 flex items-center gap-1.5 px-2 py-3 text-xs border-b-2 font-semibold ${activeTab === id ? 'text-blue-700 border-blue-700 dark:text-blue-400' : 'text-slate-500 border-transparent hover:text-slate-800'}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}</nav>
+    <nav aria-label="Profile sections" className="flex gap-4 border-b border-slate-200 dark:border-slate-800 overflow-x-auto">{tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={activeTab === id ? 'page' : undefined} onClick={() => router.replace(`/view-profile?tab=${id}`)} className={`shrink-0 flex items-center gap-1.5 px-2 py-3 text-xs border-b-2 font-semibold ${activeTab === id ? 'text-blue-700 border-blue-700 dark:text-blue-400' : 'text-slate-500 border-transparent hover:text-slate-800'}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}<Link href="/view-profile/security" className="shrink-0 flex items-center gap-1.5 px-2 py-3 text-xs border-b-2 border-transparent font-semibold text-slate-500 hover:text-slate-800">My Sessions</Link></nav>
     {activeTab === 'personal_contacts' && <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
       <form onSubmit={saveDetails} className="max-w-3xl space-y-5">
         <div><h2 className="text-sm font-bold">Personal details</h2><p className="text-xs text-slate-500 mt-1">Keep your contact information up to date.</p></div>

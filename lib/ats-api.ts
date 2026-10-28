@@ -390,6 +390,7 @@ const auth = {
       refreshToken?: string;
       expiresIn: number;
       tokenType: string;
+      officeLoginReceipt?: string | null;
       user: {
         id: string;
         email: string;
