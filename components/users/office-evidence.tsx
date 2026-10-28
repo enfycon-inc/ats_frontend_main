@@ -42,7 +42,7 @@ export function OfficePolicySettings({ scope }: { scope: string }) {
       </div>)}<Button size="sm" variant="outline" disabled={networks.length >= 10} onClick={() => setNetworks(items => [...items, { network: '', kind: 'office', expiresAt: new Date(Date.now() + 7 * 86400000).toISOString() }])}>Add network</Button><p className="text-neutral-500">The date is when the network must be verified again. Register both Jio and Airtel uplinks where applicable.</p></div>
       <Button size="sm" disabled={saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save office networks'}</Button>
     </>}
-    {!!candidates.data?.length && <div className="space-y-2 border-t pt-3"><h3 className="font-semibold">Unverified network suggestions</h3><p className="text-neutral-500">Repeated shared-IP patterns are suggestions only. Check the office router and VPN configuration before adding a mapping.</p>{candidates.data.filter(item => !branch || item.branch_id === branch).map(item => <p key={`${item.branch_id}:${item.network}`} className="font-mono">{item.network} · {item.employees} employees · {Math.round(item.ratio * 100)}%</p>)}</div>}
+    {!!candidates.data?.length && <div className="space-y-2 border-t pt-3"><h3 className="text-sm font-semibold">Unverified network suggestions</h3><p className="text-neutral-500">Repeated public-IP patterns are suggestions only. Check the office router and VPN configuration before adding a mapping.</p>{candidates.data.filter(item => !branch || item.branch_id === branch).map(item => <p key={`${item.branch_id}:${item.network}`} className="font-mono">{item.network} · {item.employees} employees · {Math.round(item.ratio * 100)}%</p>)}</div>}
   </div></details>;
 }
 
