@@ -415,7 +415,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // Session consumers must see the same selected-role permissions as API requests.
         const preferenceKey = dashboardPreferenceCookie({ id: token.id as string, tenantId: token.tenantId as string });
         const savedRole = preferenceKey ? (await cookies()).get(preferenceKey)?.value : null;
-        if (savedRole && token.accessToken) {
+        if (savedRole && token.accessToken && token.error !== 'SessionRenewalUnavailable') {
           (session.user as any).permissions = [];
           (session.user as any).roles = [];
           (session.user as any).systemRole = null;

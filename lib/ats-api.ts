@@ -156,6 +156,10 @@ function clearToken() {
   }
 }
 
+function clearAccessToken() {
+  if (typeof window !== 'undefined') localStorage.removeItem(TOKEN_KEY);
+}
+
 function setCurrentUser(user: any, notifyProfileChange = true) {
   if (typeof window !== 'undefined') {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -330,7 +334,10 @@ export async function apiFetch<T = any>(
     // refresh credential, and retry this request once.
     if (isExpired && !isRetry && !skipsSessionRecovery) {
       if (typeof window !== 'undefined') {
-        clearToken();
+        // Preserve the cached identity and active role while Auth.js tries to
+        // renew the server-held session. A transient renewal outage is not a
+        // sign-out and must not make the profile flash into an unknown state.
+        clearAccessToken();
         const freshToken = await fetchSessionToken();
         if (freshToken) {
           return apiFetch<T>(path, options, true, roleRecoveryRetry, omitActiveRole);
@@ -1502,6 +1509,22 @@ const candidates = {
     const headers: Record<string, string> = activeRoleHeaders();
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(`${getApiBase()}/api/candidates/${candidateId}/resume-preview?page=${page}`, { headers, signal, cache: 'no-store' });
+    if (!res.ok) throw new Error('Unable to display resume page.');
+    return res.blob();
+  },
+  async uploadedResumePreview(file: File): Promise<{ pages: number }> {
+    const form = new FormData(); form.append('file', file);
+    const token = getToken(); const headers: Record<string, string> = activeRoleHeaders();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${getApiBase()}/api/candidates/resume-preview/upload`, { method: 'POST', headers, body: form, cache: 'no-store' });
+    if (!res.ok) throw new Error('Unable to prepare resume preview.');
+    return res.json();
+  },
+  async uploadedResumePage(file: File, page: number, signal?: AbortSignal): Promise<Blob> {
+    const form = new FormData(); form.append('file', file);
+    const token = getToken(); const headers: Record<string, string> = activeRoleHeaders();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${getApiBase()}/api/candidates/resume-preview/upload?page=${page}`, { method: 'POST', headers, body: form, signal, cache: 'no-store' });
     if (!res.ok) throw new Error('Unable to display resume page.');
     return res.blob();
   },

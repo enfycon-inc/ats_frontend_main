@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useSession } from "next-auth/react";
 import { atsApi } from "@/lib/ats-api";
 import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 import { getSavedDashboardRole, saveDashboardRole } from "@/lib/dashboard-preference";
@@ -23,14 +24,27 @@ type DashboardContextValue = {
 };
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
+const navigationCacheKey = (userId: string, tenantId: string) => `ats_workspace_navigation:${tenantId}:${userId}`;
+
+function readCachedNavigation(userId?: string, tenantId?: string): NavigationBootstrap | null {
+  if (!userId || !tenantId || typeof window === "undefined") return null;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(navigationCacheKey(userId, tenantId)) || "null");
+    if (parsed?.profile?.id !== userId || parsed?.profile?.tenantId !== tenantId || !Array.isArray(parsed?.roles)) return null;
+    return parsed as NavigationBootstrap;
+  } catch { return null; }
+}
 
 export function DashboardProvider({ initialNavigation = null, children }: {
   initialNavigation?: NavigationBootstrap | null;
   children: ReactNode;
 }) {
+  const { data: session } = useSession();
+  const sessionUser = session?.user as { id?: string; tenantId?: string } | undefined;
+  const cachedNavigation = readCachedNavigation(sessionUser?.id, sessionUser?.tenantId);
   const [state, setState] = useState<DashboardState>(() => ({
-    snapshot: initialNavigation,
-    status: initialNavigation ? "ready" : "loading",
+    snapshot: initialNavigation || cachedNavigation,
+    status: initialNavigation || cachedNavigation ? "ready" : "loading",
     error: null,
   }));
   const [overrideRole, setOverrideRole] = useState<string | null>(initialNavigation?.overrideRole ?? null);
@@ -40,7 +54,9 @@ export function DashboardProvider({ initialNavigation = null, children }: {
   useEffect(() => {
     if (initialNavigation && revision === 0) return;
     let cancelled = false;
-    setState({ snapshot: null, status: "loading", error: null });
+    // Keep the last verified workspace available while revalidating. A tab
+    // return or transient network failure must not blank the navigation.
+    setState(current => ({ ...current, status: current.snapshot ? "ready" : "loading", error: null }));
     const load = async () => {
       // Recover one transient failure automatically; a persistent failure stays
       // visible with Retry instead of becoming a blank menu/default dashboard.
@@ -56,11 +72,19 @@ export function DashboardProvider({ initialNavigation = null, children }: {
           if (cancelled) return;
           setOverrideRole(getSavedDashboardRole(snapshot.profile));
           setState({ snapshot, status: "ready", error: null });
+          if (typeof window !== "undefined") {
+            try { localStorage.setItem(navigationCacheKey(snapshot.profile.id, snapshot.profile.tenantId), JSON.stringify(snapshot)); }
+            catch { /* The live workspace still works when browser storage is unavailable. */ }
+          }
           return;
         } catch (err) {
           console.error("DashboardContext Error:", err);
           if (cancelled) return;
-          if (attempt === 1) setState({ snapshot: null, status: "error", error: "Could not load your workspace access. Please try again." });
+          if (attempt === 1) setState(current => ({
+            snapshot: current.snapshot,
+            status: current.snapshot ? "ready" : "error",
+            error: "Could not refresh your workspace access. Please try again.",
+          }));
         } finally {
           if (timeout) clearTimeout(timeout);
         }
@@ -102,40 +126,13 @@ export function DashboardProvider({ initialNavigation = null, children }: {
   }, [reload]);
 
   useEffect(() => {
-    let lastRecoveryAt = 0;
-    const refreshWorkspace = () => reload();
-    let filePickerActive = false;
-    const onFilePickerOpen = () => { filePickerActive = true; };
-    const onFilePickerClose = () => { filePickerActive = false; };
-    window.addEventListener('filePicker:open', onFilePickerOpen);
-    window.addEventListener('filePicker:close', onFilePickerClose);
-    const recoverWhenAvailable = () => {
-      if (document.visibilityState !== "visible") return;
-      // Skip if the OS file-picker is open — the returning focus event
-      // must not trigger a workspace reload while a modal is in use.
-      if (filePickerActive) return;
-      // Also skip if a Radix dialog is currently mounted in the DOM.
-      if (document.querySelector('[data-slot="dialog-content"]')) return;
-      const now = Date.now();
-      // Focus and online events often arrive together; avoid duplicate reloads.
-      if (now - lastRecoveryAt < 15000) return;
-      lastRecoveryAt = now;
-      window.dispatchEvent(new Event("app:refresh"));
-    };
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") recoverWhenAvailable();
-    };
-    window.addEventListener("app:refresh", refreshWorkspace);
-    window.addEventListener("focus", recoverWhenAvailable);
-    window.addEventListener("online", recoverWhenAvailable);
-    document.addEventListener("visibilitychange", onVisibilityChange);
+    // An explicit online event can repair stale permissions after connectivity
+    // returns. Ordinary focus/visibility changes are not a reason to refetch
+    // the workspace, which was causing the shell to disappear on app switches.
+    const recoverWhenOnline = () => reload();
+    window.addEventListener("online", recoverWhenOnline);
     return () => {
-      window.removeEventListener("app:refresh", refreshWorkspace);
-      window.removeEventListener("focus", recoverWhenAvailable);
-      window.removeEventListener("online", recoverWhenAvailable);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener('filePicker:open', onFilePickerOpen);
-      window.removeEventListener('filePicker:close', onFilePickerClose);
+      window.removeEventListener("online", recoverWhenOnline);
     };
   }, [reload]);
 

@@ -22,6 +22,7 @@ const ReactQuill = dynamic(async () => {
 interface RichTextEditorProps {
   value: string;
   onChange: (value: string) => void;
+  onPasteText?: (plainText: string) => void;
   placeholder?: string;
   className?: string;
   minHeight?: string;
@@ -30,6 +31,7 @@ interface RichTextEditorProps {
 export function RichTextEditor({
   value,
   onChange,
+  onPasteText,
   placeholder = "Type or paste rich job description from Word, PDF, or Docs...",
   className,
   minHeight = "240px",
@@ -129,6 +131,13 @@ export function RichTextEditor({
     }
     event.preventDefault();
     event.stopPropagation();
+    if (onPasteText) {
+      try {
+        onPasteText(plain || source);
+      } catch (err) {
+        console.debug("[rich-text-editor] onPasteText callback note:", err);
+      }
+    }
     const formatted = formatJobDescription(source);
     if (!formatted) return;
     const selection = editor.getSelection(true) || { index: Math.max(0, editor.getLength() - 1), length: 0 };

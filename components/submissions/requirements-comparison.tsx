@@ -1,7 +1,9 @@
 import { Check, CircleHelp, X } from 'lucide-react';
 import type { AssessmentCriterion, CandidateAssessment, TrackerSubmission } from '@/lib/submission-contract';
 
-export function criterionLabel(criterion: AssessmentCriterion, submission?: TrackerSubmission): string {
+export type ComparisonProfile = Partial<Pick<TrackerSubmission, 'candidateSkills' | 'candidateCurrentLocation' | 'candidateNoticePeriod' | 'candidateExperience' | 'jobSkillsRequired' | 'jobSecondarySkills' | 'jobDegree' | 'jobNoticePeriod' | 'jobExperienceMin' | 'jobExperienceMax' | 'jobLocation' | 'jobWorkMode'>>;
+
+export function criterionLabel(criterion: AssessmentCriterion, submission?: ComparisonProfile): string {
   const found = ['EVIDENCE_FOUND', 'MEETS'].includes(criterion.finding);
   const fails = criterion.finding === 'DOES_NOT_MEET';
   if (criterion.category === 'experience') return found ? 'Meets minimum' : fails ? 'Below minimum' : 'Experience needs confirmation';
@@ -10,14 +12,14 @@ export function criterionLabel(criterion: AssessmentCriterion, submission?: Trac
   return found ? 'Matched' : ['NO_EVIDENCE', 'DOES_NOT_MEET'].includes(criterion.finding) ? 'Not matched' : 'Needs confirmation';
 }
 
-function Finding({ criterion, submission, skill, text = false }: { criterion: AssessmentCriterion; submission?: TrackerSubmission; skill?: boolean; text?: boolean }) {
+function Finding({ criterion, submission, skill, text = false }: { criterion: AssessmentCriterion; submission?: ComparisonProfile; skill?: boolean; text?: boolean }) {
   const found = ['EVIDENCE_FOUND', 'MEETS'].includes(criterion.finding);
   const gap = ['NO_EVIDENCE', 'DOES_NOT_MEET'].includes(criterion.finding);
   const Icon = found ? Check : gap ? X : CircleHelp;
   const label = criterionLabel(criterion, submission);
   return <span aria-label={`${criterion.requirement}: ${label}`} className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10.5px] ${found ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200' : gap ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200' : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200'}`}><Icon aria-hidden className="h-3 w-3 shrink-0" />{skill && criterion.requirement}<span className={text ? undefined : "sr-only"}>{label}</span></span>;
 }
-export function RequirementsComparison({ submission, assessment }: { submission: TrackerSubmission; assessment: CandidateAssessment | null }) {
+export function RequirementsComparison({ submission, assessment }: { submission: ComparisonProfile; assessment: CandidateAssessment | null }) {
   const criteria = assessment?.criteria || [];
   const normalized = (value: string) => value.toLowerCase().trim();
   const candidateSkills = [...new Set((submission.candidateSkills || []).map(skill => skill.trim().replace(/[.,;:]+$/, '')).filter(Boolean).filter((skill, index, all) => all.findIndex(value => normalized(value) === normalized(skill)) === index))];

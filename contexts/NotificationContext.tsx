@@ -29,7 +29,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const identity = status === 'authenticated' && user?.id && user?.tenantId ? `${user.id}:${user.tenantId}` : null;
   const { socket, isConnected } = useSocket();
   const profile = useSWR<NotificationSettings>(identity ? ['notification-settings', identity] : null,
-    () => atsApi.fetch('/api/notifications/settings'), { revalidateOnFocus: true, revalidateOnReconnect: true, refreshInterval: 30000 });
+    () => atsApi.fetch('/api/notifications/settings'), { revalidateOnFocus: true, revalidateOnReconnect: true, refreshInterval: 0 });
   const settings = profile.data || DEFAULT_NOTIFICATION_PREFERENCES;
   const settingsRef = useRef(settings); settingsRef.current = settings;
   const confirmedRef = useRef(false); confirmedRef.current = !!profile.data && !profile.error;

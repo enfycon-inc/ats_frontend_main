@@ -3,9 +3,10 @@
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { RequirementsComparison } from "@/components/submissions/requirements-comparison";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Loader2, UploadCloud, RefreshCw } from "lucide-react";
+import { UserPlus, Loader2, UploadCloud, RefreshCw, FileText, Maximize2, Minimize2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
 import { candidateAmountSchema, candidatePhoneSchema, normalizeCandidateLocation } from "@/lib/candidate-submission-input";
@@ -13,6 +14,31 @@ import { ContractCandidateSubmissionForm } from '@/components/candidates/contrac
 import { CandidateForm } from "@/components/candidates/candidate-form";
 import { ResumePages } from '@/components/candidates/resume-pages';
 import { existingCandidateForm } from '@/lib/existing-candidate-submission';
+
+function UploadedResumePreview({ file }: { file: File }) {
+  const [pages, setPages] = useState(0);
+  const [error, setError] = useState(false);
+  const [pageUrls, setPageUrls] = useState<string[]>([]);
+  useEffect(() => {
+    let disposed = false;
+    atsApi.candidates.uploadedResumePreview(file).then(result => { if (!disposed) setPages(result.pages); }).catch(() => { if (!disposed) setError(true); });
+    return () => { disposed = true; };
+  }, [file]);
+  useEffect(() => {
+    let disposed = false;
+    const controller = new AbortController();
+    const urls: string[] = [];
+    if (pages) Promise.all(Array.from({ length: pages }, (_, index) => atsApi.candidates.uploadedResumePage(file, index + 1, controller.signal).then(blob => { urls[index] = URL.createObjectURL(blob); })))
+      .then(() => { if (!disposed) setPageUrls([...urls]); }).catch(() => { if (!disposed) setError(true); });
+    return () => { disposed = true; controller.abort(); urls.forEach(url => URL.revokeObjectURL(url)); };
+  }, [file, pages]);
+  return <div aria-label="Resume preview" className="h-full w-full overflow-auto bg-slate-100 p-3">
+    {error ? <p role="alert" className="p-4 text-center text-xs text-slate-600">Unable to display this resume. You can still submit it or choose another file.</p>
+      : !pages ? <div className="flex h-full items-center justify-center text-xs text-slate-500">Preparing resume preview…</div>
+      : pageUrls.length !== pages ? <div className="flex h-full items-center justify-center text-xs text-slate-500">Rendering {file.name}…</div>
+      : pageUrls.map((url, index) => <img key={`${file.name}:${index}`} src={url} alt={`Resume page ${index + 1}`} className="mx-auto mb-3 h-auto w-full rounded border border-slate-200 bg-white shadow-sm" />)}
+  </div>;
+}
 
 function MatchScoreCard({ assessment, state }: { assessment: Awaited<ReturnType<typeof atsApi.submissions.previewAssessment>> | null; state: 'idle' | 'updating' | 'ready' | 'unavailable' }) {
   const scoreVisible = state === 'ready' && assessment?.score != null;
@@ -28,11 +54,15 @@ function MatchScoreCard({ assessment, state }: { assessment: Awaited<ReturnType<
 }
 
 export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, job, onSuccess, existingCandidateId }: { open: boolean; onOpenChange: (open: boolean) => void; job: any; onSuccess?: () => void; existingCandidateId?: string | number }) {
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const [resumeExpanded, setResumeExpanded] = useState(false);
+  useEffect(() => { if (!isOpen) { setResumeExpanded(false); setBreakdownOpen(false); } }, [isOpen]);
   const [candidateLoading, setCandidateLoading] = useState(false);
   const [candidateError, setCandidateError] = useState('');
   const [updateProfile, setUpdateProfile] = useState(false);
   const canUpdateProfile = atsApi.auth.getCurrentUser()?.permissions?.includes('candidate:edit') === true;
   const [file, setFile] = useState<File | null>(null);
+  const [unsupportedFileName, setUnsupportedFileName] = useState('');
   const [parsing, setParsing] = useState(false);
   const [autoFilled, setAutoFilled] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -141,8 +171,24 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
     return () => { window.clearTimeout(timer); };
   }, [isOpen, file, existingCandidateId, parsing, candidateLoading, candidateError, job?.id, formData.skills, formData.totalExperienceYears, formData.currentLocation, formData.preferredLocations, formData.preferredLocationMode, formData.noticePeriodDays]);
 
+  const resumeToolbar = <div className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2 lg:max-w-[55%]">
+    <FileText className="h-4 w-4 shrink-0 text-slate-500" />
+    <span title={file?.name || 'Stored resume'} className="min-w-0 max-w-48 truncate text-xs font-semibold">{file?.name || 'Stored resume'}</span>
+    <Button onClick={() => setBreakdownOpen(true)} variant="ghost" size="sm" className="h-8 shrink-0 bg-blue-50 px-2 text-xs text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+      {assessmentState === 'updating' ? 'Updating…' : assessmentState === 'ready' && assessment?.score != null ? `Match ${assessment.score}% · Provisional` : assessmentState === 'unavailable' ? 'Match unavailable' : 'No score yet'} · Details
+    </Button>
+    <Button variant="ghost" size="sm" className="h-8 shrink-0 px-2 text-xs" aria-label={resumeExpanded ? 'Exit full screen' : 'Open full screen'} aria-pressed={resumeExpanded} onClick={() => setResumeExpanded(value => !value)}>{resumeExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}{resumeExpanded && 'Exit full screen'}</Button>
+    {!existingCandidateId && <Button variant="ghost" size="sm" disabled={isBusy} className="h-8 shrink-0 px-2 text-xs text-red-600" onClick={() => { setFile(null); setResumeExpanded(false); }}>Remove</Button>}
+  </div>;
+
   const handleFileSelect = async (selectedFile: File | null) => {
     if (!selectedFile) return;
+    const extension = selectedFile.name.toLowerCase().match(/\.([^.]+)$/)?.[1];
+    if (!extension || !['pdf', 'doc', 'docx'].includes(extension)) {
+      setUnsupportedFileName(selectedFile.name || 'Selected file');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     assessmentRequest.current++;
     setAssessment(null); setAssessmentState('idle');
@@ -250,7 +296,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
     setDragOver(false);
     const droppedFile = e.dataTransfer.files?.[0];
     if (droppedFile) {
-      handleFileSelect(droppedFile);
+      void handleFileSelect(droppedFile);
     }
   };
 
@@ -366,6 +412,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open && isBusy) {
         console.warn('[candidate-submission] blocked dialog close request', { phase: lifecycle.current.phase });
@@ -376,12 +423,15 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
       <DialogContent
         aria-busy={isBusy}
         onEscapeKeyDown={(event) => {
+          if (breakdownOpen) { event.preventDefault(); return; }
+          if (resumeExpanded) { event.preventDefault(); setResumeExpanded(false); return; }
           if (isBusy) {
             console.warn('[candidate-submission] blocked Escape dismissal', { phase: lifecycle.current.phase });
             event.preventDefault();
           }
         }}
         onInteractOutside={(event) => {
+          if (breakdownOpen) { event.preventDefault(); return; }
           if (isBusy) {
             console.warn('[candidate-submission] blocked outside dismissal', {
               phase: lifecycle.current.phase,
@@ -390,11 +440,11 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
             event.preventDefault();
           }
         }}
-        className="max-w-[98vw] lg:max-w-[1400px] h-[95vh] w-full p-0 overflow-hidden border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl bg-white dark:bg-slate-900 font-sans flex flex-col"
+        className={`${resumeExpanded ? "!inset-0 !top-0 !left-0 !translate-x-0 !translate-y-0 !max-w-none !h-dvh !w-screen !rounded-none" : "max-w-[98vw] lg:max-w-[1400px] h-[95vh] w-full rounded-xl"} p-0 overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900 font-sans flex flex-col`}
       >
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
-          <div>
+        <div className="px-6 py-4 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex flex-wrap gap-3 items-center justify-between shrink-0 pr-12">
+          <div className={resumeExpanded ? "sr-only" : "min-w-0"}>
             <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <UserPlus className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               Submit Candidate ({isContractual ? "Contractual" : "Full-Time"})
@@ -403,6 +453,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
               Submitting profile for <span className="font-semibold text-slate-800 dark:text-slate-200">{job?.jobCode} - {job?.jobTitle}</span>
             </DialogDescription>
           </div>
+          {(file || existingCandidateId) && resumeToolbar}
         </div>
 
         {/* Body Container */}
@@ -410,22 +461,15 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
           
           {/* LEFT: Preview Pane (50%) */}
           {existingCandidateId ? (
-            <div className="w-full lg:w-1/2 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 flex flex-col gap-3 min-h-48 overflow-hidden">
-              <MatchScoreCard assessment={assessment} state={assessmentState} />
-              <h3 className="text-sm font-semibold">Existing resume</h3>
-              <p className="text-xs text-slate-500">Review the stored resume and verify the candidate details. No new upload required.</p>
-              <div className="min-h-0 flex-1"><ResumePages candidateId={existingCandidateId} /></div>
+            <div className={`flex min-h-0 flex-1 flex-col overflow-hidden border-r border-slate-200 dark:border-slate-800 ${resumeExpanded ? 'w-full' : 'w-full lg:w-1/2'}`}>
+              <div className="flex min-h-0 flex-1 flex-col"><ResumePages candidateId={existingCandidateId} /></div>
             </div>
           ) : file ? (
-            <div className="w-full lg:w-1/2 border-r border-slate-200 dark:border-slate-800 bg-slate-200/50 dark:bg-slate-900/50 p-4 shrink-0 overflow-hidden flex flex-col">
-              <MatchScoreCard assessment={assessment} state={assessmentState} />
-              <div className="flex-1 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-300 dark:border-slate-700 overflow-hidden flex flex-col relative">
-                <iframe src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} className="w-full h-full border-0 absolute inset-0" title="Resume Preview" />
-              </div>
-              <div className="mt-4 flex justify-end shrink-0">
-                 <Button variant="outline" size="sm" onClick={() => setFile(null)} className="h-9 px-4 text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 dark:border-red-900/30 dark:hover:bg-red-900/20">
-                   Remove Resume
-                 </Button>
+            <div className={`flex min-h-0 flex-1 flex-col overflow-hidden border-r border-slate-200 dark:border-slate-800 ${resumeExpanded ? 'w-full' : 'w-full lg:w-1/2'}`}>
+              <div className="relative min-h-0 flex-1 overflow-hidden bg-white dark:bg-slate-900">
+                {file.name.toLowerCase().endsWith('.pdf')
+                  ? <iframe src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} className="absolute inset-0 h-full w-full border-0" title="Resume Preview" />
+                  : <div className="absolute inset-0"><UploadedResumePreview file={file} /></div>}
               </div>
             </div>
           ) : (
@@ -488,7 +532,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
           )}
 
           {/* RIGHT: Componentized Form Pane (50%) */}
-          <div className="w-full lg:w-1/2 p-0 bg-white dark:bg-slate-900 relative">
+          <div className={`${resumeExpanded ? 'hidden' : 'block'} min-h-0 w-full overflow-y-auto lg:w-1/2 p-0 bg-white dark:bg-slate-900 relative`}>
             {candidateLoading && <PageLoadingSkeleton variant="detail" compact />}
             {candidateError && <p role="alert" className="p-4 text-red-700">{candidateError}. Close and reopen to retry.</p>}
             <SubmissionForm
@@ -503,7 +547,7 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
         </div>
 
         {/* Footer Actions */}
-        <div className="px-8 py-5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] z-10">
+        <div className={`${resumeExpanded ? "hidden" : "flex"} px-8 py-5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 items-center justify-between shrink-0 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] z-10`}>
           <div className="text-sm text-slate-500 dark:text-slate-400">
             {existingCandidateId && <label className="block text-xs mb-2"><input type="checkbox" checked={updateProfile} disabled={!canUpdateProfile || loading} onChange={event => setUpdateProfile(event.target.checked)} className="mr-2" />Also update candidate profile skills{!canUpdateProfile && ' (requires candidate edit permission)'}</label>}
             Please ensure all <span className="text-red-500 font-bold">*</span> required fields are filled.
@@ -525,5 +569,34 @@ export function CandidateSubmissionModal({ open: isOpen, onOpenChange: onClose, 
         </div>
       </DialogContent>
     </Dialog>
+        <Dialog open={breakdownOpen} onOpenChange={setBreakdownOpen}><DialogContent className="flex max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-[1000px]">
+          <header className="flex shrink-0 items-center justify-between border-b px-6 py-4 pr-12"><div><DialogTitle className="text-sm font-bold">Match breakdown</DialogTitle><DialogDescription className="text-xs">Job requirements compared with the current candidate profile.</DialogDescription></div><Button autoFocus variant="outline" size="sm" onClick={() => setBreakdownOpen(false)}>Close</Button></header>
+          <div className="min-h-0 flex-1 space-y-4 overflow-auto p-4 lg:p-6">
+            <MatchScoreCard assessment={assessment} state={assessmentState} />
+            <RequirementsComparison assessment={assessment} submission={{
+              candidateSkills: formData.skills.split(',').map(value => value.trim()).filter(Boolean),
+              candidateCurrentLocation: formData.currentLocation || undefined,
+              candidateExperience: formData.totalExperienceYears === '' ? null : Number(formData.totalExperienceYears),
+              candidateNoticePeriod: formData.noticePeriodDays === '' ? null : Number(formData.noticePeriodDays),
+              jobSkillsRequired: job?.skillsRequired || job?.primarySkills,
+              jobSecondarySkills: job?.secondarySkills, jobDegree: job?.degree,
+              jobNoticePeriod: job?.noticePeriod, jobExperienceMin: job?.expMin,
+              jobExperienceMax: job?.expMax, jobLocation: job?.city || job?.location,
+              jobWorkMode: job?.workMode,
+            }} />
+          </div>
+        </DialogContent></Dialog>
+    <Dialog open={Boolean(unsupportedFileName)} onOpenChange={open => { if (!open) setUnsupportedFileName(''); }}>
+      <DialogContent className="max-w-md">
+        <div className="flex items-start gap-3">
+          <div className="rounded-full bg-red-50 p-2 text-red-600 dark:bg-red-950/40 dark:text-red-400"><FileText className="h-5 w-5" /></div>
+          <div className="space-y-1"><DialogTitle className="text-sm font-bold">Unsupported file type</DialogTitle>
+            <DialogDescription className="text-xs leading-relaxed">“{unsupportedFileName}” can’t be uploaded here. Choose a PDF, DOC, or DOCX resume.</DialogDescription>
+          </div>
+        </div>
+        <div className="flex justify-end"><Button onClick={() => setUnsupportedFileName('')} className="h-9 bg-indigo-600 text-xs text-white hover:bg-indigo-700">Choose supported file</Button></div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

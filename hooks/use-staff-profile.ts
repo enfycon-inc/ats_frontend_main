@@ -17,14 +17,16 @@ export function useStaffProfile() {
     : null;
   const key = identity ? ['staff-profile', user?.id, user?.tenantId] : null;
   const fetchProfile = useCallback(async () => {
-    if (identity) confirmedProfiles.delete(identity);
     const data = await atsApi.profile.get();
     if (identity && data?.id === user?.id && data?.tenantId === user?.tenantId) {
       confirmedProfiles.add(identity);
     }
     return data;
   }, [identity, user?.id, user?.tenantId]);
-  const profile = useSWR<StaffProfile>(key, fetchProfile, { dedupingInterval: 15000, revalidateOnFocus: true, revalidateOnReconnect: true, refreshInterval: 30000 });
+  // Profile/role data changes through explicit profile events and navigation.
+  // Avoid periodic requests that briefly replaced the visible role with a
+  // loading state and could trigger unnecessary session renewal.
+  const profile = useSWR<StaffProfile>(key, fetchProfile, { dedupingInterval: 15000, revalidateOnFocus: false, revalidateOnReconnect: true, refreshInterval: 0 });
   const mutate = profile.mutate;
   useEffect(() => {
     const changed = (event: Event) => {
@@ -37,7 +39,7 @@ export function useStaffProfile() {
     return () => { window.removeEventListener('atsProfileChanged', changed); window.removeEventListener('atsWorkspaceSettingsChanged', settingsChanged); };
   }, [mutate, user?.id, user?.tenantId]);
   const confirmed = Boolean(
-    identity && confirmedProfiles.has(identity) && !profile.isValidating && !profile.error &&
+    identity && confirmedProfiles.has(identity) &&
     profile.data?.id === user?.id && profile.data?.tenantId === user?.tenantId
   );
   return { ...profile, loading: status === 'loading' || profile.isLoading, confirmed };

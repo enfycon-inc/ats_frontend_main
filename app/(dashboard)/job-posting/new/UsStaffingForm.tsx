@@ -1074,7 +1074,7 @@ const getInitialActiveBranchContext = () => {
   const handleExtractSkillsFromDescription = async () => {
     console.log("[AI EXTRACT] Extraction button clicked.");
     const jdHtml = getValues("jobDescription") || "";
-    const strippedText = jdHtml.replace(/<[^>]*>/g, " ").trim();
+    const strippedText = jdHtml.replace(/<\/(?:p|div|h[1-6]|li|ul|ol)>|<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, " ").trim();
     console.log("[AI EXTRACT] Cleaned JD text length:", strippedText.length);
     if (!strippedText) {
       toast.error("Please enter a job description in the editor below first.");
@@ -1155,6 +1155,64 @@ const getInitialActiveBranchContext = () => {
       setIsExtractingSkills(false);
     }
   };
+  const lastExtractedSignatureRef = useRef<string>("");
+
+  const handleSilentSkillExtraction = useCallback(async (textToParse?: string) => {
+    const raw = typeof textToParse === "string" ? textToParse : (getValues("jobDescription") || "");
+    const clean = raw.replace(/<\/(?:p|div|h[1-6]|li|ul|ol)>|<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim();
+    if (clean.length < 50) return;
+
+    const signature = clean.slice(0, 100) + ":" + clean.length;
+    if (lastExtractedSignatureRef.current === signature) return;
+    lastExtractedSignatureRef.current = signature;
+
+    setIsExtractingSkills(true);
+    try {
+      const res = await atsApi.jobs.parseJd(clean);
+      if (res && res.success) {
+        const pSkills = res.primarySkills || [];
+        const sSkills = res.secondarySkills || [];
+
+        if (pSkills.length > 0) {
+          setPrimarySkills(prev => Array.from(new Set([...prev, ...pSkills])));
+        }
+        if (sSkills.length > 0) {
+          setSecondarySkills(prev => Array.from(new Set([...prev, ...sSkills])));
+        }
+
+        const curMin = getValues("expMin");
+        const curMax = getValues("expMax");
+        if ((curMin === undefined || curMin === null || isNaN(curMin)) && res.experienceMin !== undefined && res.experienceMin !== null) {
+          setValue("expMin", Number(res.experienceMin));
+        }
+        if ((curMax === undefined || curMax === null || isNaN(curMax)) && res.experienceMax !== undefined && res.experienceMax !== null) {
+          setValue("expMax", Number(res.experienceMax));
+        }
+
+        const curTitle = getValues("jobTitle");
+        const extractedTitle = res.jobTitle || res.title;
+        if ((!curTitle || curTitle.trim() === "" || curTitle.includes("Auto-generated")) && extractedTitle && extractedTitle !== "Unknown") {
+          setValue("jobTitle", extractedTitle, { shouldValidate: true, shouldDirty: true });
+        }
+      }
+    } catch (err) {
+      console.debug("[silent-skills-extract] error:", err);
+    } finally {
+      setIsExtractingSkills(false);
+    }
+  }, [getValues, setValue]);
+
+  const watchedJd = watch("jobDescription");
+  useEffect(() => {
+    if (!watchedJd || primarySkills.length > 0) return;
+    const clean = watchedJd.replace(/<\/(?:p|div|h[1-6]|li|ul|ol)>|<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim();
+    if (clean.length < 60) return;
+    const timer = setTimeout(() => {
+      handleSilentSkillExtraction(clean);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [watchedJd, primarySkills.length, handleSilentSkillExtraction]);
+
   const onSubmit = async (data: FormValues) => {
     if (assignmentRequired && !assignmentValid) {
       toast.error("Select a pod or at least one recruiter. Your active role must have assignment permission.");
@@ -1254,6 +1312,28 @@ const getInitialActiveBranchContext = () => {
       const finalApproverRole = hasDesignatedReviewer ? "DESIGNATED_REVIEWER" : resolvedApproverRole;
 
       // Map frontend form fields → backend CreateJobDto
+      
+      let finalPrimarySkills = primarySkills;
+      let finalSecondarySkills = secondarySkills;
+      if (finalPrimarySkills.length === 0) {
+        const cleanJd = (finalDescription || "").replace(/<\/(?:p|div|h[1-6]|li|ul|ol)>|<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim();
+        if (cleanJd.length >= 30) {
+          try {
+            const fallbackRes = await atsApi.jobs.parseJd(cleanJd);
+            if (fallbackRes?.primarySkills?.length) {
+              finalPrimarySkills = fallbackRes.primarySkills;
+              setPrimarySkills(fallbackRes.primarySkills);
+            }
+            if (fallbackRes?.secondarySkills?.length) {
+              finalSecondarySkills = fallbackRes.secondarySkills;
+              setSecondarySkills(fallbackRes.secondarySkills);
+            }
+          } catch (e) {
+            console.debug("[submit-skill-fallback] error:", e);
+          }
+        }
+      }
+
       const payload = {
         ...(requiresAssignmentReason && assignmentReason.trim() ? { assignmentReason: assignmentReason.trim() } : {}),
         jobCode: data.jobCode,
@@ -1265,8 +1345,8 @@ const getInitialActiveBranchContext = () => {
         location: jobLocation({ location: data.locationAutocomplete, city: data.city, state: data.states, country: data.country }),
         type: data.jobType || "Full Time",
         description: finalDescription,
-        skillsRequired: primarySkills,
-        secondarySkills: secondarySkills,
+        skillsRequired: finalPrimarySkills,
+        secondarySkills: finalSecondarySkills,
         businessUnit: data.businessUnit,
         state: data.states,
         city: data.city || undefined,
@@ -1340,9 +1420,11 @@ const getInitialActiveBranchContext = () => {
   const SectionHeader = ({
     title,
     sectionKey,
+    action,
   }: {
     title: string;
     sectionKey: keyof typeof collapsedSections;
+    action?: React.ReactNode;
   }) => {
     const isCollapsed = collapsedSections[sectionKey];
     return (
@@ -1361,11 +1443,14 @@ const getInitialActiveBranchContext = () => {
         <span className="text-[11px] font-bold text-blue-950 dark:text-blue-100 uppercase tracking-wider">
           {title}
         </span>
-        {isCollapsed ? (
-          <ChevronDown className="h-4 w-4 text-blue-600 dark:text-blue-400 transition-transform group-hover:translate-y-0.5" />
-        ) : (
-          <ChevronUp className="h-4 w-4 text-blue-600 dark:text-blue-400 transition-transform group-hover:-translate-y-0.5" />
-        )}
+        <div className="flex items-center gap-3">
+          {action && <div onClick={(e) => e.stopPropagation()}>{action}</div>}
+          {isCollapsed ? (
+            <ChevronDown className="h-4 w-4 text-blue-600 dark:text-blue-400 transition-transform group-hover:translate-y-0.5" />
+          ) : (
+            <ChevronUp className="h-4 w-4 text-blue-600 dark:text-blue-400 transition-transform group-hover:-translate-y-0.5" />
+          )}
+        </div>
       </div>
     );
   };
@@ -3062,12 +3147,37 @@ const getInitialActiveBranchContext = () => {
 
               {/* -------------------- JOB DESCRIPTION -------------------- */}
               <div className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-lg shadow-xs overflow-visible">
-                <SectionHeader title="Job Description & Editor" sectionKey="jobDescription" />
+                <SectionHeader
+                  title="Job Description & Editor"
+                  sectionKey="jobDescription"
+                  action={
+                    <button
+                      type="button"
+                      onClick={handleExtractSkillsFromDescription}
+                      disabled={isExtractingSkills}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 rounded shadow-xs cursor-pointer disabled:opacity-50 transition-colors"
+                      title="Extract skills, experience, and title from this JD and fill the form"
+                    >
+                      {isExtractingSkills ? (
+                        <>
+                          <span className="h-2.5 w-2.5 border-2 border-indigo-600 dark:border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                          <span>Extracting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                          <span>Extract Skills to Form</span>
+                        </>
+                      )}
+                    </button>
+                  }
+                />
                 {!collapsedSections.jobDescription && (
                   <div className="p-4 space-y-3">
                     <RichTextEditor
                       value={watch("jobDescription") || ""}
                       onChange={(val) => setValue("jobDescription", val, { shouldValidate: true, shouldDirty: true })}
+                      onPasteText={(plain) => handleSilentSkillExtraction(plain)}
                       placeholder="Type or paste rich job description from Word, PDF, or Docs..."
                     />
                     {errors.jobDescription && (
