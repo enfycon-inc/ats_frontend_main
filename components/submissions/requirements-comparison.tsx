@@ -24,7 +24,7 @@ export function RequirementsComparison({ submission, assessment }: { submission:
   const normalized = (value: string) => value.toLowerCase().trim();
   const candidateSkills = [...new Set((submission.candidateSkills || []).map(skill => skill.trim().replace(/[.,;:]+$/, '')).filter(Boolean).filter((skill, index, all) => all.findIndex(value => normalized(value) === normalized(skill)) === index))];
   const renderRequirements = (category: 'primary' | 'secondary') => {
-    const skills = (category === 'primary' ? submission.jobSkillsRequired : submission.jobSecondarySkills) ?? criteria.filter(row => row.category === category).map(row => row.requirement);
+    const skills = assessment ? criteria.filter(row => row.category === category && row.key !== 'primary:none').map(row => row.requirement) : (category === 'primary' ? submission.jobSkillsRequired : submission.jobSecondarySkills);
     return <div key={category} className="mb-3"><p className="mb-2 font-semibold">{category === 'primary' ? 'Required skills' : 'Preferred skills'}</p><div className="flex flex-wrap gap-1.5">{skills?.map(skill => {
       const criterion = criteria.find(row => row.category === category && normalized(row.requirement) === normalized(skill));
       return <Finding key={skill} criterion={criterion || { key: `${category}:${skill}`, category, requirement: skill, finding: 'NEEDS_CLARIFICATION', evidence: 'Assessment unavailable.' }} skill />;
