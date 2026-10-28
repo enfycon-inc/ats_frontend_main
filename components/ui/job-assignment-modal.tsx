@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Search, Users, ShieldAlert, User, Check, X, Building2 } from "lucide-react";
+import { MapPin, Search, Star, Users, User, Check, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import type { JobPodOption } from "@/lib/ats-api";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { JobPodOption, JobStaffOption } from "@/lib/ats-api";
+import { USER_CITY_OPTIONS } from "@/lib/user-city-contract";
 
 export type AssignmentType = "unassigned" | "automatic" | "pod" | "recruiters";
 
@@ -16,7 +18,7 @@ interface JobAssignmentModalProps {
   selectedRecruiterIds: string[];
   onApply: (type: AssignmentType, podIds: string[], recruiterIds: string[]) => void;
   podsList: JobPodOption[];
-  recruitersList: any[];
+  recruitersList: JobStaffOption[];
   activeBranch?: any;
   canAssignPods?: boolean;
   canAssignRecruiters?: boolean;
@@ -40,7 +42,8 @@ export function JobAssignmentModal({
   const [type, setType] = useState<AssignmentType>(initialType);
   const [podIds, setPodIds] = useState<string[]>(initialPodIds);
   const [recruiterIds, setRecruiterIds] = useState<string[]>(initialRecruiterIds);
-  
+  const [recruiterTab, setRecruiterTab] = useState<"frequent" | "all">("frequent");
+  const [cityFilter, setCityFilter] = useState("all");
   const [search, setSearch] = useState("");
 
   // Sync state when modal opens
@@ -50,6 +53,8 @@ export function JobAssignmentModal({
       setPodIds(initialPodIds);
       setRecruiterIds(initialRecruiterIds);
       setSearch("");
+      setCityFilter("all");
+      setRecruiterTab("frequent");
     }
   }, [isOpen, initialType, initialPodIds, initialRecruiterIds]);
 
@@ -59,15 +64,30 @@ export function JobAssignmentModal({
     return podsList.filter((p) => p.name?.toLowerCase().includes(q));
   }, [podsList, search]);
 
+  const cityOptions = useMemo(() => {
+    const availableCities = new Set(recruitersList.map(recruiter => recruiter.city?.trim()).filter(Boolean));
+    return USER_CITY_OPTIONS.filter(option => availableCities.has(option.value));
+  }, [recruitersList]);
+
   const filteredRecruiters = useMemo(() => {
-    if (!search) return recruitersList;
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
     return recruitersList.filter((r) => {
-      const name = (r.fullName || r.name || "").toLowerCase();
+      const name = (r.fullName || "").toLowerCase();
       const email = (r.email || "").toLowerCase();
-      return name.includes(q) || email.includes(q);
+      const matchesSearch = !q || name.includes(q) || email.includes(q);
+      const matchesCity = cityFilter === "all" || r.city?.trim() === cityFilter;
+      return matchesSearch && matchesCity;
     });
-  }, [recruitersList, search]);
+  }, [recruitersList, search, cityFilter]);
+
+  const frequentRecruiters = useMemo(() => filteredRecruiters
+    .filter(recruiter => recruiter.assignmentCount > 0)
+    .sort((a, b) => {
+      const lastAssignedDifference = new Date(b.lastAssignedAt || 0).getTime() - new Date(a.lastAssignedAt || 0).getTime();
+      return lastAssignedDifference || b.assignmentCount - a.assignmentCount || a.fullName.localeCompare(b.fullName);
+    }), [filteredRecruiters]);
+
+  const visibleRecruiters = recruiterTab === "frequent" ? frequentRecruiters : filteredRecruiters;
 
   const handleApply = () => {
     onApply(validSelection ? type : "unassigned", validSelection && type === "pod" ? podIds : [], validSelection && type === "recruiters" ? recruiterIds : []);
@@ -75,10 +95,12 @@ export function JobAssignmentModal({
   };
 
   const handleSelectAllRecruiters = () => {
-    if (allFilteredSelected) {
-      setRecruiterIds(ids => ids.filter(id => !recruitersList.some(r => r.id === id)));
+    const visibleIds = visibleRecruiters.map(recruiter => recruiter.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => recruiterIds.includes(id));
+    if (allVisibleSelected) {
+      setRecruiterIds(ids => ids.filter(id => !visibleIds.includes(id)));
     } else {
-      setRecruiterIds(ids => [...new Set([...ids, ...recruitersList.map(r => r.id)])]);
+      setRecruiterIds(ids => [...new Set([...ids, ...visibleIds])]);
     }
   };
 
@@ -87,8 +109,6 @@ export function JobAssignmentModal({
   const isRecruitersEnabled = canAssignRecruiters && activeBranch?.allowNone === true;
   const isAssignLaterEnabled = !activeBranch || activeBranch.allowUnassigned === true || activeBranch.allow_unassigned === true;
 
-  // Select All includes every eligible recruiter in the selected unit.
-  const allFilteredSelected = recruitersList.length > 0 && recruitersList.every(r => recruiterIds.includes(r.id));
   useEffect(() => {
     if (!isOpen) return;
     if ((type === "automatic" && isAutomaticEnabled) || (type === "pod" && isPodsEnabled) || (type === "recruiters" && isRecruitersEnabled)) return;
@@ -149,10 +169,23 @@ export function JobAssignmentModal({
             <p className="p-6 text-sm text-slate-500">No assignment channels are enabled for this unit and your active role.</p>
           )}
           
-          {/* SEARCH BAR (For Pods & Recruiters) */}
+          {type === "recruiters" && (
+            <div role="tablist" aria-label="Recruiter list" className="flex border-b border-slate-200 bg-slate-50 px-4 dark:border-slate-800 dark:bg-slate-900/50">
+              <button type="button" role="tab" aria-selected={recruiterTab === "frequent"} onClick={() => setRecruiterTab("frequent")}
+                className={cn("flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-semibold", recruiterTab === "frequent" ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400" : "border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white")}>
+                <Star className="h-3.5 w-3.5" /> Frequently Assigned
+              </button>
+              <button type="button" role="tab" aria-selected={recruiterTab === "all"} onClick={() => setRecruiterTab("all")}
+                className={cn("border-b-2 px-3 py-2.5 text-sm font-semibold", recruiterTab === "all" ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400" : "border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white")}>
+                All Recruiters
+              </button>
+            </div>
+          )}
+
+          {/* Search and city filter for recruiters; search for pods. */}
           {type !== "unassigned" && type !== "automatic" && (
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800">
-              <div className="relative">
+            <div className="flex gap-2 border-b border-slate-100 p-4 dark:border-slate-800">
+              <div className="relative min-w-0 flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder={type === "pod" ? "Search pods..." : "Search recruiters..."}
@@ -161,6 +194,13 @@ export function JobAssignmentModal({
                   className="pl-9 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700 h-9 text-sm"
                 />
               </div>
+              {type === "recruiters" && (
+                <select aria-label="Filter recruiters by city" value={cityFilter} onChange={event => setCityFilter(event.target.value)}
+                  className="h-9 w-36 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  <option value="all">All cities</option>
+                  {cityOptions.map(city => <option key={city.value} value={city.value}>{city.label}</option>)}
+                </select>
+              )}
             </div>
           )}
 
@@ -211,29 +251,46 @@ export function JobAssignmentModal({
             {/* --- RECRUITERS --- */}
             {type === "recruiters" && (
               <>
-                {filteredRecruiters.length > 0 && (
+                {visibleRecruiters.length > 0 && (
                   <div className="flex items-center justify-between px-3 py-2 mb-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                     <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
                       {recruiterIds.length} recruiter{recruiterIds.length !== 1 ? 's' : ''} selected
                     </span>
                     <label className="flex items-center gap-2 text-xs cursor-pointer">
-                      <input type="checkbox" checked={allFilteredSelected} onChange={handleSelectAllRecruiters} />
+                      <input type="checkbox" checked={visibleRecruiters.every(recruiter => recruiterIds.includes(recruiter.id))} onChange={handleSelectAllRecruiters} />
                       Select All
                     </label>
                   </div>
                 )}
                 
-                {filteredRecruiters.length === 0 ? (
+                {visibleRecruiters.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 text-slate-500">
                     <User className="h-8 w-8 mb-2 opacity-20" />
-                    <p className="text-sm">No recruiters found.</p>
+                    <p className="text-center text-sm">
+                      {recruiterTab === "frequent" && filteredRecruiters.length === 0
+                        ? "No recruiters match your search or city filter."
+                        : recruiterTab === "frequent"
+                          ? "No recruiters have been assigned to jobs you created in this unit yet."
+                          : "No recruiters match your search or city filter."}
+                    </p>
+                    {recruiterTab === "frequent" && filteredRecruiters.length > 0 && (
+                      <Button type="button" variant="link" className="mt-1 h-auto p-1" onClick={() => setRecruiterTab("all")}>Browse all recruiters</Button>
+                    )}
                   </div>
                 ) : (
-                  filteredRecruiters.map(rec => {
+                  visibleRecruiters.map(rec => {
                     const isSelected = recruiterIds.includes(rec.id);
+                    const initials = rec.fullName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase() || "?";
+                    const lastAssignedDate = rec.lastAssignedAt ? new Date(rec.lastAssignedAt) : null;
+                    const lastAssignedLabel = lastAssignedDate && !Number.isNaN(lastAssignedDate.getTime())
+                      ? lastAssignedDate.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+                      : null;
                     return (
                       <div
                         key={rec.id}
+                        role="checkbox"
+                        aria-checked={isSelected}
+                        tabIndex={0}
                         onClick={() => {
                           if (isSelected) {
                             setRecruiterIds(prev => prev.filter(id => id !== rec.id));
@@ -247,6 +304,13 @@ export function JobAssignmentModal({
                             ? "bg-indigo-50/50 border-indigo-100 dark:bg-indigo-900/20 dark:border-indigo-800/50"
                             : "bg-white border-transparent hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800"
                         )}
+                        onKeyDown={event => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            if (isSelected) setRecruiterIds(prev => prev.filter(id => id !== rec.id));
+                            else setRecruiterIds(prev => [...prev, rec.id]);
+                          }
+                        }}
                       >
                         <div className={cn(
                           "h-4 w-4 rounded flex items-center justify-center shrink-0 border transition-colors",
@@ -254,13 +318,17 @@ export function JobAssignmentModal({
                         )}>
                           {isSelected && <Check className="h-3 w-3" />}
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                            {rec.fullName || rec.name || "User"}
-                          </span>
-                          <span className="text-xs text-slate-500 dark:text-slate-400">
-                            {rec.email}
-                          </span>
+                        <Avatar className="h-9 w-9 shrink-0 border border-slate-200 dark:border-slate-700">
+                          <AvatarImage src={rec.avatar || undefined} alt="" />
+                          <AvatarFallback className="bg-blue-50 text-[10px] font-semibold text-[#1a4fa0] dark:bg-blue-950/50 dark:text-blue-300">{initials}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{rec.fullName || "User"}</span>
+                          <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{rec.email}</span>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                            {rec.city && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{USER_CITY_OPTIONS.find(option => option.value === rec.city)?.label || rec.city}</span>}
+                            {recruiterTab === "frequent" && <span>{rec.assignmentCount} job{rec.assignmentCount === 1 ? "" : "s"}{lastAssignedLabel ? ` · Last assigned ${lastAssignedLabel}` : ""}</span>}
+                          </div>
                         </div>
                       </div>
                     );
