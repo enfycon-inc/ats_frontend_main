@@ -284,7 +284,9 @@ export default function PendingApprovalView({
         document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       }
     });
-    await signOut({ callbackUrl: "/auth/login" });
+    // Auth.js v5: redirectTo calls Keycloak's end_session_endpoint, destroying
+    // the SSO session so the next login gets a fresh session_state.
+    await signOut({ redirectTo: "/auth/login" });
   };
 
   if (approvedRoles) {

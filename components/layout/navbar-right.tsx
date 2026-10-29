@@ -1081,11 +1081,9 @@ function ProfileDropdownNav() {
         localStorage.removeItem("override_role");
       }
 
-      await signOut({ redirect: false });
-
-      if (typeof window !== "undefined") {
-        window.location.href = "/auth/login";
-      }
+      // Auth.js v5: redirectTo calls Keycloak's end_session_endpoint, destroying
+      // the SSO session so the next login gets a fresh session_state.
+      await signOut({ redirectTo: "/auth/login" });
     } catch (error) {
       console.error("Logout error:", error);
       if (typeof window !== "undefined") {
