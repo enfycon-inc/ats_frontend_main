@@ -238,6 +238,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  events: {
+    async signOut(message) {
+      // Auth.js clears its own cookie; provider logout must be explicit. Use the
+      // server-owned credential, which follows refresh-token rotation.
+      if (!('token' in message) || !message.token?.refreshToken) return;
+      const response = await fetchBackend('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: message.token.refreshToken }),
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!response.ok) {
+        throw new Error('Identity-provider session cleanup failed during sign-out.');
+      }
+    },
+  },
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider === "google" || account?.provider === "keycloak") {

@@ -417,21 +417,11 @@ const auth = {
   },
 
   async logout() {
-    let localSessionRevoked = false;
     try {
-      const result = await apiFetch<{ localSessionRevoked: boolean }>('/api/user-management/me/logout', { method: 'POST' });
-      localSessionRevoked = result.localSessionRevoked;
+      await apiFetch<{ localSessionRevoked: boolean }>('/api/user-management/me/logout', { method: 'POST' });
     } catch { /* Local browser sign-out must remain available during a backend outage. */ }
-    const refreshToken = getRefreshToken();
-    if (refreshToken && !localSessionRevoked) {
-      try {
-        await fetch(getApiBase() + '/api/auth/logout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken })
-        }).catch(() => null);
-      } catch (e) {}
-    }
+    // Auth.js signOut ends the provider session server-side with its current
+    // refresh credential. Browser storage may contain an older rotated token.
     clearToken();
   },
 

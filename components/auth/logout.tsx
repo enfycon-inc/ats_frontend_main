@@ -27,11 +27,7 @@ const Logout = () => {
         localStorage.removeItem("tenant_id");
       }
 
-      // Use redirectTo so Auth.js v5 calls Keycloak's end_session_endpoint,
-      // destroying the Keycloak SSO session on auth.enfyjobs.com.
-      // Without this, Keycloak reuses the same session_state on immediate
-      // re-login, which the backend rejects because that membership was
-      // already revoked — causing "Access Denied" after every logout.
+      // Provider cleanup runs server-side in the Auth.js signOut event; no browser redirect to Keycloak.
       await signOut({ redirectTo: "/auth/login" });
     } catch (error) {
       console.error("Logout error:", error);

@@ -284,8 +284,7 @@ export default function PendingApprovalView({
         document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       }
     });
-    // Auth.js v5: redirectTo calls Keycloak's end_session_endpoint, destroying
-    // the SSO session so the next login gets a fresh session_state.
+    // Provider cleanup runs server-side in the Auth.js signOut event; no browser redirect to Keycloak.
     await signOut({ redirectTo: "/auth/login" });
   };
 

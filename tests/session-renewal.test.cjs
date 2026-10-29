@@ -18,8 +18,9 @@ function load(file, imports, globals = {}) {
 
 function auth(activeRole = null, activeProfile = {}) {
   let config, now = 1000000, calls = 0, failure = 0;
-  const warnings = [];
-  const fetch = async url => {
+  const warnings = [], requests = [];
+  const fetch = async (url, options) => {
+    requests.push({ url: String(url), options });
     calls++;
     if (failure) return new Response('{}', { status: failure });
     if (String(url).endsWith('/api/auth/me')) return new Response(JSON.stringify(activeProfile));
@@ -27,19 +28,36 @@ function auth(activeRole = null, activeProfile = {}) {
   };
   const provider = options => options;
   load('auth.ts', {
+    'node:crypto': require('node:crypto'),
     'next-auth': options => { config = options; return {}; },
     'next-auth/providers/credentials': provider, 'next-auth/providers/github': provider,
     'next-auth/providers/google': provider, 'next-auth/providers/keycloak': provider,
     zod: {}, './lib/zod': {}, 'next/headers': { cookies: async () => ({ get: () => activeRole ? { value: activeRole } : undefined }) }, './lib/sso-error': {}, './utils/subdomain-helper': {},
     './lib/dashboard-preference': { dashboardPreferenceCookie: () => activeRole ? 'role-cookie' : null },
   }, { fetch, Date: { now: () => now }, console: { log() {}, warn: (...args) => warnings.push(args.join(' ')), error() {} } });
-  return { config, advance: ms => { now += ms; }, fail: status => { failure = status; }, get calls() { return calls; }, warnings };
+  return { config, advance: ms => { now += ms; }, fail: status => { failure = status; }, get calls() { return calls; }, warnings, requests };
 }
 
 async function login(app) {
   const user = await app.config.providers[0].authorize({ token: 'initial', refreshToken: 'refresh-initial', expiresIn: '300', userJson: JSON.stringify({ id: 'user', email: 'user@example.test' }) });
   return app.config.callbacks.jwt({ token: {}, user });
 }
+
+test('sign-out ends the provider session using the server-owned rotated credential', async () => {
+  const app = auth();
+  await app.config.events.signOut({ token: { refreshToken: 'current-server-refresh' } });
+  assert.equal(app.calls, 1);
+  assert.ok(app.requests[0].url.endsWith('/api/auth/logout'));
+  assert.equal(app.requests[0].options.method, 'POST');
+  assert.deepEqual(JSON.parse(app.requests[0].options.body), { refreshToken: 'current-server-refresh' });
+  await app.config.events.signOut({ token: null });
+  assert.equal(app.calls, 1);
+});
+
+test('provider logout failure is reported instead of silently claiming cleanup succeeded', async () => {
+  const app = auth(); app.fail(503);
+  await assert.rejects(app.config.events.signOut({ token: { refreshToken: 'current' } }), /cleanup failed/);
+});
 
 test('password handoff retains refresh credentials and the real five-minute expiry', async () => {
   const app = auth(), token = await login(app);
@@ -99,6 +117,22 @@ function api(respond, activeRole = null) {
   });
   return { api: exports.atsApi, storage, browser, activeRoleHeaders: exports.activeRoleHeaders };
 }
+
+test('workspace logout revokes locally and leaves provider cleanup to server sign-out', async () => {
+  const calls = [];
+  const app = api(async (url, options) => {
+    calls.push(String(url));
+    assert.equal(options.method, 'POST');
+    return new Response(JSON.stringify({ localSessionRevoked: true }));
+  });
+  app.storage.set('ats_access_token', `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')}.signature`);
+  await app.api.auth.logout();
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].endsWith('/api/user-management/me/logout'));
+  assert.equal(app.storage.has('ats_refresh_token'), false);
+  assert.equal(app.storage.has('ats_access_token'), false);
+  assert.equal(app.browser.location.href, '');
+});
 
 test('session consumers receive only the switched role permissions', async () => {
   const app = auth('11111111-1111-4111-8111-111111111111', {
