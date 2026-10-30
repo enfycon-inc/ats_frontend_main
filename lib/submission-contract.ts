@@ -121,7 +121,8 @@ export interface TrackerSubmission {
   id: string;
   jobId: string;
   candidateId: string;
-  recruiterId: string;
+  recruiterId: string | null;
+  submissionOrigin?: 'RECRUITER' | 'WEBSITE';
   l1Status: string | null;
   l2Status: string | null;
   l3Status: string | null;
