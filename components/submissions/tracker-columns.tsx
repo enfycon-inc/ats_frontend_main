@@ -6,7 +6,8 @@ import { type TrackerSortKey, type TrackerSortDirection } from '@/lib/submission
 import { cn } from '@/lib/utils';
 
 export type TrackerColumn = TrackerSortKey | 'actions';
-const DEFAULT_COLUMNS: TrackerColumn[] = ['job', 'creator', 'manager', 'recruiter', 'candidate', 'pipeline', 'status', 'jobCreated', 'submitted', 'actions'];
+const DEFAULT_COLUMNS: TrackerColumn[] = ['job', 'manager', 'recruiter', 'candidate', 'pipeline', 'status', 'jobCreated', 'submitted', 'actions'];
+const LEGACY_COLUMNS: TrackerColumn[] = [...DEFAULT_COLUMNS.slice(0, -1), 'creator', 'actions'];
 export const TRACKER_COLUMN_WIDTHS: Record<TrackerColumn, number> = { creator:185, job: 270, manager: 185, recruiter: 185, candidate: 260, pipeline: 255, status: 190, jobCreated: 145, submitted: 145, actions: 88 };
 
 export function useTrackerColumns(storageKey: string | null, grouped: boolean, managerLabel: string, initialSort?: { key: TrackerSortKey; direction: TrackerSortDirection }, submittedLabel = 'Submission date') {
@@ -22,8 +23,14 @@ export function useTrackerColumns(storageKey: string | null, grouped: boolean, m
       if (!active) return;
       try {
         const value: unknown = JSON.parse(localStorage.getItem(storageKey) || 'null');
-        if (Array.isArray(value) && value.length === DEFAULT_COLUMNS.length && new Set(value).size === value.length && value.every(key => DEFAULT_COLUMNS.includes(key)) && value.at(-1) === 'actions') {
-          setSaved({ key: storageKey, order: value as TrackerColumn[] });
+        if (Array.isArray(value) && new Set(value).size === value.length && value.every(key => LEGACY_COLUMNS.includes(key as TrackerColumn)) && value.at(-1) === 'actions') {
+          const migratedOrder = (value as TrackerColumn[]).filter(key => key !== 'creator');
+          if (migratedOrder.length === DEFAULT_COLUMNS.length && DEFAULT_COLUMNS.every(key => migratedOrder.includes(key))) {
+            setSaved({ key: storageKey, order: migratedOrder });
+            if (migratedOrder.length !== value.length) {
+              try { localStorage.setItem(storageKey, JSON.stringify(migratedOrder)); } catch { /* The migrated order remains available for this visit. */ }
+            }
+          }
         }
       } catch { /* Storage may be unavailable; the table remains usable. */ }
     };
