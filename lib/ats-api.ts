@@ -5,7 +5,7 @@ import type { ClientCreationContext, ClientCreationRequest, CreatedClient } from
 import type { TenantEmailSettings, EmailDispatchMode, EmailDispatchResult } from './system-email.types';
 import type { UserCity } from './user-city-contract';
 import type { RoleRequestDecision, RoleRequestReview, RoleRequestSubmission } from './role-request-contract';
-import type { DeliveryDashboard, DeliveryStage } from './delivery-dashboard-contract';
+import type { DeliveryDashboard, DeliveryStage, ManagerDashboard, ManagerDashboardFilters, ManagerDetailFilters, ManagerPerformanceDetail, RecruiterDashboard, RecruiterFilters, RecruiterPerformance, RecruiterDetailFilters } from './delivery-dashboard-contract';
 import type { StaffProfile, ProfileDetailsInput, SignatureSettings, SignatureInput, SignatureDefaultsInput } from './profile-contract';
 export interface ClientAccessPolicy { clientsVisibleAcrossUnits: boolean; bdmClientsTenantWide: boolean; otherOwnerPocsVisible: boolean; maskOtherOwnerPocDetails: boolean; }
 import type { CandidateAssessment, EligibleInterviewResponse, SubmissionHistoryResponse, TrackerListFilters, TrackerResponse, TrackerStatsResponse, TrackerSubmission, TrackerUpdate } from './submission-contract';
@@ -1734,12 +1734,17 @@ const submissions = {
   async history(id: string, page = 1, order: 'asc' | 'desc' = 'asc'): Promise<SubmissionHistoryResponse> {
     return apiFetch<SubmissionHistoryResponse>(`/api/recruiter-submissions/${id}/history?page=${page}&order=${order}`);
   },
+  async filterOptions(kind: import('./submission-contract').TrackerOptionKind, filters: TrackerListFilters = {}, optionSearch = '', optionPage = 1): Promise<import('./submission-contract').TrackerFilterOptions> {
+    const query=new URLSearchParams({kind,optionSearch,optionPage:String(optionPage)});
+    Object.entries(filters).forEach(([key,value])=>{if(value!==undefined&&value!=='')query.set(key,typeof value==='object'?JSON.stringify(value):String(value));});
+    return apiFetch(`/api/recruiter-submissions/filter-options?${query}`);
+  },
   async list(filters?: TrackerListFilters): Promise<TrackerResponse> {
     const cleanFilters: Record<string, string> = {};
     if (filters) {
       Object.entries(filters).forEach(([key, val]) => {
         if (val !== undefined && val !== null && val !== "") {
-          cleanFilters[key] = String(val);
+          cleanFilters[key] = typeof val==='object'?JSON.stringify(val):String(val);
         }
       });
     }
@@ -1911,6 +1916,26 @@ const branches = {
 };
 
 const businessUnits = {
+  recruiterDashboard(filters: RecruiterFilters = {}) {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([key,value])=>{if(value!==undefined&&value!=='')query.set(key,String(value));});
+    return apiFetch<RecruiterDashboard>(`/api/business-units/current/dashboard/recruiters?${query}`);
+  },
+  recruiterDetail(id: string, filters: RecruiterDetailFilters = {}) {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([key,value])=>{if(value!==undefined&&value!=='')query.set(key,String(value));});
+    return apiFetch<RecruiterPerformance>(`/api/business-units/current/dashboard/recruiters/${encodeURIComponent(id)}?${query}`);
+  },
+  accountManagerDetail(id: string, filters: ManagerDetailFilters = {}) {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
+    return apiFetch<ManagerPerformanceDetail>(`/api/business-units/current/dashboard/account-managers/${encodeURIComponent(id)}?${query}`);
+  },
+  accountManagerDashboard(filters: ManagerDashboardFilters = {}) {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
+    return apiFetch<ManagerDashboard>(`/api/business-units/current/dashboard/account-managers?${query}`);
+  },
   deliveryDashboard(stage: DeliveryStage = 'review', page = 1, memberPage = 1) {
     return apiFetch<DeliveryDashboard>(`/api/business-units/current/dashboard?stage=${stage}&page=${page}&memberPage=${memberPage}`);
   },

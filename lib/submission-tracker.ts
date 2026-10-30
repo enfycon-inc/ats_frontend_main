@@ -14,11 +14,12 @@ export function canMaintainSubmission(sub: TrackerSubmission): boolean {
   return Boolean(caps && (caps.review || caps.schedule || caps.outcome || Object.values(caps.results).some(Boolean)));
 }
 
-export function submissionBucket(sub: TrackerSubmission): 'review' | 'interviews' | 'offers' | 'closed' {
+export function submissionBucket(sub: TrackerSubmission): 'review' | 'interviews' | 'offers' | 'closures' | 'closed' {
   if (['SELECTED', 'OFFER'].includes(sub.finalStatus)) return 'offers';
-  if (['REJECTED', 'NOT_SELECTED', 'WITHDRAWN', 'JOIN'].includes(sub.finalStatus)) return 'closed';
-  const started = ROUNDS.some(({ key }) => ['SCHEDULED', 'AWAITING_FEEDBACK', 'CLEARED', 'REJECTED', 'CANCELLED'].includes(sub[`${key}Status`] || '') || Boolean(sub[`${key}Date`]));
-  return sub.finalStatus === 'SUBMITTED' && started ? 'interviews' : 'review';
+  if(sub.finalStatus==='JOIN') return 'closures';
+  if (['REJECTED', 'NOT_SELECTED', 'WITHDRAWN'].includes(sub.finalStatus)) return 'closed';
+  if (sub.workflowPaused && ['PENDING_APPROVAL', 'SUBMITTED'].includes(sub.finalStatus)) return 'closed';
+  return sub.finalStatus === 'PENDING_APPROVAL' ? 'review' : 'interviews';
 }
 export const ACTION_LABELS: Record<TrackerAction, string> = {
   rounds: 'Update submission', review: 'Review submission', schedule: 'Schedule interview', result: 'Record result',

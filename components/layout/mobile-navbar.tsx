@@ -23,7 +23,7 @@ function MobileNavItem({
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
   const isActive = item.href === "/dashboard"
-    ? pathname === "/dashboard"
+    ? pathname === "/dashboard" || pathname.startsWith('/dashboard/')
     : pathname.startsWith(item.href);
 
   if (!item.children || item.children.length === 0) {

@@ -153,7 +153,7 @@ export function ClientRoot({
     return roles.includes("SUPER_ADMIN") || systemRole === "SUPER_ADMIN";
   }, [session]);
 
-  const isViewportLocked = 
+  const isViewportLocked = pathname === "/utility/submissions" || 
     (pathname?.startsWith("/job-posting") && !pathname.endsWith("/new") && !pathname.includes("/matches")) ||
     (pathname?.startsWith("/applicants") && !pathname.endsWith("/new")) ||
     (pathname?.startsWith("/clients") && !pathname.endsWith("/new"));

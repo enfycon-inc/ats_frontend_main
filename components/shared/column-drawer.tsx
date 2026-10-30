@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { X, Search, Check, ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -12,27 +12,24 @@ interface ColumnDrawerProps {
   selectedColumns: string[];
   defaultColumns?: string[];
   onApply: (newSelectedOrder: string[]) => void;
+  onResetToDefault?: () => void;
 }
 
-export default function ColumnDrawer({
+export default function ColumnDrawer(props: ColumnDrawerProps) {
+  return props.isOpen ? <ColumnDrawerContent key={props.selectedColumns.join(':')} {...props} /> : null;
+}
+
+function ColumnDrawerContent({
   isOpen,
   onClose,
   allColumns,
   selectedColumns: initialSelected,
   defaultColumns,
   onApply,
+  onResetToDefault,
 }: ColumnDrawerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [tempSelected, setTempSelected] = useState<string[]>(initialSelected);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-
-  // Sync selected columns when initialSelected changes or when drawer opens
-  useEffect(() => {
-    if (isOpen) {
-      setTempSelected(initialSelected);
-    }
-  }, [isOpen, initialSelected]);
 
   const toggleColumnSelection = (id: string) => {
     setTempSelected((prev) => {
@@ -52,31 +49,34 @@ export default function ColumnDrawer({
     }
   };
 
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    if (draggedIndex !== null && draggedIndex !== index) {
+    if (dragOverIndex !== index) {
       setDragOverIndex(index);
     }
   };
 
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
-    if (draggedIndex === null || draggedIndex === dropIndex) {
+    if (draggedIndex === null || draggedIndex === targetIndex) {
       setDraggedIndex(null);
       setDragOverIndex(null);
       return;
     }
 
     const newOrder = [...tempSelected];
-    const [movedCol] = newOrder.splice(draggedIndex, 1);
-    newOrder.splice(dropIndex, 0, movedCol);
-
+    const [removed] = newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, removed);
     setTempSelected(newOrder);
     setDraggedIndex(null);
     setDragOverIndex(null);
@@ -238,7 +238,7 @@ export default function ColumnDrawer({
                               ? "opacity-30 border-dashed border-primary bg-primary/5"
                               : dragOverIndex === index
                               ? "border-primary bg-primary/10 ring-1 ring-primary scale-[1.02] shadow-xs"
-                              : "border-neutral-200 dark:border-slate-800 hover:border-neutral-400 dark:hover:border-slate-655"
+                              : "border-neutral-200 dark:border-slate-800 hover:border-neutral-400 dark:hover:border-slate-650"
                           )}
                           title="Drag up or down to reorder display order"
                         >
@@ -287,22 +287,40 @@ export default function ColumnDrawer({
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50 dark:bg-slate-900/50 flex items-center justify-end gap-2 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-slate-800 cursor-pointer font-semibold text-xs"
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleApply}
-              className="bg-primary text-white hover:bg-primary/90 px-5 cursor-pointer font-bold text-xs shadow-xs"
-            >
-              Apply Changes
-            </Button>
+          <div className="p-4 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50 dark:bg-slate-900/50 flex items-center justify-between gap-2 shrink-0">
+            {defaultColumns && defaultColumns.length > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => {
+                  setTempSelected(defaultColumns);
+                  if (onResetToDefault) onResetToDefault();
+                }}
+                className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 border-neutral-300 dark:border-slate-700 text-xs font-semibold cursor-pointer"
+              >
+                Reset Default
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-slate-800 cursor-pointer font-semibold text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleApply}
+                className="bg-primary text-white hover:bg-primary/90 px-5 cursor-pointer font-bold text-xs shadow-xs"
+              >
+                Apply Changes
+              </Button>
+            </div>
           </div>
         </div>
       </div>

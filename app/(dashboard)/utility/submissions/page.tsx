@@ -1,4 +1,9 @@
 "use client";
+import useSWR from 'swr';
+import SubmissionFilterBar from '@/components/submissions/submission-filter-bar';
+import { localFilterAccess, readSubmissionFilters, submissionFilterQuery, submissionTabs } from '@/lib/submission-filters';
+import type { TrackerListFilters } from '@/lib/submission-contract';
+import { UserIdentity } from '@/components/shared/user-identity';
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { PodFeatureGate } from "@/components/shared/pod-feature-gate";
 
@@ -17,10 +22,9 @@ import { closeSubmissionReviewHref, submissionReviewHref } from "@/lib/submissio
 import { Suspense, Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock3, Filter, Loader2, RefreshCw, Search, Mail, Phone, MapPin, BriefcaseBusiness, Building2, ExternalLink } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock3, Loader2, RefreshCw, Mail, Phone, MapPin, BriefcaseBusiness, Building2, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
-import { resolveActiveSystemRole } from "@/lib/role-permissions";
 import { useDashboardContext } from "@/contexts/DashboardContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,12 +33,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { TrackerBucket, TrackerResponse, TrackerSubmission, TrackerUpdate } from "@/lib/submission-contract";
-import { ACTION_LABELS, canRejectRound, canRecordResult, canUpdateOutcome, needsOutcomeReason, currentRound, formatInterview, interviewInstant, localInterviewParts, primaryAction, validTimezone, ROUNDS, type TrackerAction } from "@/lib/submission-tracker";
+import { ACTION_LABELS, canRejectRound, canRecordResult, canUpdateOutcome, needsOutcomeReason, currentRound, interviewInstant, localInterviewParts, primaryAction, validTimezone, type TrackerAction } from "@/lib/submission-tracker";
 
-const FILTERS: { key: TrackerBucket; label: string }[] = [
-  { key: "all", label: "All" }, { key: "review", label: "Needs review" },
-  { key: "interviews", label: "Interviews" }, { key: "offers", label: "Offers" }, { key: "closed", label: "Closed" },
-];
+const FILTERS = submissionTabs;
 function submissionOrdinal(value: number): string {
   const remainder = value % 100;
   const suffix = remainder >= 11 && remainder <= 13 ? 'th' : value % 10 === 1 ? 'st' : value % 10 === 2 ? 'nd' : value % 10 === 3 ? 'rd' : 'th';
@@ -42,7 +43,6 @@ function submissionOrdinal(value: number): string {
 }
 
 const PRIMARY = "bg-[#1a4fa0] text-white hover:bg-[#154181]";
-const OUTLINE = "border-[#1a4fa0]/40 text-[#1a4fa0] hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950";
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500";
 function TableDate({ value, timezone }: { value?: string | null; timezone?: string | null }) {
   if (!value || !Number.isFinite(new Date(value).getTime())) return <span>—</span>;
@@ -50,12 +50,16 @@ function TableDate({ value, timezone }: { value?: string | null; timezone?: stri
   const zone = validTimezone(timezone);
   const date = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: zone }).format(instant);
   const time = new Intl.DateTimeFormat('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: zone, timeZoneName: 'short' }).format(instant);
-  return <time dateTime={value} title={zone} className="block"><span className="block">{date}</span><span className="mt-1 block text-[10.5px] text-muted-foreground">{time}</span></time>;
+  return <time dateTime={value} title={zone} className="block"><span className="block">{date}</span><span className="mt-1 block text-xs text-muted-foreground">{time}</span></time>;
 }
 type PersonKind = "candidate" | "recruiter" | "account-manager";
 type ProfileTarget = { kind: PersonKind; submission: TrackerSubmission };
+interface PersonProfileData {
+  fullName?:string;full_name?:string;email?:string;phone?:string;avatar?:string;profilePicture?:string;profile_picture?:string;designation?:string;jobTitle?:string;city?:string;state?:string;businessUnitName?:string;podName?:string;currentCompany?:string;experienceYears?:number|string;noticePeriodDays?:number;skills?:string[];assignedRoles?:{name:string}[];
+  parsedJson?:{experience?:{detected_roles?:string[]};ats_normalized?:{designations?:Array<string|{raw?:string;canonical?:string}>}};
+}
 function PersonProfileDialog({ target, onClose }: { target: ProfileTarget; onClose: () => void }) {
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<PersonProfileData | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -63,7 +67,7 @@ function PersonProfileDialog({ target, onClose }: { target: ProfileTarget; onClo
     const request = target.kind === "candidate"
       ? atsApi.candidates.get(target.submission.candidateId)
       : atsApi.submissions.getPersonProfile(target.submission.id, target.kind);
-    void request.then(value => { if (!cancelled) setProfile(value); })
+    void request.then(value => { if (!cancelled) setProfile(value as PersonProfileData); })
       .catch(() => { if (!cancelled) setError("Unable to load this profile. Please try again."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -74,8 +78,8 @@ function PersonProfileDialog({ target, onClose }: { target: ProfileTarget; onClo
   const avatar = profile?.avatar || profile?.profilePicture || profile?.profile_picture || null;
   const parsed = profile?.parsedJson || {};
   const roles: string[] = candidate
-    ? [...new Set([...(Array.isArray(parsed?.experience?.detected_roles) ? parsed.experience.detected_roles : []), ...(Array.isArray(parsed?.ats_normalized?.designations) ? parsed.ats_normalized.designations.map((item: any) => typeof item === "string" ? item : item?.raw || item?.canonical) : [])].filter(Boolean))]
-    : (profile?.assignedRoles || []).map((role: any) => role.name).filter(Boolean);
+    ? [...new Set([...(Array.isArray(parsed?.experience?.detected_roles) ? parsed.experience.detected_roles : []), ...(Array.isArray(parsed?.ats_normalized?.designations) ? parsed.ats_normalized.designations.map((item: string | {raw?:string;canonical?:string}) => typeof item === "string" ? item : item?.raw || item?.canonical) : [])].filter((value):value is string=>Boolean(value)))]
+    : (profile?.assignedRoles || []).map((role: {name:string}) => role.name).filter(Boolean);
   const designation = candidate ? profile?.jobTitle || target.submission.candidateDesignation : profile?.designation;
   const location = candidate
     ? [profile?.city, profile?.state].filter(Boolean).join(", ")
@@ -114,13 +118,13 @@ function PersonProfileDialog({ target, onClose }: { target: ProfileTarget; onClo
   </Dialog>;
 }
 function CandidateCell({ submission: sub, onOpen }: { submission: TrackerSubmission; onOpen: () => void }) {
-  return <><button type="button" onClick={onOpen} className="text-left font-semibold text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.candidateName || "Name unavailable"}</button>{[sub.candidateEmail || "Email unavailable", sub.candidatePhone || "Mobile unavailable", sub.candidateCurrentLocation || "Location unavailable"].map((text, i) => <p key={i} className="mt-1 break-words text-[10.5px] text-muted-foreground">{text}</p>)}</>;
+  return <><button type="button" onClick={onOpen} className="text-left font-semibold text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.candidateName || "Name unavailable"}</button>{[sub.candidateEmail || "Email unavailable", sub.candidatePhone || "Mobile unavailable", sub.candidateCurrentLocation || "Location unavailable"].map((text, i) => <p key={i} className="mt-1 break-words text-xs text-muted-foreground">{text}</p>)}</>;
 }
 interface RemarkTemplate { id: number; stage: string; remarkText: string; remarkType?: string }
 function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
   submission: TrackerSubmission; action: TrackerAction; onClose: () => void; onSaved: (sub: TrackerSubmission) => void;
 }) {
-  const [action, setAction] = useState<TrackerAction>(initialAction);
+  const [action] = useState<TrackerAction>(initialAction);
   const [current, setCurrent] = useState<TrackerSubmission | null>(null);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -235,7 +239,7 @@ function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
               <div className="space-y-1.5"><Label htmlFor="interview-date" className="text-xs">Date</Label><Input id="interview-date" type="date" value={date} onChange={e => setDate(e.target.value)} required className="text-xs h-9" /></div>
               <div className="space-y-1.5"><Label htmlFor="interview-time" className="text-xs">Time</Label><Input id="interview-time" type="time" value={time} onChange={e => setTime(e.target.value)} required className="text-xs h-9" /></div>
             </div>
-            <div className="space-y-1.5"><Label htmlFor="interview-timezone" className="text-xs">Timezone</Label><Input id="interview-timezone" readOnly value={timezone} className="text-xs h-9" /><p className="text-[10.5px] text-muted-foreground">{current.timezone ? "Timezone from this job." : "Using your device timezone; this job has no timezone configured."}</p></div>
+            <div className="space-y-1.5"><Label htmlFor="interview-timezone" className="text-xs">Timezone</Label><Input id="interview-timezone" readOnly value={timezone} className="text-xs h-9" /><p className="text-xs text-muted-foreground">{current.timezone ? "Timezone from this job." : "Using your device timezone; this job has no timezone configured."}</p></div>
             <div className="space-y-1.5"><Label htmlFor="meeting-link" className="text-xs">Meeting link (optional)</Label><Input id="meeting-link" type="url" value={meetingLink} onChange={e => setMeetingLink(e.target.value)} placeholder="Add meeting link" className="text-xs h-9" /></div>
           </>}
           {action === "result" && <div className="space-y-1.5"><Label htmlFor="interview-result" className="text-xs">Result</Label><select id="interview-result" className={SELECT} value={result} onChange={e => setResult(e.target.value)}><option value="CLEARED">Selected</option><option value="REJECTED">Rejected</option></select></div>}
@@ -289,71 +293,43 @@ function SubmissionDetails({ submission, onReview }: { submission: TrackerSubmis
 }
 
 function SubmissionsPageContent() {
+  const {profile,selection}=useDashboardContext();
+  const params=useSearchParams();
+  const scope=[profile?.id,profile?.tenantId,profile?.branchId,profile?.businessUnitId,selection.active.id,[...(profile?.permissions??[])].sort().join(','),params.get('submission')??''].join(':');
+  return <FilteredSubmissionsPage key={scope} scope={scope}/>;
+}
+function FilteredSubmissionsPage({scope}:{scope:string}) {
   const router = useRouter();
   const params = useSearchParams();
-  const { status: workspaceStatus, selection, profile, roles } = useDashboardContext();
-  const isAccountManager = resolveActiveSystemRole(selection.active.id, roles, profile) === "ACCOUNT_MANAGER";
-  const view = params.get("view") || (isAccountManager ? "my" : "all");
+  const { status: workspaceStatus, profile } = useDashboardContext();
+  const access=localFilterAccess(profile?.permissions??[]);
+  const [filters,setFilters]=useState<TrackerListFilters>(()=>({...readSubmissionFilters(new URLSearchParams(params.toString())),view:params.get('view')||(access.portfolio?'my':'all')}));
+  const bucket=filters.bucket??'all';
+  function changeFilters(patch:Partial<TrackerListFilters>,reset=false){setFilters(f=>{if(reset)return {view:f.view,bucket:'all',page:1};const next={...f,...patch,page:patch.page??1};if(patch.bucket==='closures'&&f.bucket!=='closures'&&patch.dateBasis===undefined)next.dateBasis='joined';if(next.bucket!=='closures'&&next.dateBasis==='joined')next.dateBasis='submitted';return next;});}
+  function setBucket(value:TrackerBucket){changeFilters({bucket:value,stage:undefined,stageStatus:undefined,queue:undefined,workflow:undefined,...(value==='review'||filters.roundStatus!=='CLEARED'?{round:undefined,roundStatus:undefined}:{}),dateBasis:value==='closures'?'joined':'submitted'});}
+  const page=filters.page??1;
+  const setPage=(value:number|((current:number)=>number))=>setFilters(f=>({...f,page:typeof value==='function'?value(f.page??1):value}));
   const submissionId = params.get("submission");
   const reviewRequested = Boolean(submissionId && params.get("review") === "1");
-  const [bucket, setBucket] = useState<TrackerBucket>("all");
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [page, setPage] = useState(1);
-  const [response, setResponse] = useState<TrackerResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [search,setSearch]=useState(filters.search??'');
   const [revision, setRevision] = useState(0);
   const [detail, setDetail] = useState<TrackerSubmission | null>(null);
   const [editor, setEditor] = useState<{ submission: TrackerSubmission; action: TrackerAction } | null>(null);
   const [profileTarget, setProfileTarget] = useState<ProfileTarget | null>(null);
   const [collapsedJobs, setCollapsedJobs] = useState<Record<string, boolean>>({});
-  const [groupByJob, setGroupByJob] = useState(false);
-  const { columns, sort, headers } = useTrackerColumns(profile ? `submission-columns:v1:${profile.tenantId}:${profile.id}` : null, groupByJob, 'Created By');
-  const [jobFilter, setJobFilter] = useState<{ id: string; label: string; previousPage: number } | null>(null);
-  useEffect(() => { const timer = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 300); return () => clearTimeout(timer); }, [search]);
-  useEffect(() => {
-    const refresh = () => { setEditor(null); setRevision(r => r + 1); };
-    window.addEventListener("app:refresh", refresh); window.addEventListener("branchChanged", refresh);
-    return () => { window.removeEventListener("app:refresh", refresh); window.removeEventListener("branchChanged", refresh); };
-  }, []);
-  useEffect(() => {
-    if (workspaceStatus !== "ready") return;
-    let cancelled = false;
-    const load = async () => {
-      await Promise.resolve();
-      if (cancelled) return;
-      setLoading(true); setError(""); setDetail(null); setResponse(null);
-      if (startDate && endDate && startDate > endDate) { setError("The end date must be on or after the start date."); setLoading(false); return; }
-      try {
-        if (submissionId) {
-          const data = await atsApi.submissions.get(submissionId);
-          if (!cancelled) setDetail(data);
-        } else {
-          const data = await atsApi.submissions.list({ view, bucket, jobId: jobFilter?.id, search: debouncedSearch, startDate, endDate, page, sortBy: sort.key, sortDirection: sort.direction, limit: 10 });
-          if (!cancelled) {
-            if (page > Math.max(1, data.totalPages)) { setPage(Math.max(1, data.totalPages)); return; }
-            setResponse(data);
-          }
-        }
-      } catch (err: any) {
-        if (!cancelled) {
-          const msg = err?.message || "";
-          if (msg.includes("permission") || msg.includes("403") || msg.includes("Forbidden")) {
-            setError("You do not have permission to view submissions. Please contact your administrator or enable 'submission:view' in Role Management.");
-          } else {
-            setError("Unable to load submissions. Please try again.");
-          }
-        }
-      }
-      finally { if (!cancelled) setLoading(false); }
-    };
-    void load();
-    return () => { cancelled = true; };
-  }, [view, submissionId, bucket, jobFilter?.id, debouncedSearch, startDate, endDate, page, sort.key, sort.direction, revision, workspaceStatus, selection.active.id, profile?.branchId]);
+  const [groupByJob, setGroupByJob] = useState(params.get("groupByJob")==="1");
+  const { columns, sort, headers } = useTrackerColumns(profile ? `submission-columns:v1:${profile.tenantId}:${profile.id}` : null, groupByJob, 'Account manager', {key:(params.get('sortBy')||'submitted') as import('@/lib/submission-contract').TrackerSortKey,direction:params.get('sortDirection')==='asc'?'asc':'desc'}, bucket==='closures'?'Joined at':'Submission date');
+  useEffect(()=>{if(search===(filters.search??''))return;const t=setTimeout(()=>changeFilters({search}),300);return()=>clearTimeout(t);},[search,filters.search]);
+  useEffect(()=>{const refresh=()=>{setEditor(null);setRevision(r=>r+1);};window.addEventListener('app:refresh',refresh);window.addEventListener('branchChanged',refresh);return()=>{window.removeEventListener('app:refresh',refresh);window.removeEventListener('branchChanged',refresh);};},[]);
+  useEffect(()=>{if(submissionId)return;const next=submissionFilterQuery(new URLSearchParams(params.toString()),filters);next.set('sortBy',sort.key);next.set('sortDirection',sort.direction);if(groupByJob)next.set('groupByJob','1');else next.delete('groupByJob');if(next.toString()!==params.toString())window.history.replaceState(null,'',`/utility/submissions?${next}`);},[filters,sort,groupByJob,submissionId,params]);
+  const invalidDates=Boolean(filters.startDate&&filters.endDate&&filters.startDate>filters.endDate);
+  const list=useSWR<TrackerResponse>(workspaceStatus==='ready'&&!submissionId&&!invalidDates?['submission-tracker',scope,revision,filters,sort]:null,()=>atsApi.submissions.list({...filters,sortBy:sort.key,sortDirection:sort.direction,limit:filters.limit??20}),{revalidateOnFocus:false,shouldRetryOnError:false,onSuccess:result=>{if(page>Math.max(1,result.totalPages))setPage(Math.max(1,result.totalPages));}});
+  const record=useSWR<TrackerSubmission>(workspaceStatus==='ready'&&submissionId?['submission-record',scope,submissionId,revision]:null,()=>atsApi.submissions.get(submissionId!),{revalidateOnFocus:false,shouldRetryOnError:false});
+  const response=list.data;
+  const shownDetail=detail??record.data;
+  const loading=workspaceStatus!=='ready'||(submissionId?record.isLoading:list.isLoading);
+  const loadError=list.error??record.error;
+  const error=invalidDates?'The end date must be on or after the start date.':loadError instanceof Error?loadError.message:'';
   const detailHref = useCallback((id: string) => { const query = new URLSearchParams(params.toString()); query.set("submission", id); return `/utility/submissions?${query}`; }, [params]);
   function backToTracker() { const query = new URLSearchParams(params.toString()); query.delete("submission"); router.push(`/utility/submissions?${query}`); }
   function openReview(id: string, returnToTracker = false) {
@@ -365,12 +341,13 @@ function SubmissionsPageContent() {
   }
   function renderCell(sub: TrackerSubmission, column: TrackerColumn): ReactNode {
     switch (column) {
-      case "job": return <td key="job" className="px-5 py-5"><div className="space-y-1.5"><Link href={detailHref(sub.id)} className="block text-sm font-semibold leading-5 text-slate-900 hover:text-[#1a4fa0] hover:underline dark:text-slate-100">{sub.jobTitle || "Title unavailable"}</Link><p className="whitespace-nowrap font-medium text-muted-foreground">{sub.jobCode || "Code unavailable"}</p><div className="flex items-center gap-2 whitespace-nowrap text-[10.5px] leading-5">{sub.jobUrgency && <span className="rounded bg-amber-50 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{sub.jobUrgency}</span>}<button type="button" className="border-l border-border pl-2 font-medium text-[#1a4fa0] dark:text-blue-300 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => { setJobFilter({ id: sub.jobId, label: sub.jobCode || sub.jobTitle || "Selected job", previousPage: jobFilter?.previousPage ?? page }); setPage(1); }}>{sub.submissionNumber ? `${submissionOrdinal(sub.submissionNumber)} submission` : "Submission"}</button><span className="border-l border-border pl-2 text-muted-foreground">{sub.jobSubmissionRequired ?? "—"} required</span></div>{sub.jobIsCoSourced && <span className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[10.5px] text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Co-sourced</span>}</div></td>;
-      case "manager": return <td key="manager" className="px-2.5 py-3"><button type="button" onClick={() => setProfileTarget({ kind: "account-manager", submission: sub })} className="text-left font-medium break-words text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.accountManagerName || "Name unavailable"}</button><p className="mt-1 break-words text-[10.5px] text-muted-foreground">{sub.accountManagerEmail || "Email unavailable"}</p></td>;
-      case "recruiter": return <td key="recruiter" className="px-2.5 py-3"><button type="button" onClick={() => setProfileTarget({ kind: "recruiter", submission: sub })} className="text-left font-medium break-words text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.recruiterName || "Name unavailable"}</button><p className="mt-1 break-words text-[10.5px] text-muted-foreground">{sub.recruiterEmail || "Email unavailable"}</p></td>;
+      case "job": return <td key="job" className="px-5 py-5"><div className="space-y-1.5"><Link href={detailHref(sub.id)} className="block text-sm font-semibold leading-5 text-slate-900 hover:text-[#1a4fa0] hover:underline dark:text-slate-100">{sub.jobTitle || "Title unavailable"}</Link><p className="whitespace-nowrap font-medium text-muted-foreground">{sub.jobCode || "Code unavailable"}</p><div className="flex items-center gap-2 whitespace-nowrap text-xs leading-5">{sub.jobUrgency && <span className="rounded bg-amber-50 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{sub.jobUrgency}</span>}<button type="button" className="border-l border-border pl-2 font-medium text-[#1a4fa0] dark:text-blue-300 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => { changeFilters({jobId:sub.jobId}); }}>{sub.submissionNumber ? `${submissionOrdinal(sub.submissionNumber)} submission` : "Submission"}</button><span className="border-l border-border pl-2 text-muted-foreground">{sub.jobSubmissionRequired ?? "—"} required</span></div>{sub.jobIsCoSourced && <span className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Co-sourced</span>}</div></td>;
+      case "creator": return <td key="creator" className="px-2.5 py-3"><UserIdentity size="table" user={{name:sub.creatorName,email:sub.creatorEmail,avatar:sub.creatorAvatar}}/></td>;
+      case "manager": return <td key="manager" className="px-2.5 py-3"><button type="button" onClick={()=>setProfileTarget({kind:'account-manager',submission:sub})} className="block w-full text-left hover:text-[#1a4fa0]"><UserIdentity size="table" user={{name:sub.accountManagerName,email:sub.accountManagerEmail}}/></button></td>;
+      case "recruiter": return <td key="recruiter" className="px-2.5 py-3"><button type="button" onClick={()=>setProfileTarget({kind:'recruiter',submission:sub})} className="block w-full text-left hover:text-[#1a4fa0]"><UserIdentity size="table" user={{name:sub.recruiterName,email:sub.recruiterEmail,avatar:sub.recruiterAvatar}}/></button></td>;
       case "candidate": return <td key="candidate" className="px-2.5 py-3"><CandidateCell submission={sub} onOpen={() => setProfileTarget({ kind: "candidate", submission: sub })} /></td>;
       case "jobCreated": return <td key="jobCreated" className="px-2.5 py-3"><TableDate value={sub.jobCreatedAt} timezone={sub.timezone} /></td>;
-      case "submitted": return <td key="submitted" className="px-2.5 py-3"><TableDate value={sub.createdAt} timezone={sub.timezone} /></td>;
+      case "submitted": return <td key="submitted" className="px-2.5 py-3"><TableDate value={bucket==='closures'?sub.joinedAt:sub.createdAt} timezone={sub.timezone} /></td>;
       case "pipeline": return <td key="pipeline" className="px-2.5 py-4 text-center"><Pipeline submission={sub} /></td>;
       case "status": return <td key="status" className="px-2.5 py-3 text-center align-middle">
         <div className="flex flex-col items-center gap-1.5">
@@ -387,22 +364,20 @@ function SubmissionsPageContent() {
     }
   }
   if (workspaceStatus === "error") return <div role="alert" className="text-sm text-red-700">Unable to load workspace access. Refresh the page to retry.</div>;
-  if (reviewRequested && workspaceStatus === "ready") return <ReviewWorkspace key={submissionId} submissionId={submissionId!} onClose={closeReview} onSaved={saved => { setDetail(saved); setRevision(r => r + 1); closeReview(); }} />;
-  return <main className="space-y-5 min-w-0 text-foreground">
-    {submissionId ? <Button variant="ghost" size="sm" className="text-xs -ml-2" onClick={backToTracker}><ArrowLeft className="h-3.5 w-3.5" />Back to submissions</Button> : <div><p className="mt-1 text-xs text-muted-foreground">Track progress. Take the next action.</p></div>}
-    {!submissionId && <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs" aria-label="Submission tracker">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-5">
+  if (reviewRequested && workspaceStatus === "ready") return <div className="h-full min-h-0 overflow-auto"><ReviewWorkspace key={submissionId} submissionId={submissionId!} onClose={closeReview} onSaved={saved => { setDetail(saved); setRevision(r => r + 1); closeReview(); }} /></div>;
+  return <main className={submissionId?"h-full min-h-0 min-w-0 space-y-4 overflow-auto text-foreground":"flex h-full min-h-0 min-w-0 flex-col text-foreground"}>
+    {submissionId ? <Button variant="ghost" size="sm" className="text-xs -ml-2" onClick={backToTracker}><ArrowLeft className="h-3.5 w-3.5" />Back to submissions</Button> : null}
+    {!submissionId && <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs" aria-label="Submission tracker">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 bg-card px-4 py-3">
         <div role="group" aria-label="Submission stage" className="flex flex-wrap gap-0">{FILTERS.map(filter => <button type="button" aria-pressed={bucket === filter.key} key={filter.key} onClick={() => { setBucket(filter.key); setPage(1); }} className={cn("flex items-center gap-2 border border-border px-3 py-2 text-xs font-medium first:rounded-l-md last:rounded-r-md focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-blue-500 -ml-px first:ml-0", bucket === filter.key ? "border-blue-300 bg-blue-50 text-[#1a4fa0] dark:bg-blue-950 dark:text-blue-200" : "hover:bg-muted")}>
-          {filter.label}<span className={cn("rounded-full px-1.5 py-0.5 text-[10.5px] min-w-5 text-center", bucket === filter.key ? PRIMARY : "bg-muted text-muted-foreground")}>{response?.counts?.[filter.key] ?? "—"}</span>
+          {filter.label}<span className={cn("rounded-full px-1.5 py-0.5 text-xs min-w-5 text-center", bucket === filter.key ? PRIMARY : "bg-muted text-muted-foreground")}>{response?.counts?.[filter.key] ?? "—"}</span>
         </button>)}</div>
-        <div className="flex flex-1 sm:flex-none items-center gap-2"><div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input type="search" aria-label="Search candidate, job code or client" placeholder="Search candidate, job code or client…" value={search} onChange={e => setSearch(e.target.value)} className="h-9 pl-9 text-xs sm:w-[240px]" /></div><button type="button" role="switch" aria-checked={groupByJob} onClick={() => setGroupByJob(value => !value)} className="flex shrink-0 items-center gap-2 rounded-md px-2 py-2 text-xs focus-visible:outline-2 focus-visible:outline-blue-500">Group by job<span aria-hidden="true" className={cn("flex h-5 w-9 items-center rounded-full p-0.5 transition-colors", groupByJob ? "bg-[#1a4fa0]" : "bg-slate-300 dark:bg-slate-600")}><span className={cn("h-4 w-4 rounded-full bg-white transition-transform", groupByJob && "translate-x-4")} /></span></button><Button variant="outline" className={cn("h-9 text-xs", OUTLINE)} aria-expanded={showFilters} onClick={() => setShowFilters(v => !v)}><Filter className="h-3.5 w-3.5" />More filters</Button><Button variant="ghost" size="icon" aria-label="Refresh submissions" disabled={loading} onClick={() => setRevision(r => r + 1)}><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /></Button></div>
+        <div className="flex items-center gap-2"><button type="button" role="switch" aria-checked={groupByJob} onClick={() => setGroupByJob(value => !value)} className="flex shrink-0 items-center gap-2 rounded-md px-2 py-2 text-xs focus-visible:outline-2 focus-visible:outline-blue-500">Group by job<span aria-hidden="true" className={cn("flex h-5 w-9 items-center rounded-full p-0.5 transition-colors", groupByJob ? "bg-[#1a4fa0]" : "bg-slate-300 dark:bg-slate-600")}><span className={cn("h-4 w-4 rounded-full bg-white transition-transform", groupByJob && "translate-x-4")} /></span></button><Button variant="ghost" size="icon" aria-label="Refresh submissions" disabled={loading} onClick={() => setRevision(r => r + 1)}><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /></Button></div>
       </div>
-      {jobFilter && <div className="border-t border-border px-5 py-2 text-xs">
-        <div>{jobFilter && <button type="button" className="rounded-md bg-blue-50 px-3 py-1.5 text-[#1a4fa0] dark:bg-blue-950 dark:text-blue-200" aria-label={`Remove job filter ${jobFilter.label}`} onClick={() => { setPage(jobFilter.previousPage); setJobFilter(null); }}>Job: {jobFilter.label} <span aria-hidden="true" className="ml-2">×</span></button>}</div>
-      </div>}
-      {showFilters && <div className="flex flex-wrap items-end gap-3 border-t border-border bg-muted/30 px-5 py-4"><div className="space-y-1"><Label htmlFor="from-date" className="text-xs">Submitted from</Label><Input id="from-date" type="date" className="h-9 text-xs" value={startDate} max={endDate || undefined} onChange={e => { setStartDate(e.target.value); setPage(1); }} /></div><div className="space-y-1"><Label htmlFor="to-date" className="text-xs">Submitted to</Label><Input id="to-date" type="date" className="h-9 text-xs" value={endDate} min={startDate || undefined} onChange={e => { setEndDate(e.target.value); setPage(1); }} /></div><Button variant="ghost" className="text-xs" onClick={() => { setStartDate(""); setEndDate(""); setSearch(""); setPage(1); }}>Clear filters</Button></div>}
-      <div className="overflow-x-auto">
-        <table className="w-full table-fixed border-collapse text-xs [&_th]:border-r [&_th]:border-border [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border [&_td:last-child]:border-r-0 [&_td]:align-middle" style={{ minWidth: columns.reduce((width, column) => width + TRACKER_COLUMN_WIDTHS[column], 0) }}><colgroup>{columns.map(column => <col key={column} style={{ width: TRACKER_COLUMN_WIDTHS[column] }} />)}</colgroup><thead className="select-none border-y border-border"><tr>{headers(() => setPage(1))}</tr></thead>
+      <SubmissionFilterBar filters={filters} access={response?.filterAccess??access} scope={scope} search={search} onSearch={setSearch} onChange={(patch,reset)=>{if(reset)setSearch('');changeFilters(patch,reset);}}/>
+      {!!response?.undatedClosures&&bucket==='closures'&&<p className="px-5 py-2 text-xs text-amber-800 dark:text-amber-300">{response.undatedClosures} closures have no recorded join date and cannot be included in a joined-date range.</p>}
+      <div className="relative min-h-0 flex-1 overflow-auto" data-slot="submission-table-scroll">
+        <table className="w-full table-fixed border-collapse text-sm [&_th]:border-r [&_th]:border-border [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border [&_td:last-child]:border-r-0 [&_td]:align-middle" style={{ minWidth: columns.reduce((width, column) => width + TRACKER_COLUMN_WIDTHS[column], 0) }}><colgroup>{columns.map(column => <col key={column} style={{ width: TRACKER_COLUMN_WIDTHS[column] }} />)}</colgroup><thead className="sticky top-0 z-20 select-none border-y border-border bg-card"><tr>{headers(() => setPage(1))}</tr></thead>
           <tbody className="divide-y divide-border">
             {loading || workspaceStatus !== "ready" ? <tr><td colSpan={100}><PageLoadingSkeleton variant="compact" /></td></tr> : error ? <tr><td colSpan={columns.length} className="py-12 text-center" role="alert">{error}{!error.includes("permission") && <Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button>}</td></tr> : !response?.data.length ? <tr><td colSpan={columns.length} className="py-16 text-center text-muted-foreground">No submissions match these filters.</td></tr> : !groupByJob ? response.data.map(sub => {
 
@@ -412,7 +387,7 @@ function SubmissionsPageContent() {
             }) : Array.from(new Set(response.data.map(sub => sub.jobId))).map(jobId => {
               const submissions = response.data.filter(sub => sub.jobId === jobId);
               const job = submissions[0];
-              return <Fragment key={jobId}><tr className="bg-blue-50/70 dark:bg-blue-950/40"><td colSpan={columns.length} className="px-5 py-3"><div className="flex items-center justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-x-3 gap-y-2"><button type="button" className="font-semibold text-[#1a4fa0] dark:text-blue-200" aria-expanded={!collapsedJobs[jobId]} onClick={() => setCollapsedJobs(previous => ({ ...previous, [jobId]: !previous[jobId] }))}>{collapsedJobs[jobId] ? "▸" : "▾"} {job.jobCode || "Code unavailable"}</button><span className="font-semibold text-[#1a4fa0] dark:text-blue-200">{job.jobTitle || "Title unavailable"}</span>{job.jobUrgency && <span className="rounded bg-amber-100 px-2 py-1 text-[10.5px] text-amber-900">{job.jobUrgency}</span>}{job.jobIsCoSourced && <span className="rounded bg-violet-100 px-2 py-1 text-[10.5px] text-violet-800">Co-sourced</span>}</div><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>Client: {job.clientName || "Not provided"}</span><span>End client: {job.endClientName || "Not provided"}</span></div></div><span className="shrink-0 text-xs font-medium text-muted-foreground">{job.jobSubmissionDone ?? job.matchingJobSubmissionCount ?? submissions.length} / {job.jobSubmissionRequired ?? "—"} submissions{submissions.length < (job.matchingJobSubmissionCount ?? submissions.length) && ` · ${submissions.length} on this page`}</span></div></td></tr>{!collapsedJobs[jobId] && submissions.map(sub => {
+              return <Fragment key={jobId}><tr className="bg-blue-50/70 dark:bg-blue-950/40"><td colSpan={columns.length} className="px-5 py-3"><div className="flex items-center justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-x-3 gap-y-2"><button type="button" className="font-semibold text-[#1a4fa0] dark:text-blue-200" aria-expanded={!collapsedJobs[jobId]} onClick={() => setCollapsedJobs(previous => ({ ...previous, [jobId]: !previous[jobId] }))}>{collapsedJobs[jobId] ? "▸" : "▾"} {job.jobCode || "Code unavailable"}</button><span className="font-semibold text-[#1a4fa0] dark:text-blue-200">{job.jobTitle || "Title unavailable"}</span>{job.jobUrgency && <span className="rounded bg-amber-100 px-2 py-1 text-xs text-amber-900">{job.jobUrgency}</span>}{job.jobIsCoSourced && <span className="rounded bg-violet-100 px-2 py-1 text-xs text-violet-800">Co-sourced</span>}</div><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>Client: {job.clientName || "Not provided"}</span><span>End client: {job.endClientName || "Not provided"}</span></div></div><span className="shrink-0 text-xs font-medium text-muted-foreground">{job.jobSubmissionDone ?? job.matchingJobSubmissionCount ?? submissions.length} / {job.jobSubmissionRequired ?? "—"} submissions{submissions.length < (job.matchingJobSubmissionCount ?? submissions.length) && ` · ${submissions.length} on this page`}</span></div></td></tr>{!collapsedJobs[jobId] && submissions.map(sub => {
               return <tr key={sub.id} className="hover:bg-muted/25 transition-colors">
                 {columns.map(column => renderCell(sub, column))}
               </tr>;
@@ -421,12 +396,12 @@ function SubmissionsPageContent() {
           </tbody>
         </table>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4 text-xs text-muted-foreground">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border bg-card px-4 py-3 text-xs text-muted-foreground" data-slot="submission-pagination">
         <p>{response ? `Showing ${response.total ? (response.page - 1) * response.limit + 1 : 0}–${Math.min(response.page * response.limit, response.total)} of ${response.total}` : "Loading records…"}</p>
-        <nav aria-label="Submission pages" className="flex items-center gap-1"><Button variant="outline" size="icon" className="h-8 w-8" aria-label="Previous page" disabled={loading || page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>{response && Array.from({ length: Math.min(5, response.totalPages) }, (_, i) => Math.max(1, Math.min(page - 2, response.totalPages - 4)) + i).map(p => <Button key={p} variant={p === page ? "default" : "outline"} className={cn("h-8 min-w-8 px-2 text-xs", p === page && PRIMARY)} aria-label={`Page ${p}`} aria-current={p === page ? "page" : undefined} disabled={loading} onClick={() => setPage(p)}>{p}</Button>)}<Button variant="outline" size="icon" className="h-8 w-8" aria-label="Next page" disabled={loading || !response || page >= response.totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button></nav>
+        <label className="hidden items-center gap-2 sm:flex">Rows per page<select aria-label="Rows per page" className="h-8 rounded border bg-card px-2" value={filters.limit??20} onChange={e=>changeFilters({limit:Number(e.target.value)})}>{[10,20,50,100].map(value=><option key={value} value={value}>{value}</option>)}</select></label><nav aria-label="Submission pages" className="flex items-center gap-1"><Button variant="outline" size="icon" className="h-8 w-8" aria-label="Previous page" disabled={loading || page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>{response && Array.from({ length: Math.min(5, response.totalPages) }, (_, i) => Math.max(1, Math.min(page - 2, response.totalPages - 4)) + i).map(p => <Button key={p} variant={p === page ? "default" : "outline"} className={cn("h-8 min-w-8 px-2 text-xs", p === page && PRIMARY)} aria-label={`Page ${p}`} aria-current={p === page ? "page" : undefined} disabled={loading} onClick={() => setPage(p)}>{p}</Button>)}<Button variant="outline" size="icon" className="h-8 w-8" aria-label="Next page" disabled={loading || !response || page >= response.totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button></nav>
       </div>
     </section>}
-    {submissionId && !reviewRequested && (loading ? <PageLoadingSkeleton variant="table" /> : error ? <div role="alert" className="text-xs">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : detail && <SubmissionDetails submission={detail} onReview={() => openReview(detail.id)} />)}
+    {submissionId && !reviewRequested && (loading ? <PageLoadingSkeleton variant="table" /> : error ? <div role="alert" className="text-xs">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : shownDetail && <SubmissionDetails submission={shownDetail} onReview={() => openReview(shownDetail.id)} />)}
     {editor && !["review", "notes", "rate"].includes(editor.action) && <UpdateSubmissionDialog key={editor.submission.id} submission={editor.submission} href={detailHref(editor.submission.id)} onReview={() => {
       openReview(editor.submission.id, true);
     }} onClose={() => setEditor(null)} onSaved={saved => { setEditor(null); setDetail(saved); setRevision(r => r + 1); }} />}

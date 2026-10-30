@@ -45,13 +45,26 @@ test('shared job/tracker status renders the scheduled round and the interview ti
 });
 test('job board uses tracker buckets for cancellation, later rounds and closed outcomes', () => {
   assert.equal(tracker.submissionBucket({ ...base, finalStatus: 'PENDING_APPROVAL' }), 'review');
-  assert.equal(tracker.submissionBucket({ ...base, l1Status: 'PENDING', l1Date: null }), 'review');
+  assert.equal(tracker.submissionBucket({ ...base, l1Status: 'PENDING', l1Date: null }), 'interviews');
   for (const l1Status of ['SCHEDULED', 'AWAITING_FEEDBACK', 'CLEARED', 'REJECTED', 'CANCELLED']) {
     assert.equal(tracker.submissionBucket({ ...base, l1Status, l1Date: null }), 'interviews');
   }
   assert.equal(tracker.submissionBucket({ ...base, l1Status: 'PENDING' }), 'interviews');
   for (const finalStatus of ['SELECTED', 'OFFER']) assert.equal(tracker.submissionBucket({ ...base, finalStatus }), 'offers');
-  for (const finalStatus of ['JOIN', 'REJECTED', 'NOT_SELECTED', 'WITHDRAWN']) assert.equal(tracker.submissionBucket({ ...base, finalStatus }), 'closed');
+  assert.equal(tracker.submissionBucket({ ...base, finalStatus: 'JOIN' }), 'closures');
+  for (const finalStatus of ['REJECTED', 'NOT_SELECTED', 'WITHDRAWN']) assert.equal(tracker.submissionBucket({ ...base, finalStatus }), 'closed');
+});
+
+test('approved pending rounds never return to internal review and paused jobs stay closed', () => {
+  for (const sub of [
+    { ...base, l1Status: 'PENDING', l1Date: null },
+    { ...base, l1Status: 'CLEARED', l2Status: 'PENDING', l1Date: null },
+    { ...base, l1Status: 'CLEARED', l2Status: 'CLEARED', l3Status: 'PENDING', l1Date: null },
+  ]) assert.equal(tracker.submissionBucket(sub), 'interviews');
+  for (const finalStatus of ['PENDING_APPROVAL', 'SUBMITTED']) {
+    assert.equal(tracker.submissionBucket({ ...base, finalStatus, workflowPaused: true }), 'closed');
+    assert.equal(tracker.submissionBucket({ ...base, finalStatus, jobStatus: 'Closed', keepExistingSubmissionsOpen: true, workflowPaused: false }), finalStatus === 'PENDING_APPROVAL' ? 'review' : 'interviews');
+  }
 });
 test('shared status distinguishes internal rejection from L2 rejection', () => {
   const internal = renderToStaticMarkup(React.createElement(StageBadge, { submission: { ...base, finalStatus: 'REJECTED', l1Status: 'PENDING', rejectionFromStatus: 'PENDING_APPROVAL' } }));
@@ -64,8 +77,10 @@ function renderJob(submission = {}, options = {}, menuOpen = false) {
   const response = { data: [{ ...base, resume: { available: true, canDownload: true, filename: 'CV.docx' }, ...submission }], page: 1, limit: 20, total: 41, totalPages: 3, counts: { all: 41, review: 10, interviews: 20, offers: 5, closed: 6 } };
   const menu = props => React.createElement(React.Fragment, null, props.children);
   const testLoad = modules({
-    swr: { __esModule: true, default: () => ({ data: response, mutate() {}, isValidating: false }) },
+    swr: { __esModule: true, default: () => ({ data: response, mutate() {}, isValidating: false }), useSWRConfig: () => ({ mutate() {} }) },
     'next/link': { __esModule: true, default: props => React.createElement('a', props) },
+    'next/navigation': { useRouter: () => ({ push() {}, refresh() {} }) },
+    '@/components/users/use-management-profile': { useManagementProfile: () => ({ permissions: [] }) },
     '@/lib/ats-api': { atsApi: {} },
     '@/components/ui/button': { Button: ({ asChild, variant, size, ...props }) => React.createElement('button', props) },
     ...(menuOpen ? { '@/components/ui/dropdown-menu': {

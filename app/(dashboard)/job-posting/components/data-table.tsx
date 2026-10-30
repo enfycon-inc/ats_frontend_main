@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { enterpriseGrid } from '@/components/shared/enterprise-grid';
 import { QUICK_CHANGE_JOB_STATUSES, normalizeJobStatus } from "@/lib/job-status-contract";
 import { atsApi } from "@/lib/ats-api";
 import { getActiveRolePermissions, resolveActiveSystemRole } from "@/lib/role-permissions";
@@ -376,11 +377,11 @@ export default function DataTable({
 
   return (
     <div
-      className="flex-1 flex flex-col min-h-0 min-w-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none overflow-hidden relative font-sans"
+      className={cn(enterpriseGrid.surface, 'flex-1 flex flex-col min-h-0 relative [&_tbody_td]:text-sm [&_thead_th_span]:text-xs')}
       onClick={() => setContextMenu(null)}
     >
       {/* Action Bar */}
-      <div className="py-1 px-2.5 border-b border-neutral-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 bg-neutral-50/50 dark:bg-slate-900/50 text-xs">
+      <div className={enterpriseGrid.toolbar}>
         <div className="flex items-center gap-2">
           {selectedRowIds.length > 0 && (
             <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-sm">
@@ -486,12 +487,12 @@ export default function DataTable({
         style={{ userSelect: "none", WebkitUserSelect: "none" }}
       >
         <table
-          className="w-full border-collapse text-left table-auto border-neutral-200 dark:border-slate-800 select-none"
+          className={cn(enterpriseGrid.table, 'table-auto border-neutral-200 dark:border-slate-800 select-none')}
           onCopy={(e) => e.preventDefault()}
           onCut={(e) => e.preventDefault()}
           style={{ userSelect: "none", WebkitUserSelect: "none" }}
         >
-          <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-900 border-b border-neutral-200 dark:border-slate-800 shadow-2xs select-none backdrop-blur-xs">
+          <thead className={cn(enterpriseGrid.header, 'border-b border-neutral-200 dark:border-slate-800 shadow-2xs select-none')}>
             <tr>
               <th className="sticky left-0 z-20 w-[44px] min-w-[44px] px-3.5 py-3.5 text-center bg-slate-100 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800">
                 <input

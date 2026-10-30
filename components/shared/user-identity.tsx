@@ -21,12 +21,12 @@ export function UserAvatar({ user, className }: { user: UserIdentityDetails; cla
   </Avatar>;
 }
 
-export function UserIdentity({ user, className }: { user: UserIdentityDetails; className?: string }) {
+export function UserIdentity({ user, className, size = 'compact' }: { user: UserIdentityDetails; className?: string; size?: 'compact' | 'table' }) {
   return <div className={cn('flex items-center gap-2 min-w-0', className)}>
     <UserAvatar user={user} />
     <div className="min-w-0">
-      <div className="text-xs font-semibold truncate">{user.fullName || user.name || user.email || 'Name unavailable'}</div>
-      {user.email && <div className="text-[11px] text-slate-500 truncate">{user.email}</div>}
+      <div className={cn('font-semibold truncate', size === 'table' ? 'text-sm' : 'text-xs')} title={user.fullName || user.name || undefined}>{user.fullName || user.name || user.email || 'Name unavailable'}</div>
+      {user.email && <div className={cn('text-slate-500 dark:text-slate-400 truncate', size === 'table' ? 'text-xs' : 'text-[11px]')} title={user.email}>{user.email}</div>}
     </div>
   </div>;
 }

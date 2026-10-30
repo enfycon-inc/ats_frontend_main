@@ -16,7 +16,7 @@ import { UpdateSubmissionDialog } from './update-submission-dialog';
 
 const buckets: Array<{ key: TrackerBucket; label: string }> = [
   { key: 'all', label: 'All' }, { key: 'review', label: 'Needs review' },
-  { key: 'interviews', label: 'Interviews' }, { key: 'offers', label: 'Offers' }, { key: 'closed', label: 'Closed' },
+  { key: 'interviews', label: 'Interviews' }, { key: 'offers', label: 'Offers' }, { key: 'closures', label: 'Closures' }, { key: 'closed', label: 'Closed' },
 ];
 
 export function JobSubmissions({ jobId, jobType, market, initialResponse, onSaved, showBoard = false, showStageFilters = true }: {

@@ -10,7 +10,7 @@ const UpdownBarChartSmall = () => {
             stacked: true,
             type: "bar",
             height: 64,
-            fontFamily: "Poppins, sans-serif",
+            fontFamily: "inherit",
             toolbar: {
                 show: false,
             },

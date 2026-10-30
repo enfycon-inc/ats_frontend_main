@@ -1,5 +1,6 @@
 // @ts-nocheck
 "use client";
+import { JOB_URGENCIES } from '@/lib/job-urgency-contract';
 import { jobFormContext } from "@/lib/job-form-context";
 import { useJobAssignmentPolicy } from "../lib/use-job-assignment-policy";
 
@@ -94,7 +95,7 @@ const formSchema = zod.object({
   client: zod.string().optional(),
   endClientName: zod.string().min(1, "End Client is required"),
   clientJobId: zod.string().optional(),
-  priority: zod.enum(["Hot", "Warm", "Cold"]),
+  priority: zod.enum(JOB_URGENCIES),
   additionalDetails: zod.string().optional(),
   ceipalRefNum: zod.string().optional(),
   duration: zod.string().optional(),

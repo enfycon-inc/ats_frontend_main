@@ -30,6 +30,21 @@ export function getRouteBreadcrumbInfo(
   searchParams?: URLSearchParams | null
 ): RouteBreadcrumbInfo {
   const cleanPath = (pathname || "/").split("?")[0].replace(/\/+$/, "") || "/";
+  if (/^\/dashboard\/account-managers\/[^/]+$/.test(cleanPath)) return {
+    pageTitle: 'Account Manager Performance', breadcrumbs: [{ label: 'Dashboard', href: '/dashboard/overview' },
+      { label: 'Account Managers', href: '/dashboard/account-managers' }, { label: 'Performance', isCurrent: true }], showBackButton: false,
+  };
+
+  if (/^\/dashboard\/recruiters\/[^/]+$/.test(cleanPath)) return {
+    pageTitle: 'Recruiter Performance', breadcrumbs: [{ label: 'Dashboard', href: '/dashboard/overview' },
+      { label: 'Recruiters', href: '/dashboard/recruiters' }, { label: 'Performance', isCurrent: true }], showBackButton: false,
+  };
+  if (cleanPath === '/dashboard/overview' || cleanPath === '/dashboard/account-managers' || cleanPath === '/dashboard/recruiters') {
+    const label = cleanPath.endsWith('/overview') ? 'Overview' : cleanPath.endsWith('/recruiters') ? 'Recruiters' : 'Account Managers';
+    return { pageTitle: 'Delivery Dashboard', breadcrumbs: [
+      { label: 'Dashboard', href: '/dashboard/overview' }, { label, isCurrent: true },
+    ], showBackButton: false };
+  }
 
   // 1. Root / Dashboard
   if (cleanPath === "" || cleanPath === "/" || cleanPath === "/dashboard") {

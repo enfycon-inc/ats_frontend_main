@@ -16,7 +16,9 @@ const imports = {
   '@/components/ui/button': { Button: ({ children, disabled }) => React.createElement('button', { disabled }, children) },
   '@/components/ui/input': { Input: props => React.createElement('input', props) },
   '@/lib/utils': { cn: (...values) => values.filter(Boolean).join(' ') },
-  'lucide-react': Object.fromEntries(['Search','Users','ShieldAlert','User','Check','X','Building2'].map(key => [key, () => null])),
+  '@/lib/user-city-contract': { USER_CITY_OPTIONS: [] },
+  '@/components/ui/avatar': { Avatar: box, AvatarFallback: box, AvatarImage: () => null },
+  'lucide-react': Object.fromEntries(['MapPin','Star','Search','Users','ShieldAlert','User','Check','X','Building2'].map(key => [key, () => null])),
 };
 new Function('exports', 'require', code)(moduleValue.exports, name => imports[name]);
 function dialog(overrides = {}) {
@@ -47,7 +49,7 @@ test('optional assignment can be cleared without a third tab', () => {
   assert.doesNotMatch(html, /Assign Later/);
 });
 test('recruiters have a select all checkbox rather than a pool option', () => {
-  const html = dialog({ assignmentType: 'recruiters', recruitersList: [{ id: 'one', fullName: 'Recruiter' }] });
+  const html = dialog({ assignmentType: 'recruiters', recruitersList: [{ id: 'one', fullName: 'Recruiter', assignmentCount: 1 }] });
   assert.match(html, /type="checkbox"/);
   assert.match(html, /Select All/);
   assert.doesNotMatch(html, /Unit Pool|All Unit Recruiters/);

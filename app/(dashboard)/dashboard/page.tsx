@@ -90,7 +90,7 @@ const AccountManagerDashboardView = dynamic(() => import("./components/account-m
 const PodLeadDashboardView = dynamic(() => import("./components/pod-lead-dashboard-view"), {
   ssr: false, loading: () => <DashboardViewSkeleton />,
 });
-const DeliveryHeadDashboardView = dynamic(() => import("./components/delivery-head-dashboard-view"), {
+const DeliveryDashboardEntry = dynamic(() => import("./components/delivery-dashboard-entry"), {
   ssr: false, loading: () => <DashboardViewSkeleton />,
 });
 const RecruiterDashboardView = dynamic(() => import("./components/recruiter-dashboard-view"), {
@@ -289,7 +289,7 @@ export default function DashboardPage() {
       {systemRole === "SUPER_ADMIN" && profile.permissions?.includes("platform:manage") ? (
         <GlobalAdminDashboardView profile={profile} />
       ) : systemRole === "DELIVERY_HEAD" ? (
-        <DeliveryHeadDashboardView />
+        <DeliveryDashboardEntry />
       ) : (systemRole === "UNIT_ADMIN" || profile.permissions?.includes("unit_admin:manage")) && !profile.permissions?.some((p: string) => ["tenant:settings", "tenant:manage", "platform:manage", "branch_admin:manage"].includes(p)) ? (
         <UnitAdminDashboardView profile={profile} jobs={jobs} />
       ) : systemRole === "BRANCH_ADMIN" && profile.permissions?.includes("branch_admin:manage") ? (

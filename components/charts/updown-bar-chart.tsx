@@ -17,7 +17,7 @@ const UpdownBarChart = ({ upBarColor="487FFF", downBarColor="EF4A00", chartHeigh
             stacked: true,
             type: "bar",
             height: chartHeight,
-            fontFamily: "Poppins, sans-serif",
+            fontFamily: "inherit",
             toolbar: {
                 show: false,
             },

@@ -24,7 +24,7 @@ export function SitePageHeader({ className, customTitle }: SitePageHeaderProps) 
   }, [pathname, searchParams]);
 
   const displayTitle = customTitle || routeInfo.pageTitle;
-  const isDashboard = pathname === "/" || pathname === "/dashboard";
+  const isDashboard = pathname === "/" || pathname === "/dashboard" || pathname.startsWith('/dashboard/');
 
   const handleBack = () => {
     if (routeInfo.backHref) {
@@ -65,7 +65,8 @@ export function SitePageHeader({ className, customTitle }: SitePageHeaderProps) 
 
       {/* Right side: EnfySync-Style Clean Breadcrumb Trail */}
       <div className="flex items-center shrink-0">
-        <SiteBreadcrumbPill breadcrumbs={routeInfo.breadcrumbs} />
+        <div className="hidden sm:block"><SiteBreadcrumbPill breadcrumbs={routeInfo.breadcrumbs} /></div>
+        <div className="sm:hidden"><SiteBreadcrumbPill breadcrumbs={[]} /></div>
       </div>
     </header>
   );

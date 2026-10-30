@@ -14,7 +14,7 @@ interface NavbarMenuProps {
 /** Returns true if the current path starts with the item's href */
 function useIsActive(href: string) {
   const pathname = usePathname();
-  if (href === "/dashboard") return pathname === "/dashboard";
+  if (href === "/dashboard") return pathname === "/dashboard" || pathname.startsWith('/dashboard/');
   return pathname.startsWith(href);
 }
 

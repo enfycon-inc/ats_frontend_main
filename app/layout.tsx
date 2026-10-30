@@ -4,8 +4,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 // next/font/google (Inter) removed: it makes a live HTTPS call to fonts.googleapis.com
 // at build time, which is blocked in the GitHub Actions docker-container buildx environment.
-// The active app font is Geist Sans, applied via --font-geist-sans in globals.css
-// and surfaced through the Tailwind --font-sans CSS variable. Inter was unused scaffold code.
+// App and grid typography share the concrete system UI stack in globals.css.
+// No remote font download is required for rendering or production builds.
 
 export const metadata: Metadata = {
   title: `${APP_BRAND.name} - Recruitment Platform`,

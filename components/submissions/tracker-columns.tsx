@@ -6,12 +6,12 @@ import { type TrackerSortKey, type TrackerSortDirection } from '@/lib/submission
 import { cn } from '@/lib/utils';
 
 export type TrackerColumn = TrackerSortKey | 'actions';
-const DEFAULT_COLUMNS: TrackerColumn[] = ['job', 'manager', 'recruiter', 'candidate', 'pipeline', 'status', 'jobCreated', 'submitted', 'actions'];
-export const TRACKER_COLUMN_WIDTHS: Record<TrackerColumn, number> = { job: 270, manager: 185, recruiter: 185, candidate: 260, pipeline: 255, status: 190, jobCreated: 145, submitted: 145, actions: 88 };
+const DEFAULT_COLUMNS: TrackerColumn[] = ['job', 'creator', 'manager', 'recruiter', 'candidate', 'pipeline', 'status', 'jobCreated', 'submitted', 'actions'];
+export const TRACKER_COLUMN_WIDTHS: Record<TrackerColumn, number> = { creator:185, job: 270, manager: 185, recruiter: 185, candidate: 260, pipeline: 255, status: 190, jobCreated: 145, submitted: 145, actions: 88 };
 
-export function useTrackerColumns(storageKey: string | null, grouped: boolean, managerLabel: string) {
+export function useTrackerColumns(storageKey: string | null, grouped: boolean, managerLabel: string, initialSort?: { key: TrackerSortKey; direction: TrackerSortDirection }, submittedLabel = 'Submission date') {
   const [saved, setSaved] = useState<{ key: string; order: TrackerColumn[] } | null>(null);
-  const [sort, setSort] = useState<{ key: TrackerSortKey; direction: TrackerSortDirection }>({ key: 'submitted', direction: 'desc' });
+  const [sort, setSort] = useState<{ key: TrackerSortKey; direction: TrackerSortDirection }>(initialSort && ['job','manager','creator','recruiter','candidate','pipeline','status','jobCreated','submitted'].includes(initialSort.key) ? initialSort : { key: 'submitted', direction: 'desc' });
   const [dragged, setDragged] = useState<TrackerColumn | null>(null);
   const [over, setOver] = useState<TrackerColumn | null>(null);
   const suppressClick = useRef(false);
@@ -39,7 +39,7 @@ export function useTrackerColumns(storageKey: string | null, grouped: boolean, m
     setSaved({ key: storageKey, order: next });
     try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* Keep the order for this visit. */ }
   }
-  const labels: Record<TrackerColumn, string> = { job: 'Job reference', manager: managerLabel, recruiter: 'Recruiter', candidate: 'Candidate', pipeline: 'Pipeline', status: 'Current status', jobCreated: 'Job created at', submitted: 'Submission date', actions: 'Actions' };
+  const labels: Record<TrackerColumn, string> = { creator:'Created by', job: 'Job reference', manager: managerLabel, recruiter: 'Recruiter', candidate: 'Candidate', pipeline: 'Pipeline', status: 'Current status', jobCreated: 'Job created at', submitted: submittedLabel, actions: 'Actions' };
   function headers(onSort: () => void) {
     return columns.map(column => {
       const active = column === sort.key;
@@ -50,7 +50,7 @@ export function useTrackerColumns(storageKey: string | null, grouped: boolean, m
         onDragOver={event => { if (dragged && column !== 'actions') { event.preventDefault(); setOver(column); } }}
         onDrop={event => { event.preventDefault(); if (dragged) move(dragged, column); setDragged(null); setOver(null); }}
         onDragEnd={() => { setDragged(null); setOver(null); }}
-        className={cn('border-b bg-slate-100/95 px-3 py-3.5 text-left text-[10.5px] font-bold uppercase tracking-wider text-slate-600 dark:bg-slate-900 dark:text-slate-300', column !== 'actions' && 'cursor-grab hover:bg-slate-200/70 active:cursor-grabbing dark:hover:bg-slate-800', dragged === column && 'opacity-40', over === column && 'shadow-[inset_3px_0_0_#1a4fa0]', column === 'actions' && 'sticky right-0 z-20 pr-6 text-center shadow-[-1px_0_0_0_var(--border)]')}>
+        className={cn('border-b bg-slate-100/95 px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:bg-slate-900 dark:text-slate-300', column !== 'actions' && 'cursor-grab hover:bg-slate-200/70 active:cursor-grabbing dark:hover:bg-slate-800', dragged === column && 'opacity-40', over === column && 'shadow-[inset_3px_0_0_#1a4fa0]', column === 'actions' && 'sticky right-0 z-20 pr-6 text-center shadow-[-1px_0_0_0_var(--border)]')}>
         {column === 'actions' ? labels[column] : <button type="button" className="flex w-full items-center gap-1.5 text-left uppercase focus-visible:outline-2 focus-visible:outline-blue-500" title="Drag to reorder, click to sort. Alt + Left/Right moves this column."
           onPointerDown={() => { suppressClick.current = false; }}
           onKeyDown={event => { if (event.altKey && ['ArrowLeft', 'ArrowRight'].includes(event.key)) { event.preventDefault(); const target = columns[columns.indexOf(column) + (event.key === 'ArrowLeft' ? -1 : 1)]; if (target) move(column, target); } }}

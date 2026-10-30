@@ -30,7 +30,7 @@ test('explicit details and multiple recruiter names are retained without pods', 
 function hook(overrides = {}) {
   let index = 0;
   const react = { useMemo: fn => fn(), useEffect() {}, useState(initial) { const i = index++; return [Object.hasOwn(overrides, i) ? overrides[i] : initial, () => {}]; } };
-  return load('use-job-table-data.ts', { react, './job-table-utils': utils }).useJobTableData({ data, branchUsesPods: true });
+  return load('use-job-table-data.ts', { react, swr: { default: () => ({ data: [] }) }, './job-table-utils': utils }).useJobTableData({ data, branchUsesPods: true });
 }
 test('dropdown contains individual recruiters; secondary recruiter matches; pod-only is unassigned', () => {
   assert.deepEqual(hook().availableAssignees, ['Alice', 'Bob', 'Carol']);
