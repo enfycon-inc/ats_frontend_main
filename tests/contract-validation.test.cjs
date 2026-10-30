@@ -17,16 +17,29 @@ const pairs = [
   ['user-management/user-management.contract.ts', 'lib/user-management.contract.ts'],
   ['jobs/job-export-contract.ts', 'lib/job-export-contract.ts'],
   ['business-units/delivery-dashboard.contract.ts', 'lib/delivery-dashboard-contract.ts'],
+  ['jobs/job-urgency-contract.ts', 'lib/job-urgency-contract.ts'],
 ];
 const scripts = ['sync-notification-preferences.cjs', 'sync-tenant-branding.cjs', 'sync-sign-in-policy.cjs', 'sync-job-access.cjs', 'sync-submission-auto-approval.cjs', 'sync-user-management-contract.cjs', 'sync-delivery-contract.cjs'];
+const scriptIndices = [0, 1, 2, 3, 3, 3, 4, 5, 3, 6, 3];
+function assertFixtureCoverage(root) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'contracts.manifest.json'), 'utf8'));
+  assert.deepEqual(pairs.map(([, target]) => target).sort(), Object.keys(manifest.files).sort(), 'Contract fixture must include every manifest target exactly once. Update pairs and scriptIndices when registering a contract.');
+  assert.equal(scriptIndices.length, pairs.length, 'Every fixture contract must have a validation script mapping.');
+  for (const index of scriptIndices) assert(scripts[index], 'Invalid fixture validation script mapping.');
+}
+function assertSuccess(f, script, ...args) {
+  const result = f.run(script, ...args);
+  assert.equal(result.status, 0, `${script} ${args.join(' ')} failed:\n${result.error?.message || ''}${result.stderr}${result.stdout}`);
+}
 function fixture(t, backend = false) {
+  const root = path.resolve(__dirname, '..');
+  assertFixtureCoverage(root);
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'ats-contract-validation-'));
   t.after(() => {
     if (path.dirname(temp) !== path.resolve(os.tmpdir()) || !path.basename(temp).startsWith('ats-contract-validation-')) throw new Error('Unexpected cleanup path');
     fs.rmSync(temp, { recursive: true, force: true });
   });
   const frontend = path.join(temp, 'frontend');
-  const root = path.resolve(__dirname, '..');
   for (const file of ['contracts.manifest.json', ...pairs.map(([, target]) => target), ...['contract-validation.cjs', ...scripts].map(name => `scripts/${name}`)]) {
     const target = path.join(frontend, file);
     fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -39,17 +52,20 @@ function fixture(t, backend = false) {
   }
   return { frontend, temp, run: (script, ...args) => spawnSync(process.execPath, [path.join(frontend, 'scripts', script), ...args], { encoding: 'utf8' }) };
 }
+test('fixture covers every registered contract and its validation script', () => {
+  assertFixtureCoverage(path.resolve(__dirname, '..'));
+});
 test('all build checks succeed inside a frontend-only context', t => {
   const f = fixture(t);
-  for (const script of scripts) assert.equal(f.run(script, '--check').status, 0);
+  for (const script of scripts) assertSuccess(f, script, '--check');
 });
 test('each contract fails standalone validation when modified', t => {
   const f = fixture(t);
   pairs.forEach(([, target], i) => {
     const file = path.join(f.frontend, target), original = fs.readFileSync(file, 'utf8');
     fs.writeFileSync(file, original + '// changed\n');
-    const result = f.run(scripts[[0, 1, 2, 3, 3, 3, 4, 5, 3, 6][i]], '--check');
-    assert.notEqual(result.status, 0); assert.match(result.stderr, /checksum mismatch/);
+    const result = f.run(scripts[scriptIndices[i]], '--check');
+    assert.notEqual(result.status, 0, `Tampering with ${target} must fail validation.`); assert.match(result.stderr, /checksum mismatch/, `${target}: ${result.stderr}`);
     fs.writeFileSync(file, original);
   });
 });
@@ -62,20 +78,20 @@ test('canonical checks require the backend instead of skipping absent sources', 
 });
 test('canonical validation detects drift and synchronization updates its checksum', t => {
   const f = fixture(t, true);
-  for (const script of scripts) assert.equal(f.run(script, '--check-backend').status, 0);
+  for (const script of scripts) assertSuccess(f, script, '--check-backend');
   fs.appendFileSync(path.join(f.temp, 'ats_backend/src/auth/sign-in-policy.ts'), '// new canonical policy\n');
   const changed = f.run(scripts[2], '--check-backend');
   assert.notEqual(changed.status, 0); assert.match(changed.stderr, /Canonical backend contract differs/);
-  assert.equal(f.run(scripts[2]).status, 0);
-  assert.equal(f.run(scripts[2], '--check').status, 0);
-  assert.equal(f.run(scripts[2], '--check-backend').status, 0);
+  assertSuccess(f, scripts[2]);
+  assertSuccess(f, scripts[2], '--check');
+  assertSuccess(f, scripts[2], '--check-backend');
 });
 test('line endings do not cause cross-platform false failures', t => {
   const f = fixture(t, true);
   for (const [source, target] of pairs) {
     for (const file of [path.join(f.frontend, target), path.join(f.temp, 'ats_backend/src', source)]) fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/\r?\n/g, '\r\n'));
   }
-  for (const script of scripts) assert.equal(f.run(script, '--check-backend').status, 0);
+  for (const script of scripts) assertSuccess(f, script, '--check-backend');
 });
 test('incomplete manifest fails closed', t => {
   const f = fixture(t);
