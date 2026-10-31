@@ -437,57 +437,6 @@ export default function SubmissionFilterBar({
           ))}
         </div>
       )}
-      {round && (
-        <div
-          className="flex min-w-0 items-center gap-2 overflow-x-auto px-4 pb-3 [&>button]:shrink-0 [&>select]:shrink-0"
-          aria-label={`${round.toUpperCase()} shortcuts`}
-        >
-          <Button
-            size="sm"
-            variant={!filters.roundStatus ? 'default' : 'outline'}
-            aria-pressed={!filters.roundStatus}
-            onClick={() => onChange(roundPatch(round))}
-          >
-            All {round.toUpperCase()}
-          </Button>
-          {[
-            InterviewRoundStatus.PENDING,
-            InterviewRoundStatus.SCHEDULED,
-            InterviewRoundStatus.AWAITING_FEEDBACK,
-            InterviewRoundStatus.CLEARED,
-          ].map((status) => (
-            <Button
-              key={status}
-              size="sm"
-              variant={filters.roundStatus === status ? 'default' : 'outline'}
-              aria-pressed={filters.roundStatus === status}
-              onClick={() => onChange(roundPatch(round, status))}
-            >
-              {round.toUpperCase()} {text(status)}
-            </Button>
-          ))}
-          <select
-            aria-label={`${round.toUpperCase()} more statuses`}
-            className={grid.control}
-            value={
-              filters.roundStatus === 'REJECTED' ||
-              filters.roundStatus === 'CANCELLED'
-                ? filters.roundStatus
-                : ''
-            }
-            onChange={(e) => {
-              if (e.target.value)
-                onChange(
-                  roundPatch(round, e.target.value as InterviewRoundStatus),
-                );
-            }}
-          >
-            <option value="">More statuses</option>
-            <option value="REJECTED">{round.toUpperCase()} Rejected</option>
-            <option value="CANCELLED">{round.toUpperCase()} Cancelled</option>
-          </select>
-        </div>
-      )}
       {round && filters.roundStatus === 'CLEARED' && (
         <p role="status" className="px-4 pb-3 text-xs text-muted-foreground">
           {round.toUpperCase()} cleared includes candidates who have progressed
