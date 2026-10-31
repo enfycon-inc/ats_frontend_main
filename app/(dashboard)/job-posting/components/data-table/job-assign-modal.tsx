@@ -361,7 +361,6 @@ export function JobAssignModal({
     setIsAssigning(false);
     setRecruiterFilterMode("all");
     setHasUserInteracted(false);
-    setAssignmentReason("");
     setAssignTab(mode === "pods" ? "pods" : mode === "users" ? "users" : branchAllowsPods ? "pods" : "users");
 
     // Initial selected pod IDs from job
