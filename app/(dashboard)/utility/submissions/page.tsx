@@ -2,7 +2,7 @@
 import useSWR from 'swr';
 import SubmissionFilterBar from '@/components/submissions/submission-filter-bar';
 import { localFilterAccess, readSubmissionFilters, submissionFilterQuery, submissionTabs } from '@/lib/submission-filters';
-import type { TrackerListFilters } from '@/lib/submission-contract';
+import { InterviewRoundStatus, type RoundKey, type TrackerListFilters } from '@/lib/submission-contract';
 import { UserIdentity } from '@/components/shared/user-identity';
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { PodFeatureGate } from "@/components/shared/pod-feature-gate";
@@ -13,7 +13,7 @@ import { SubmissionActions } from "@/components/submissions/submission-actions";
 import { useTrackerColumns, TRACKER_COLUMN_WIDTHS, type TrackerColumn } from "@/components/submissions/tracker-columns";
 import { UpdateSubmissionDialog } from "@/components/submissions/update-submission-dialog";
 import { SubmissionHistory } from "@/components/submissions/submission-history";
-import { compensationLabel, formatClientBillRate, submissionCompensationValue } from "@/lib/submission-compensation";
+import { compensationLabel, formatClientTerms, submissionCompensationValue } from "@/lib/submission-compensation";
 import { ReviewWorkspace } from "@/components/submissions/review-workspace";
 import { stageRemarkSuggestions } from "@/lib/stage-remarks";
 import { USER_CITY_OPTIONS } from "@/lib/user-city-contract";
@@ -40,6 +40,19 @@ function submissionOrdinal(value: number): string {
   const remainder = value % 100;
   const suffix = remainder >= 11 && remainder <= 13 ? 'th' : value % 10 === 1 ? 'st' : value % 10 === 2 ? 'nd' : value % 10 === 3 ? 'rd' : 'th';
   return `${value}${suffix}`;
+}
+
+function jobTypeBadgeClass(jobType?: string | null): string {
+  switch (jobType?.trim().toLowerCase()) {
+    case 'full time': return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200';
+    case 'part time': return 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-200';
+    case 'contract': return 'bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200';
+    case 'c2h':
+    case 'contract to hire':
+    case 'contract-to-hire': return 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-200';
+    case 'freelance': return 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200';
+    default: return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+  }
 }
 
 const PRIMARY = "bg-[#1a4fa0] text-white hover:bg-[#154181]";
@@ -306,6 +319,7 @@ function FilteredSubmissionsPage({scope}:{scope:string}) {
   const permissions: string[]=profile?.permissions??[];
   const canViewClientBillRate=permissions.some(permission=>['job:bill_rate:view','*','platform:manage'].includes(permission));
   const canViewClientCommission=permissions.some(permission=>['placement:view','*','platform:manage'].includes(permission));
+  const canViewClientTerms=canViewClientBillRate||canViewClientCommission;
   const [filters,setFilters]=useState<TrackerListFilters>(()=>({...readSubmissionFilters(new URLSearchParams(params.toString())),view:params.get('view')||(access.portfolio?'my':'all')}));
   const bucket=filters.bucket??'all';
   function changeFilters(patch:Partial<TrackerListFilters>,reset=false){setFilters(f=>{if(reset)return {view:f.view,bucket:'all',page:1};const next={...f,...patch,page:patch.page??1};if(patch.bucket==='closures'&&f.bucket!=='closures'&&patch.dateBasis===undefined)next.dateBasis='joined';if(next.bucket!=='closures'&&next.dateBasis==='joined')next.dateBasis='submitted';return next;});}
@@ -321,7 +335,15 @@ function FilteredSubmissionsPage({scope}:{scope:string}) {
   const [profileTarget, setProfileTarget] = useState<ProfileTarget | null>(null);
   const [collapsedJobs, setCollapsedJobs] = useState<Record<string, boolean>>({});
   const [groupByJob, setGroupByJob] = useState(params.get("groupByJob")==="1");
-  const { columns, sort, headers } = useTrackerColumns(profile ? `submission-columns:v1:${profile.tenantId}:${profile.id}` : null, groupByJob, 'Account manager', {key:(params.get('sortBy')||'submitted') as import('@/lib/submission-contract').TrackerSortKey,direction:params.get('sortDirection')==='asc'?'asc':'desc'}, bucket==='closures'?'Joined at':'Submission date',canViewClientBillRate,canViewClientCommission);
+  const { columns, sort, headers } = useTrackerColumns(profile ? `submission-columns:v1:${profile.tenantId}:${profile.id}` : null, groupByJob, 'Account manager', {key:(params.get('sortBy')||'submitted') as import('@/lib/submission-contract').TrackerSortKey,direction:params.get('sortDirection')==='asc'?'asc':'desc'}, bucket==='closures'?'Joined at':'Submission date',canViewClientTerms,access.portfolio);
+  const quickRoundOptions: RoundKey[] = ['l1', 'l2', 'l3'];
+  const quickRoundStatuses = [InterviewRoundStatus.PENDING, InterviewRoundStatus.SCHEDULED, InterviewRoundStatus.AWAITING_FEEDBACK];
+  function toggleQuickRound(round: RoundKey) {
+    changeFilters({ round: filters.round === round ? undefined : round, roundStatus: filters.round === round ? undefined : filters.roundStatus, bucket: 'all' });
+  }
+  function toggleQuickRoundStatus(roundStatus: InterviewRoundStatus) {
+    changeFilters({ roundStatus: filters.roundStatus === roundStatus ? undefined : roundStatus, bucket: 'all' });
+  }
   useEffect(()=>{if(search===(filters.search??''))return;const t=setTimeout(()=>changeFilters({search}),300);return()=>clearTimeout(t);},[search,filters.search]);
   useEffect(()=>{const refresh=()=>{setEditor(null);setRevision(r=>r+1);};window.addEventListener('app:refresh',refresh);window.addEventListener('branchChanged',refresh);return()=>{window.removeEventListener('app:refresh',refresh);window.removeEventListener('branchChanged',refresh);};},[]);
   useEffect(()=>{if(submissionId)return;const next=submissionFilterQuery(new URLSearchParams(params.toString()),filters);next.set('sortBy',sort.key);next.set('sortDirection',sort.direction);if(groupByJob)next.set('groupByJob','1');else next.delete('groupByJob');if(next.toString()!==params.toString())window.history.replaceState(null,'',`/utility/submissions?${next}`);},[filters,sort,groupByJob,submissionId,params]);
@@ -344,13 +366,12 @@ function FilteredSubmissionsPage({scope}:{scope:string}) {
   }
   function renderCell(sub: TrackerSubmission, column: TrackerColumn): ReactNode {
     switch (column) {
-      case "job": return <td key="job" className="px-5 py-5"><div className="space-y-1.5"><Link href={detailHref(sub.id)} className="block text-sm font-semibold leading-5 text-slate-900 hover:text-[#1a4fa0] hover:underline dark:text-slate-100">{sub.jobTitle || "Title unavailable"}</Link><p className="whitespace-nowrap font-medium text-muted-foreground">{sub.jobCode || "Code unavailable"}</p><div className="flex items-center gap-2 whitespace-nowrap text-xs leading-5">{sub.jobUrgency && <span className="rounded bg-amber-50 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{sub.jobUrgency}</span>}<button type="button" className="border-l border-border pl-2 font-medium text-[#1a4fa0] dark:text-blue-300 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => { changeFilters({jobId:sub.jobId}); }}>{sub.submissionNumber ? `${submissionOrdinal(sub.submissionNumber)} submission` : "Submission"}</button><span className="border-l border-border pl-2 text-muted-foreground">{sub.jobSubmissionRequired ?? "—"} required</span></div>{sub.jobIsCoSourced && <span className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Co-sourced</span>}</div></td>;
-      case "manager": return <td key="manager" className="px-2.5 py-3"><button type="button" onClick={()=>setProfileTarget({kind:'account-manager',submission:sub})} className="block w-full text-left hover:text-[#1a4fa0]"><UserIdentity size="table" user={{name:sub.accountManagerName,email:sub.accountManagerEmail}}/></button></td>;
-      case "recruiter": return <td key="recruiter" className="px-2.5 py-3"><button type="button" onClick={()=>setProfileTarget({kind:'recruiter',submission:sub})} className="block w-full text-left hover:text-[#1a4fa0]"><UserIdentity size="table" user={{name:sub.recruiterName,email:sub.recruiterEmail,avatar:sub.recruiterAvatar}}/></button></td>;
+      case "job": return <td key="job" className="px-5 py-5"><div className="space-y-1.5"><div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"><Link href={detailHref(sub.id)} className="text-sm font-semibold leading-5 text-slate-900 hover:text-[#1a4fa0] hover:underline dark:text-slate-100">{sub.jobTitle || "Title unavailable"}</Link>{sub.jobType && <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10.5px] font-semibold leading-4 ${jobTypeBadgeClass(sub.jobType)}`}>{sub.jobType}</span>}</div><p className="whitespace-nowrap font-medium text-muted-foreground">{sub.jobCode || "Code unavailable"}</p><div className="flex items-center gap-2 whitespace-nowrap text-xs leading-5">{sub.jobUrgency && <span className="rounded bg-amber-50 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{sub.jobUrgency}</span>}<button type="button" aria-label={`${sub.submissionNumber ? `${submissionOrdinal(sub.submissionNumber)} submission` : "Submission"}; ${sub.jobSubmissionRequired ?? "No submission target"} required. Filter by this job.`} title={`${sub.submissionNumber ? `${submissionOrdinal(sub.submissionNumber)} submission` : "Submission"} · ${sub.jobSubmissionRequired ?? "—"} required`} className="border-l border-border pl-2 font-medium text-[#1a4fa0] dark:text-blue-300 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => { changeFilters({jobId:sub.jobId}); }}>{sub.submissionNumber ? submissionOrdinal(sub.submissionNumber) : "Submission"} / {sub.jobSubmissionRequired ?? "—"} req</button></div>{sub.jobIsCoSourced && <span className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Co-sourced</span>}</div></td>;
+      case "manager": return <td key="manager" className="px-2.5 py-3"><button type="button" onClick={()=>setProfileTarget({kind:'account-manager',submission:sub})} className="block w-full text-left hover:text-[#1a4fa0]"><UserIdentity size="table" wrapDetails user={{name:sub.accountManagerName,email:sub.accountManagerEmail}}/></button></td>;
+      case "recruiter": return <td key="recruiter" className="px-2.5 py-3"><button type="button" onClick={()=>setProfileTarget({kind:'recruiter',submission:sub})} className="block w-full text-left hover:text-[#1a4fa0]"><UserIdentity size="table" wrapDetails user={{name:sub.recruiterName,email:sub.recruiterEmail,avatar:sub.recruiterAvatar}}/></button></td>;
       case "candidate": return <td key="candidate" className="px-2.5 py-3"><CandidateCell submission={sub} onOpen={() => setProfileTarget({ kind: "candidate", submission: sub })} /></td>;
       case "payDetails": return <td key="payDetails" className="px-3 py-3"><div className="space-y-2"><div><span className="block text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">{compensationLabel(false,sub.jobType,sub.compensationPeriod)}</span><span className="text-xs font-medium">{submissionCompensationValue(sub,false)}</span></div><div><span className="block text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">{compensationLabel(true,sub.jobType,sub.compensationPeriod)}</span><span className="text-xs font-medium">{submissionCompensationValue(sub,true)}</span></div></div></td>;
-      case "clientBillRate": return <td key="clientBillRate" className="px-3 py-3 text-xs font-medium">{formatClientBillRate(sub.clientBillRate)}</td>;
-      case "clientCommission": return <td key="clientCommission" className="px-3 py-3 text-xs font-medium">{sub.clientCommissionPct == null ? '—' : `${sub.clientCommissionPct}%`}</td>;
+      case "clientTerms": return <td key="clientTerms" className="px-3 py-3 text-xs font-medium">{formatClientTerms(sub)}</td>;
       case "jobCreated": return <td key="jobCreated" className="px-2.5 py-3"><TableDate value={sub.jobCreatedAt} timezone={sub.timezone} /></td>;
       case "submitted": return <td key="submitted" className="px-2.5 py-3"><TableDate value={bucket==='closures'?sub.joinedAt:sub.createdAt} timezone={sub.timezone} /></td>;
       case "pipeline": return <td key="pipeline" className="px-2.5 py-4 text-center"><Pipeline submission={sub} /></td>;
@@ -377,9 +398,16 @@ function FilteredSubmissionsPage({scope}:{scope:string}) {
         <div role="group" aria-label="Submission stage" className="flex flex-wrap gap-0">{FILTERS.map(filter => <button type="button" aria-pressed={bucket === filter.key} key={filter.key} onClick={() => { setBucket(filter.key); setPage(1); }} className={cn("flex items-center gap-2 border border-border px-3 py-2 text-xs font-medium first:rounded-l-md last:rounded-r-md focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-blue-500 -ml-px first:ml-0", bucket === filter.key ? "border-blue-300 bg-blue-50 text-[#1a4fa0] dark:bg-blue-950 dark:text-blue-200" : "hover:bg-muted")}>
           {filter.label}<span className={cn("rounded-full px-1.5 py-0.5 text-xs min-w-5 text-center", bucket === filter.key ? PRIMARY : "bg-muted text-muted-foreground")}>{response?.counts?.[filter.key] ?? "—"}</span>
         </button>)}</div>
+        {bucket === 'all' && <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-1.5 px-1" role="group" aria-label="Round and status quick filters">
+          <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Round</span>
+          {quickRoundOptions.map(round => <Button key={round} size="sm" variant={filters.round === round ? 'default' : 'outline'} aria-pressed={filters.round === round} className={cn('h-7 min-w-9 px-2 text-xs', filters.round === round && PRIMARY)} onClick={() => toggleQuickRound(round)}>{round.toUpperCase()}</Button>)}
+          <span aria-hidden="true" className="mx-1 h-5 border-l border-border" />
+          <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Status</span>
+          {quickRoundStatuses.map(status => <Button key={status} size="sm" variant={filters.roundStatus === status ? 'default' : 'outline'} aria-pressed={filters.roundStatus === status} className={cn('h-7 px-2 text-xs', filters.roundStatus === status && PRIMARY)} onClick={() => toggleQuickRoundStatus(status)}>{status === InterviewRoundStatus.AWAITING_FEEDBACK ? 'Awaiting feedback' : status.charAt(0) + status.slice(1).toLowerCase()}</Button>)}
+        </div>}
         <div className="flex items-center gap-2"><button type="button" role="switch" aria-checked={groupByJob} onClick={() => setGroupByJob(value => !value)} className="flex shrink-0 items-center gap-2 rounded-md px-2 py-2 text-xs focus-visible:outline-2 focus-visible:outline-blue-500">Group by job<span aria-hidden="true" className={cn("flex h-5 w-9 items-center rounded-full p-0.5 transition-colors", groupByJob ? "bg-[#1a4fa0]" : "bg-slate-300 dark:bg-slate-600")}><span className={cn("h-4 w-4 rounded-full bg-white transition-transform", groupByJob && "translate-x-4")} /></span></button><Button variant="ghost" size="icon" aria-label="Refresh submissions" disabled={loading} onClick={() => setRevision(r => r + 1)}><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /></Button></div>
       </div>
-      <SubmissionFilterBar filters={filters} access={response?.filterAccess??access} scope={scope} search={search} onSearch={setSearch} onChange={(patch,reset)=>{if(reset)setSearch('');changeFilters(patch,reset);}}/>
+      <SubmissionFilterBar filters={filters} access={response?.filterAccess??access} scope={scope} search={search} onSearch={setSearch} onChange={(patch,reset)=>{if(reset)setSearch('');const scopedPatch=bucket==='all'&&('round'in patch||'roundStatus'in patch)?{...patch,bucket:'all' as const}:patch;changeFilters(scopedPatch,reset);}}/>
       {!!response?.undatedClosures&&bucket==='closures'&&<p className="px-5 py-2 text-xs text-amber-800 dark:text-amber-300">{response.undatedClosures} closures have no recorded join date and cannot be included in a joined-date range.</p>}
       <div className="relative min-h-0 flex-1 overflow-auto" data-slot="submission-table-scroll">
         <table className="w-full table-fixed border-collapse text-sm [&_th]:border-r [&_th]:border-border [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border [&_td:last-child]:border-r-0 [&_td]:align-middle" style={{ minWidth: columns.reduce((width, column) => width + TRACKER_COLUMN_WIDTHS[column], 0) }}><colgroup>{columns.map(column => <col key={column} style={{ width: TRACKER_COLUMN_WIDTHS[column] }} />)}</colgroup><thead className="sticky top-0 z-20 select-none border-y border-border bg-card"><tr>{headers(() => setPage(1))}</tr></thead>

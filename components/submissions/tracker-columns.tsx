@@ -5,19 +5,19 @@ import { ArrowDown, ArrowUp, ChevronsUpDown, GripVertical } from 'lucide-react';
 import { type TrackerSortKey, type TrackerSortDirection } from '@/lib/submission-contract';
 import { cn } from '@/lib/utils';
 
-export type TrackerColumn = Exclude<TrackerSortKey, 'creator'> | 'payDetails' | 'clientBillRate' | 'clientCommission' | 'actions';
-const DEFAULT_COLUMNS: TrackerColumn[] = ['job', 'manager', 'recruiter', 'candidate', 'payDetails', 'clientBillRate', 'clientCommission', 'pipeline', 'status', 'jobCreated', 'submitted', 'actions'];
-type LegacyTrackerColumn = TrackerColumn | 'creator';
-const STORED_COLUMNS: LegacyTrackerColumn[] = [...DEFAULT_COLUMNS, 'creator'];
-export const TRACKER_COLUMN_WIDTHS: Record<TrackerColumn, number> = { job:270, manager:185, recruiter:185, candidate:260, payDetails:220, clientBillRate:190, clientCommission:135, pipeline:255, status:190, jobCreated:145, submitted:145, actions:88 };
+export type TrackerColumn = Exclude<TrackerSortKey, 'creator'> | 'payDetails' | 'clientTerms' | 'actions';
+const DEFAULT_COLUMNS: TrackerColumn[] = ['job', 'manager', 'recruiter', 'candidate', 'payDetails', 'clientTerms', 'pipeline', 'status', 'jobCreated', 'submitted', 'actions'];
+type LegacyTrackerColumn = TrackerColumn | 'creator' | 'clientBillRate' | 'clientCommission';
+const STORED_COLUMNS: LegacyTrackerColumn[] = [...DEFAULT_COLUMNS, 'creator', 'clientBillRate', 'clientCommission'];
+export const TRACKER_COLUMN_WIDTHS: Record<TrackerColumn, number> = { job:270, manager:195, recruiter:195, candidate:260, payDetails:220, clientTerms:190, pipeline:255, status:190, jobCreated:145, submitted:145, actions:88 };
 
 function isSortableColumn(column: TrackerColumn): column is Exclude<TrackerSortKey, 'creator'> {
-  return column !== 'actions' && column !== 'payDetails' && column !== 'clientBillRate' && column !== 'clientCommission';
+  return column !== 'actions' && column !== 'payDetails' && column !== 'clientTerms';
 }
 
-export function useTrackerColumns(storageKey: string | null, grouped: boolean, managerLabel: string, initialSort?: { key: TrackerSortKey; direction: TrackerSortDirection }, submittedLabel = 'Submission date', canViewClientBillRate = false, canViewCommission = false) {
+export function useTrackerColumns(storageKey: string | null, grouped: boolean, managerLabel: string, initialSort?: { key: TrackerSortKey; direction: TrackerSortDirection }, submittedLabel = 'Submission date', canViewClientTerms = false, hideManager = false) {
   const [saved, setSaved] = useState<{ key: string; order: TrackerColumn[] } | null>(null);
-  const [sort, setSort] = useState<{ key: TrackerSortKey; direction: TrackerSortDirection }>(initialSort && ['job','manager','creator','recruiter','candidate','pipeline','status','jobCreated','submitted'].includes(initialSort.key) ? initialSort : { key: 'submitted', direction: 'desc' });
+  const [sort, setSort] = useState<{ key: TrackerSortKey; direction: TrackerSortDirection }>(initialSort && ['job','manager','creator','recruiter','candidate','pipeline','status','jobCreated','submitted'].includes(initialSort.key) && !(hideManager && initialSort.key === 'manager') ? initialSort : { key: 'submitted', direction: 'desc' });
   const [dragged, setDragged] = useState<TrackerColumn | null>(null);
   const [over, setOver] = useState<TrackerColumn | null>(null);
   const suppressClick = useRef(false);
@@ -28,14 +28,21 @@ export function useTrackerColumns(storageKey: string | null, grouped: boolean, m
       if (!active) return;
       try {
         const value: unknown = JSON.parse(localStorage.getItem(storageKey) || 'null');
-        if (Array.isArray(value) && new Set(value).size === value.length && value.every(key => STORED_COLUMNS.includes(key as TrackerColumn)) && value.at(-1) === 'actions') {
-          const migratedOrder = (value as LegacyTrackerColumn[]).filter((key): key is TrackerColumn => key !== 'creator');
-          for (const column of DEFAULT_COLUMNS) {
+        const expectedColumns = DEFAULT_COLUMNS.filter(column => column !== 'manager' || !hideManager);
+        if (Array.isArray(value) && new Set(value).size === value.length && value.every(key => STORED_COLUMNS.includes(key as LegacyTrackerColumn)) && value.at(-1) === 'actions') {
+          const migratedOrder: TrackerColumn[] = [];
+          for (const storedColumn of value as LegacyTrackerColumn[]) {
+            if (storedColumn === 'creator') continue;
+            if (storedColumn === 'manager' && hideManager) continue;
+            const column: TrackerColumn = storedColumn === 'clientBillRate' || storedColumn === 'clientCommission' ? 'clientTerms' : storedColumn;
+            if (!migratedOrder.includes(column)) migratedOrder.push(column);
+          }
+          for (const column of expectedColumns) {
             if (migratedOrder.some(existing => existing === column)) continue;
             const insertionPoint = migratedOrder.indexOf('pipeline');
             migratedOrder.splice(insertionPoint < 0 ? migratedOrder.length - 1 : insertionPoint, 0, column);
           }
-          if (migratedOrder.length === DEFAULT_COLUMNS.length && DEFAULT_COLUMNS.every(key => migratedOrder.includes(key))) {
+          if (migratedOrder.length === expectedColumns.length && expectedColumns.every(key => migratedOrder.includes(key))) {
             setSaved({ key: storageKey, order: migratedOrder });
             if (migratedOrder.length !== value.length || migratedOrder.some((column, index) => column !== value[index])) {
               try { localStorage.setItem(storageKey, JSON.stringify(migratedOrder)); } catch { /* The migrated order remains available for this visit. */ }
@@ -46,9 +53,9 @@ export function useTrackerColumns(storageKey: string | null, grouped: boolean, m
     };
     const restoreHandle = window.setTimeout(restoreOrder, 0);
     return () => { active = false; window.clearTimeout(restoreHandle); };
-  }, [storageKey]);
-  const order = saved && saved.key === storageKey ? saved.order : DEFAULT_COLUMNS;
-  const available = DEFAULT_COLUMNS.filter(column => (column !== 'clientBillRate' || canViewClientBillRate) && (column !== 'clientCommission' || canViewCommission));
+  }, [storageKey, hideManager]);
+  const order = saved && saved.key === storageKey ? saved.order : DEFAULT_COLUMNS.filter(column => column !== 'manager' || !hideManager);
+  const available = DEFAULT_COLUMNS.filter(column => (column !== 'clientTerms' || canViewClientTerms) && (column !== 'manager' || !hideManager));
   const columns = order.filter(key => available.includes(key) && (!grouped || key !== 'job'));
   function move(source: TrackerColumn, target: TrackerColumn) {
     if (!storageKey || source === target || source === 'actions' || target === 'actions') return;
@@ -57,7 +64,7 @@ export function useTrackerColumns(storageKey: string | null, grouped: boolean, m
     setSaved({ key: storageKey, order: next });
     try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* Keep the order for this visit. */ }
   }
-  const labels: Record<TrackerColumn, string> = { job:'Job reference', manager:managerLabel, recruiter:'Recruiter', candidate:'Candidate', payDetails:'Pay details', clientBillRate:'Client bill rate', clientCommission:'Commission', pipeline:'Pipeline', status:'Current status', jobCreated:'Job created at', submitted:submittedLabel, actions:'Actions' };
+  const labels: Record<TrackerColumn, string> = { job:'Job reference', manager:managerLabel, recruiter:'Recruiter', candidate:'Candidate', payDetails:'Pay details', clientTerms:'Client terms', pipeline:'Pipeline', status:'Current status', jobCreated:'Job created at', submitted:submittedLabel, actions:'Actions' };
   function headers(onSort: () => void) {
     return columns.map(column => {
       const active = column === sort.key;

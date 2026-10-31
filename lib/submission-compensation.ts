@@ -51,6 +51,15 @@ export function formatClientBillRate(rate: TrackerSubmission['clientBillRate']):
   return `${currency ? `${currency} ${range}` : `Currency not recorded · ${range}`}${suffix}`;
 }
 
+export function formatClientTerms(submission: Pick<TrackerSubmission, 'clientCommissionPct' | 'clientBillRate'>): string {
+  const commission = submission.clientCommissionPct?.trim();
+  if (commission) {
+    const percentage = Number(commission);
+    return Number.isFinite(percentage) && percentage >= 0 && percentage <= 100 ? `${percentage}%` : '—';
+  }
+  return formatClientBillRate(submission.clientBillRate);
+}
+
 export function displaySubmissionCompensation(s: TrackerSubmission, expected: boolean) {
  const amount = expected ? s.expectedCompensationAmount : s.currentCompensationAmount;
  if (s.compensationInputUnit && amount == null) return { amount: null, currency: s.compensationCurrency, unit: s.compensationPeriod };
