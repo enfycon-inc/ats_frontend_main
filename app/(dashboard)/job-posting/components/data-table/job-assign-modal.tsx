@@ -595,8 +595,25 @@ export function JobAssignModal({
 
 
 
+  const [assignmentError, setAssignmentError] = useState("");
+  const savedPodIds = job?.podIds || (job?.podId ? String(job.podId).split(',').filter(id => !['none', 'off'].includes(id)) : []);
+  const savedRecruiterIds = job?.recruiterIds || (job?.recruiterId ? [job.recruiterId] : []);
+  const remainingAssignmentAllowed = (clear: boolean) => {
+    if (!assignmentPolicy) return false;
+    const clearsPods = clear ? mode !== "users" && canAssignPods : assignTab === "pods";
+    const clearsRecruiters = clear ? mode !== "pods" && userPerms.includes("job:assign_recruiter") : assignTab === "users";
+    const podsRemain = podsEnabled && (clearsPods ? (!clear && selectedPodIds.length > 0) : savedPodIds.length > 0);
+    const recruitersRemain = clearsRecruiters ? (!clear && selectedUserIds.length > 0) : savedRecruiterIds.length > 0;
+    return assignmentPolicy.allowUnassigned === true || podsRemain || recruitersRemain;
+  };
+
   const handleSaveCombinedAssignment = async (override?: { unassignAll?: boolean }) => {
     if (!job) return;
+    setAssignmentError("");
+    if (!remainingAssignmentAllowed(override?.unassignAll === true)) {
+      setAssignmentError("This unit requires at least one recruiter or pod assignment.");
+      return;
+    }
     if (!override?.unassignAll && !currentModeAllowed) {
       toast.error(assignTab === "pods" ? "Pod assignment is disabled for this branch or unit." : "Direct recruiter assignment is disabled for this branch or unit.");
       return;
@@ -1177,13 +1194,14 @@ export function JobAssignModal({
           )}
         </div>
 
+        {assignmentError && <p role="alert" className="px-5 py-2 text-xs text-red-700">{assignmentError}</p>}
         {/* Footer */}
         <DialogFooter className="px-5 py-2.5 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/70 dark:bg-slate-850/70 flex flex-row items-center justify-between sm:justify-between">
           {!isPodHead && <Button
             type="button"
             variant="ghost"
             size="sm"
-            disabled={isAssigning}
+            disabled={isAssigning || !remainingAssignmentAllowed(true)}
             onClick={() => handleSaveCombinedAssignment({ unassignAll: true })}
             className="text-xs text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 h-8 cursor-pointer font-medium"
           >
@@ -1205,7 +1223,7 @@ export function JobAssignModal({
               type="button"
               size="sm"
               disabled={
-                isAssigning || !currentModeAllowed || (assignTab === "pods" ? selectedPodIds.length === 0 : selectedUserIds.length === 0)
+                isAssigning || !currentModeAllowed || !remainingAssignmentAllowed(false)
               }
               onClick={() => handleSaveCombinedAssignment()}
               className="h-8 px-4 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
