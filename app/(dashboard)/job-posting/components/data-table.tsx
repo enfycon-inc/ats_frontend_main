@@ -54,6 +54,7 @@ import { JobContextMenu } from "./data-table/job-context-menu";
 import { JobAssignModal, type JobAssignmentMode } from "./data-table/job-assign-modal";
 
 export interface DataTableProps {
+  catalog?: Record<string, string | number>;
   data: Job[];
   selectedColumns: string[];
   allColumns: { id: string; label: string }[];
@@ -73,6 +74,7 @@ export interface DataTableProps {
 }
 
 export default function DataTable({
+  catalog,
   data,
   selectedColumns,
   allColumns,
@@ -133,7 +135,7 @@ export default function DataTable({
       if (!disposed) setHasOnBehalfTargets(Array.isArray(targets) && targets.length > 0);
     }).catch(() => { if (!disposed) setHasOnBehalfTargets(false); });
     return () => { disposed = true; };
-  }, [currentUser]);
+  }, [currentUser?.id, currentUser?.tenantId, currentUser?.branchId, currentUser?.businessUnitId, JSON.stringify(currentUser?.permissions || [])]);
 
   const hasEditPermission = useMemo(() => {
     if (!currentUser) return false;
@@ -300,8 +302,8 @@ export default function DataTable({
     setCurrentPage,
     totalPages,
     processedData,
-    paginatedData,
-  } = useJobTableData({ data, branchUsesPods, podAllowedUnitIds });
+    paginatedData, totalRecords, catalogError, catalogLoading,
+  } = useJobTableData({ data, branchUsesPods, podAllowedUnitIds, catalog });
 
   useEffect(() => { onPodVisibilityChange?.(isPodSystemEnabled); }, [isPodSystemEnabled, onPodVisibilityChange]);
 
@@ -563,7 +565,7 @@ export default function DataTable({
                   colSpan={activeSelectedColumns.length + 2}
                   className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900"
                 >
-                  No matching jobs found. Try resetting your search or filters.
+                  {catalogLoading ? "Loading jobs…" : catalogError ? "Unable to load jobs. Use Refresh to try again." : "No matching jobs found. Try resetting your search or filters."}
                 </td>
               </tr>
             ) : (
@@ -610,9 +612,9 @@ export default function DataTable({
       <div className="py-1 px-3 border-t border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-850 flex items-center justify-between select-none shrink-0 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
         <div className="flex items-center gap-1.5">
           <span>
-            {Math.min(processedData.length, (currentPage - 1) * pageSize + 1)}-
-            {Math.min(processedData.length, currentPage * pageSize)} of{" "}
-            {processedData.length} records
+            {Math.min(totalRecords, (currentPage - 1) * pageSize + 1)}-
+            {Math.min(totalRecords, currentPage * pageSize)} of{" "}
+            {totalRecords} records
           </span>
         </div>
 
@@ -620,7 +622,7 @@ export default function DataTable({
           <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
+              disabled={catalogLoading || currentPage === 1}
               className="p-1 border border-neutral-350 dark:border-slate-700 rounded-sm bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
@@ -630,7 +632,7 @@ export default function DataTable({
             </span>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages || totalPages === 0}
+              disabled={catalogLoading || currentPage === totalPages || totalPages === 0}
               className="p-1 border border-neutral-350 dark:border-slate-700 rounded-sm bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               <ChevronRight className="h-3.5 w-3.5" />
@@ -668,7 +670,7 @@ export default function DataTable({
       {/* Right-click Context Menu */}
       {contextMenu && (
         (() => {
-          const contextJob = data.find((j) => j.id === contextMenu.jobId);
+          const contextJob = processedData.find((j) => j.id === contextMenu.jobId);
           if (!contextJob) return null;
           return (
             <JobContextMenu

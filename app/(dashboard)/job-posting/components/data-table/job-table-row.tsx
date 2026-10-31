@@ -315,12 +315,13 @@ export function JobTableRow({
                   ((job as any).sharedBranchIds && (job as any).sharedBranchIds.length > 0);
 
                 return (
-                  <div className="flex items-center gap-1.5 whitespace-nowrap">
+                  <div className="flex flex-col items-start gap-1.5">
                     <Link href={`/job-posting/${job.id}`}>
                       <span className="whitespace-nowrap hover:underline cursor-pointer text-slate-900 dark:text-slate-100 hover:text-[#1a4fa0] dark:hover:text-blue-400 font-semibold">
                         {job.jobTitle}
                       </span>
                     </Link>
+                    <div className="flex flex-wrap items-center gap-1.5">
                     {(isActive || isClosed) && (
                       <span
                         className={cn(
@@ -362,6 +363,7 @@ export function JobTableRow({
                         <AlertTriangle className="h-2.5 w-2.5" /> SLA
                       </Badge>
                     )}
+                    </div>
                   </div>
                 );
               })()
@@ -425,7 +427,7 @@ export function JobTableRow({
                       {formatted.date}
                     </span>
                     {formatted.time && (
-                      <span className="font-mono text-[10.5px] text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                      <span className="font-sans text-[11px] text-slate-400 dark:text-slate-500 whitespace-nowrap">
                         {formatted.time}
                       </span>
                     )}
@@ -444,7 +446,7 @@ export function JobTableRow({
                       {formatted.date}
                     </span>
                     {formatted.time && (
-                      <span className="font-mono text-[10.5px] text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                      <span className="font-sans text-[11px] text-slate-400 dark:text-slate-500 whitespace-nowrap">
                         {formatted.time}
                       </span>
                     )}
@@ -491,7 +493,7 @@ export function JobTableRow({
                           {assignInfo.recruiters.names.slice(0, 2).map((name, i) => (
                             <span
                               key={i}
-                              className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800 shrink-0 max-w-[85px] truncate"
+                              className="inline-flex items-center px-1.5 py-0.2 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800 shrink-0 max-w-[85px] truncate"
                             >
                               {name}
                             </span>

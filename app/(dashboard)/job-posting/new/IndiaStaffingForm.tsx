@@ -636,7 +636,9 @@ const getInitialActiveBranchContext = () => {
       if (profileInitialized.current) return;
       profileInitialized.current = true;
       try {
-        const prof = await jobFormContext.profile();
+        const [prof, initialBranches, initialUnits] = await Promise.all([
+          jobFormContext.profile(), jobFormContext.branches().catch(() => []), jobFormContext.units().catch(() => []),
+        ]);
         if (prof) {
           setCurrentUserProfile(prof);
           let tName = prof.tenant?.name || prof.tenantDomain || "";
@@ -670,8 +672,8 @@ const getInitialActiveBranchContext = () => {
           let matchedUnit = null;
           try {
             const [bList, unitsList] = await Promise.all([
-              jobFormContext.branches().catch(() => []),
-              jobFormContext.units().catch(() => []),
+              Promise.resolve(initialBranches),
+              Promise.resolve(initialUnits),
             ]);
             branchesList = bList || [];
             

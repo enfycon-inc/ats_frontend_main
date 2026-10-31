@@ -5,16 +5,18 @@ import { useState, useMemo, useEffect } from "react";
 import useSWR from "swr";
 import { toast } from "react-hot-toast";
 import { atsApi } from "@/lib/ats-api";
+import { mapApiJobToJob } from "../data/mock-jobs";
 import { Job } from "../data/mock-jobs";
 import { getAssignedPersonDisplay, getRecruiterDisplay } from "./job-table-utils";
 
 export interface UseJobTableDataOptions {
+  catalog?: Record<string, string | number>;
   data: Job[];
   branchUsesPods?: boolean;
   podAllowedUnitIds?: string[];
 }
 
-export function useJobTableData({ data, branchUsesPods, podAllowedUnitIds }: UseJobTableDataOptions) {
+export function useJobTableData({ data, branchUsesPods, podAllowedUnitIds, catalog }: UseJobTableDataOptions) {
   // Sorting State
   const [sortColumn, setSortColumn] = useState<keyof Job | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -35,9 +37,9 @@ export function useJobTableData({ data, branchUsesPods, podAllowedUnitIds }: Use
 
   const isPodSystemEnabled = useMemo(() => {
     if (branchUsesPods !== true) return false;
-    if (selectedBranch === 'All' || !podAllowedUnitIds) return true;
+    if (catalog || selectedBranch === 'All' || !podAllowedUnitIds) return true;
     return data.some(job => (job.businessUnit || job.branchName) === selectedBranch && podAllowedUnitIds.includes(job.businessUnitId || ''));
-  }, [branchUsesPods, selectedBranch, podAllowedUnitIds, data]);
+  }, [branchUsesPods, selectedBranch, podAllowedUnitIds, data, catalog]);
 
   const { data: podRecords } = useSWR(isPodSystemEnabled ? ['job-filter-pods', ...(podAllowedUnitIds || [])] : null, () => atsApi.pods.list());
   const podsList = useMemo(() => (podRecords || []).filter(pod => !podAllowedUnitIds || podAllowedUnitIds.includes(pod.businessUnitId)), [podRecords, podAllowedUnitIds]);
@@ -351,6 +353,29 @@ export function useJobTableData({ data, branchUsesPods, podAllowedUnitIds }: Use
 
   const totalPages = Math.ceil(processedData.length / pageSize);
 
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+  useEffect(() => { const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300); return () => clearTimeout(timer); }, [searchQuery]);
+  const query = useMemo(() => {
+    const q: Record<string, string | number> = { ...catalog, page: currentPage, limit: pageSize, search: debouncedSearch };
+    for (const [key, value] of Object.entries({ pod: selectedPod, unit: selectedBranch, creator: selectedCreator, recruiter: selectedAssignee, client: selectedClient })) if (value !== 'All') q[key] = value;
+    const now = new Date(); const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (selectedPeriod === 'Today') q.from = today.toISOString();
+    if (selectedPeriod === 'Yesterday') { q.from = new Date(+today - 86400000).toISOString(); q.to = today.toISOString(); }
+    if (selectedPeriod === 'This Week') q.from = new Date(+today - 7 * 86400000).toISOString();
+    if (selectedPeriod === 'Last 30 Days') q.from = new Date(+today - 30 * 86400000).toISOString();
+    if (selectedPeriod === 'This Month') q.from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    if (startDate) q.from = new Date(startDate).toISOString();
+    if (endDate) q.to = new Date(new Date(endDate).getTime() + 86400000).toISOString();
+    const sorts = { jobCode:'code', jobTitle:'title', client:'client', endClientName:'endClient', createdBy:'creator', assignedTo:'recruiter', recruiter:'recruiter', jobStatus:'status', businessUnit:'unit', createdOn:'created', modifiedOn:'updated', type:'type', priority:'urgency', podName:'pod', location:'location', states:'states', clientJobId:'clientJob', payRate:'payRate', clientBillRate:'billRate', submissionsCount:'submissions' };
+    q.sort = sortColumn ? (sorts[sortColumn] || 'created') : selectedSort === 'Recently Updated' ? 'updated' : selectedSort.startsWith('Job Title') ? 'title' : selectedSort === 'Hot First' ? 'hot' : 'created';
+    q.direction = sortColumn ? sortDirection : ['Oldest Posted','Job Title (A-Z)','Hot First'].includes(selectedSort) ? 'asc' : 'desc';
+    return q;
+  }, [catalog,currentPage,pageSize,debouncedSearch,selectedPod,selectedBranch,selectedCreator,selectedAssignee,selectedClient,selectedPeriod,startDate,endDate,sortColumn,sortDirection,selectedSort]);
+  const filterKey = JSON.stringify({ ...query, page: undefined });
+  useEffect(() => { if (catalog) setCurrentPage(1); }, [filterKey]);
+  const { data: server, error: catalogError, isLoading: catalogLoading } = useSWR(catalog ? ['job-catalog', query] : null, () => atsApi.jobs.catalog(query), { revalidateOnFocus: false, onSuccess: result => { if(currentPage > Math.max(1,result.totalPages)) setCurrentPage(Math.max(1,result.totalPages)); } });
+  const serverRows = useMemo(() => (server?.data || []).map(mapApiJobToJob), [server]);
+  const option = (key: string, split = false) => [...new Set((server?.options?.[key] || []).flatMap(value => split ? value.split(',').map(v => v.trim()).filter(Boolean) : [value]))].sort();
   return {
     searchQuery,
     setSearchQuery,
@@ -375,11 +400,11 @@ export function useJobTableData({ data, branchUsesPods, podAllowedUnitIds }: Use
     showRangePicker,
     setShowRangePicker,
     isPodSystemEnabled,
-    availablePods,
-    availableBranches,
-    availableCreators,
-    availableAssignees,
-    availableClients,
+    availablePods: catalog ? option("pods", true).map(name => ({ id:name, name })) : availablePods,
+    availableBranches: catalog ? option("branches") : availableBranches,
+    availableCreators: catalog ? option("creators") : availableCreators,
+    availableAssignees: catalog ? option("recruiters", true) : availableAssignees,
+    availableClients: catalog ? option("clients") : availableClients,
     isAnyFilterActive,
     handleResetFilters,
     sortColumn,
@@ -389,8 +414,10 @@ export function useJobTableData({ data, branchUsesPods, podAllowedUnitIds }: Use
     setPageSize,
     currentPage,
     setCurrentPage,
-    totalPages,
-    processedData,
-    paginatedData,
+    totalPages: catalog ? server?.totalPages || 0 : totalPages,
+    totalRecords: catalog ? server?.total || 0 : processedData.length,
+    catalogError, catalogLoading,
+    processedData: catalog ? serverRows : processedData,
+    paginatedData: catalog ? serverRows : paginatedData,
   };
 }

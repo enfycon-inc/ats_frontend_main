@@ -296,46 +296,11 @@ export default function JobPostingDashboard({
   }, []);
 
   // Fetch jobs from backend API
+  const [catalogRevision, setCatalogRevision] = useState(0);
   const fetchJobs = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const apiJobs = await atsApi.jobs.list(filterParam ? { filter: filterParam } : undefined);
-      if (apiJobs && apiJobs.length > 0) {
-        const mapped = apiJobs.map(mapApiJobToJob);
-        let jobsToDisplay = mapped; // Frontend market filtering removed to allow cross-market delegations and prevent hiding valid jobs
-
-        // Account Manager scoping handled entirely by backend API jobs.service.ts
-        // Frontend safety net removed to allow unit-wide job visibility.
-
-        // ── Filter by Priority / Urgency (Hot / Warm / Cold) ───────────────
-        if (priorityParam) {
-          const target = priorityParam.toUpperCase();
-          jobsToDisplay = jobsToDisplay.filter((job) => {
-            const p = String(job.priority || (job as any).urgency || "").toUpperCase();
-            if (target === "HOT") return p.includes("HOT") || p.includes("HIGH") || p.includes("URGENT");
-            if (target === "COLD") return p.includes("COLD") || p.includes("LOW");
-            if (target === "WARM") return p.includes("WARM") || p.includes("MEDIUM") || (!p.includes("HOT") && !p.includes("COLD") && !p.includes("LOW") && !p.includes("HIGH") && !p.includes("URGENT"));
-            return p === target;
-          });
-        }
-        // ────────────────────────────────────────────────────────────────────
-
-        const filteredByRoute = jobsToDisplay.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
-
-        setAllJobs(jobsToDisplay);
-        setJobsData(filteredByRoute);
-      } else {
-        setAllJobs([]);
-        setJobsData([]);
-      }
-    } catch (err) {
-      console.warn("[Jobs] API fetch failed:", err);
-      setAllJobs([]);
-      setJobsData([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [initialStatusFilter, market, filterParam, priorityParam, isRecruiter, isAccountManager, currentUser]);
+    setCatalogRevision(value => value + 1);
+    setIsLoading(false);
+  }, [initialStatusFilter, filterParam, priorityParam, currentUser?.id, currentUser?.tenantId, currentUser?.branchId, currentUser?.businessUnitId, userPermissions.join(",")]);
 
   useEffect(() => {
     fetchJobs();
@@ -500,7 +465,7 @@ export default function JobPostingDashboard({
       prev.map((job) => (job.id === jobId ? { ...job, ...updatedFields } : job))
     );
 
-    if (updatedFields._alreadySaved) return;
+    if (updatedFields._alreadySaved) { void fetchJobs(); return; }
 
     // 2. Prepare payload and persist to database
     try {
@@ -657,7 +622,7 @@ export default function JobPostingDashboard({
             <span className="font-black px-2 py-0.5 rounded text-[11px] bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300">
               {priorityParam.toUpperCase() === "HOT" ? "🔥 HOT" : priorityParam.toUpperCase() === "COLD" ? "❄️ COLD" : "⚡ WARM"}
             </span>
-            <span className="text-slate-500 text-[11px]">({jobsData.length} requirements found)</span>
+            <span className="text-slate-500 text-[11px]">(Jobs in your authorized scope)</span>
           </div>
           <button
             onClick={() => router.push("/job-posting")}
@@ -671,6 +636,7 @@ export default function JobPostingDashboard({
       {showBranchTabs && dashboardTab === "shared" && <PendingDelegationRequests onRefresh={handleRefresh} />}
       <DataTable
             data={displayJobs}
+            catalog={{ filter: filterParam || '', status: initialStatusFilter === 'All' ? '' : initialStatusFilter, priority: priorityParam || '', tab: dashboardTab, predefined: currentFilters.predefined.join('|'), unit: currentFilters.businessUnit === 'All selected' ? '' : currentFilters.businessUnit, revision: catalogRevision, scope: JSON.stringify([currentUser?.id,currentUser?.tenantId,currentUser?.branchId,currentUser?.businessUnitId,userPermissions]) }}
             selectedColumns={activeSelectedColumns}
             allColumns={allColumns}
             branchUsesPods={branchUsesPods}

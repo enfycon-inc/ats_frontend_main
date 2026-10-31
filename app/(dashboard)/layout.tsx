@@ -21,9 +21,29 @@ const getSessionSafe = cache(async () => {
   }
 });
 
-export async function generateMetadata(): Promise<Metadata> {
+// Metadata and layout share the same active-role bootstrap for this request.
+const getInitialNavigation = cache(async () => {
   const session = await getSessionSafe();
-  const navigation = await loadNavigationBootstrap(getApiBase(), (session as any)?.user?.accessToken || "");
+  const user = session?.user as any;
+  const token = user?.accessToken || "";
+  if (!token) return null;
+  const store = await cookies();
+  const key = dashboardPreferenceCookie(user);
+  const saved = key ? store.get(key)?.value : null;
+  if (saved) {
+    try {
+      const roleId = decodeURIComponent(saved);
+      if (/^[0-9a-f-]{36}$/i.test(roleId)) {
+        const navigation = await loadNavigationBootstrap(getApiBase(), token, roleId);
+        if (navigation) return { ...navigation, overrideRole: roleId };
+      }
+    } catch { /* Invalid preferences fall back to the current primary role. */ }
+  }
+  return loadNavigationBootstrap(getApiBase(), token);
+});
+
+export async function generateMetadata(): Promise<Metadata> {
+  const navigation = await getInitialNavigation();
   const title = navigation?.profile?.tenant?.siteTitle;
   return title ? { title: { absolute: title } } : {};
 }
@@ -73,27 +93,8 @@ export default async function DashboardLayout({
     redirect("/auth/login");
   }
 
-  let initialNavigation = await loadNavigationBootstrap(getApiBase(), (session as any)?.user?.accessToken || "");
+  const initialNavigation = await getInitialNavigation();
   const cookieStore = await cookies();
-  if (initialNavigation) {
-    const key = dashboardPreferenceCookie(initialNavigation.profile);
-    const saved = key ? cookieStore.get(key)?.value : null;
-    if (saved) {
-      try {
-        const roleId = decodeURIComponent(saved);
-        if (/^[0-9a-f-]{36}$/i.test(roleId)) {
-          initialNavigation = await loadNavigationBootstrap(getApiBase(), (session as any)?.user?.accessToken || "", roleId);
-          if (initialNavigation) initialNavigation.overrideRole = roleId;
-          else {
-            // A role can be removed or moved after the preference was saved.
-            // Keep the member in their workspace and let the server use the
-            // current primary assignment instead of rendering an empty shell.
-            initialNavigation = await loadNavigationBootstrap(getApiBase(), (session as any)?.user?.accessToken || "");
-          }
-        }
-      } catch { /* Ignore malformed preferences. */ }
-    }
-  }
 
   return (
     <SessionProvider session={session} refetchInterval={0} refetchOnWindowFocus={false}>

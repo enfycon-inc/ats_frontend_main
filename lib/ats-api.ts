@@ -1,3 +1,4 @@
+import type { JobCatalogQuery, JobCatalogResponse } from "./job-catalog-contract";
 import type { TenantBrandingUpdate, TenantBrandingSettingsResponse } from './tenant-branding-contract';
 import type { JobExportRequest, JobExportResponse, JobExportManager } from './job-export-contract';
 import type { SignInPolicy, SignInPolicyUpdate } from "./sign-in-policy";
@@ -1188,6 +1189,11 @@ const jobs = {
       staffingRequests.set(requestKey, request);
     }
     return request;
+  },
+  async catalog(query: JobCatalogQuery): Promise<JobCatalogResponse<JobPayload>> {
+    const params = new URLSearchParams();
+    Object.entries(query).forEach(([key,value]) => { if (value !== '') params.set(key, String(value)); });
+    return apiFetch(`/api/jobs/catalog?${params}`);
   },
   async list(opts?: { filter?: string }): Promise<JobPayload[]> {
     const qs = opts?.filter ? `?filter=${encodeURIComponent(opts.filter)}` : '';

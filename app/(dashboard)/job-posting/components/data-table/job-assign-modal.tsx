@@ -54,6 +54,7 @@ export function JobAssignModal({
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [selectedPodIds, setSelectedPodIds] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [recruiterHistoryTab, setRecruiterHistoryTab] = useState<"frequent" | "all">("all");
   const [recruiterFilterMode, setRecruiterFilterMode] = useState<"all" | "podMembers">("all");
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
@@ -510,7 +511,7 @@ export function JobAssignModal({
 
   const filteredUsers = useMemo(() => {
     const q = assignSearch.trim().toLowerCase();
-    let list = branchRecruiterUsers;
+    let list = recruiterHistoryTab === "frequent" ? branchRecruiterUsers.filter((u: any) => u.assignmentCount > 0) : branchRecruiterUsers;
     if (selectedPodIds.length > 0 && recruiterFilterMode === "podMembers") {
       list = list.filter((u: any) => isUserInSelectedPods(u.id, u.podId || u.pod_id));
     }
@@ -528,11 +529,14 @@ export function JobAssignModal({
     return [...result].sort((a: any, b: any) => {
       const aIsPodMember = isUserInSelectedPods(a.id, a.podId || a.pod_id);
       const bIsPodMember = isUserInSelectedPods(b.id, b.podId || b.pod_id);
-      if (aIsPodMember === bIsPodMember) return 0;
+      if (aIsPodMember === bIsPodMember) return recruiterHistoryTab === "frequent"
+        ? (b.assignmentCount || 0) - (a.assignmentCount || 0) || new Date(b.lastAssignedAt || 0).getTime() - new Date(a.lastAssignedAt || 0).getTime()
+        : 0;
       return aIsPodMember ? 1 : -1;
     });
   }, [
     branchRecruiterUsers,
+    recruiterHistoryTab,
     assignSearch,
     getUserRoleLabel,
     targetBranch,
@@ -877,6 +881,9 @@ export function JobAssignModal({
           </>
         )}
 
+        {assignTab === "users" && <div role="group" aria-label="Recruiter history" className="flex gap-2 px-5 py-2">
+          {([['frequent', 'Frequently assigned'], ['all', 'All recruiters']] as const).map(([key, label]) => <Button key={key} type="button" variant={recruiterHistoryTab === key ? 'secondary' : 'ghost'} size="sm" aria-pressed={recruiterHistoryTab === key} onClick={() => setRecruiterHistoryTab(key)}>{label}</Button>)}
+        </div>}
         {/* Search Box & Multi-Select Toolbar */}
         <div className={cn("px-5 pt-1 space-y-2", !currentModeAllowed && "pointer-events-none opacity-50")} aria-disabled={!currentModeAllowed}>
           <div className="relative">
