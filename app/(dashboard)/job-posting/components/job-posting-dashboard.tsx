@@ -358,7 +358,7 @@ export default function JobPostingDashboard({
       { id: "jobStatus", label: "Job Status" },
       {
         id: "clientBillRate",
-        label: market === "IN" ? "Client Bill Rate / CTC" : "Client Bill Rate / Salary",
+        label: "Client terms",
       },
       {
         id: "payRate",
