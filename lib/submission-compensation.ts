@@ -32,6 +32,25 @@ export function submissionCompensationValue(submission: TrackerSubmission, expec
   const baseAmount = pay.unit === 'LPA' && pay.amount != null ? String(Number(pay.amount) * 100000) : pay.amount;
   return formatRecordedCompensation(baseAmount, pay.currency, pay.unit);
 }
+
+export function formatClientBillRate(rate: TrackerSubmission['clientBillRate']): string {
+  if (!rate || rate.min == null || rate.min.trim() === '') return '—';
+  const minimum = Number(rate.min.replaceAll(',', ''));
+  const maximum = rate.max == null || rate.max.trim() === '' ? minimum : Number(rate.max.replaceAll(',', ''));
+  if (!Number.isFinite(minimum) || !Number.isFinite(maximum) || minimum < 0 || maximum < minimum) return '—';
+  const currency = rate.currency?.trim().toUpperCase();
+  const locale = currency === 'INR' ? 'en-IN' : 'en-US';
+  const format = (value: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
+  const range = maximum === minimum ? format(minimum) : `${format(minimum)}–${format(maximum)}`;
+  const term = rate.term?.trim().toUpperCase();
+  const suffix = term === 'LPA' ? ' LPA'
+    : ['MONTH', 'MONTHLY'].includes(term || '') ? ' / month'
+      : ['HOUR', 'HOURLY'].includes(term || '') ? ' / hour'
+        : ['YEAR', 'YEARLY'].includes(term || '') ? ' / year'
+          : term ? ` / ${term.toLowerCase()}` : ' · unit not recorded';
+  return `${currency ? `${currency} ${range}` : `Currency not recorded · ${range}`}${suffix}`;
+}
+
 export function displaySubmissionCompensation(s: TrackerSubmission, expected: boolean) {
  const amount = expected ? s.expectedCompensationAmount : s.currentCompensationAmount;
  if (s.compensationInputUnit && amount == null) return { amount: null, currency: s.compensationCurrency, unit: s.compensationPeriod };

@@ -13,7 +13,7 @@ import { SubmissionActions } from "@/components/submissions/submission-actions";
 import { useTrackerColumns, TRACKER_COLUMN_WIDTHS, type TrackerColumn } from "@/components/submissions/tracker-columns";
 import { UpdateSubmissionDialog } from "@/components/submissions/update-submission-dialog";
 import { SubmissionHistory } from "@/components/submissions/submission-history";
-import { compensationLabel, submissionCompensationValue } from "@/lib/submission-compensation";
+import { compensationLabel, formatClientBillRate, submissionCompensationValue } from "@/lib/submission-compensation";
 import { ReviewWorkspace } from "@/components/submissions/review-workspace";
 import { stageRemarkSuggestions } from "@/lib/stage-remarks";
 import { USER_CITY_OPTIONS } from "@/lib/user-city-contract";
@@ -303,6 +303,9 @@ function FilteredSubmissionsPage({scope}:{scope:string}) {
   const params = useSearchParams();
   const { status: workspaceStatus, profile } = useDashboardContext();
   const access=localFilterAccess(profile?.permissions??[]);
+  const permissions: string[]=profile?.permissions??[];
+  const canViewClientBillRate=permissions.some(permission=>['job:bill_rate:view','*','platform:manage'].includes(permission));
+  const canViewClientCommission=permissions.some(permission=>['placement:view','*','platform:manage'].includes(permission));
   const [filters,setFilters]=useState<TrackerListFilters>(()=>({...readSubmissionFilters(new URLSearchParams(params.toString())),view:params.get('view')||(access.portfolio?'my':'all')}));
   const bucket=filters.bucket??'all';
   function changeFilters(patch:Partial<TrackerListFilters>,reset=false){setFilters(f=>{if(reset)return {view:f.view,bucket:'all',page:1};const next={...f,...patch,page:patch.page??1};if(patch.bucket==='closures'&&f.bucket!=='closures'&&patch.dateBasis===undefined)next.dateBasis='joined';if(next.bucket!=='closures'&&next.dateBasis==='joined')next.dateBasis='submitted';return next;});}
@@ -318,7 +321,7 @@ function FilteredSubmissionsPage({scope}:{scope:string}) {
   const [profileTarget, setProfileTarget] = useState<ProfileTarget | null>(null);
   const [collapsedJobs, setCollapsedJobs] = useState<Record<string, boolean>>({});
   const [groupByJob, setGroupByJob] = useState(params.get("groupByJob")==="1");
-  const { columns, sort, headers } = useTrackerColumns(profile ? `submission-columns:v1:${profile.tenantId}:${profile.id}` : null, groupByJob, 'Account manager', {key:(params.get('sortBy')||'submitted') as import('@/lib/submission-contract').TrackerSortKey,direction:params.get('sortDirection')==='asc'?'asc':'desc'}, bucket==='closures'?'Joined at':'Submission date');
+  const { columns, sort, headers } = useTrackerColumns(profile ? `submission-columns:v1:${profile.tenantId}:${profile.id}` : null, groupByJob, 'Account manager', {key:(params.get('sortBy')||'submitted') as import('@/lib/submission-contract').TrackerSortKey,direction:params.get('sortDirection')==='asc'?'asc':'desc'}, bucket==='closures'?'Joined at':'Submission date',canViewClientBillRate,canViewClientCommission);
   useEffect(()=>{if(search===(filters.search??''))return;const t=setTimeout(()=>changeFilters({search}),300);return()=>clearTimeout(t);},[search,filters.search]);
   useEffect(()=>{const refresh=()=>{setEditor(null);setRevision(r=>r+1);};window.addEventListener('app:refresh',refresh);window.addEventListener('branchChanged',refresh);return()=>{window.removeEventListener('app:refresh',refresh);window.removeEventListener('branchChanged',refresh);};},[]);
   useEffect(()=>{if(submissionId)return;const next=submissionFilterQuery(new URLSearchParams(params.toString()),filters);next.set('sortBy',sort.key);next.set('sortDirection',sort.direction);if(groupByJob)next.set('groupByJob','1');else next.delete('groupByJob');if(next.toString()!==params.toString())window.history.replaceState(null,'',`/utility/submissions?${next}`);},[filters,sort,groupByJob,submissionId,params]);
@@ -342,10 +345,12 @@ function FilteredSubmissionsPage({scope}:{scope:string}) {
   function renderCell(sub: TrackerSubmission, column: TrackerColumn): ReactNode {
     switch (column) {
       case "job": return <td key="job" className="px-5 py-5"><div className="space-y-1.5"><Link href={detailHref(sub.id)} className="block text-sm font-semibold leading-5 text-slate-900 hover:text-[#1a4fa0] hover:underline dark:text-slate-100">{sub.jobTitle || "Title unavailable"}</Link><p className="whitespace-nowrap font-medium text-muted-foreground">{sub.jobCode || "Code unavailable"}</p><div className="flex items-center gap-2 whitespace-nowrap text-xs leading-5">{sub.jobUrgency && <span className="rounded bg-amber-50 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{sub.jobUrgency}</span>}<button type="button" className="border-l border-border pl-2 font-medium text-[#1a4fa0] dark:text-blue-300 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => { changeFilters({jobId:sub.jobId}); }}>{sub.submissionNumber ? `${submissionOrdinal(sub.submissionNumber)} submission` : "Submission"}</button><span className="border-l border-border pl-2 text-muted-foreground">{sub.jobSubmissionRequired ?? "—"} required</span></div>{sub.jobIsCoSourced && <span className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Co-sourced</span>}</div></td>;
-      case "creator": return <td key="creator" className="px-2.5 py-3"><UserIdentity size="table" user={{name:sub.creatorName,email:sub.creatorEmail,avatar:sub.creatorAvatar}}/></td>;
       case "manager": return <td key="manager" className="px-2.5 py-3"><button type="button" onClick={()=>setProfileTarget({kind:'account-manager',submission:sub})} className="block w-full text-left hover:text-[#1a4fa0]"><UserIdentity size="table" user={{name:sub.accountManagerName,email:sub.accountManagerEmail}}/></button></td>;
       case "recruiter": return <td key="recruiter" className="px-2.5 py-3"><button type="button" onClick={()=>setProfileTarget({kind:'recruiter',submission:sub})} className="block w-full text-left hover:text-[#1a4fa0]"><UserIdentity size="table" user={{name:sub.recruiterName,email:sub.recruiterEmail,avatar:sub.recruiterAvatar}}/></button></td>;
       case "candidate": return <td key="candidate" className="px-2.5 py-3"><CandidateCell submission={sub} onOpen={() => setProfileTarget({ kind: "candidate", submission: sub })} /></td>;
+      case "payDetails": return <td key="payDetails" className="px-3 py-3"><div className="space-y-2"><div><span className="block text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">{compensationLabel(false,sub.jobType,sub.compensationPeriod)}</span><span className="text-xs font-medium">{submissionCompensationValue(sub,false)}</span></div><div><span className="block text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">{compensationLabel(true,sub.jobType,sub.compensationPeriod)}</span><span className="text-xs font-medium">{submissionCompensationValue(sub,true)}</span></div></div></td>;
+      case "clientBillRate": return <td key="clientBillRate" className="px-3 py-3 text-xs font-medium">{formatClientBillRate(sub.clientBillRate)}</td>;
+      case "clientCommission": return <td key="clientCommission" className="px-3 py-3 text-xs font-medium">{sub.clientCommissionPct == null ? '—' : `${sub.clientCommissionPct}%`}</td>;
       case "jobCreated": return <td key="jobCreated" className="px-2.5 py-3"><TableDate value={sub.jobCreatedAt} timezone={sub.timezone} /></td>;
       case "submitted": return <td key="submitted" className="px-2.5 py-3"><TableDate value={bucket==='closures'?sub.joinedAt:sub.createdAt} timezone={sub.timezone} /></td>;
       case "pipeline": return <td key="pipeline" className="px-2.5 py-4 text-center"><Pipeline submission={sub} /></td>;
