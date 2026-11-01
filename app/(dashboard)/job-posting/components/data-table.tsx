@@ -420,8 +420,26 @@ export default function DataTable({
   const primaryActions = <>
     {dockActions && <input type="search" aria-label="Search jobs" placeholder="Search jobs, code, client…" value={searchQuery} onChange={event=>setSearchQuery(event.target.value)} className="h-8 w-24 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 sm:w-48 lg:w-64" />}
 
+    {actionsBesideLeadingContent && <button
+      type="button"
+      onClick={() => { onRefresh(); toast.success("Jobs list reloaded."); }}
+      className="p-1.5 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
+      title="Refresh Table"
+      aria-label="Refresh jobs"
+    >
+      <RefreshCw className="h-3 w-3" />
+    </button>}
     {hasCreatePermission && <button type="button" onClick={() => router.push('/job-posting/new')} aria-label="New Job" className="flex h-8 items-center gap-1 px-2.5 py-1 rounded bg-primary text-white text-xs font-semibold"><Plus className="h-3 w-3" /><span className="hidden sm:inline">New Job</span></button>}
     <button type="button" onClick={onOpenFilters} aria-label="Open job filters" title="Filters" className="flex items-center gap-1 rounded border px-2 py-1 text-xs"><Filter className="h-3.5 w-3.5" /><span className="hidden sm:inline">Filters</span></button>
+    {actionsBesideLeadingContent && <button
+      type="button"
+      onClick={onOpenColumns}
+      className="p-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
+      title="Columns settings"
+      aria-label="Column settings"
+    >
+      <Settings className="h-3.5 w-3.5" />
+    </button>}
   </>;
 
   if (catalog && catalogLoading && paginatedData.length === 0) return <>{leadingContent}<JobPostingSkeleton showTabs={false} /></>;
@@ -454,13 +472,14 @@ export default function DataTable({
 
         {/* Global actions */}
         <div className="flex items-center gap-1.5">
-          <button
+          {!actionsBesideLeadingContent && <button
             onClick={() => { onRefresh(); toast.success("Jobs list reloaded."); }}
             className="p-1.5 border border-neutral-300 dark:border-slate-750 rounded bg-white dark:bg-slate-900 hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
             title="Refresh Table"
+            aria-label="Refresh jobs"
           >
             <RefreshCw className="h-3 w-3" />
-          </button>
+          </button>}
 
           {!dockActions && !actionsBesideLeadingContent && primaryActions}
 
@@ -472,15 +491,16 @@ export default function DataTable({
               Create for colleague
             </button>
           )}
-          <div className="flex items-center border-l border-neutral-200 dark:border-slate-800 pl-1.5 gap-0.5">
+          {!actionsBesideLeadingContent && <div className="flex items-center border-l border-neutral-200 dark:border-slate-800 pl-1.5 gap-0.5">
             <button
               onClick={onOpenColumns}
               className="p-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
               title="Columns settings"
+              aria-label="Column settings"
             >
               <Settings className="h-3.5 w-3.5" />
             </button>
-          </div>
+          </div>}
         </div>
       </div>
 
