@@ -416,9 +416,9 @@ export default function DataTable({
     >
       {dockActions && createPortal(primaryActions, actionHost!)}
       <div ref={scrollRoot} className="flex-1 overflow-auto relative min-h-0 bg-neutral-50/20 dark:bg-slate-950/10">
-      {leadingContent}
+      {leadingContent && <div className="sticky left-0 z-30 w-full min-w-0">{leadingContent}</div>}
       {/* Action Bar */}
-      <div ref={toolbarRef} className={cn(enterpriseGrid.toolbar, "min-h-[52px]")}>
+      <div ref={toolbarRef} className={cn(enterpriseGrid.toolbar, "sticky left-0 z-30 w-full min-w-0 min-h-[52px]")}>
         <div className="flex items-center gap-2">
           {selectedRowIds.length > 0 && (
             <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-sm">
@@ -468,6 +468,7 @@ export default function DataTable({
       </div>
 
       {/* Filter Toolbar */}
+      <div className="sticky left-0 z-30 w-full min-w-0">
       <JobTableFilters
         hideSearch={dockActions}
         searchQuery={searchQuery}
@@ -502,6 +503,7 @@ export default function DataTable({
         isAnyFilterActive={isAnyFilterActive}
         onResetFilters={handleResetFilters}
       />
+      </div>
 
       {/* Spreadsheet Grid Table */}
         <table
