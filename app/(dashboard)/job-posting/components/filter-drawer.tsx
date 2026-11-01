@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Plus, Layers, Building2 } from "lucide-react";
+import { X, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
@@ -30,14 +30,10 @@ const PREDEFINED_FILTERS = [
   "Archived Jobs",
   "My Jobs",
   "Closed Jobs",
-  "Shared Jobs",
   "Jobs with submissions",
   "Jobs without submissions",
-  "Jobs with Client Submissions",
   "Jobs without Recruiters Assigned",
   "Jobs with Pipeline",
-  "Bench Jobs",
-  "Referral Jobs",
   "VMS Jobs",
 ];
 
@@ -62,7 +58,7 @@ export default function FilterDrawer({
     atsApi.businessUnits.list()
       .then((data) => setBusinessUnits(data || []))
       .catch((err) => console.error("Failed to load business units for filter:", err));
-    atsApi.users.list().then(data => setUsers(data || [])).catch(() => setUsers([]));
+    atsApi.auth.listUsers().then(data => setUsers(data || [])).catch(() => setUsers([]));
     atsApi.clients.list().then(data => setClients(data || [])).catch(() => setClients([]));
   }, []);
 
@@ -97,6 +93,32 @@ export default function FilterDrawer({
     setSelectedPredefined([]);
     setDraft({ businessUnit: "All selected", predefined: [], accountManagers: [], recruiters: [], branches: [], clients: [], workModes: [], statuses: [], priorities: [] });
   };
+
+  const toggleValue = (key: keyof SelectedFilters, value: string) => {
+    setDraft((previous) => {
+      const values = (previous[key] as string[]) || [];
+      return { ...previous, [key]: values.includes(value) ? values.filter((item) => item !== value) : [...values, value] };
+    });
+  };
+
+  const peopleOptions = (role: "manager" | "recruiter") => users
+    .filter((user) => {
+      const roles = [user.role, ...(user.roles || []), ...(user.assignedRoles || []).map((item: any) => item.name || item.roleName || item.role)]
+        .filter(Boolean).join(" ").toLowerCase();
+      return role === "manager" ? /account.manager|delivery.head|branch.admin|unit.admin|tenant.admin/.test(roles) : /recruiter/.test(roles);
+    })
+    .map((user) => ({ id: user.id, label: user.fullName || user.name || user.email }))
+    .filter((item) => item.id && item.label);
+
+  const filterGroups: Array<{ key: keyof SelectedFilters; label: string; options: Array<{ id: string; label: string }> }> = [
+    { key: "accountManagers", label: "Account manager", options: peopleOptions("manager") },
+    { key: "recruiters", label: "Recruiter", options: peopleOptions("recruiter") },
+    { key: "branches", label: "Branch", options: branches.map((item) => ({ id: item.id, label: item.name })).filter((item) => item.id && item.label) },
+    { key: "clients", label: "Client", options: clients.map((item) => ({ id: item.id, label: item.clientName || item.name })).filter((item) => item.id && item.label) },
+    { key: "workModes", label: "Work mode", options: ["In Office", "Remote", "Hybrid"].map((value) => ({ id: value, label: value })) },
+    { key: "statuses", label: "Job status", options: ["Active", "Draft", "Closed", "Archived"].map((value) => ({ id: value, label: value })) },
+    { key: "priorities", label: "Priority", options: ["Hot", "Warm", "Cold"].map((value) => ({ id: value, label: value })) },
+  ];
 
   if (!isOpen) return null;
 
@@ -174,6 +196,23 @@ export default function FilterDrawer({
               </select>
             </div>
 
+            <div className="space-y-4">
+              <h3 className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Filter by</h3>
+              {filterGroups.map(({ key, label, options }) => (
+                <fieldset key={key} className="space-y-2">
+                  <legend className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">{label}</legend>
+                  <div className="max-h-36 overflow-y-auto rounded-md border border-neutral-200 dark:border-slate-700 p-2 space-y-1">
+                    {options.length ? options.map((option) => (
+                      <label key={option.id} className="flex items-center gap-2 rounded px-1.5 py-1 text-xs text-neutral-700 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-slate-800">
+                        <input type="checkbox" checked={((draft[key] as string[]) || []).includes(option.id)} onChange={() => toggleValue(key, option.id)} />
+                        <span className="truncate">{option.label}</span>
+                      </label>
+                    )) : <p className="px-1.5 py-1 text-xs text-neutral-400">No options available</p>}
+                  </div>
+                </fieldset>
+              ))}
+            </div>
+
             {/* Predefined Filters Tag Grid */}
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
@@ -206,12 +245,6 @@ export default function FilterDrawer({
               </div>
             </div>
 
-            {/* Add Custom Filter Button */}
-            <div className="pt-2">
-              <button className="text-xs text-primary dark:text-blue-400 font-bold flex items-center gap-1 hover:underline cursor-pointer">
-                <Plus className="h-3.5 w-3.5" /> Add Custom Filter
-              </button>
-            </div>
           </div>
 
           {/* Footer Buttons */}

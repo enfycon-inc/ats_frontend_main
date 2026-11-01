@@ -9,7 +9,7 @@ import { RoleRequestReviewModal, type ReviewForm } from './role-request-review-m
 import { reviewCategory, reviewRoles, approvalDecision, initialReviewForm } from '@/lib/user-review-form';
 
 export function PendingUserReview({ user, scope, profile, permissions, onClose, onChanged }: {
-  user: ManagementRow; scope: string; profile: { branchId?: string | null; businessUnitId?: string | null };
+  user: ManagementRow; scope: string; profile: { branchId?: string | null; businessUnitId?: string | null; systemRole?: string | null };
   permissions: string[]; onClose: () => void; onChanged: () => void;
 }) {
   const [form, setForm] = useState<ReviewForm>(initialReviewForm(user, []));
@@ -34,14 +34,17 @@ export function PendingUserReview({ user, scope, profile, permissions, onClose, 
     }
   }, [options.data, request.data, user]);
   const tenantWide = permissions.some(p => ['*', 'platform:manage', 'tenant:manage', 'tenant:settings'].includes(p));
+  const deliveryHead = String(profile.systemRole || '').toUpperCase() === 'DELIVERY_HEAD';
   const branchWide = !tenantWide && permissions.includes('branch_admin:manage');
   const unitScoped = !tenantWide && !branchWide;
   const rows = options.data;
   const permittedRoles = (rows?.roles || []).filter((role: any) => {
     if (isAutomaticPodLeadRole(role)) return false;
-    if (tenantWide) return true;
+    const roleCategory = reviewCategory(role.systemRole || role.system_role || role.name);
     let grants: unknown = role.permissions;
     if (typeof grants === 'string') { try { grants = JSON.parse(grants); } catch { return false; } }
+    if (deliveryHead && (roleCategory !== 'EMPLOYEE' || (Array.isArray(grants) && grants.some((p: string) => ['*', 'platform:manage', 'tenant:settings', 'tenant:manage', 'branch_admin:manage', 'unit_admin:manage'].includes(p))))) return false;
+    if (tenantWide) return true;
     return Array.isArray(grants) && grants.every((p: string) => permissions.includes(p));
   });
   const availableRoles = reviewRoles(permittedRoles, form);
@@ -49,6 +52,7 @@ export function PendingUserReview({ user, scope, profile, permissions, onClose, 
   const branches = (rows?.branches || []).filter((b: any) => tenantWide || b.id === profile.branchId);
   const units = (rows?.units || []).filter((u: any) => !unitScoped || u.id === profile.businessUnitId);
   const currentUser = request.data ? { ...user, ...request.data, requestedRoleId: request.data.roleId } : user;
+  const requestedRoleGrantable = permittedRoles.some((role: any) => role.id === currentUser.requestedRoleId);
   const close = () => { if (!guard.current) onClose(); };
   const decide = async (reject: boolean) => {
     if (guard.current || !rows) return;
@@ -79,6 +83,7 @@ export function PendingUserReview({ user, scope, profile, permissions, onClose, 
     <RoleRequestReviewModal reviewUser={currentUser} reviewForm={form} setReviewForm={setForm}
       branches={branches} businessUnits={units} availableReviewRoles={availableRoles} allowedCategories={allowedCategories}
       isBranchAdmin={branchWide} isUnitScoped={unitScoped} isUnitAdmin={unitScoped}
+      grantWarning={deliveryHead && !requestedRoleGrantable ? 'You can review this request, but the requested role requires a higher-level approver. Choose a role available to you or ask a workspace administrator to approve it.' : undefined}
       busy={busy || confirmReject} error={error} onClose={close}
       onApprove={() => void decide(false)} onReject={() => setConfirmReject(true)} />
     {confirmReject && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"><section role="alertdialog" aria-modal="true" aria-labelledby="reject-request-title" className="w-full max-w-md space-y-4 rounded-xl bg-white p-5 text-sm dark:bg-slate-900">

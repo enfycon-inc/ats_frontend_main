@@ -14,10 +14,10 @@ interface Props {
   reviewUser: ReviewMember; reviewForm: ReviewForm; setReviewForm: Dispatch<SetStateAction<ReviewForm>>;
   branches: any[]; businessUnits: any[]; availableReviewRoles: any[];
   isBranchAdmin: boolean; isUnitScoped: boolean; isUnitAdmin: boolean;
-  busy: boolean; error?: string; allowedCategories?: string[]; onClose: () => void; onApprove: () => void; onReject: () => void;
+  busy: boolean; error?: string; grantWarning?: string; allowedCategories?: string[]; onClose: () => void; onApprove: () => void; onReject: () => void;
 }
 export function RoleRequestReviewModal({ reviewUser, reviewForm, setReviewForm, branches, businessUnits, availableReviewRoles,
-  isBranchAdmin, isUnitScoped, isUnitAdmin, busy, error, allowedCategories, onClose, onApprove, onReject }: Props) {
+  isBranchAdmin, isUnitScoped, isUnitAdmin, busy, error, grantWarning, allowedCategories, onClose, onApprove, onReject }: Props) {
   return (
 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
           <div role="dialog" aria-modal="true" aria-labelledby="role-review-title" className="max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -51,6 +51,7 @@ export function RoleRequestReviewModal({ reviewUser, reviewForm, setReviewForm, 
 
             {/* Modal Body */}
             <div className="p-6 space-y-4">
+              {grantWarning && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{grantWarning}</p>}
               {/* User Summary Card */}
               <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/60 dark:bg-amber-950/20">
                 <div className="flex items-center justify-between mb-2">

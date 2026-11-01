@@ -12,6 +12,6 @@
     "lib/user-management.contract.ts": "8d43c8738459484d33e0d341fb2f09360fbc45b2db5a87d760b62c9b68ba3b6f",
     "lib/job-export-contract.ts": "65bddd40e0ef9fc97a87182684c2fb74d192016bbb0b72a6b31deeab398a7942",
     "lib/job-urgency-contract.ts": "644fc885b508a5909da70974ca991f8d3a68eaf4f237003237bc4789e5cfce37",
-    "lib/job-catalog-contract.ts": "3271080cae3d3ee19b623de21fe07f505722c6aa004dfee0068633c4c31896cd"
+    "lib/job-catalog-contract.ts": "bac96a69f132913a94a0738e15c8795bc4f8dd3430b9eb5fb1c754e4b7ca7b9e"
   }
 }

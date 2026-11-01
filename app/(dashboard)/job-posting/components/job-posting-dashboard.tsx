@@ -256,6 +256,7 @@ export default function JobPostingDashboard({
   const [currentFilters, setCurrentFilters] = useState<SelectedFilters>({
     businessUnit: "All selected",
     predefined: [],
+    accountManagers: [], recruiters: [], branches: [], clients: [], workModes: [], statuses: [], priorities: [],
   });
 
   // Job Data
@@ -341,47 +342,6 @@ export default function JobPostingDashboard({
 
   const handleApplyFilters = (filters: SelectedFilters) => {
     setCurrentFilters(filters);
-
-    let filtered = [...allJobs];
-
-    // Status Filter if set on route level
-    if (initialStatusFilter !== "All") {
-      filtered = filtered.filter((job) => matchStatus(job.jobStatus, initialStatusFilter));
-    }
-
-    // Business Unit filter
-    if (filters.businessUnit !== "All selected") {
-      filtered = filtered.filter(
-        (job) => (job as any).businessUnit || 'N/A' === filters.businessUnit
-      );
-    }
-
-    // Predefined tags filter
-    if (filters.predefined.length > 0) {
-      filtered = filtered.filter((job) => {
-        return filters.predefined.some((pref) => {
-          if (pref === "Active Jobs") return job.jobStatus === "Active";
-          if (pref === "Archived Jobs") return job.jobStatus === "Archived";
-          if (pref === "Closed Jobs") return job.jobStatus === "Closed" || job.jobStatus === "Close";
-          if (pref === "My Jobs") {
-            if (isAccountManager) return job.creatorEmail === currentUser?.email || (currentUser?.fullName && job.createdBy === currentUser.fullName) || job.recruitmentManagerId === currentUser?.id;
-            return job.recruiterId === currentUser?.id || (currentUser?.fullName && job.recruiter === currentUser.fullName) || job.recruitmentManagerId === currentUser?.id;
-          }
-          if (pref === "Jobs with submissions") return job.submissionsCount > 0;
-          if (pref === "Jobs without submissions") return job.submissionsCount === 0;
-          if (pref === "Jobs with Pipeline")
-            return (
-              job.pipeline.applied > 0 ||
-              job.pipeline.interviewing > 0 ||
-              job.pipeline.offered > 0
-            );
-          if (pref === "VMS Jobs") return job.clientJobId !== "N/A";
-          return true;
-        });
-      });
-    }
-
-    setJobsData(filtered);
   };
 
   const handleSaveView = (viewName: string) => {
@@ -399,7 +359,7 @@ export default function JobPostingDashboard({
 
     if (viewName === "All Jobs" || viewName === "All Assigned Jobs") {
       setJobsData(baseData);
-      setCurrentFilters({ businessUnit: "All selected", predefined: [] });
+      setCurrentFilters({ businessUnit: "All selected", predefined: [], accountManagers: [], recruiters: [], branches: [], clients: [], workModes: [], statuses: [], priorities: [] });
     } else if (viewName === "My Jobs" || viewName === "Assigned to Me") {
       const myJobs = baseData.filter((job) => {
         // Account Managers: jobs they created (created_by stored as UUID)
@@ -512,7 +472,7 @@ export default function JobPostingDashboard({
   }, [fetchJobs]);
 
   const handleRefresh = useCallback(() => {
-    setCurrentFilters({ businessUnit: "All selected", predefined: [] });
+    setCurrentFilters({ businessUnit: "All selected", predefined: [], accountManagers: [], recruiters: [], branches: [], clients: [], workModes: [], statuses: [], priorities: [] });
     setActiveView(defaultViewLabel);
     setIsLoading(true);
     fetchJobs();
@@ -640,7 +600,7 @@ export default function JobPostingDashboard({
             </>}
             key={JSON.stringify([currentUser?.id, currentUser?.tenantId, currentUser?.branchId, currentUser?.businessUnitId, userPermissions])}
             data={displayJobs}
-            catalog={{ filter: filterParam || '', status: initialStatusFilter === 'All' ? '' : initialStatusFilter, priority: priorityParam || '', tab: dashboardTab, predefined: currentFilters.predefined.join('|'), unit: currentFilters.businessUnit === 'All selected' ? '' : currentFilters.businessUnit, revision: catalogRevision, scope: JSON.stringify([currentUser?.id,currentUser?.tenantId,currentUser?.branchId,currentUser?.businessUnitId,userPermissions]) }}
+            catalog={{ filter: filterParam || '', status: initialStatusFilter === 'All' ? '' : initialStatusFilter, priority: priorityParam || '', tab: dashboardTab, predefined: currentFilters.predefined.join('|'), unit: currentFilters.businessUnit === 'All selected' ? '' : currentFilters.businessUnit, accountManagers: currentFilters.accountManagers.join(','), recruiters: currentFilters.recruiters.join(','), branches: currentFilters.branches.join(','), clients: currentFilters.clients.join(','), workModes: currentFilters.workModes.join(','), statuses: currentFilters.statuses.join(','), priorities: currentFilters.priorities.join(','), revision: catalogRevision, scope: JSON.stringify([currentUser?.id,currentUser?.tenantId,currentUser?.branchId,currentUser?.businessUnitId,userPermissions]) }}
             selectedColumns={activeSelectedColumns}
             allColumns={allColumns}
             branchUsesPods={branchUsesPods}
