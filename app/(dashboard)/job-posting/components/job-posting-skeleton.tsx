@@ -1,15 +1,15 @@
 ﻿import React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function JobPostingSkeleton() {
+export default function JobPostingSkeleton({ showTabs = true }: { showTabs?: boolean } = {}) {
   return (
-    <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0 animate-pulse select-none">
+    <div role="status" aria-label="Loading jobs" className="h-full flex flex-col min-h-0 font-sans gap-2 p-0 animate-pulse select-none">
       {/* 1. Branch Tabs Skeleton (All Jobs / Branch Jobs / Shared Jobs) */}
-      <div className="flex bg-default-100 dark:bg-slate-800 p-1 rounded-lg border border-default-250 w-fit mb-2 gap-1">
+      {showTabs && <div className="flex bg-default-100 dark:bg-slate-800 p-1 rounded-lg border border-default-250 w-fit mb-2 gap-1">
         <Skeleton className="h-8 w-24 rounded-md bg-white dark:bg-slate-700 shadow-xs" />
         <Skeleton className="h-8 w-28 rounded-md bg-default-200/50 dark:bg-slate-750/50" />
         <Skeleton className="h-8 w-28 rounded-md bg-default-200/50 dark:bg-slate-750/50" />
-      </div>
+      </div>}
 
       {/* 2. Main Table Card Container */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-sm shadow-none overflow-hidden relative font-sans">

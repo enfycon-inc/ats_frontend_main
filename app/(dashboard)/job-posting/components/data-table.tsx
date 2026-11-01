@@ -44,6 +44,7 @@ export {
   exportJobsToCSV,
   canAssignRecruitersToJob,
 };
+import JobPostingSkeleton from "./job-posting-skeleton";
 import { useJobTableData } from "../lib/use-job-table-data";
 import { JobTableFilters } from "./data-table/job-table-filters";
 import { JobTableRow } from "./data-table/job-table-row";
@@ -377,6 +378,8 @@ export default function DataTable({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  if (catalog && catalogLoading && paginatedData.length === 0) return <JobPostingSkeleton showTabs={false} />;
+
   return (
     <div
       className={cn(enterpriseGrid.surface, 'flex-1 flex flex-col min-h-0 relative [&_tbody_td]:text-sm [&_thead_th_span]:text-xs')}
@@ -565,7 +568,7 @@ export default function DataTable({
                   colSpan={activeSelectedColumns.length + 2}
                   className="h-32 text-center text-neutral-500 font-medium bg-white dark:bg-slate-900"
                 >
-                  {catalogLoading ? "Loading jobs…" : catalogError ? "Unable to load jobs. Use Refresh to try again." : "No matching jobs found. Try resetting your search or filters."}
+                  {catalogError ? "Unable to load jobs. Use Refresh to try again." : "No matching jobs found. Try resetting your search or filters."}
                 </td>
               </tr>
             ) : (

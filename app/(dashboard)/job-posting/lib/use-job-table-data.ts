@@ -373,7 +373,7 @@ export function useJobTableData({ data, branchUsesPods, podAllowedUnitIds, catal
   }, [catalog,currentPage,pageSize,debouncedSearch,selectedPod,selectedBranch,selectedCreator,selectedAssignee,selectedClient,selectedPeriod,startDate,endDate,sortColumn,sortDirection,selectedSort]);
   const filterKey = JSON.stringify({ ...query, page: undefined });
   useEffect(() => { if (catalog) setCurrentPage(1); }, [filterKey]);
-  const { data: server, error: catalogError, isLoading: catalogLoading } = useSWR(catalog ? ['job-catalog', query] : null, () => atsApi.jobs.catalog(query), { revalidateOnFocus: false, onSuccess: result => { if(currentPage > Math.max(1,result.totalPages)) setCurrentPage(Math.max(1,result.totalPages)); } });
+  const { data: server, error: catalogError, isLoading: catalogLoading } = useSWR(catalog ? ['job-catalog', query] : null, () => atsApi.jobs.catalog(query), { revalidateOnFocus: false, keepPreviousData: true, onSuccess: result => { if(currentPage > Math.max(1,result.totalPages)) setCurrentPage(Math.max(1,result.totalPages)); } });
   const serverRows = useMemo(() => (server?.data || []).map(mapApiJobToJob), [server]);
   const option = (key: string, split = false) => [...new Set((server?.options?.[key] || []).flatMap(value => split ? value.split(',').map(v => v.trim()).filter(Boolean) : [value]))].sort();
   return {

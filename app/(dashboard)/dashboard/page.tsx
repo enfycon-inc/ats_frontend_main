@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
+import { DeliveryDashboardSkeleton } from "@/components/dashboard/delivery-dashboard-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -91,7 +92,7 @@ const PodLeadDashboardView = dynamic(() => import("./components/pod-lead-dashboa
   ssr: false, loading: () => <DashboardViewSkeleton />,
 });
 const DeliveryDashboardEntry = dynamic(() => import("./components/delivery-dashboard-entry"), {
-  ssr: false, loading: () => <DashboardViewSkeleton />,
+  ssr: false, loading: () => <DeliveryDashboardSkeleton />,
 });
 const RecruiterDashboardView = dynamic(() => import("./components/recruiter-dashboard-view"), {
   ssr: false, loading: () => <DashboardViewSkeleton />,
@@ -178,6 +179,9 @@ export default function DashboardPage() {
   };
 
 
+
+  if (status === "loading") return <DeliveryDashboardSkeleton />;
+  if (status === "ready" && profile && selection?.systemRole === "DELIVERY_HEAD") return <DeliveryDashboardEntry />;
 
   if (status === "error" || (jobsError && selection?.systemRole !== "ACCOUNT_MANAGER")) {
     return (

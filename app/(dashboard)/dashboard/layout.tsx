@@ -2,13 +2,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDashboardContext } from "@/contexts/DashboardContext";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DeliveryDashboardSkeleton } from "@/components/dashboard/delivery-dashboard-skeleton";
 import { Button } from "@/components/ui/button";
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { profile, status, reload } = useDashboardContext();
   if (pathname === '/dashboard') return children;
-  if (status === 'loading') return <Skeleton className="h-64 w-full" aria-label="Loading dashboard access" />;
+  if (status === 'loading') return <DeliveryDashboardSkeleton />;
   if (status === 'error') return <div role="alert" className="space-y-3 text-xs">Could not load dashboard access.<Button size="sm" onClick={reload}>Retry</Button></div>;
   if (!profile?.permissions?.includes('unit_admin:manage')) return <p role="alert" className="text-sm">You do not have access to this unit dashboard.</p>;
   const tabs = [{ href: '/dashboard/overview', label: 'Overview' }, { href: '/dashboard/account-managers', label: 'Account Managers' }, { href: '/dashboard/recruiters', label: 'Recruiters' }];

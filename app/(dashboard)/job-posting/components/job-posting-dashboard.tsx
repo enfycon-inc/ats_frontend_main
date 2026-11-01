@@ -635,6 +635,7 @@ export default function JobPostingDashboard({
       {/* Main Table Content */}
       {showBranchTabs && dashboardTab === "shared" && <PendingDelegationRequests onRefresh={handleRefresh} />}
       <DataTable
+            key={JSON.stringify([currentUser?.id, currentUser?.tenantId, currentUser?.branchId, currentUser?.businessUnitId, userPermissions])}
             data={displayJobs}
             catalog={{ filter: filterParam || '', status: initialStatusFilter === 'All' ? '' : initialStatusFilter, priority: priorityParam || '', tab: dashboardTab, predefined: currentFilters.predefined.join('|'), unit: currentFilters.businessUnit === 'All selected' ? '' : currentFilters.businessUnit, revision: catalogRevision, scope: JSON.stringify([currentUser?.id,currentUser?.tenantId,currentUser?.branchId,currentUser?.businessUnitId,userPermissions]) }}
             selectedColumns={activeSelectedColumns}

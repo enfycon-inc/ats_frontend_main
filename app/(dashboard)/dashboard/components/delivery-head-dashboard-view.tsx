@@ -1,5 +1,6 @@
 "use client";
 
+import { DeliveryDashboardSkeleton } from "@/components/dashboard/delivery-dashboard-skeleton";
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
@@ -92,9 +93,8 @@ function ScopedDeliveryDashboard({ profile, scopeKey }: { profile: DeliveryProfi
     </div>
   </section>;
 }
-function DashboardSkeleton() {
-  return <div aria-label="Loading delivery dashboard" className="min-w-0 space-y-4"><Skeleton className="h-12 w-full" /><div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{[0, 1, 2, 3].map(index => <Skeleton key={index} className="h-24 w-full" />)}</div><Skeleton className="h-64 w-full" /><Skeleton className="h-48 w-full" /></div>;
-}
+const DashboardSkeleton = DeliveryDashboardSkeleton;
+
 function Empty({ children }: { children: React.ReactNode }) { return <p className="px-4 py-5 text-xs text-slate-500">{children}</p>; }
 function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (page: number) => void }) {
   return <div className="flex items-center justify-between gap-3 border-t border-slate-100 p-3 dark:border-slate-800"><p className="text-xs text-slate-500">Page {page} of {Math.max(1, Math.ceil(total / 10))}</p><div className="flex gap-2"><Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onChange(page - 1)}>Previous</Button><Button size="sm" variant="outline" disabled={page * 10 >= total} onClick={() => onChange(page + 1)}>Next</Button></div></div>;
