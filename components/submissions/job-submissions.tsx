@@ -1,4 +1,5 @@
 "use client";
+import { TablePagination } from "@/components/shared/table-pagination";
 
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { useState } from 'react';
@@ -89,7 +90,7 @@ export function JobSubmissions({ jobId, jobType, market, initialResponse, onSave
               </tbody>
             </table>
           </div>}
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><p>{data.total ? `${(data.page - 1) * data.limit + 1}–${Math.min(data.page * data.limit, data.total)} of ${data.total}` : '0 submissions'}</p><nav aria-label="Candidate submission pages" className="flex items-center gap-2"><Button variant="outline" className="h-8 text-xs" disabled={page <= 1 || isValidating} onClick={() => setPage(value => value - 1)}>Previous</Button><span>Page {data.page} of {Math.max(1, data.totalPages)}</span><Button variant="outline" className="h-8 text-xs" disabled={page >= data.totalPages || isValidating} onClick={() => setPage(value => value + 1)}>Next</Button></nav></div>
+        <TablePagination page={data.page} pageSize={data.limit} total={data.total} loading={isValidating} onPageChange={setPage} label="submissions" />
       </>}
     {editor && <UpdateSubmissionDialog submission={editor} href={href(editor)} onClose={() => setEditor(null)} onSaved={saved} onReview={() => { setReview(editor.id); setEditor(null); }} />}
   </section>;

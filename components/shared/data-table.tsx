@@ -1,4 +1,5 @@
 "use client";
+import { TablePagination } from "@/components/shared/table-pagination";
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -685,55 +686,7 @@ export default function DataTable<TData extends Record<string, any>>({
         </table>
       </div>
 
-      {/* Pagination Footer */}
-      <div className="py-1 px-3 border-t border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-850 flex items-center justify-between select-none shrink-0 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-        <div className="flex items-center gap-1.5">
-          <span>
-            {Math.min(processedData.length, (currentPage - 1) * pageSize + 1)}-
-            {Math.min(processedData.length, currentPage * pageSize)} of{" "}
-            {processedData.length} records
-          </span>
-        </div>
-
-        {/* Page Selector */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="p-1 border border-neutral-350 dark:border-slate-700 rounded-sm bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <span className="text-xs">
-              Page {currentPage} of {totalPages || 1}
-            </span>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages || totalPages === 0}
-              className="p-1 border border-neutral-350 dark:border-slate-700 rounded-sm bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <span>Show</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="px-1.5 py-0.5 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded-sm text-[11px] text-neutral-805 dark:text-neutral-150 outline-hidden cursor-pointer"
-            >
-              <option value={10}>10 Per Page</option>
-              <option value={25}>25 Per Page</option>
-              <option value={50}>50 Per Page</option>
-            </select>
-          </div>
-        </div>
-      </div>
+      <TablePagination page={currentPage} pageSize={pageSize} total={processedData.length} loading={false} onPageChange={setCurrentPage} onPageSizeChange={setPageSize} />
 
       {/* Save View Modal Dialog */}
       {isSavingView && (

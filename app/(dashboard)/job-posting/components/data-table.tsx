@@ -1,4 +1,5 @@
 "use client";
+import { TablePagination } from "@/components/shared/table-pagination";
 
 import { createPortal } from "react-dom";
 import { usePageHeader } from "@/components/layout/page-header-context";
@@ -400,7 +401,9 @@ export default function DataTable({
   }, [initialLoading]);
   const dockActions = toolbarHidden && !!actionHost;
   const primaryActions = <>
-    {hasCreatePermission && <button type="button" onClick={() => router.push('/job-posting/new')} className="flex items-center gap-1 px-2.5 py-1 rounded bg-primary text-white text-xs font-semibold"><Plus className="h-3 w-3" />New Job</button>}
+    {dockActions && <input type="search" aria-label="Search jobs" placeholder="Search jobs, code, client…" value={searchQuery} onChange={event=>setSearchQuery(event.target.value)} className="h-8 w-24 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 sm:w-48 lg:w-64" />}
+
+    {hasCreatePermission && <button type="button" onClick={() => router.push('/job-posting/new')} aria-label="New Job" className="flex h-8 items-center gap-1 px-2.5 py-1 rounded bg-primary text-white text-xs font-semibold"><Plus className="h-3 w-3" /><span className="hidden sm:inline">New Job</span></button>}
     <button type="button" onClick={onOpenFilters} aria-label="Open job filters" title="Filters" className="flex items-center gap-1 rounded border px-2 py-1 text-xs"><Filter className="h-3.5 w-3.5" /><span className="hidden sm:inline">Filters</span></button>
   </>;
 
@@ -466,6 +469,7 @@ export default function DataTable({
 
       {/* Filter Toolbar */}
       <JobTableFilters
+        hideSearch={dockActions}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         isPodSystemEnabled={isPodSystemEnabled}
@@ -620,54 +624,7 @@ export default function DataTable({
         </table>
       </div>
 
-      {/* Pagination Footer */}
-      <div className="py-1 px-3 border-t border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-850 flex items-center justify-between select-none shrink-0 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-        <div className="flex items-center gap-1.5">
-          <span>
-            {Math.min(totalRecords, (currentPage - 1) * pageSize + 1)}-
-            {Math.min(totalRecords, currentPage * pageSize)} of{" "}
-            {totalRecords} records
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={catalogLoading || currentPage === 1}
-              className="p-1 border border-neutral-350 dark:border-slate-700 rounded-sm bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <span className="text-xs">
-              Page {currentPage} of {totalPages || 1}
-            </span>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={catalogLoading || currentPage === totalPages || totalPages === 0}
-              className="p-1 border border-neutral-350 dark:border-slate-700 rounded-sm bg-white dark:bg-slate-900 hover:bg-neutral-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <span>Show</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="px-1.5 py-0.5 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded-sm text-[11px] text-neutral-805 dark:text-neutral-150 outline-hidden cursor-pointer"
-            >
-              <option value={10}>10 Per Page</option>
-              <option value={25}>25 Per Page</option>
-              <option value={50}>50 Per Page</option>
-            </select>
-          </div>
-        </div>
-      </div>
+      <TablePagination page={currentPage} pageSize={pageSize} total={totalRecords} loading={catalogLoading} onPageChange={setCurrentPage} onPageSizeChange={setPageSize} />
 
       {/* Save View Modal Dialog */}
       <JobSaveViewModal

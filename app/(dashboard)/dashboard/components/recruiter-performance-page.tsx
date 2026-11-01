@@ -1,4 +1,5 @@
 'use client';
+import { TablePagination } from '@/components/shared/table-pagination';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -638,32 +639,7 @@ function Detail({
                 </tbody>
               </table>
             </div>
-            <div className={`${grid.toolbar} border-b-0 border-t`}>
-              <span>
-                Page {data.table.page} · {data.table.total} records
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={isValidating || data.table.page <= 1}
-                  onClick={() => change({ page: data.table.page - 1 })}
-                >
-                  Previous
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={
-                    isValidating ||
-                    data.table.page * data.table.limit >= data.table.total
-                  }
-                  onClick={() => change({ page: data.table.page + 1 })}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            <TablePagination page={data.table.page} pageSize={data.table.limit} total={data.table.total} loading={isValidating} onPageChange={page=>change({page})} />
           </div>
           <p className="text-xs leading-5 text-slate-500">
             Results belong to this recruiter’s submissions. Current assignments

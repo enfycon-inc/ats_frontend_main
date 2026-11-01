@@ -1,4 +1,5 @@
 "use client";
+import { TablePagination } from "@/components/shared/table-pagination";
 import useSWR from 'swr';
 import SubmissionFilterBar from '@/components/submissions/submission-filter-bar';
 import { localFilterAccess, readSubmissionFilters, submissionFilterQuery, submissionTabs } from '@/lib/submission-filters';
@@ -429,10 +430,7 @@ function FilteredSubmissionsPage({scope}:{scope:string}) {
           </tbody>
         </table>
       </div>
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border bg-card px-4 py-3 text-xs text-muted-foreground" data-slot="submission-pagination">
-        <p>{response ? `Showing ${response.total ? (response.page - 1) * response.limit + 1 : 0}–${Math.min(response.page * response.limit, response.total)} of ${response.total}` : "Loading records…"}</p>
-        <label className="hidden items-center gap-2 sm:flex">Rows per page<select aria-label="Rows per page" className="h-8 rounded border bg-card px-2" value={filters.limit??20} onChange={e=>changeFilters({limit:Number(e.target.value)})}>{[10,20,50,100].map(value=><option key={value} value={value}>{value}</option>)}</select></label><nav aria-label="Submission pages" className="flex items-center gap-1"><Button variant="outline" size="icon" className="h-8 w-8" aria-label="Previous page" disabled={loading || page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>{response && Array.from({ length: Math.min(5, response.totalPages) }, (_, i) => Math.max(1, Math.min(page - 2, response.totalPages - 4)) + i).map(p => <Button key={p} variant={p === page ? "default" : "outline"} className={cn("h-8 min-w-8 px-2 text-xs", p === page && PRIMARY)} aria-label={`Page ${p}`} aria-current={p === page ? "page" : undefined} disabled={loading} onClick={() => setPage(p)}>{p}</Button>)}<Button variant="outline" size="icon" className="h-8 w-8" aria-label="Next page" disabled={loading || !response || page >= response.totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button></nav>
-      </div>
+      <div className="shrink-0" data-slot="submission-pagination"><TablePagination page={page} pageSize={filters.limit??20} total={response?.total} loading={loading || !response} pageSizes={[10,20,25,50,100]} onPageChange={setPage} onPageSizeChange={limit=>changeFilters({limit})} label="submissions" /></div>
     </section>}
     {submissionId && !reviewRequested && (loading ? <PageLoadingSkeleton variant="table" /> : error ? <div role="alert" className="text-xs">{error}<Button variant="outline" className="ml-3 text-xs" onClick={() => setRevision(r => r + 1)}>Retry</Button></div> : shownDetail && <SubmissionDetails submission={shownDetail} onReview={() => openReview(shownDetail.id)} />)}
     {editor && !["review", "notes", "rate"].includes(editor.action) && <UpdateSubmissionDialog key={editor.submission.id} submission={editor.submission} href={detailHref(editor.submission.id)} onReview={() => {

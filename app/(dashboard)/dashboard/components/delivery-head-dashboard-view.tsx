@@ -1,4 +1,5 @@
 "use client";
+import { TablePagination } from "@/components/shared/table-pagination";
 
 import { DeliveryDashboardSkeleton } from "@/components/dashboard/delivery-dashboard-skeleton";
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
@@ -96,6 +97,6 @@ function ScopedDeliveryDashboard({ profile, scopeKey }: { profile: DeliveryProfi
 const DashboardSkeleton = DeliveryDashboardSkeleton;
 
 function Empty({ children }: { children: React.ReactNode }) { return <p className="px-4 py-5 text-xs text-slate-500">{children}</p>; }
-function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (page: number) => void }) {
-  return <div className="flex items-center justify-between gap-3 border-t border-slate-100 p-3 dark:border-slate-800"><p className="text-xs text-slate-500">Page {page} of {Math.max(1, Math.ceil(total / 10))}</p><div className="flex gap-2"><Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onChange(page - 1)}>Previous</Button><Button size="sm" variant="outline" disabled={page * 10 >= total} onClick={() => onChange(page + 1)}>Next</Button></div></div>;
+function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (page:number)=>void }) {
+  return <TablePagination page={page} pageSize={10} total={total} onPageChange={onChange} />;
 }

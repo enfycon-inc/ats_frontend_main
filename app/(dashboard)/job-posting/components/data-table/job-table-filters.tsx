@@ -5,6 +5,7 @@ import { Search, Calendar, ChevronDown, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface JobTableFiltersProps {
+  hideSearch?: boolean;
   searchQuery: string;
   onSearchChange: (val: string) => void;
   isPodSystemEnabled: boolean;
@@ -39,6 +40,7 @@ export interface JobTableFiltersProps {
 }
 
 export function JobTableFilters({
+  hideSearch = false,
   searchQuery,
   onSearchChange,
   isPodSystemEnabled,
@@ -75,7 +77,7 @@ export function JobTableFilters({
     <div className="px-4 py-3 bg-slate-50/70 dark:bg-slate-900/60 border-b border-neutral-200 dark:border-slate-800">
       <div className="flex flex-wrap items-end gap-3 lg:gap-3.5">
         {/* 1. SEARCH */}
-        <div className="flex flex-col gap-1.5 flex-[1.4] min-w-[200px]">
+        {!hideSearch && <div className="flex flex-col gap-1.5 flex-[1.4] min-w-[200px]">
           <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
             SEARCH
           </label>
@@ -99,7 +101,7 @@ export function JobTableFilters({
               </button>
             )}
           </div>
-        </div>
+        </div>}
 
         {/* 2. POD (Only rendered if pod system is enabled!) */}
         {isPodSystemEnabled && (

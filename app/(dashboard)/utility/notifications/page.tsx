@@ -1,4 +1,5 @@
 "use client";
+import { TablePagination } from "@/components/shared/table-pagination";
 
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useEffect, useCallback } from "react";
@@ -630,78 +631,7 @@ export default function AdminNotificationsPage() {
           </div>
         )}
 
-        {/* ─── FULL PAGINATION FOOTER ────────────────────────────────────── */}
-        <div className="p-4 border-t border-neutral-100 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-900/50 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400">
-            <span>
-              Showing {totalCount === 0 ? 0 : (page - 1) * limit + 1} to {Math.min(page * limit, totalCount)} of {totalCount} events
-            </span>
-            <div className="flex items-center gap-1.5 ml-2">
-              <span className="text-neutral-400">Rows:</span>
-              <select
-                value={limit}
-                onChange={(e) => {
-                  setLimit(Number(e.target.value));
-                  fetchAdminNotifications(1);
-                }}
-                className="h-7 px-2 text-xs rounded border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-neutral-700 dark:text-neutral-200 outline-none"
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fetchAdminNotifications(page - 1)}
-              disabled={page <= 1 || isLoading}
-              className="h-8 px-2.5 text-xs font-semibold border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-200 hover:bg-[#1a4fa0] hover:text-white hover:border-[#1a4fa0] disabled:opacity-40"
-            >
-              <ChevronLeft className="w-3.5 h-3.5 mr-1" />
-              Previous
-            </Button>
-
-            {/* Page number buttons */}
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
-              .map((p, idx, arr) => {
-                const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
-                return (
-                  <React.Fragment key={p}>
-                    {showEllipsis && <span className="px-1 text-xs text-neutral-400">...</span>}
-                    <Button
-                      variant={p === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => fetchAdminNotifications(p)}
-                      disabled={isLoading}
-                      className={`h-8 w-8 p-0 text-xs font-semibold ${
-                        p === page
-                          ? "bg-[#1a4fa0] hover:bg-[#153f80] text-white border-[#1a4fa0]"
-                          : "border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-200 hover:bg-[#1a4fa0] hover:text-white hover:border-[#1a4fa0]"
-                      }`}
-                    >
-                      {p}
-                    </Button>
-                  </React.Fragment>
-                );
-              })}
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fetchAdminNotifications(page + 1)}
-              disabled={page >= totalPages || isLoading}
-              className="h-8 px-2.5 text-xs font-semibold border-neutral-200 dark:border-slate-700 text-neutral-700 dark:text-neutral-200 hover:bg-[#1a4fa0] hover:text-white hover:border-[#1a4fa0] disabled:opacity-40"
-            >
-              Next
-              <ChevronRight className="w-3.5 h-3.5 ml-1" />
-            </Button>
-          </div>
-        </div>
+        <TablePagination page={page} pageSize={limit} total={totalCount} loading={isLoading} pageSizes={[10,20,50]} onPageChange={fetchAdminNotifications} onPageSizeChange={setLimit} resetPageOnSizeChange={false} label="events" />
       </div>
 
       {/* ─── VIEW NOTIFICATION DETAILS MODAL ──────────────────────────────── */}
