@@ -1,5 +1,7 @@
 "use client";
 
+import { createPortal } from "react-dom";
+import { usePageHeader } from "@/components/layout/page-header-context";
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -55,6 +57,7 @@ import { JobContextMenu } from "./data-table/job-context-menu";
 import { JobAssignModal, type JobAssignmentMode } from "./data-table/job-assign-modal";
 
 export interface DataTableProps {
+  leadingContent?: React.ReactNode;
   catalog?: Record<string, string | number>;
   data: Job[];
   selectedColumns: string[];
@@ -75,6 +78,7 @@ export interface DataTableProps {
 }
 
 export default function DataTable({
+  leadingContent,
   catalog,
   data,
   selectedColumns,
@@ -90,6 +94,11 @@ export default function DataTable({
   onReorderColumns,
 }: DataTableProps) {
   const router = useRouter();
+  const { actionHost } = usePageHeader();
+  const scrollRoot = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarHidden, setToolbarHidden] = useState(false);
+
 
   // User details & permission controls
   const [currentUser, setCurrentUser] = useState(() => atsApi.auth.getCurrentUser());
@@ -378,15 +387,35 @@ export default function DataTable({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  if (catalog && catalogLoading && paginatedData.length === 0) return <JobPostingSkeleton showTabs={false} />;
+  const initialLoading = Boolean(catalog && catalogLoading && paginatedData.length === 0);
+  useEffect(() => {
+    if (initialLoading) { setToolbarHidden(false); return; }
+    const root = scrollRoot.current, toolbar = toolbarRef.current;
+    if (!root || !toolbar) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setToolbarHidden(!entry.isIntersecting && entry.boundingClientRect.bottom <= (entry.rootBounds?.top ?? 0));
+    }, { root, threshold: 0 });
+    observer.observe(toolbar);
+    return () => observer.disconnect();
+  }, [initialLoading]);
+  const dockActions = toolbarHidden && !!actionHost;
+  const primaryActions = <>
+    {hasCreatePermission && <button type="button" onClick={() => router.push('/job-posting/new')} className="flex items-center gap-1 px-2.5 py-1 rounded bg-primary text-white text-xs font-semibold"><Plus className="h-3 w-3" />New Job</button>}
+    <button type="button" onClick={onOpenFilters} aria-label="Open job filters" title="Filters" className="flex items-center gap-1 rounded border px-2 py-1 text-xs"><Filter className="h-3.5 w-3.5" /><span className="hidden sm:inline">Filters</span></button>
+  </>;
+
+  if (catalog && catalogLoading && paginatedData.length === 0) return <>{leadingContent}<JobPostingSkeleton showTabs={false} /></>;
 
   return (
     <div
       className={cn(enterpriseGrid.surface, 'flex-1 flex flex-col min-h-0 relative [&_tbody_td]:text-sm [&_thead_th_span]:text-xs')}
       onClick={() => setContextMenu(null)}
     >
+      {dockActions && createPortal(primaryActions, actionHost!)}
+      <div ref={scrollRoot} className="flex-1 overflow-auto relative min-h-0 bg-neutral-50/20 dark:bg-slate-950/10">
+      {leadingContent}
       {/* Action Bar */}
-      <div className={enterpriseGrid.toolbar}>
+      <div ref={toolbarRef} className={cn(enterpriseGrid.toolbar, "min-h-[52px]")}>
         <div className="flex items-center gap-2">
           {selectedRowIds.length > 0 && (
             <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-sm">
@@ -413,14 +442,7 @@ export default function DataTable({
             <RefreshCw className="h-3 w-3" />
           </button>
 
-          {hasCreatePermission && (
-            <button
-              onClick={() => router.push("/job-posting/new")}
-              className="flex items-center gap-1 px-2.5 py-1 rounded bg-primary hover:bg-primary/95 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
-            >
-              <Plus className="h-3 w-3" /> New Job
-            </button>
-          )}
+          {!dockActions && primaryActions}
 
           {hasOnBehalfTargets && (
             <button
@@ -431,13 +453,6 @@ export default function DataTable({
             </button>
           )}
           <div className="flex items-center border-l border-neutral-200 dark:border-slate-800 pl-1.5 gap-0.5">
-            <button
-              onClick={onOpenFilters}
-              className="p-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
-              title="Filters"
-            >
-              <Filter className="h-3.5 w-3.5" />
-            </button>
             <button
               onClick={onOpenColumns}
               className="p-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 rounded text-neutral-600 dark:text-neutral-400 transition-colors cursor-pointer"
@@ -485,12 +500,6 @@ export default function DataTable({
       />
 
       {/* Spreadsheet Grid Table */}
-      <div
-        className="flex-1 overflow-auto relative min-h-0 bg-neutral-50/20 dark:bg-slate-950/10 select-none"
-        onCopy={(e) => e.preventDefault()}
-        onCut={(e) => e.preventDefault()}
-        style={{ userSelect: "none", WebkitUserSelect: "none" }}
-      >
         <table
           className={cn(enterpriseGrid.table, 'table-auto border-neutral-200 dark:border-slate-800 select-none')}
           onCopy={(e) => e.preventDefault()}

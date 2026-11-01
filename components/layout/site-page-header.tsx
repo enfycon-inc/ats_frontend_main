@@ -14,7 +14,7 @@ interface SitePageHeaderProps {
 }
 
 export function SitePageHeader({ className, customTitle }: SitePageHeaderProps) {
-  const { hidden } = usePageHeader();
+  const { hidden, setActionHost } = usePageHeader();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -64,7 +64,8 @@ export function SitePageHeader({ className, customTitle }: SitePageHeaderProps) 
       </div>
 
       {/* Right side: EnfySync-Style Clean Breadcrumb Trail */}
-      <div className="flex items-center shrink-0">
+      <div className="flex items-center gap-3 shrink-0">
+        <div ref={setActionHost} className="flex items-center gap-1.5" />
         <div className="hidden sm:block"><SiteBreadcrumbPill breadcrumbs={routeInfo.breadcrumbs} /></div>
         <div className="sm:hidden"><SiteBreadcrumbPill breadcrumbs={[]} /></div>
       </div>

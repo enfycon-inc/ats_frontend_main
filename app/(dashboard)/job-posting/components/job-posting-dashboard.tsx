@@ -580,6 +580,8 @@ export default function JobPostingDashboard({
 
   return (
     <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
+      <DataTable
+            leadingContent={<>
       {showBranchTabs && (
         <div className="flex bg-default-100 dark:bg-slate-800 p-1 rounded-lg border border-default-250 w-fit mb-2">
           <button
@@ -634,7 +636,7 @@ export default function JobPostingDashboard({
       )}
       {/* Main Table Content */}
       {showBranchTabs && dashboardTab === "shared" && <PendingDelegationRequests onRefresh={handleRefresh} />}
-      <DataTable
+            </>}
             key={JSON.stringify([currentUser?.id, currentUser?.tenantId, currentUser?.branchId, currentUser?.businessUnitId, userPermissions])}
             data={displayJobs}
             catalog={{ filter: filterParam || '', status: initialStatusFilter === 'All' ? '' : initialStatusFilter, priority: priorityParam || '', tab: dashboardTab, predefined: currentFilters.predefined.join('|'), unit: currentFilters.businessUnit === 'All selected' ? '' : currentFilters.businessUnit, revision: catalogRevision, scope: JSON.stringify([currentUser?.id,currentUser?.tenantId,currentUser?.branchId,currentUser?.businessUnitId,userPermissions]) }}
