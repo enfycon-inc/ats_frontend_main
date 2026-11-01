@@ -15,12 +15,14 @@ interface Props {
   branches: any[]; businessUnits: any[]; availableReviewRoles: any[];
   isBranchAdmin: boolean; isUnitScoped: boolean; isUnitAdmin: boolean;
   busy: boolean; error?: string; grantWarning?: string; allowedCategories?: string[]; onClose: () => void; onApprove: () => void; onReject: () => void;
+  loading?: boolean; loadingError?: string; onRetry?: () => void;
 }
 export function RoleRequestReviewModal({ reviewUser, reviewForm, setReviewForm, branches, businessUnits, availableReviewRoles,
-  isBranchAdmin, isUnitScoped, isUnitAdmin, busy, error, grantWarning, allowedCategories, onClose, onApprove, onReject }: Props) {
+  isBranchAdmin, isUnitScoped, isUnitAdmin, busy, error, grantWarning, allowedCategories, onClose, onApprove, onReject,
+  loading = false, loadingError, onRetry }: Props) {
   return (
 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-          <div role="dialog" aria-modal="true" aria-labelledby="role-review-title" className="max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div role="dialog" aria-modal="true" aria-labelledby="role-review-title" className="max-h-[90vh] min-h-[560px] flex flex-col bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between bg-neutral-50/80 dark:bg-slate-800/50">
               <div className="flex items-center gap-2.5">
@@ -50,7 +52,17 @@ export function RoleRequestReviewModal({ reviewUser, reviewForm, setReviewForm, 
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-4">
+            {loading && <div className="flex-1 min-h-0 p-6 space-y-5 overflow-y-auto" role="status" aria-live="polite">
+              {loadingError ? <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">{loadingError}</div> : null}
+              {!loadingError && <>
+                <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 animate-pulse space-y-3"><div className="h-3 w-2/5 rounded bg-amber-200/70"/><div className="h-2.5 w-3/5 rounded bg-amber-200/50"/><div className="grid grid-cols-3 gap-3 border-t border-amber-200/60 pt-3">{[1,2,3].map(item => <div key={item} className="space-y-2"><div className="h-2 w-3/4 rounded bg-amber-200/60"/><div className="h-3 w-4/5 rounded bg-amber-200/40"/></div>)}</div></div>
+                <div className="space-y-2"><div className="h-3 w-36 rounded bg-slate-200 dark:bg-slate-700 animate-pulse"/><div className="h-12 w-1/2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 animate-pulse"/></div>
+                <div className="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800"><div className="h-3 w-44 rounded bg-slate-200 dark:bg-slate-700 animate-pulse"/><div className="grid grid-cols-2 gap-3"><div className="h-10 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse"/><div className="h-10 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse"/></div></div>
+                <div className="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800"><div className="h-3 w-28 rounded bg-slate-200 dark:bg-slate-700 animate-pulse"/><div className="h-10 w-1/2 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse"/></div>
+                <p className="flex items-center justify-center gap-2 pt-1 text-xs text-neutral-500"><Loader2 className="h-4 w-4 animate-spin text-indigo-600"/>Loading request details…</p>
+              </>}
+            </div>}
+            <div className={`flex-1 min-h-0 p-6 space-y-4 overflow-y-auto ${loading ? 'hidden' : ''}`}>
               {grantWarning && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{grantWarning}</p>}
               {/* User Summary Card */}
               <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/60 dark:bg-amber-950/20">
@@ -285,12 +297,12 @@ export function RoleRequestReviewModal({ reviewUser, reviewForm, setReviewForm, 
       )}
     </div>
   )}
-</div>
+            </div>
 
-              </div>
-              {error && <p role="alert" className="mx-6 mb-3 rounded border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}</p>}
+              {!loading && error && <p role="alert" className="mx-6 mb-3 rounded border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}</p>}
               {/* Modal Footer */}
             <div className="px-6 py-3.5 border-t border-neutral-200 dark:border-slate-800 flex items-center justify-between bg-neutral-50/80 dark:bg-slate-800/50">
+              {loading ? <><div>{loadingError && <Button variant="ghost" size="sm" type="button" onClick={onRetry} className="text-xs font-semibold text-indigo-700">Try again</Button>}</div><div className="flex items-center gap-2"><Button variant="outline" size="sm" type="button" onClick={onClose} className="text-xs font-semibold">Cancel</Button><Button size="sm" type="button" disabled className="text-xs font-bold bg-emerald-600 text-white opacity-60"><Loader2 className="h-3.5 w-3.5 animate-spin"/>Loading…</Button></div></> : <>
               <Button
                 variant="ghost"
                 size="sm"
@@ -332,8 +344,10 @@ export function RoleRequestReviewModal({ reviewUser, reviewForm, setReviewForm, 
                   Approve & Activate
                 </Button>
               </div>
+              </>}
             </div>
           </div>
         </div>
+      </div>
   );
 }
