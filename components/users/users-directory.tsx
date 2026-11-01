@@ -4,7 +4,7 @@ import { PendingUserReview } from './pending-user-review';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
-import { Activity, ChevronLeft, ChevronRight, Loader2, Search, X, MoreVertical, Edit2, Key, LogOut, Trash2, UserCheck, UserX, MapPin } from 'lucide-react';
+import { Activity, ChevronDown, ChevronLeft, ChevronRight, Loader2, Search, X, MoreVertical, Edit2, Key, LogOut, Trash2, UserCheck, UserX, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -148,13 +148,14 @@ export function UsersDirectory({ view }: { view: UserView }) {
         <label className="space-y-1 text-xs font-semibold">Role<select className={`${enterpriseGrid.control} block min-w-40`} value={params.get('role') || ''} onChange={e => setFilter('role', e.target.value)}><option value="">All roles</option>{data?.filters?.roles.map(role => <option key={role} value={role}>{role}</option>)}</select></label>
         <div className="ml-auto flex items-center gap-2">
           {activeFilters && <Button variant="outline" size="sm" onClick={resetFilters}>Reset filters</Button>}
-          {selectedUsers.length > 0 && <><span className="whitespace-nowrap text-xs font-medium text-neutral-600">{selectedUsers.length} selected</span>{hasBulkActions && <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button variant="outline" size="sm" aria-label="Actions for selected users"><MoreVertical className="mr-1 h-4 w-4" />Actions</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 bg-white text-xs dark:bg-slate-900">
+          {selectedUsers.length > 0 && <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button size="sm" aria-label={`Bulk actions for ${selectedUsers.length} selected users`} className="h-9 min-w-16 justify-between gap-2 bg-[#1a4fa0] px-3 text-white hover:bg-[#164381]" ><span>{selectedUsers.length}</span><ChevronDown aria-hidden="true" className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 bg-white text-xs dark:bg-slate-900">
             {canBulkStatus && <DropdownMenuItem onSelect={() => { setBulkDialog('status'); setBulkError(''); setBulkReason(''); }}>{bulkStatusTarget ? <UserCheck className="h-3.5 w-3.5" /> : <UserX className="h-3.5 w-3.5" />}{bulkStatusTarget ? 'Activate accounts' : 'Deactivate / Block access'}</DropdownMenuItem>}
             {canBulk('assignManager') && <DropdownMenuItem onSelect={() => { setBulkDialog('manager'); setBulkError(''); setBulkManagerId(''); }}><UserCheck className="h-3.5 w-3.5" />Assign / change manager</DropdownMenuItem>}
             {canBulk('endSessions') && <DropdownMenuItem onSelect={() => { setBulkDialog('sessions'); setBulkError(''); }}><LogOut className="h-3.5 w-3.5" />Revoke sessions</DropdownMenuItem>}
             {canBulk('edit') && <DropdownMenuItem onSelect={() => { setBulkDialog('city'); setBulkError(''); setBulkCity(''); }}><MapPin className="h-3.5 w-3.5" />Change city</DropdownMenuItem>}
-            <DropdownMenuSeparator /><DropdownMenuItem onSelect={() => { setChecked([]); setBulkError(''); setBulkFeedback(''); }}>Clear selection</DropdownMenuItem>
-          </DropdownMenuContent></DropdownMenu>}</>}
+            {hasBulkActions ? <DropdownMenuSeparator /> : <DropdownMenuItem disabled className="whitespace-normal text-neutral-500">No actions are available for every selected user.</DropdownMenuItem>}
+            <DropdownMenuItem onSelect={() => { setChecked([]); setBulkError(''); setBulkFeedback(''); }}>Clear selection</DropdownMenuItem>
+          </DropdownMenuContent></DropdownMenu>}
         </div>
       </div>
       {bulkFeedback && <div role="status" className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{bulkFeedback}</div>}
