@@ -59,6 +59,7 @@ import { JobAssignModal, type JobAssignmentMode } from "./data-table/job-assign-
 
 export interface DataTableProps {
   leadingContent?: React.ReactNode;
+  actionsBesideLeadingContent?: boolean;
   catalog?: Record<string, string | number>;
   data: Job[];
   selectedColumns: string[];
@@ -80,6 +81,7 @@ export interface DataTableProps {
 
 export default function DataTable({
   leadingContent,
+  actionsBesideLeadingContent = false,
   catalog,
   data,
   selectedColumns,
@@ -416,7 +418,7 @@ export default function DataTable({
     >
       {dockActions && createPortal(primaryActions, actionHost!)}
       <div ref={scrollRoot} className="flex-1 overflow-auto relative min-h-0 bg-neutral-50/20 dark:bg-slate-950/10">
-      {leadingContent && <div className="sticky left-0 z-30 w-full min-w-0">{leadingContent}</div>}
+      {leadingContent && <div className="sticky left-0 z-30 w-full min-w-0">{actionsBesideLeadingContent ? <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2">{leadingContent}<div className="flex items-center gap-1.5">{primaryActions}</div></div> : leadingContent}</div>}
       {/* Action Bar */}
       <div ref={toolbarRef} className={cn(enterpriseGrid.toolbar, "sticky left-0 z-30 w-full min-w-0 min-h-[52px]")}>
         <div className="flex items-center gap-2">
@@ -445,7 +447,7 @@ export default function DataTable({
             <RefreshCw className="h-3 w-3" />
           </button>
 
-          {!dockActions && primaryActions}
+          {!dockActions && !actionsBesideLeadingContent && primaryActions}
 
           {hasOnBehalfTargets && (
             <button

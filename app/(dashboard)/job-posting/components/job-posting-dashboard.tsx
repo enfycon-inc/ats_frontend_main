@@ -581,6 +581,7 @@ export default function JobPostingDashboard({
   return (
     <div className="h-full flex flex-col min-h-0 font-sans gap-2 p-0">
       <DataTable
+            actionsBesideLeadingContent={showBranchTabs}
             leadingContent={<>
       {showBranchTabs && (
         <div className="flex bg-default-100 dark:bg-slate-800 p-1 rounded-lg border border-default-250 w-fit mb-2">
