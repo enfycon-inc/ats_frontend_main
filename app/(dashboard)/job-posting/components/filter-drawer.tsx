@@ -16,6 +16,13 @@ interface FilterDrawerProps {
 export interface SelectedFilters {
   businessUnit: string;
   predefined: string[];
+  accountManagers: string[];
+  recruiters: string[];
+  branches: string[];
+  clients: string[];
+  workModes: string[];
+  statuses: string[];
+  priorities: string[];
 }
 
 const PREDEFINED_FILTERS = [
@@ -44,6 +51,9 @@ export default function FilterDrawer({
   const [selectedPredefined, setSelectedPredefined] = useState<string[]>(currentFilters.predefined || []);
   const [branches, setBranches] = useState<any[]>([]);
   const [businessUnits, setBusinessUnits] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [draft, setDraft] = useState<SelectedFilters>(currentFilters);
 
   useEffect(() => {
     atsApi.branches.list()
@@ -52,11 +62,14 @@ export default function FilterDrawer({
     atsApi.businessUnits.list()
       .then((data) => setBusinessUnits(data || []))
       .catch((err) => console.error("Failed to load business units for filter:", err));
+    atsApi.users.list().then(data => setUsers(data || [])).catch(() => setUsers([]));
+    atsApi.clients.list().then(data => setClients(data || [])).catch(() => setClients([]));
   }, []);
 
   // Sync state with parent state when drawer opens
   useEffect(() => {
     if (isOpen) {
+      setDraft(currentFilters);
       setBusinessUnit(currentFilters.businessUnit || "All selected");
       setSelectedPredefined(currentFilters.predefined || []);
     }
@@ -72,6 +85,7 @@ export default function FilterDrawer({
 
   const handleApply = () => {
     onApply({
+      ...draft,
       businessUnit,
       predefined: selectedPredefined,
     });
@@ -81,6 +95,7 @@ export default function FilterDrawer({
   const handleReset = () => {
     setBusinessUnit("All selected");
     setSelectedPredefined([]);
+    setDraft({ businessUnit: "All selected", predefined: [], accountManagers: [], recruiters: [], branches: [], clients: [], workModes: [], statuses: [], priorities: [] });
   };
 
   if (!isOpen) return null;
