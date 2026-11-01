@@ -89,8 +89,8 @@ export function PendingUserReview({ user, scope, profile, permissions, onClose, 
       busy={busy || confirmReject} error={error} onClose={close}
       onApprove={() => void decide(false)} onReject={() => setConfirmReject(true)} />
     {confirmReject && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"><section role="alertdialog" aria-modal="true" aria-labelledby="reject-request-title" className="w-full max-w-md space-y-4 rounded-xl bg-white p-5 text-sm dark:bg-slate-900">
-      <h2 id="reject-request-title" className="font-semibold">Reject request for {user.fullName}?</h2>
-      <p>This rejects the pending registration. It does not approve or activate the account.</p>
+      <h2 id="reject-request-title" className="text-sm font-semibold leading-5 text-neutral-900 dark:text-neutral-100">Reject request for {user.fullName}?</h2>
+      <p className="text-xs leading-5 text-neutral-600 dark:text-neutral-300">This rejects the pending registration. It does not approve or activate the account.</p>
       <div className="flex justify-end gap-3"><button disabled={busy} onClick={() => setConfirmReject(false)}>Cancel</button><button disabled={busy} onClick={() => void decide(true)} className="rounded bg-rose-600 px-3 py-2 font-semibold text-white">{busy ? 'Rejecting…' : 'Reject Request'}</button></div>
     </section></div>}
   </>;
