@@ -46,21 +46,30 @@ export function TeamPresenceNavbar() {
   if (!canView) return null;
   const counts = data?.counts;
   const cards: Array<{ key: Group; count: number; color: string }> = [
-    { key: 'loggedInToday', count: counts?.loggedInToday || 0, color: 'text-sky-100' },
-    { key: 'active', count: counts?.active || 0, color: 'text-emerald-200' },
-    { key: 'away', count: counts?.away || 0, color: 'text-amber-200' },
-    { key: 'offline', count: counts?.offline || 0, color: 'text-slate-200' },
+    { key: 'loggedInToday', count: counts?.loggedInToday || 0, color: 'bg-sky-300' },
+    { key: 'active', count: counts?.active || 0, color: 'bg-emerald-300' },
+    { key: 'away', count: counts?.away || 0, color: 'bg-amber-300' },
+    { key: 'offline', count: counts?.offline || 0, color: 'bg-slate-300' },
   ];
   const openGroup = (value: Group) => { setGroup(value); setListPage(1); setOpen(true); setSummaryOpen(false); };
   return <>
     <div className="relative">
-      <button type="button" onClick={() => setSummaryOpen(value => !value)} aria-expanded={summaryOpen} aria-label="Open team presence" className="flex h-9 items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-2.5 text-white/90 hover:bg-white/15">
-        <Users className="h-4 w-4 text-indigo-100" />
-        {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span className="text-[11px] font-semibold">Team <span className="text-emerald-200">{counts?.active ?? '—'}</span></span>}
-        <ChevronDown className="h-3.5 w-3.5 opacity-75" />
-      </button>
+      <div className="flex h-9 items-center rounded-lg border border-white/15 bg-white/10 text-white/90">
+        <span className="flex h-full items-center px-2 text-indigo-100" title="Team presence"><Users className="h-4 w-4" /></span>
+        <div className="hidden h-full items-center 2xl:flex">
+          {cards.map(card => <button key={card.key} type="button" onClick={() => openGroup(card.key)} aria-label={`${groupLabels[card.key]}: ${card.count}`} title={groupLabels[card.key]} className="flex h-full items-center gap-1.5 border-l border-white/10 px-2 text-[10px] hover:bg-white/10 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+            <span className={`h-1.5 w-1.5 rounded-full ${card.color}`} />
+            <span className="text-white/75">{card.key === 'loggedInToday' ? 'Today' : card.key === 'active' ? 'Online' : card.key === 'away' ? 'Away' : 'Offline'}</span>
+            <span className="min-w-3 font-bold text-white">{isLoading ? '–' : card.count}</span>
+          </button>)}
+        </div>
+        <button type="button" onClick={() => setSummaryOpen(value => !value)} aria-expanded={summaryOpen} aria-label="Open team presence details" className="flex h-full items-center gap-1 border-l border-white/10 px-2 text-[10px] font-semibold hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white 2xl:border-l-0">
+          <span className="2xl:hidden">Team <span className="text-emerald-200">{isLoading ? '–' : counts?.active ?? 0}</span></span>
+          <ChevronDown className="h-3.5 w-3.5 opacity-75" />
+        </button>
+      </div>
       {summaryOpen && <div className="absolute right-0 top-full z-40 mt-2 w-72 rounded-xl border border-neutral-200 bg-white p-3 text-neutral-900 shadow-xl">
-        <div className="mb-2 flex items-center justify-between"><p className="text-xs font-bold">Team presence</p><span className="text-[10px] text-neutral-500">Live · 30 sec</span></div>
+        <div className="mb-2 flex items-center justify-between"><p className="text-xs font-bold">Team presence</p><span className="text-[10px] text-neutral-500">Live updates</span></div>
         {error && <p role="status" className="mb-2 rounded bg-amber-50 p-2 text-[10px] text-amber-800">Presence summary unavailable. Retry on focus.</p>}
         {data && !data.telemetryAvailable && <p role="status" className="mb-2 rounded bg-amber-50 p-2 text-[10px] text-amber-800">Live presence is unavailable; login totals remain available.</p>}
         <div className="grid grid-cols-2 gap-2">
