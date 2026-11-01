@@ -4,8 +4,7 @@ import { PendingUserReview } from './pending-user-review';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
-import { Activity, ChevronLeft, ChevronRight, Loader2, RefreshCw, Search, X, MoreVertical, Edit2, Key, LogOut, Trash2, UserCheck, UserX, MapPin } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Activity, ChevronLeft, ChevronRight, Loader2, Search, X, MoreVertical, Edit2, Key, LogOut, Trash2, UserCheck, UserX, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -21,6 +20,18 @@ import { enterpriseGrid } from '@/components/shared/enterprise-grid';
 import { isAutomaticPodLeadRole } from '@/lib/pod-lead-role-policy';
 
 const date = (value?: string | null) => value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Not recorded';
+const relativeTime = (value?: string | null) => {
+  if (!value) return 'Not recorded';
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return 'Not recorded';
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+};
 export function UsersDirectory({ view }: { view: UserView }) {
   const profile = useManagementProfile();
   const permissions = profile.permissions;
@@ -30,7 +41,6 @@ export function UsersDirectory({ view }: { view: UserView }) {
   const pathname = usePathname();
   const [search, setSearch] = useState(params.get('search') || '');
   const [checked, setChecked] = useState<string[]>([]);
-  const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
   const selectAll = useRef<HTMLInputElement>(null);
   const [selected, setSelected] = useState<ManagementRow | null>(null);
   const [editing, setEditing] = useState<ManagementRow | null>(null);
@@ -39,6 +49,13 @@ export function UsersDirectory({ view }: { view: UserView }) {
   const [decision, setDecision] = useState<ManagementRow | null>(null);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
+  const [bulkDialog, setBulkDialog] = useState<'status' | 'manager' | 'sessions' | 'city' | null>(null);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkError, setBulkError] = useState('');
+  const [bulkFeedback, setBulkFeedback] = useState('');
+  const [bulkReason, setBulkReason] = useState('');
+  const [bulkCity, setBulkCity] = useState('');
+  const [bulkManagerId, setBulkManagerId] = useState('');
   const allowed = canOpenUserPage(view, permissions);
   const page = Math.max(1, Number(params.get('page')) || 1);
   const query = new URLSearchParams({ state: view, page: String(page), pageSize: params.get('pageSize') || '25', search: params.get('search') || '', city: params.get('city') || '', role: params.get('role') || '', sort: params.get('sort') || 'name', direction: params.get('direction') || 'asc' });
@@ -47,7 +64,9 @@ export function UsersDirectory({ view }: { view: UserView }) {
   const queryKey = query.toString();
   useEffect(() => { setSelected(null); setReviewing(null); setChecked([]); }, [profile.scope, view, queryKey]);
   useEffect(() => { setChecked(current => current.filter(key => data?.items.some(user => `${user.kind}:${user.id}` === key))); }, [data]);
-  const allChecked = !!data?.items.length && data.items.every(user => checked.includes(`${user.kind}:${user.id}`));
+  const selectableUsers = (data?.items || []).filter(user => user.kind === 'user');
+  const selectedUsers = selectableUsers.filter(user => checked.includes(`user:${user.id}`));
+  const allChecked = !!selectableUsers.length && selectableUsers.every(user => checked.includes(`user:${user.id}`));
   useEffect(() => { if (selectAll.current) selectAll.current.indeterminate = checked.length > 0 && !allChecked; }, [checked, allChecked]);
   const setFilter = (key: string, value: string) => { const next = new URLSearchParams(params.toString()); next.delete('page'); value ? next.set(key, value) : next.delete(key); router.replace(`${pathname}?${next}`, { scroll: false }); };
   const sortColumn = (key: string) => { const next = new URLSearchParams(params.toString()); next.delete('page'); next.set('sort', key); next.set('direction', (params.get('sort') || 'name') === key && params.get('direction') !== 'desc' ? 'desc' : 'asc'); router.replace(`${pathname}?${next}`, { scroll: false }); };
@@ -65,12 +84,56 @@ export function UsersDirectory({ view }: { view: UserView }) {
   const changeAccess = async () => {
     if (!decision || reason.trim().length < 3) return;
     setSaving(true);
-    try { await atsApi.auth.setUserStatus(decision.id, !decision.isActive, reason.trim()); setDecision(null); setReason(''); await mutate(); toast.success('Account access updated.'); }
-    catch (e) { toast.error(e instanceof Error ? e.message : 'Unable to update access.'); }
+    setBulkError('');
+    try { await atsApi.auth.setUserStatus(decision.id, !decision.isActive, reason.trim()); setDecision(null); setReason(''); await mutate(); setBulkFeedback('Account access updated.'); }
+    catch (e) { setBulkError(e instanceof Error ? e.message : 'Unable to update access.'); }
+    finally { setSaving(false); }
+  };
+  const activeFilters = !!(search.trim() || params.get('city') || params.get('role'));
+  const resetFilters = () => {
+    setSearch('');
+    const next = new URLSearchParams(params.toString());
+    ['search', 'city', 'role', 'page'].forEach(key => next.delete(key));
+    router.replace(next.size ? `${pathname}?${next.toString()}` : pathname, { scroll: false });
+  };
+  const canBulk = (key: 'changeAccess' | 'assignManager' | 'endSessions' | 'edit') => selectedUsers.length > 0 && selectedUsers.every(user => !!user.allowedActions?.[key]);
+  const bulkStatusTarget = selectedUsers.length > 0 && selectedUsers.every(user => !user.isActive);
+  const canBulkStatus = canBulk('changeAccess') && (selectedUsers.every(user => user.isActive) || selectedUsers.every(user => !user.isActive));
+  const hasBulkActions = canBulkStatus || canBulk('assignManager') || canBulk('endSessions') || canBulk('edit');
+  const runBulkAction = async () => {
+    if (!selectedUsers.length || !bulkDialog) return;
+    const userIds = selectedUsers.map(user => user.id);
+    setBulkSaving(true); setBulkError(''); setBulkFeedback('');
+    try {
+      let result: any;
+      if (bulkDialog === 'manager') {
+        result = await atsApi.auth.bulkSetJobReviewer(userIds, bulkManagerId || null);
+        setBulkFeedback(`Manager assignment updated for ${result.count ?? userIds.length} user(s).`);
+      } else {
+        result = await atsApi.auth.bulkUserAction(bulkDialog === 'status'
+          ? { userIds, action: 'change-status', isActive: view === 'blocked', reason: bulkReason.trim() }
+          : bulkDialog === 'sessions'
+            ? { userIds, action: 'revoke-sessions' }
+            : { userIds, action: 'change-city', city: bulkCity || null });
+        const failed = (result.results || []).filter((item: any) => !item.success);
+        setBulkFeedback(`${result.succeeded} of ${result.count} account(s) updated${result.failed ? `; ${result.failed} failed` : ''}.`);
+        if (failed.length) setBulkError(failed.slice(0, 5).map((item: any) => `${selectedUsers.find(user => user.id === item.userId)?.fullName || 'Selected user'}: ${item.message}`).join(' '));
+      }
+      if (!result.failed) setChecked([]);
+      setBulkDialog(null); setBulkReason(''); setBulkCity(''); setBulkManagerId('');
+      await mutate();
+    } catch (e) {
+      setBulkError(e instanceof Error ? e.message : 'Unable to complete the selected action.');
+    } finally { setBulkSaving(false); }
+  };
+  const unassignManager = async (user: ManagementRow) => {
+    setSaving(true); setBulkError(''); setBulkFeedback('');
+    try { await atsApi.auth.updateUserDetail(user.id, { jobReviewerId: null }); setBulkFeedback(`Manager unassigned for ${user.fullName}.`); await mutate(); }
+    catch (e) { setBulkError(e instanceof Error ? e.message : 'Unable to unassign the manager.'); }
     finally { setSaving(false); }
   };
   if (profile.error) return <div role="alert" className="p-6 text-sm text-red-600">Unable to verify your access. Refresh to try again.</div>;
-  const columns = ['Select', 'Staff member', 'City', ...(view === 'pending' ? [] : ['Assigned role(s)']), 'Branch / Unit', ...(view === 'pending' ? [] : ['Manager']), 'Account status',
+  const columns = ['Select', 'Staff member', 'City', ...(view === 'pending' ? [] : ['Assigned role(s)']), 'Branch / Unit', ...(view === 'pending' ? [] : ['Manager']), ...(view === 'active' ? [] : ['Account status']),
     ...(has('user:presence:view') ? ['Online status'] : []),
     ...(view === 'activity' && has('user:sessions:view') ? ['Sessions'] : []),
     ...(view === 'activity' && has('user:login_logs:view') ? ['Last login'] : []), 'Actions'];
@@ -83,43 +146,49 @@ export function UsersDirectory({ view }: { view: UserView }) {
         <label className="min-w-56 flex-1 space-y-1 text-xs font-semibold">Search<div className="relative"><Search className="absolute left-3 top-3 h-3.5 w-3.5 text-neutral-400" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Name or email" className="h-9 pl-9 text-xs" /></div></label>
         <label className="space-y-1 text-xs font-semibold">City<select className={`${enterpriseGrid.control} block min-w-36`} value={params.get('city') || ''} onChange={e => setFilter('city', e.target.value)}><option value="">All cities</option>{data?.filters?.cities.map(city => <option key={city} value={city}>{cityName[city] || city}</option>)}</select></label>
         <label className="space-y-1 text-xs font-semibold">Role<select className={`${enterpriseGrid.control} block min-w-40`} value={params.get('role') || ''} onChange={e => setFilter('role', e.target.value)}><option value="">All roles</option>{data?.filters?.roles.map(role => <option key={role} value={role}>{role}</option>)}</select></label>
-        <Button variant="outline" size="sm" onClick={() => { setSearch(''); router.replace(pathname, { scroll: false }); }}>Reset filters</Button>
-        <Button variant="outline" size="sm" onClick={() => void mutate()} disabled={isValidating}><RefreshCw className={`mr-2 h-3.5 w-3.5 ${isValidating ? 'animate-spin' : ''}`} />Refresh</Button>
-        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm">Columns</Button></DropdownMenuTrigger><DropdownMenuContent>{columns.filter(label => !['Select', 'Staff member', 'Actions'].includes(label)).map(label => <DropdownMenuItem key={label} onSelect={event => { event.preventDefault(); setHiddenColumns(current => current.includes(label) ? current.filter(item => item !== label) : [...current, label]); }}><input type="checkbox" tabIndex={-1} checked={!hiddenColumns.includes(label)} readOnly className="mr-2" />{label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>
-        {view !== 'pending' && <span className="text-[11px] text-neutral-500">{data ? `Updated ${date(data.asOf)}` : ''}</span>}
+        <div className="ml-auto flex items-center gap-2">
+          {activeFilters && <Button variant="outline" size="sm" onClick={resetFilters}>Reset filters</Button>}
+          {selectedUsers.length > 0 && <><span className="whitespace-nowrap text-xs font-medium text-neutral-600">{selectedUsers.length} selected</span>{hasBulkActions && <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button variant="outline" size="sm" aria-label="Actions for selected users"><MoreVertical className="mr-1 h-4 w-4" />Actions</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 bg-white text-xs dark:bg-slate-900">
+            {canBulkStatus && <DropdownMenuItem onSelect={() => { setBulkDialog('status'); setBulkError(''); setBulkReason(''); }}>{bulkStatusTarget ? <UserCheck className="h-3.5 w-3.5" /> : <UserX className="h-3.5 w-3.5" />}{bulkStatusTarget ? 'Activate accounts' : 'Deactivate / Block access'}</DropdownMenuItem>}
+            {canBulk('assignManager') && <DropdownMenuItem onSelect={() => { setBulkDialog('manager'); setBulkError(''); setBulkManagerId(''); }}><UserCheck className="h-3.5 w-3.5" />Assign / change manager</DropdownMenuItem>}
+            {canBulk('endSessions') && <DropdownMenuItem onSelect={() => { setBulkDialog('sessions'); setBulkError(''); }}><LogOut className="h-3.5 w-3.5" />Revoke sessions</DropdownMenuItem>}
+            {canBulk('edit') && <DropdownMenuItem onSelect={() => { setBulkDialog('city'); setBulkError(''); setBulkCity(''); }}><MapPin className="h-3.5 w-3.5" />Change city</DropdownMenuItem>}
+            <DropdownMenuSeparator /><DropdownMenuItem onSelect={() => { setChecked([]); setBulkError(''); setBulkFeedback(''); }}>Clear selection</DropdownMenuItem>
+          </DropdownMenuContent></DropdownMenu>}</>}
+        </div>
       </div>
-      {checked.length > 0 && <div role="status" className="border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-800">{checked.length} selected on this page</div>}
+      {bulkFeedback && <div role="status" className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{bulkFeedback}</div>}
+      {bulkError && <div role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{bulkError}</div>}
       {has('user:presence:view') && data && !data.telemetryEnabled && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Live activity is currently unavailable. Your account directory remains available. Contact your workspace administrator.</p>}
       {error && <div role="alert" className="rounded-lg border border-red-200 p-3 text-xs text-red-700">{error instanceof Error ? error.message : 'Unable to load users.'} <button className="underline" onClick={() => void mutate()}>Try again</button></div>}
       <div className={`${enterpriseGrid.surface} users-directory-grid overflow-x-auto`}>
-        <style>{hiddenColumns.map(label => { const index = columns.indexOf(label) + 1; return index > 0 ? `.users-directory-grid th:nth-child(${index}),.users-directory-grid td:nth-child(${index}){display:none}` : ''; }).join('')}</style>
         <table className={`${enterpriseGrid.table} min-w-[1050px]`}>
         <thead className={enterpriseGrid.header}><tr>
-          {columns.map(label => { const sortKey = ({ 'Staff member': 'name', City: 'city', 'Branch / Unit': 'branch' } as Record<string, string>)[label]; return <th key={label} className={`${enterpriseGrid.heading} whitespace-nowrap`} aria-sort={sortKey && (params.get('sort') || 'name') === sortKey ? params.get('direction') === 'desc' ? 'descending' : 'ascending' : undefined}>{label === 'Select' ? <input ref={selectAll} type="checkbox" aria-label="Select all users on this page" checked={allChecked} disabled={!data?.items.length || !!error || isLoading} onChange={e => setChecked(e.target.checked ? (data?.items || []).map(user => `${user.kind}:${user.id}`) : [])} /> : sortKey ? <button onClick={() => sortColumn(sortKey)}>{label} ↕</button> : label}</th>; })}
+          {columns.map(label => { const sortKey = ({ 'Staff member': 'name', City: 'city', 'Branch / Unit': 'branch' } as Record<string, string>)[label]; return <th key={label} className={`${enterpriseGrid.heading} whitespace-nowrap`} aria-sort={sortKey && (params.get('sort') || 'name') === sortKey ? params.get('direction') === 'desc' ? 'descending' : 'ascending' : undefined}>{label === 'Select' ? <input ref={selectAll} type="checkbox" aria-label="Select user accounts on this page" checked={allChecked} disabled={!selectableUsers.length || !!error || isLoading} onChange={e => setChecked(e.target.checked ? selectableUsers.map(user => `user:${user.id}`) : [])} /> : sortKey ? <button onClick={() => sortColumn(sortKey)}>{label} ↕</button> : label}</th>; })}
         </tr></thead>
         <tbody className="divide-y divide-neutral-100 dark:divide-slate-800">
           {isLoading && Array.from({ length: 7 }, (_, row) => <tr key={`skeleton-${row}`} aria-hidden="true">{columns.map((column, index) => <td key={`${column}-${index}`} className="px-3 py-3"><div className={`h-4 animate-pulse rounded bg-neutral-200 dark:bg-slate-700 ${index === 0 ? 'w-44' : 'w-20'}`} /></td>)}</tr>)}
           {!isLoading && !error && !data?.items.length && <tr><td colSpan={columns.length} className="p-10 text-center text-neutral-500">{search || params.get('city') || params.get('role') ? 'No users match your filters.' : 'No users in this view.'}</td></tr>}
           {!error && data?.items.map(user => <tr key={`${user.kind}:${user.id}`} aria-selected={checked.includes(`${user.kind}:${user.id}`)} className={`${enterpriseGrid.row} ${checked.includes(`${user.kind}:${user.id}`) ? '!bg-blue-50 dark:!bg-blue-950/40' : ''}`}>
-            <td className={enterpriseGrid.cell}><input type="checkbox" aria-label={`Select ${user.fullName}`} checked={checked.includes(`${user.kind}:${user.id}`)} onChange={e => setChecked(current => e.target.checked ? [...current, `${user.kind}:${user.id}`] : current.filter(key => key !== `${user.kind}:${user.id}`))} /></td>
+            <td className={enterpriseGrid.cell}><input type="checkbox" aria-label={`Select ${user.fullName}`} disabled={user.kind !== 'user'} checked={checked.includes(`${user.kind}:${user.id}`)} onChange={e => setChecked(current => e.target.checked ? [...current, `${user.kind}:${user.id}`] : current.filter(key => key !== `${user.kind}:${user.id}`))} /></td>
             <td className={`${enterpriseGrid.cell} whitespace-nowrap`}><div className="flex items-center gap-2.5"><Avatar className="size-8 border border-blue-100 dark:border-slate-700"><AvatarImage src={user.avatar || undefined} alt="" /><AvatarFallback className="bg-blue-50 text-[10px] font-semibold text-[#1a4fa0] dark:bg-blue-950/50 dark:text-blue-300">{initials(user.fullName)}</AvatarFallback></Avatar><div className="min-w-0"><span className="block font-semibold text-neutral-800 dark:text-neutral-100">{user.fullName}</span><span className="block text-[10.5px] text-neutral-500">{user.email}</span></div></div></td>
             <td className={`${enterpriseGrid.cell} whitespace-nowrap`}>{user.city ? <span className="inline-flex items-center gap-1 text-neutral-700 dark:text-neutral-300"><MapPin className="h-3 w-3 text-indigo-600" />{cityName[user.city] || user.city}</span> : '—'}</td>
             {view !== 'pending' && <td className={enterpriseGrid.cell}><div className="flex max-w-56 flex-wrap items-center gap-1">{(user.assignedRoles?.length ? user.assignedRoles : user.roleName ? [user.roleName] : []).map(role => <span key={role} className="rounded border border-indigo-200 bg-indigo-50 px-1.5 py-1 text-[9.5px] font-semibold text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">{role}</span>)}{user.kind === 'user' && user.allowedActions?.edit && <button type="button" onClick={() => { setEditing(user); setEditorMode('roles'); }} aria-label={`Assign roles to ${user.fullName}`} className="rounded border border-neutral-200 px-1.5 text-xs text-neutral-600 hover:bg-neutral-50">+</button>}</div></td>}
             <td className={`${enterpriseGrid.cell} whitespace-nowrap`}><span className="block font-semibold">{user.branchName || 'Unassigned'}</span><span className="block text-xs text-neutral-500">{user.businessUnitName || '—'}</span></td>
-            {view !== 'pending' && <td className={`${enterpriseGrid.cell} whitespace-nowrap`}>{user.managerName ? <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">{user.managerName}</span> : <span className="text-neutral-400">Unassigned</span>}{user.kind === 'user' && user.allowedActions?.assignManager && <button type="button" onClick={() => { setEditing(user); setEditorMode('manager'); }} className="ml-2 text-[10px] font-semibold text-indigo-700 hover:underline">Assign</button>}</td>}
-            <td className={`${enterpriseGrid.cell} whitespace-nowrap`}>{view === 'pending' ? <><span className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">{user.invitationStatus === 'expired' ? 'Invite expired' : user.invitationStatus ? 'Invited' : 'Awaiting approval'}</span>{user.kind === 'user' && !user.isApproved && user.requestedRole && user.allowedActions?.review && <button type="button" aria-label={`Review request for ${user.fullName}`} onClick={() => setReviewing(user)} className="mt-1 inline-flex min-h-6 items-center justify-center gap-1 rounded px-2 text-xs font-medium text-[#1a4fa0] hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300">Review request <span aria-hidden="true">→</span></button>}</> : <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold ${user.isActive ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'}`}><span className={`h-1.5 w-1.5 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-red-500'}`} />{user.isActive ? 'Active' : 'Blocked'}</span>}{view === 'blocked' && <span className="mt-1 block max-w-48 whitespace-normal text-[10px] text-neutral-500">{user.blockReason || 'Reason not recorded'}</span>}</td>
-            {has('user:presence:view') && <><td className={`${enterpriseGrid.cell} whitespace-nowrap`}>{user.kind === 'user' ? <><PresenceBadge value={user.presence || 'unknown'} /><span className="mt-1 block text-[10.5px] text-neutral-500">Last seen {date(user.lastSeenAt)}</span>{user.officeNetwork && <span className="mt-1 block max-w-44 text-[9.5px] text-neutral-500">{user.officeNetwork}<span className="block">Seen {date(user.officeObservedAt)}</span></span>}</> : <span className="text-neutral-400">—</span>}</td></>}
+            {view !== 'pending' && <td className={`${enterpriseGrid.cell} whitespace-nowrap`}>{user.managerName ? <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">{user.managerName}</span> : null}{user.kind === 'user' && !user.managerName && user.allowedActions?.assignManager && <button type="button" onClick={() => { setEditing(user); setEditorMode('manager'); }} className="text-[10px] font-semibold text-indigo-700 hover:underline">+ Assign</button>}</td>}
+            {view !== 'active' && <td className={`${enterpriseGrid.cell} whitespace-nowrap`}>{view === 'pending' ? <><span className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">{user.invitationStatus === 'expired' ? 'Invite expired' : user.invitationStatus ? 'Invited' : 'Awaiting approval'}</span>{user.kind === 'user' && !user.isApproved && user.requestedRole && user.allowedActions?.review && <button type="button" aria-label={`Review request for ${user.fullName}`} onClick={() => setReviewing(user)} className="mt-1 inline-flex min-h-6 items-center justify-center gap-1 rounded px-2 text-xs font-medium text-[#1a4fa0] hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300">Review request <span aria-hidden="true">→</span></button>}</> : <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold ${user.isActive ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'}`}><span className={`h-1.5 w-1.5 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-red-500'}`} />{user.isActive ? 'Active' : 'Blocked'}</span>}{view === 'blocked' && <span className="mt-1 block max-w-48 whitespace-normal text-[10px] text-neutral-500">{user.blockReason || 'Reason not recorded'}</span>}</td>}
+            {has('user:presence:view') && <td className={`${enterpriseGrid.cell} whitespace-nowrap`}>{user.kind === 'user' ? <><PresenceBadge value={user.presence || 'unknown'} /><span className="mt-1 block text-[10.5px] text-neutral-500" title={user.lastSeenAt ? date(user.lastSeenAt) : 'No activity checkpoint recorded'}>Last active · {relativeTime(user.lastSeenAt)}</span></> : <span className="text-neutral-400">—</span>}</td>}
             {view === 'activity' && has('user:sessions:view') && <td className={enterpriseGrid.cell}>{user.sessions ?? '—'}</td>}
             {view === 'activity' && has('user:login_logs:view') && <td className="whitespace-nowrap px-3 py-2.5 text-[10.5px]">{date(user.lastLoginAt)}</td>}
-            <td className="whitespace-nowrap px-3 py-2.5 text-right"><div className="flex items-center justify-end gap-2">{user.kind === 'user' && view === 'activity' && has('user:sessions:view', 'user:login_logs:view') && <button aria-label={`View activity for ${user.fullName}`} onClick={() => setSelected(user)} className="font-semibold text-indigo-700 hover:underline dark:text-blue-300">Details</button>}{((view !== 'pending' && (user.allowedActions?.edit || user.allowedActions?.review)) || user.allowedActions?.changeAccess || user.allowedActions?.resetPassword || user.allowedActions?.endSessions || user.allowedActions?.deleteUser || user.allowedActions?.resendInvitation) && <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button aria-label={`Actions for ${user.fullName}`} variant="ghost" size="sm" className="h-8 w-8 p-0 text-neutral-500"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 bg-white text-xs dark:bg-slate-900">
+            <td className="whitespace-nowrap px-3 py-2.5 text-right"><div className="flex items-center justify-end gap-2">{user.kind === 'user' && view === 'activity' && has('user:sessions:view', 'user:login_logs:view') && <button aria-label={`View activity for ${user.fullName}`} onClick={() => setSelected(user)} className="font-semibold text-indigo-700 hover:underline dark:text-blue-300">Details</button>}{((view !== 'pending' && (user.allowedActions?.edit || user.allowedActions?.review || user.allowedActions?.assignManager)) || user.allowedActions?.changeAccess || user.allowedActions?.resetPassword || user.allowedActions?.endSessions || user.allowedActions?.deleteUser || user.allowedActions?.resendInvitation) && <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button aria-label={`Actions for ${user.fullName}`} variant="ghost" size="sm" className="h-8 w-8 p-0 text-neutral-500"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 bg-white text-xs dark:bg-slate-900">
 
               {view !== 'pending' && user.allowedActions?.edit && <DropdownMenuItem onSelect={() => { setEditing(user); setEditorMode('profile'); }}><Edit2 className="h-3.5 w-3.5" />Edit Profile & Roles</DropdownMenuItem>}
-              {view !== 'pending' && user.allowedActions?.assignManager && <DropdownMenuItem onSelect={() => { setEditing(user); setEditorMode('manager'); }}><UserCheck className="h-3.5 w-3.5" />Assign Manager</DropdownMenuItem>}
-              {user.allowedActions?.resendInvitation && <DropdownMenuItem disabled={saving} onSelect={async () => { setSaving(true); try { const result = await atsApi.auth.resendInvitation(user.id); toast.success(result.message); await mutate(); } catch (e) { toast.error(e instanceof Error ? e.message : 'Invitation could not be sent.'); } finally { setSaving(false); } }}>Resend invitation</DropdownMenuItem>}
-              {user.allowedActions?.resetPassword && <DropdownMenuItem onSelect={async () => { if (!window.confirm(`Send a password reset link to ${user.email}?`)) return; try { const result = await atsApi.auth.sendUserResetLink(user.id); toast.success(result.message || 'Password reset link sent.'); } catch (e) { toast.error(e instanceof Error ? e.message : 'Unable to send password reset link.'); } }}><Key className="h-3.5 w-3.5" />Reset Password</DropdownMenuItem>}
-              {user.allowedActions?.endSessions && <DropdownMenuItem onSelect={async () => { if (!window.confirm(`End all active sessions for ${user.fullName}?`)) return; try { const result = await atsApi.auth.logoutUserSessions(user.id); toast.success(result.message || 'User sessions ended.'); await mutate(); } catch (e) { toast.error(e instanceof Error ? e.message : 'Unable to end sessions.'); } }}><LogOut className="h-3.5 w-3.5" />End All User Sessions</DropdownMenuItem>}
+              {view !== 'pending' && user.allowedActions?.assignManager && <><DropdownMenuItem onSelect={() => { setEditing(user); setEditorMode('manager'); }}><UserCheck className="h-3.5 w-3.5" />{user.managerName ? 'Change Manager' : 'Assign Manager'}</DropdownMenuItem>{user.managerName && <DropdownMenuItem disabled={saving} onSelect={() => void unassignManager(user)}><UserX className="h-3.5 w-3.5" />Unassign Manager</DropdownMenuItem>}</>}
+              {user.allowedActions?.resendInvitation && <DropdownMenuItem disabled={saving} onSelect={async () => { setSaving(true); setBulkError(''); try { const result = await atsApi.auth.resendInvitation(user.id); setBulkFeedback(result.message); await mutate(); } catch (e) { setBulkError(e instanceof Error ? e.message : 'Invitation could not be sent.'); } finally { setSaving(false); } }}>Resend invitation</DropdownMenuItem>}
+              {user.allowedActions?.resetPassword && <DropdownMenuItem onSelect={async () => { if (!window.confirm(`Send a password reset link to ${user.email}?`)) return; setBulkError(''); try { const result = await atsApi.auth.sendUserResetLink(user.id); setBulkFeedback(result.message || 'Password reset link sent.'); } catch (e) { setBulkError(e instanceof Error ? e.message : 'Unable to send password reset link.'); } }}><Key className="h-3.5 w-3.5" />Reset Password</DropdownMenuItem>}
+              {user.allowedActions?.endSessions && <DropdownMenuItem onSelect={async () => { if (!window.confirm(`End all active sessions for ${user.fullName}?`)) return; setBulkError(''); try { const result = await atsApi.auth.logoutUserSessions(user.id); setBulkFeedback(result.message || 'User sessions ended.'); await mutate(); } catch (e) { setBulkError(e instanceof Error ? e.message : 'Unable to end sessions.'); } }}><LogOut className="h-3.5 w-3.5" />End All User Sessions</DropdownMenuItem>}
               {user.allowedActions?.changeAccess && <><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => { setDecision(user); setReason(''); }} className={user.isActive ? 'text-amber-700' : 'text-emerald-700'}>{user.isActive ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}{user.isActive ? 'Deactivate & Revoke Access' : 'Reactivate Account'}</DropdownMenuItem></>}
-              {user.allowedActions?.deleteUser && <><DropdownMenuSeparator /><DropdownMenuItem className="text-rose-600" onSelect={async () => { if (window.prompt(`Permanently delete ${user.fullName} and account history? Independent business records will be retained. This cannot be undone. Type DELETE to confirm.`) !== 'DELETE') return; try { await atsApi.auth.deleteUser(user.id); toast.success('Team member deleted.'); await mutate(); } catch (e) { toast.error(e instanceof Error ? e.message : 'Unable to delete team member.'); } }}><Trash2 className="h-3.5 w-3.5" />Delete Team Member</DropdownMenuItem></>}
+              {user.allowedActions?.deleteUser && <><DropdownMenuSeparator /><DropdownMenuItem className="text-rose-600" onSelect={async () => { if (window.prompt(`Permanently delete ${user.fullName} and account history? Independent business records will be retained. This cannot be undone. Type DELETE to confirm.`) !== 'DELETE') return; setBulkError(''); try { await atsApi.auth.deleteUser(user.id); setBulkFeedback('Team member deleted.'); await mutate(); } catch (e) { setBulkError(e instanceof Error ? e.message : 'Unable to delete team member.'); } }}><Trash2 className="h-3.5 w-3.5" />Delete Team Member</DropdownMenuItem></>}
             </DropdownMenuContent></DropdownMenu>}</div></td>
           </tr>)}
         </tbody>
@@ -129,7 +198,50 @@ export function UsersDirectory({ view }: { view: UserView }) {
     {reviewing && profile.data && <PendingUserReview key={`${profile.scope}:${reviewing.id}`} user={reviewing} scope={profile.scope} profile={profile.data} permissions={permissions} onClose={() => setReviewing(null)} onChanged={() => { setChecked([]); void mutate(); }} />}
     {selected && <UserActivityDrawer user={selected} scope={profile.scope} has={has} onClose={() => setSelected(null)} onChanged={() => void mutate()} />}
     {editing && <DirectoryMemberEditor user={editing} mode={editorMode} activeRole={profile.systemRole} permissions={permissions} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void mutate(); }} />}
+    {bulkDialog && <BulkUserActionDialog action={bulkDialog} count={selectedUsers.length} userIds={selectedUsers.map(user => user.id)} statusWillActivate={bulkStatusTarget} tenantWideManagerScope={has('tenant:settings', 'tenant:manage')} saving={bulkSaving} error={bulkError} managerId={bulkManagerId} city={bulkCity} reason={bulkReason} onManagerChange={setBulkManagerId} onCityChange={setBulkCity} onReasonChange={setBulkReason} onClose={() => { if (!bulkSaving) setBulkDialog(null); }} onSubmit={() => void runBulkAction()} />}
     {decision && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><section role="dialog" aria-modal="true" aria-labelledby="access-title" className="w-full max-w-md space-y-4 rounded-xl border bg-white p-5 dark:bg-slate-900"><h2 id="access-title" className="text-sm font-bold">{decision.isActive ? 'Block' : 'Unblock'} {decision.fullName}?</h2><p className="text-xs text-neutral-500">{decision.isActive ? 'This ends access to this workspace. Business records are preserved.' : 'The user will need to sign in again. Previously ended sessions remain revoked.'}</p><label className="block text-xs font-semibold">Reason<Input value={reason} maxLength={500} onChange={e => setReason(e.target.value)} className="mt-2 text-xs" /></label><div className="flex justify-end gap-2"><Button variant="outline" disabled={saving} onClick={() => setDecision(null)}>Cancel</Button><Button disabled={saving || reason.trim().length < 3} onClick={() => void changeAccess()}>{saving ? 'Saving…' : 'Confirm'}</Button></div></section></div>}
+  </div>;
+}
+function BulkUserActionDialog({ action, count, userIds, statusWillActivate, tenantWideManagerScope, saving, error, managerId, city, reason, onManagerChange, onCityChange, onReasonChange, onClose, onSubmit }: {
+  action: 'status' | 'manager' | 'sessions' | 'city'; count: number; userIds: string[]; statusWillActivate: boolean; tenantWideManagerScope: boolean; saving: boolean; error: string;
+  managerId: string; city: string; reason: string; onManagerChange: (value: string) => void; onCityChange: (value: string) => void;
+  onReasonChange: (value: string) => void; onClose: () => void; onSubmit: () => void;
+}) {
+  const [managers, setManagers] = useState<any[]>([]);
+  const [loadingManagers, setLoadingManagers] = useState(action === 'manager');
+  const [managerLoadError, setManagerLoadError] = useState('');
+  useEffect(() => {
+    if (action !== 'manager') return;
+    let current = true;
+    atsApi.auth.listUsers().then(rows => {
+      if (current) setManagers((rows || []).filter((user: any) => {
+        const permissions: string[] = Array.isArray(user.permissions) ? user.permissions : [];
+        const protectedManager = permissions.some(permission => ['platform:manage', 'tenant:manage', 'tenant:settings', 'branch_admin:manage'].includes(permission));
+        return user.isActive !== false && user.is_approved !== false && !userIds.includes(user.id) && (tenantWideManagerScope || !protectedManager);
+      }));
+    }).catch(e => { if (current) setManagerLoadError(e instanceof Error ? e.message : 'Unable to load managers.'); })
+      .finally(() => { if (current) setLoadingManagers(false); });
+    return () => { current = false; };
+  }, [action, userIds.join(','), tenantWideManagerScope]);
+  const title = action === 'status' ? statusWillActivate ? 'Activate selected accounts' : 'Deactivate / block selected accounts'
+    : action === 'manager' ? 'Assign manager to selected accounts'
+    : action === 'sessions' ? 'Revoke selected users’ sessions'
+    : 'Change city for selected accounts';
+  const canSubmit = !saving && (action === 'manager' ? !!managerId && !loadingManagers
+    : action === 'city' ? true
+    : action === 'status' && !statusWillActivate ? reason.trim().length >= 3 : true);
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <section role="dialog" aria-modal="true" aria-labelledby="bulk-user-action-title" className="w-full max-w-lg space-y-4 rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+      <header><h2 id="bulk-user-action-title" className="text-sm font-bold">{title}</h2><p className="mt-1 text-xs text-neutral-500">This action applies to {count} selected account(s) on this page. Each account is rechecked against your access scope.</p></header>
+      {action === 'status' && (statusWillActivate
+        ? <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">Selected accounts will be allowed to sign in again. Their previous sessions remain revoked.</p>
+        : <label className="block space-y-1 text-xs font-semibold">Reason required<Input value={reason} maxLength={500} onChange={e => onReasonChange(e.target.value)} placeholder="Why are these accounts being deactivated?" className="h-9 text-xs" /><span className="block font-normal text-neutral-500">Enter at least 3 characters.</span></label>)}
+      {action === 'manager' && <label className="block space-y-1 text-xs font-semibold">New manager<select value={managerId} onChange={e => onManagerChange(e.target.value)} disabled={loadingManagers} className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-800"><option value="">{loadingManagers ? 'Loading managers…' : 'Select a manager'}</option>{managers.map(manager => <option key={manager.id} value={manager.id}>{manager.fullName || manager.full_name} · {manager.roleName || manager.role_name || manager.email}</option>)}</select>{managerLoadError && <span role="alert" className="block text-xs font-normal text-red-700">{managerLoadError}</span>}</label>}
+      {action === 'sessions' && <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">This ends the selected users’ sign-in sessions. Each user’s workspace and identity-provider scope will be validated individually.</p>}
+      {action === 'city' && <label className="block space-y-1 text-xs font-semibold">City<select value={city} onChange={e => onCityChange(e.target.value)} className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-800"><option value="">No city assigned</option>{[['BBSR','Bhubaneswar'],['PUNE','Pune'],['BENGALURU','Bengaluru'],['VIZAG','Vizag'],['HYDERABAD','Hyderabad']].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
+      {error && <p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{error}</p>}
+      <footer className="flex justify-end gap-2"><Button type="button" variant="outline" size="sm" disabled={saving} onClick={onClose}>Cancel</Button><Button type="button" size="sm" disabled={!canSubmit || (action === 'manager' && !!managerLoadError)} onClick={onSubmit}>{saving ? 'Applying…' : 'Apply to selected'}</Button></footer>
+    </section>
   </div>;
 }
 export function PresenceBadge({ value }: { value: string }) {
@@ -140,10 +252,11 @@ function UserActivityDrawer({ user, scope, has, onClose, onChanged }: { user: Ma
   const [tab, setTab] = useState(has('user:sessions:view') ? 'sessions' : 'history');
   const [page, setPage] = useState(1);
   const [busy, setBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
   const sessions = useSWR(tab === 'sessions' && has('user:sessions:view') ? ['user-sessions', scope, user.id, page] : null, () => userManagementApi.sessions(user.id, page));
   const events = useSWR(tab === 'history' && has('user:login_logs:view') ? ['user-events', scope, user.id, page] : null, () => userManagementApi.events(user.id, page));
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const revoke = async (id: string) => { setBusy(id); try { const result = await userManagementApi.revoke(id); toast.success(result.message); setConfirmId(null); await sessions.mutate(); onChanged(); } catch (e) { toast.error(e instanceof Error ? e.message : 'Unable to end session.'); } finally { setBusy(null); } };
+  const revoke = async (id: string) => { setBusy(id); setActionError(''); try { await userManagementApi.revoke(id); setConfirmId(null); await sessions.mutate(); onChanged(); } catch (e) { setActionError(e instanceof Error ? e.message : 'Unable to end session.'); } finally { setBusy(null); } };
   const current = tab === 'sessions' ? sessions : events;
   const exportHistory = async () => {
     setBusy('export');
@@ -154,13 +267,14 @@ function UserActivityDrawer({ user, scope, has, onClose, onChanged }: { user: Ma
       const csv = [['Time (UTC)', 'Event', 'Outcome', 'Actor', ...(includeIp ? ['IP address'] : [])], ...rows.map(row => [row.createdAt, row.action, row.outcome, row.actorName, ...(includeIp ? [row.ipAddress] : [])])].map(row => row.map(cell).join(',')).join('\r\n');
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
       const link = document.createElement('a'); link.href = url; link.download = `login-history-${user.id}.csv`; link.click(); URL.revokeObjectURL(url);
-    } catch (e) { toast.error(e instanceof Error ? e.message : 'Unable to export history.'); }
+    } catch (e) { setActionError(e instanceof Error ? e.message : 'Unable to export history.'); }
     finally { setBusy(null); }
   };
   return <Sheet open onOpenChange={open => { if (!open) onClose(); }}><SheetContent side="right" className="w-full space-y-4 overflow-y-auto bg-white p-5 sm:max-w-xl dark:bg-slate-900">
     <header><SheetTitle className="text-lg font-bold">{user.fullName}</SheetTitle><SheetDescription className="text-xs">{user.email}</SheetDescription></header>
     <div className="flex gap-4 border-b text-xs font-semibold">{[['sessions', 'Sessions', has('user:sessions:view')], ['history', 'Login history', has('user:login_logs:view')]].filter(item => item[2]).map(([key, label]) => <button key={String(key)} onClick={() => { setTab(String(key)); setPage(1); }} className={`border-b-2 py-3 ${tab === key ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-neutral-500'}`}>{label}</button>)}</div>
     {tab === 'history' && has('user:login_logs:export') && <Button variant="outline" size="sm" disabled={!!busy} onClick={() => void exportHistory()} className="text-xs">Export last 7 days</Button>}
+    {actionError && <p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{actionError}</p>}
     {current.error && <p role="alert" className="text-xs text-red-600">Unable to load details. <button onClick={() => void current.mutate()} className="underline">Try again</button></p>}
     {current.isLoading && <p className="text-xs">Loading…</p>}
     {!current.isLoading && !current.error && !current.data?.length && <p className="text-xs text-neutral-500">No recorded {tab === 'sessions' ? 'sessions' : 'events'}.</p>}
@@ -224,12 +338,12 @@ function DirectoryMemberEditor({ user, mode, activeRole, permissions, onClose, o
     try {
       const body = mode === 'manager' ? { jobReviewerId: managerId || null } : mode === 'roles' ? { assignedRoleIds: roleIds } : { fullName: fullName.trim(), email: email.trim(), city: city || null, assignedRoleIds: roleIds };
       await atsApi.auth.updateUserDetail(user.id, body);
-      toast.success('User details updated.'); onSaved();
+      onSaved();
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to update user.'); }
     finally { setSaving(false); }
   };
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><section role="dialog" aria-modal="true" aria-labelledby="member-editor-title" className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-    <header className="flex items-start justify-between"><div><h2 id="member-editor-title" className="text-sm font-bold">{mode === 'manager' ? 'Assign Manager' : mode === 'roles' ? 'Assign Role(s)' : 'Edit user'} · {user.fullName}</h2><p className="mt-1 text-xs text-neutral-500">{mode === 'manager' ? 'Choose a designated manager for this user.' : mode === 'roles' ? 'Assign permitted business roles.' : 'Update profile details and business roles.'}</p></div><button type="button" onClick={onClose} aria-label="Close editor"><X className="h-4 w-4" /></button></header>
+    <header className="flex items-start justify-between"><div><h2 id="member-editor-title" className="text-sm font-bold">{mode === 'manager' ? user.managerName ? 'Change Manager' : 'Assign Manager' : mode === 'roles' ? 'Assign Role(s)' : 'Edit user'} · {user.fullName}</h2><p className="mt-1 text-xs text-neutral-500">{mode === 'manager' ? 'Choose a designated manager for this user.' : mode === 'roles' ? 'Assign permitted business roles.' : 'Update profile details and business roles.'}</p></div><button type="button" onClick={onClose} aria-label="Close editor"><X className="h-4 w-4" /></button></header>
     {loading ? <div className="space-y-3 py-8"><div className="h-4 w-48 animate-pulse rounded bg-neutral-200" /><div className="h-9 animate-pulse rounded bg-neutral-200" /><div className="h-9 animate-pulse rounded bg-neutral-200" /></div> : <>
       {mode === 'profile' && <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1 text-xs font-semibold">Full name<Input value={fullName} onChange={e => setFullName(e.target.value)} className="h-9 text-xs" /></label><label className="space-y-1 text-xs font-semibold">Email<Input type="email" value={email} onChange={e => setEmail(e.target.value)} className="h-9 text-xs" /></label><label className="space-y-1 text-xs font-semibold">City<select value={city} onChange={e => setCity(e.target.value)} className="h-9 w-full rounded-md border bg-white px-2 text-xs dark:bg-slate-800"><option value="">No city assigned</option>{[['BBSR','Bhubaneswar'],['PUNE','Pune'],['BENGALURU','Bengaluru'],['VIZAG','Vizag'],['HYDERABAD','Hyderabad']].map(([id,label]) => <option key={id} value={id}>{label}</option>)}</select></label></div>}
       {mode === 'manager' && <label className="block space-y-1 text-xs font-semibold">Designated manager<select value={managerId} onChange={e => setManagerId(e.target.value)} className="h-9 w-full rounded-md border bg-white px-2 text-xs dark:bg-slate-800"><option value="">Auto (Hierarchy)</option>{managers.map(member => <option key={member.id} value={member.id}>{member.fullName} · {member.roleName || 'Manager'}</option>)}</select></label>}

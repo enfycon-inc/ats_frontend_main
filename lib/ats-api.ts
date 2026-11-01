@@ -620,6 +620,10 @@ const auth = {
     });
   },
 
+  async bulkUserAction(data: { userIds: string[]; action: 'change-status' | 'revoke-sessions' | 'change-city'; isActive?: boolean; reason?: string; city?: string | null }): Promise<{ success: boolean; count: number; succeeded: number; failed: number; results: Array<{ userId: string; success: boolean; message: string }> }> {
+    return apiFetch('/api/auth/users/bulk-action', { method: 'POST', body: JSON.stringify(data) });
+  },
+
   async requestRole(role: string, branchId?: string, businessUnitId?: string, city?: UserCity | null): Promise<RoleRequestSubmission> {
     return apiFetch<RoleRequestSubmission>('/api/auth/request-role', {
       method: 'POST',
