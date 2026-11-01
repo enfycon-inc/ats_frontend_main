@@ -9,6 +9,8 @@ import { mapApiJobToJob } from "../data/mock-jobs";
 import { Job } from "../data/mock-jobs";
 import { getAssignedPersonDisplay, getRecruiterDisplay } from "./job-table-utils";
 
+const EMPTY_PERSON_OPTIONS: Array<{ id: string; label: string }> = [];
+
 export interface UseJobTableDataOptions {
   catalog?: Record<string, string | number>;
   data: Job[];
@@ -416,6 +418,8 @@ export function useJobTableData({ data, branchUsesPods, podAllowedUnitIds, catal
     setCurrentPage,
     totalPages: catalog ? server?.totalPages || 0 : totalPages,
     totalRecords: catalog ? server?.total || 0 : processedData.length,
+    accountManagerOptions: catalog ? server?.options?.accountManagerOptions || EMPTY_PERSON_OPTIONS : EMPTY_PERSON_OPTIONS,
+    recruiterOptions: catalog ? server?.options?.recruiterOptions || EMPTY_PERSON_OPTIONS : EMPTY_PERSON_OPTIONS,
     catalogError, catalogLoading,
     processedData: catalog ? serverRows : processedData,
     paginatedData: catalog ? serverRows : paginatedData,

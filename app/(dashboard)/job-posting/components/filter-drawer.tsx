@@ -11,6 +11,7 @@ interface FilterDrawerProps {
   onClose: () => void;
   onApply: (filters: SelectedFilters) => void;
   currentFilters: SelectedFilters;
+  peopleOptions: { accountManagers: Array<{ id: string; label: string }>; recruiters: Array<{ id: string; label: string }> };
 }
 
 export interface SelectedFilters {
@@ -42,12 +43,12 @@ export default function FilterDrawer({
   onClose,
   onApply,
   currentFilters,
+  peopleOptions,
 }: FilterDrawerProps) {
   const [businessUnit, setBusinessUnit] = useState(currentFilters.businessUnit || "All selected");
   const [selectedPredefined, setSelectedPredefined] = useState<string[]>(currentFilters.predefined || []);
   const [branches, setBranches] = useState<any[]>([]);
   const [businessUnits, setBusinessUnits] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [draft, setDraft] = useState<SelectedFilters>(currentFilters);
 
@@ -58,7 +59,6 @@ export default function FilterDrawer({
     atsApi.businessUnits.list()
       .then((data) => setBusinessUnits(data || []))
       .catch((err) => console.error("Failed to load business units for filter:", err));
-    atsApi.auth.listUsers().then(data => setUsers(data || [])).catch(() => setUsers([]));
     atsApi.clients.list().then(data => setClients(data || [])).catch(() => setClients([]));
   }, []);
 
@@ -101,18 +101,9 @@ export default function FilterDrawer({
     });
   };
 
-  const peopleOptions = (role: "manager" | "recruiter") => users
-    .filter((user) => {
-      const roles = [user.role, ...(user.roles || []), ...(user.assignedRoles || []).map((item: any) => item.name || item.roleName || item.role)]
-        .filter(Boolean).join(" ").toLowerCase();
-      return role === "manager" ? /account.manager|delivery.head|branch.admin|unit.admin|tenant.admin/.test(roles) : /recruiter/.test(roles);
-    })
-    .map((user) => ({ id: user.id, label: user.fullName || user.name || user.email }))
-    .filter((item) => item.id && item.label);
-
   const filterGroups: Array<{ key: keyof SelectedFilters; label: string; options: Array<{ id: string; label: string }> }> = [
-    { key: "accountManagers", label: "Account manager", options: peopleOptions("manager") },
-    { key: "recruiters", label: "Recruiter", options: peopleOptions("recruiter") },
+    { key: "accountManagers", label: "Account manager", options: peopleOptions.accountManagers },
+    { key: "recruiters", label: "Recruiter", options: peopleOptions.recruiters },
     { key: "branches", label: "Branch", options: branches.map((item) => ({ id: item.id, label: item.name })).filter((item) => item.id && item.label) },
     { key: "clients", label: "Client", options: clients.map((item) => ({ id: item.id, label: item.clientName || item.name })).filter((item) => item.id && item.label) },
     { key: "workModes", label: "Work mode", options: ["In Office", "Remote", "Hybrid"].map((value) => ({ id: value, label: value })) },

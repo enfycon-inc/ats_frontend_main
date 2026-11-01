@@ -73,6 +73,7 @@ export default function JobPostingDashboard({
   // Drawer States
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isColumnOpen, setIsColumnOpen] = useState(false);
+  const [filterPeopleOptions, setFilterPeopleOptions] = useState<{ accountManagers: Array<{ id: string; label: string }>; recruiters: Array<{ id: string; label: string }> }>({ accountManagers: [], recruiters: [] });
   const [market, setMarket] = useState<"US" | "IN">("IN");
 
   const { profile: currentUser, selection } = useDashboardContext();
@@ -451,13 +452,10 @@ export default function JobPostingDashboard({
         if (recruiterName === "N/A" || !recruiterName) {
           apiPayload.recruiterId = null;
         } else {
-          const users = await atsApi.auth.listUsers();
-          const foundUser = users.find((u: any) => u.fullName === recruiterName);
-          if (foundUser) {
-            apiPayload.recruiterId = foundUser.id;
-          } else {
-            apiPayload.recruiterId = null;
-          }
+          const job = allJobs.find((item) => item.id === jobId);
+          const foundRecruiter = job?.recruiterDetails?.find((recruiter: any) => recruiter.fullName === recruiterName);
+          if (!foundRecruiter?.id) throw new Error("Could not resolve the assigned recruiter. Refresh the job and try again.");
+          apiPayload.recruiterId = foundRecruiter.id;
         }
       }
 
@@ -469,7 +467,7 @@ export default function JobPostingDashboard({
       // Revert local state by reloading from server
       fetchJobs();
     }
-  }, [fetchJobs]);
+  }, [allJobs, fetchJobs]);
 
   const handleRefresh = useCallback(() => {
     setCurrentFilters({ businessUnit: "All selected", predefined: [], accountManagers: [], recruiters: [], branches: [], clients: [], workModes: [], statuses: [], priorities: [] });
@@ -606,6 +604,7 @@ export default function JobPostingDashboard({
             branchUsesPods={branchUsesPods}
             podAllowedUnitIds={podAllowedUnitIds}
             onPodVisibilityChange={setTableUsesPods}
+            onFilterPeopleOptionsChange={setFilterPeopleOptions}
             onOpenFilters={() => setIsFilterOpen(true)}
             onOpenColumns={() => setIsColumnOpen(true)}
             onRefresh={handleRefresh}
@@ -624,6 +623,7 @@ export default function JobPostingDashboard({
         onClose={() => setIsFilterOpen(false)}
         onApply={handleApplyFilters}
         currentFilters={currentFilters}
+        peopleOptions={filterPeopleOptions}
       />
 
       {/* Slide-over Column Configuration Panel */}

@@ -57,6 +57,12 @@ import { ApproveJobModal, RejectJobModal } from "./data-table/job-approval-modal
 import { JobContextMenu } from "./data-table/job-context-menu";
 import { JobAssignModal, type JobAssignmentMode } from "./data-table/job-assign-modal";
 
+const normalizePersonOptions = (value: unknown): Array<{ id: string; label: string }> =>
+  Array.isArray(value)
+    ? value.filter((item): item is { id: string; label: string } =>
+        Boolean(item && typeof item === "object" && typeof item.id === "string" && typeof item.label === "string"))
+    : [];
+
 export interface DataTableProps {
   leadingContent?: React.ReactNode;
   actionsBesideLeadingContent?: boolean;
@@ -67,6 +73,7 @@ export interface DataTableProps {
   branchUsesPods?: boolean;
   podAllowedUnitIds?: string[];
   onPodVisibilityChange?: (enabled: boolean) => void;
+  onFilterPeopleOptionsChange?: (options: { accountManagers: Array<{ id: string; label: string }>; recruiters: Array<{ id: string; label: string }> }) => void;
   onOpenFilters: () => void;
   onOpenColumns: () => void;
   onRefresh: () => void;
@@ -89,6 +96,7 @@ export default function DataTable({
   branchUsesPods,
   podAllowedUnitIds,
   onPodVisibilityChange,
+  onFilterPeopleOptionsChange,
   onOpenFilters,
   onOpenColumns,
   onRefresh,
@@ -316,9 +324,16 @@ export default function DataTable({
     totalPages,
     processedData,
     paginatedData, totalRecords, catalogError, catalogLoading,
+    accountManagerOptions, recruiterOptions,
   } = useJobTableData({ data, branchUsesPods, podAllowedUnitIds, catalog });
 
   useEffect(() => { onPodVisibilityChange?.(isPodSystemEnabled); }, [isPodSystemEnabled, onPodVisibilityChange]);
+  useEffect(() => {
+    onFilterPeopleOptionsChange?.({
+      accountManagers: normalizePersonOptions(accountManagerOptions),
+      recruiters: normalizePersonOptions(recruiterOptions),
+    });
+  }, [accountManagerOptions, recruiterOptions, onFilterPeopleOptionsChange]);
 
   const activeSelectedColumns = permissionSelectedColumns.filter(column => isPodSystemEnabled || column !== 'podName');
   const activeAllColumns = permissionAllColumns.filter(column => isPodSystemEnabled || column.id !== 'podName');
