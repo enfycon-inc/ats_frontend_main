@@ -36,6 +36,7 @@ import { getDashboardRoleSelection } from "@/lib/dashboard-role";
 import { getSavedDashboardRole, saveDashboardRole } from "@/lib/dashboard-preference";
 import { syncAssignedOffice } from "@/lib/assigned-office";
 import { OfficeClock } from "./office-clock";
+import { TeamPresenceNavbar } from "./team-presence-navbar";
 
 // ─── Shared icon button base ─────────────────────────────────────────────────
 function NavIconBtn({
@@ -1437,6 +1438,8 @@ function BranchSwitcher() {
       <OfficeClock />
 
       <BranchSwitcher />
+
+      <TeamPresenceNavbar />
 
       {/* Divider */}
       <div className="w-px h-5 bg-white/15 mx-0.5 flex-shrink-0" />

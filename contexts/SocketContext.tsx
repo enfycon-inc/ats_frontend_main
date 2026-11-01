@@ -111,6 +111,10 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
+    // Refresh the legacy online ID snapshot only when presence actually changes,
+    // rather than querying the scoped directory on every heartbeat.
+    newSocket.on('presence_changed', () => newSocket.emit('get_online_users'));
+
     newSocket.on("disconnect", (reason) => {
       console.log(`[SocketContext] Disconnected from WebSocket gateway: ${reason}`);
       setIsConnected(false);

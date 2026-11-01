@@ -18,6 +18,7 @@ import { useManagementProfile } from './use-management-profile';
 import { UserPageSkeleton } from './user-page-skeleton';
 import { enterpriseGrid } from '@/components/shared/enterprise-grid';
 import { isAutomaticPodLeadRole } from '@/lib/pod-lead-role-policy';
+import { useSocket } from '@/contexts/SocketContext';
 
 const date = (value?: string | null) => value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Not recorded';
 const relativeTime = (value?: string | null) => {
@@ -34,8 +35,10 @@ const relativeTime = (value?: string | null) => {
 };
 export function UsersDirectory({ view }: { view: UserView }) {
   const profile = useManagementProfile();
+  const { socket, isConnected } = useSocket();
   const permissions = profile.permissions;
   const has = (...keys: string[]) => permissions.some(p => ['*', 'platform:manage', ...keys].includes(p));
+  const canViewPresence = has('user:presence:view');
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -58,11 +61,17 @@ export function UsersDirectory({ view }: { view: UserView }) {
   const [bulkManagerId, setBulkManagerId] = useState('');
   const allowed = canOpenUserPage(view, permissions);
   const page = Math.max(1, Number(params.get('page')) || 1);
-  const query = new URLSearchParams({ state: view, page: String(page), pageSize: params.get('pageSize') || '25', search: params.get('search') || '', city: params.get('city') || '', role: params.get('role') || '', sort: params.get('sort') || 'name', direction: params.get('direction') || 'asc' });
+  const query = new URLSearchParams({ state: view, page: String(page), pageSize: params.get('pageSize') || '25', search: params.get('search') || '', city: params.get('city') || '', role: params.get('role') || '', presence: params.get('presence') || '', loginToday: params.get('loginToday') || '', sort: params.get('sort') || 'name', direction: params.get('direction') || 'asc' });
   const { data, error, isLoading, isValidating, mutate } = useSWR(allowed && profile.scope ? ['users-directory', profile.scope, query.toString()] : null,
-    () => userManagementApi.list(query.toString()), { refreshInterval: has('user:presence:view') ? 30_000 : 60_000, revalidateOnFocus: true });
+    () => userManagementApi.list(query.toString()), { refreshInterval: 0, revalidateOnFocus: true, revalidateOnReconnect: true });
   const queryKey = query.toString();
   useEffect(() => { setSelected(null); setReviewing(null); setChecked([]); }, [profile.scope, view, queryKey]);
+  useEffect(() => {
+    if (!socket || !isConnected || !canViewPresence) return;
+    const refresh = () => { void mutate(); };
+    socket.on('presence_changed', refresh);
+    return () => { socket.off('presence_changed', refresh); };
+  }, [socket, isConnected, canViewPresence, mutate]);
   useEffect(() => { setChecked(current => current.filter(key => data?.items.some(user => `${user.kind}:${user.id}` === key))); }, [data]);
   const selectableUsers = (data?.items || []).filter(user => user.kind === 'user');
   const selectedUsers = selectableUsers.filter(user => checked.includes(`user:${user.id}`));
@@ -89,11 +98,11 @@ export function UsersDirectory({ view }: { view: UserView }) {
     catch (e) { setBulkError(e instanceof Error ? e.message : 'Unable to update access.'); }
     finally { setSaving(false); }
   };
-  const activeFilters = !!(search.trim() || params.get('city') || params.get('role'));
+  const activeFilters = !!(search.trim() || params.get('city') || params.get('role') || params.get('presence') || params.get('loginToday'));
   const resetFilters = () => {
     setSearch('');
     const next = new URLSearchParams(params.toString());
-    ['search', 'city', 'role', 'page'].forEach(key => next.delete(key));
+    ['search', 'city', 'role', 'presence', 'loginToday', 'page'].forEach(key => next.delete(key));
     router.replace(next.size ? `${pathname}?${next.toString()}` : pathname, { scroll: false });
   };
   const canBulk = (key: 'changeAccess' | 'assignManager' | 'endSessions' | 'edit') => selectedUsers.length > 0 && selectedUsers.every(user => !!user.allowedActions?.[key]);
@@ -146,6 +155,7 @@ export function UsersDirectory({ view }: { view: UserView }) {
         <label className="min-w-56 flex-1 space-y-1 text-xs font-semibold">Search<div className="relative"><Search className="absolute left-3 top-3 h-3.5 w-3.5 text-neutral-400" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Name or email" className="h-9 pl-9 text-xs" /></div></label>
         <label className="space-y-1 text-xs font-semibold">City<select className={`${enterpriseGrid.control} block min-w-36`} value={params.get('city') || ''} onChange={e => setFilter('city', e.target.value)}><option value="">All cities</option>{data?.filters?.cities.map(city => <option key={city} value={city}>{cityName[city] || city}</option>)}</select></label>
         <label className="space-y-1 text-xs font-semibold">Role<select className={`${enterpriseGrid.control} block min-w-40`} value={params.get('role') || ''} onChange={e => setFilter('role', e.target.value)}><option value="">All roles</option>{data?.filters?.roles.map(role => <option key={role} value={role}>{role}</option>)}</select></label>
+        {(view === 'active' || view === 'activity') && has('user:presence:view') && <label className="space-y-1 text-xs font-semibold">Online status<select className={`${enterpriseGrid.control} block min-w-36`} value={params.get('presence') || ''} onChange={e => setFilter('presence', e.target.value)}><option value="">All statuses</option><option value="active">Online</option><option value="away">Away</option><option value="offline">Offline</option><option value="unknown">Unavailable</option></select></label>}
         <div className="ml-auto flex items-center gap-2">
           {activeFilters && <Button variant="outline" size="sm" onClick={resetFilters}>Reset filters</Button>}
           {selectedUsers.length > 0 && <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button size="sm" aria-label={`Bulk actions for ${selectedUsers.length} selected users`} className="h-9 min-w-16 justify-between gap-2 bg-[#1a4fa0] px-3 text-white hover:bg-[#164381]" ><span>{selectedUsers.length}</span><ChevronDown aria-hidden="true" className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 bg-white text-xs dark:bg-slate-900">
