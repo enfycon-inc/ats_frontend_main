@@ -1463,7 +1463,7 @@ const candidates = {
   async uploadCv(
     file: File, 
     source = 'CV Upload',
-    overrides?: { jobId?: string; totalExperienceYears?: string; firstName?: string; lastName?: string; fullName?: string; email?: string; phone?: string; relevantExperienceYears?: string; currentCompany?: string; availabilityToStart?: string; currentCtc?: string; expectedCtc?: string; noticePeriodDays?: string; skills?: string; currentLocation?: string; preferredLocations?: string; preferredLocationMode?: 'SPECIFIC_LOCATIONS' | 'REMOTE_ONLY' | 'REMOTE_OR_LOCATIONS' }
+    overrides?: { jobId?: string; totalExperienceYears?: string; firstName?: string; lastName?: string; fullName?: string; email?: string; phone?: string; linkedinUrl?: string; relevantExperienceYears?: string; currentCompany?: string; availabilityToStart?: string; currentCtc?: string; expectedCtc?: string; noticePeriodDays?: string; skills?: string; currentLocation?: string; preferredLocations?: string; preferredLocationMode?: 'SPECIFIC_LOCATIONS' | 'REMOTE_ONLY' | 'REMOTE_OR_LOCATIONS' }
   ): Promise<{ candidate: any; duplicate: boolean; parsed: boolean; updated?: boolean }> {
     const formData = new FormData();
     formData.append('file', file);
@@ -1475,6 +1475,7 @@ const candidates = {
       if (overrides.fullName) formData.append('fullName', overrides.fullName);
       if (overrides.email) formData.append('email', overrides.email);
       if (overrides.phone) formData.append('phone', overrides.phone);
+      if (overrides.linkedinUrl) formData.append('linkedinUrl', overrides.linkedinUrl);
       if (overrides.relevantExperienceYears) formData.append('relevantExperienceYears', overrides.relevantExperienceYears);
       if (overrides.currentCompany) formData.append('currentCompany', overrides.currentCompany);
       if (overrides.availabilityToStart) formData.append('availabilityToStart', overrides.availabilityToStart);

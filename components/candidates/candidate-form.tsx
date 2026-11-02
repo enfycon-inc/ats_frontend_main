@@ -11,7 +11,7 @@ import { TagInput } from "@/components/ui/tag-input";
 import { CityAutocomplete } from "@/components/city-autocomplete";
 
 export interface CandidateFormProps {
-  formData: Record<'firstName' | 'lastName' | 'email' | 'phone' | 'totalExperienceYears' | 'currentLocation' | 'preferredLocations' | 'preferredLocationMode' | 'source' | 'skills' | 'relevantExperienceYears' | 'currentCtc' | 'expectedCtc' | 'currentCompany' | 'noticePeriodDays' | 'availabilityToStart' | 'sourceChannel' | 'sourceDetail', string>;
+  formData: Record<'firstName' | 'lastName' | 'email' | 'phone' | 'linkedinUrl' | 'totalExperienceYears' | 'currentLocation' | 'preferredLocations' | 'preferredLocationMode' | 'source' | 'skills' | 'relevantExperienceYears' | 'currentCtc' | 'expectedCtc' | 'currentCompany' | 'noticePeriodDays' | 'availabilityToStart' | 'sourceChannel' | 'sourceDetail', string>;
   setFormData: (data: CandidateFormProps['formData']) => void;
   recruiterComment: string;
   setRecruiterComment: (comment: string) => void;
@@ -58,6 +58,10 @@ export function CandidateForm({
               <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Mobile number <span className="text-red-500">*</span></Label>
               <PhoneInput limitMaxLength placeholder="Enter phone" defaultCountry={defaultPhoneCountry} value={formData.phone} onChange={(v) => setFormData({...formData, phone: v?.toString() || ""})} className="h-10 bg-slate-50 dark:bg-slate-950 [&>div]:bg-transparent" />
               {formData.phone && !candidatePhoneSchema.safeParse(formData.phone).success && <p className="text-xs text-red-600">Enter valid mobile number</p>}
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="candidate-linkedin" className="text-sm font-semibold text-slate-700 dark:text-slate-300">LinkedIn profile</Label>
+              <Input id="candidate-linkedin" type="url" maxLength={500} placeholder="https://www.linkedin.com/in/username" value={formData.linkedinUrl || ''} onChange={event => setFormData({...formData, linkedinUrl: event.target.value})} className="h-10 bg-slate-50 dark:bg-slate-950 focus:bg-white" />
             </div>
           </div>
         </div>

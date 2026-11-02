@@ -5,7 +5,7 @@ export function existingCandidateForm(candidate: any) {
   const bench = String(candidate.source || candidate.sourceCategory || '').toLowerCase() === 'bench';
   return {
     firstName: candidate.firstName || name[0] || '', lastName: candidate.lastName || name.slice(1).join(' '),
-    email: candidate.email || '', phone: candidate.phone || candidate.mobile || '',
+    email: candidate.email || '', phone: candidate.phone || candidate.mobile || '', linkedinUrl: candidate.linkedinUrl || '',
     totalExperienceYears: text(candidate.totalExperienceYears ?? candidate.experienceYears),
     relevantExperienceYears: text(candidate.relevantExperienceYears),
     currentLocation: candidate.currentLocation || candidate.location || candidate.rawCurrentLocation || [candidate.city, candidate.state].filter(value => value && value !== 'Unknown').join(', '),
