@@ -6,7 +6,7 @@ import { type TrackerSortKey, type TrackerSortDirection } from '@/lib/submission
 import { cn } from '@/lib/utils';
 
 export type TrackerColumn = Exclude<TrackerSortKey, 'creator'> | 'payDetails' | 'clientTerms' | 'actions';
-const DEFAULT_COLUMNS: TrackerColumn[] = ['job', 'manager', 'recruiter', 'candidate', 'payDetails', 'clientTerms', 'pipeline', 'status', 'jobCreated', 'submitted', 'actions'];
+const DEFAULT_COLUMNS: TrackerColumn[] = ['job', 'manager', 'recruiter', 'candidate', 'pipeline', 'status', 'payDetails', 'clientTerms', 'jobCreated', 'submitted', 'actions'];
 type LegacyTrackerColumn = TrackerColumn | 'creator' | 'clientBillRate' | 'clientCommission';
 const STORED_COLUMNS: LegacyTrackerColumn[] = [...DEFAULT_COLUMNS, 'creator', 'clientBillRate', 'clientCommission'];
 export const TRACKER_COLUMN_WIDTHS: Record<TrackerColumn, number> = { job:270, manager:195, recruiter:195, candidate:260, payDetails:220, clientTerms:190, pipeline:255, status:190, jobCreated:145, submitted:145, actions:88 };
