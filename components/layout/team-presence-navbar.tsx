@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { Activity, ChevronDown, Clock3, Loader2, Users } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
 import { useManagementProfile } from '@/components/users/use-management-profile';
 import { useSocket } from '@/contexts/SocketContext';
 import { userManagementApi } from '@/lib/user-management-api';
@@ -32,10 +34,17 @@ export function TeamPresenceNavbar() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [group, setGroup] = useState<Group>('active');
   const [listPage, setListPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [city, setCity] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => { setSearchQuery(search.trim()); setListPage(1); }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
   const { data, error, isLoading, mutate: refreshSummary } = useSWR<PresenceSummary>(canView && profile.scope ? ['team-presence-summary', profile.scope] : null,
     () => userManagementApi.presenceSummary(), { refreshInterval: 0, revalidateOnFocus: true, revalidateOnReconnect: true });
-  const query = new URLSearchParams({ state: 'activity', page: String(listPage), pageSize: '25', presence: group === 'loggedInToday' ? '' : group, loginToday: group === 'loggedInToday' ? '1' : '' });
-  const { data: list, error: listError, isLoading: listLoading, mutate: refreshList } = useSWR(open ? ['team-presence-list', profile.scope, group, listPage] : null,
+  const query = new URLSearchParams({ state: 'active', page: String(listPage), pageSize: '25', search: searchQuery, city, presence: group === 'loggedInToday' ? '' : group, loginToday: group === 'loggedInToday' ? '1' : '' });
+  const { data: list, error: listError, isLoading: listLoading, mutate: refreshList } = useSWR(open && canView && profile.scope ? ['team-presence-list', profile.scope, query.toString()] : null,
     () => userManagementApi.list(query.toString()), { refreshInterval: 0, revalidateOnFocus: true, revalidateOnReconnect: true });
   useEffect(() => {
     if (!socket || !isConnected || !canView) return;
@@ -51,7 +60,7 @@ export function TeamPresenceNavbar() {
     { key: 'away', count: counts?.away || 0, color: 'bg-amber-300' },
     { key: 'offline', count: counts?.offline || 0, color: 'bg-slate-300' },
   ];
-  const openGroup = (value: Group) => { setGroup(value); setListPage(1); setOpen(true); setSummaryOpen(false); };
+  const openGroup = (value: Group) => { setGroup(value); setListPage(1); setSearch(''); setSearchQuery(''); setCity(''); setOpen(true); setSummaryOpen(false); };
   return <>
     <div className="relative">
       <div className="flex h-9 items-center rounded-lg border border-white/15 bg-white/10 text-white/90">
@@ -82,17 +91,24 @@ export function TeamPresenceNavbar() {
       </div>}
     </div>
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent side="right" className="w-full overflow-y-auto bg-white p-0 text-neutral-900 sm:max-w-md">
+      <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden bg-white p-0 text-neutral-900 sm:max-w-lg">
         <header className="border-b px-5 py-4 pr-12"><div className="flex items-center gap-2"><Activity className="h-4 w-4 text-blue-700" /><SheetTitle className="text-sm font-bold">{groupLabels[group]}</SheetTitle></div><SheetDescription className="mt-1 text-xs">Users in your authorized branch and unit scope.</SheetDescription></header>
-        <div className="flex items-center justify-between border-b bg-neutral-50 px-5 py-2 text-[10px] text-neutral-500"><span>{list?.total ?? 0} users</span><span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" />Updates live</span></div>
+        <div className="flex shrink-0 gap-3 border-b px-5 py-3">
+          <Input aria-label="Search users by name or email" placeholder="Search name or email" value={search} onChange={event => setSearch(event.target.value)} className="h-9 min-w-0 flex-1 text-xs" />
+          <select aria-label="Filter users by city" value={city} onChange={event => { setCity(event.target.value); setListPage(1); }} className="h-9 max-w-40 rounded-md border border-neutral-200 bg-white px-2 text-xs"><option value="">All cities</option>{list?.filters.cities.map(value => <option key={value} value={value}>{({ BBSR: 'Bhubaneswar', VIZAG: 'Vizag', BENGALURU: 'Bengaluru', PUNE: 'Pune', HYDERABAD: 'Hyderabad' } as Record<string, string>)[value] || value}</option>)}</select>
+        </div>
+        <div className="flex shrink-0 items-center justify-between border-b bg-neutral-50 px-5 py-2 text-[10px] text-neutral-500"><span>{list?.total ?? 0} users</span><span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" />Updates live</span></div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
         {!data?.telemetryAvailable && group !== 'loggedInToday' && <p className="m-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Presence tracking is unavailable, so current online status cannot be listed.</p>}
         {listLoading && <div className="flex items-center gap-2 p-5 text-xs text-neutral-500"><Loader2 className="h-4 w-4 animate-spin" />Loading users…</div>}
         {listError && <p role="alert" className="m-4 rounded border border-red-200 p-3 text-xs text-red-700">Unable to load this status list.</p>}
         {!listLoading && !listError && list?.items.map(user => <article key={user.id} className="flex items-center justify-between gap-3 border-b px-5 py-3">
-          <div className="min-w-0"><p className="truncate text-xs font-semibold">{user.fullName}</p><p className="truncate text-[10px] text-neutral-500">{user.email}</p><p className="mt-1 text-[10px] text-neutral-500">{since(user.lastSeenAt)}</p></div>
-          <div className="shrink-0 text-right"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${presenceStyles[user.presence || 'unknown']}`}>{groupLabels[user.presence || 'unknown']}</span><p className="mt-1 text-[9px] text-neutral-500">{user.assignedRoles?.join(', ')}</p></div>
+          <Avatar className="h-10 w-10 shrink-0"><AvatarImage src={user.avatar || undefined} alt={user.fullName} /><AvatarFallback className="bg-blue-50 text-xs text-blue-800">{user.fullName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || '?'}</AvatarFallback></Avatar>
+          <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{user.fullName}</p><p className="truncate text-[10px] text-neutral-500" title={user.email}>{user.email}</p><p className="mt-1 text-[10px] text-neutral-500">{since(user.lastSeenAt)}</p></div>
+          <div className="shrink-0 text-right"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${presenceStyles[user.presence || 'unknown']}`}>{groupLabels[user.presence || 'unknown']}</span></div>
         </article>)}
         {!listLoading && !listError && !list?.items.length && <p className="p-8 text-center text-xs text-neutral-500">No users in this group.</p>}
+        </div>
         {!!list?.total && <footer className="flex items-center justify-between border-t px-5 py-3 text-xs"><span className="text-neutral-500">Page {listPage} of {Math.max(1, Math.ceil(list.total / 25))}</span><div className="flex gap-2"><button className="rounded border px-2 py-1 disabled:opacity-40" disabled={listPage <= 1} onClick={() => setListPage(page => page - 1)}>Previous</button><button className="rounded border px-2 py-1 disabled:opacity-40" disabled={listPage * 25 >= list.total} onClick={() => setListPage(page => page + 1)}>Next</button></div></footer>}
       </SheetContent>
     </Sheet>
