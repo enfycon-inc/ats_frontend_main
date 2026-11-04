@@ -47,7 +47,6 @@ export function DeliveryRoundOverview({ analytics, onSelect, jobHref }: { jobHre
   return <div className={styles.overview}>
     {jobs && <section aria-label="Job overview" className={styles.summary}>
       <div className={styles.summaryTop}>
-        <div className="flex flex-wrap items-center gap-3"><h2 className={styles.summaryTitle} title="Jobs posted in the selected period · current status"><BriefcaseBusiness className="size-5" aria-hidden="true" />Job overview</h2></div>
         <div className={styles.jobTiles}>
           <Link href={jobHref({})} className={`${styles.jobTile} ${styles.totalTile}`}><BriefcaseBusiness aria-hidden="true" /><div><span>Total jobs</span><strong>{number(jobs.total)}</strong></div></Link>
           <Link href={jobHref({jobStatus:'ACTIVE'})} className={`${styles.jobTile} ${styles.activeTile}`}><CircleCheck aria-hidden="true" /><div><span>Active</span><strong>{number(jobs.statuses.ACTIVE || 0)}</strong></div></Link>

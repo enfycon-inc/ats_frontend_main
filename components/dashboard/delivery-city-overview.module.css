@@ -22,10 +22,9 @@
 .toolbarNote { @apply mt-2 text-right;  }
 .overview { @apply grid gap-3;  }
 .summary { @apply overflow-hidden; }
-.summaryTop { @apply flex flex-wrap items-center gap-4 p-3; }
-.summaryTitle { @apply m-0 flex shrink-0 items-center gap-2 text-sm font-bold; color:var(--foreground); }
-.jobTiles { @apply grid flex-1 grid-cols-4 gap-3; min-width:0; }
-.jobTile { @apply flex min-w-0 items-center gap-3 rounded-lg border px-4 py-3; }
+.summaryTop { @apply p-3; min-width:0; overflow-x:auto; }
+.jobTiles { display:flex; flex-wrap:nowrap; gap:0.75rem; min-width:100%; }
+.jobTile { @apply flex items-center gap-3 rounded-lg border px-4 py-3; flex:1 0 160px; min-width:160px; }
 .jobTile > svg { @apply size-9 shrink-0 rounded-lg p-2; }
 .jobTile span { @apply block text-xs font-medium; }
 .jobTile strong { @apply block text-xl font-semibold tabular-nums; }
@@ -127,9 +126,9 @@
 .fullDialog .employeeTable td { @apply py-3;  }
 @media (max-width:1250px) { .group { flex-basis:auto; } }
 @media (max-width:900px) { .cities { grid-template-columns:minmax(0,1fr); } .single .cityBody { grid-template-columns:minmax(0,1fr); } .roundGrid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media (max-width:600px) { .filterRow, .roundGrid { grid-template-columns:minmax(0,1fr); } .finalStrip { grid-template-columns:1fr; } .finalStrip button { border-left:0; border-top:1px solid var(--border); } .summaryTitle { width:100%; } .group { @apply py-2;  } .barRow { grid-template-columns:120px minmax(30px,1fr); } }
-@media (max-width:900px) { .summaryTitle { width:100%; } .jobTiles { flex-basis:100%; } }
-@media (max-width:600px) { .jobTiles { @apply grid-cols-2; } .miniCounter { @apply border-l-0 pl-0; } }
+@media (max-width:600px) { .filterRow, .roundGrid { grid-template-columns:minmax(0,1fr); } .finalStrip { grid-template-columns:1fr; } .finalStrip button { border-left:0; border-top:1px solid var(--border); } .group { @apply py-2;  } .barRow { grid-template-columns:120px minmax(30px,1fr); } }
+
+@media (max-width:600px) { .miniCounter { @apply border-l-0 pl-0; } }
 :global(.dark) .pipelineHeader { @apply bg-slate-800; }
 :global(.dark) .pipelineHeader h2 svg { @apply text-blue-300; }
 :global(.dark) .pipelineHeader button { @apply border-slate-600 bg-slate-900 text-blue-200 hover:bg-slate-700; }
