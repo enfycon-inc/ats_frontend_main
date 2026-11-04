@@ -1,4 +1,6 @@
 'use client';
+import {PerformanceCityFilter} from '@/components/shared/performance-city-filter';
+import {ClosureCount} from '@/components/shared/closure-count';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWRInfinite from 'swr/infinite';
@@ -34,7 +36,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import RecruiterPerformanceCharts from './recruiter-performance-charts';
 
-export default function RecruiterComparison() {
+export default function RecruiterComparison({initialFilters,embedded=false}:{initialFilters?:RecruiterFilters;embedded?:boolean} = {}) {
   const { profile, selection } = useDashboardContext();
   if (!profile?.permissions?.includes('user:manage'))
     return (
@@ -51,27 +53,32 @@ export default function RecruiterComparison() {
     [...profile.permissions].sort().join(','),
   ].join(':');
   return (
-    <Comparison key={scope} scope={scope} permissions={profile.permissions} />
+    <Comparison key={`${scope}:${embedded ? JSON.stringify(initialFilters) : ""}`} scope={embedded ? `${scope}:embedded` : scope} permissions={profile.permissions} initialFilters={initialFilters} embedded={embedded} />
   );
 }
 function Comparison({
   scope,
   permissions,
+  initialFilters,
+  embedded,
 }: {
   scope: string;
   permissions: string[];
+  initialFilters?:RecruiterFilters;
+  embedded:boolean;
 }) {
-  const [saved] = useState(() => readRecruiterState(scope));
-  const available = availableRecruiterColumns(permissions),
+  const [saved] = useState(() => embedded ? undefined : readRecruiterState(scope));
+  const [podsEnabled,setPodsEnabled]=useState(false);
+  const available = availableRecruiterColumns(permissions,podsEnabled), allAvailable=availableRecruiterColumns(permissions,true),
     defaultFilters: RecruiterFilters = {
       sort: permissions.includes('submission:view') ? 'joined' : 'name',
       direction: permissions.includes('submission:view') ? 'desc' : 'asc',
     };
   const [filters, setFilters] = useState<RecruiterFilters>(
-      saved?.filters ?? defaultFilters,
+      initialFilters ?? (saved?.filters?.sort==='sharedJobs' ? {...saved.filters,sort:defaultFilters.sort} : saved?.filters) ?? defaultFilters,
     ),
     [search, setSearch] = useState(saved?.search ?? ''),
-    [period, setPeriod] = useState(saved?.period ?? 'all');
+    [period, setPeriod] = useState(initialFilters?.from ? 'context' : saved?.period ?? 'all');
   const [startDate, setStart] = useState(saved?.startDate ?? ''),
     [endDate, setEnd] = useState(saved?.endDate ?? ''),
     [dateError, setDateError] = useState('');
@@ -82,9 +89,9 @@ function Comparison({
   const normalize = (ids: unknown): RecruiterSort[] =>
     [
       'name',
-      ...(Array.isArray(ids) ? ids : available.map((c) => c.id)).filter(
+      ...(Array.isArray(ids) ? ids : allAvailable.map((c) => c.id)).filter(
         (id): id is RecruiterSort =>
-          id !== 'name' && available.some((c) => c.id === id),
+          id !== 'name' && allAvailable.some((c) => c.id === id),
       ),
     ].filter((id, i, a) => a.indexOf(id) === i) as RecruiterSort[];
   const [columns, setColumns] = useState<RecruiterSort[]>(() => {
@@ -132,7 +139,7 @@ function Comparison({
         revalidateIfStale: false,
         shouldRetryOnError: false,
         persistSize: false,
-        onSuccess: pages => { if (pages[0]) setOptions(pages[0].options); },
+        onSuccess: pages => { if (pages[0]) {setOptions(pages[0].options);setPodsEnabled(pages[0].features?.podsEnabled===true);} },
       },
     );
   const first = data?.[0],
@@ -180,7 +187,8 @@ function Comparison({
     setExpanded(false);
     if (scroll.current) scroll.current.scrollTop = 0;
   };
-  const remember = () =>
+  const remember = () => {
+    if (embedded) return;
     saveRecruiterState(scope, {
       filters,
       search,
@@ -190,8 +198,9 @@ function Comparison({
       expanded,
       scrollTop: scroll.current?.scrollTop ?? 0,
     });
+  };
   const saveColumns = (ids: string[]) => {
-    const next = normalize(ids);
+    const next = normalize(!podsEnabled && columns.includes('sharedJobs') ? [...ids,'sharedJobs'] : ids);
     setColumns(next);
     try {
       localStorage.setItem(key, JSON.stringify(next));
@@ -201,12 +210,12 @@ function Comparison({
   };
   const reset = () => {
     setSearch('');
-    setPeriod('all');
+    setPeriod(initialFilters?.from ? 'context' : 'all');
     setStart('');
     setEnd('');
     setDateError('');
     setExpanded(false);
-    setFilters(defaultFilters);
+    setFilters(initialFilters ?? defaultFilters);
   };
   const visibleColumns = columns
     .map((id) => available.find((c) => c.id === id))
@@ -258,12 +267,12 @@ function Comparison({
           </div>
         ))}
       </div>
-      <RecruiterPerformanceCharts
+      {!embedded && <RecruiterPerformanceCharts
         charts={first?.charts}
         filters={filters}
         onNavigate={remember}
         loading={!first && !error}
-      />
+      />}
       {error && (
         <p
           role="alert"
@@ -328,6 +337,7 @@ function Comparison({
               ))}
             </select>
           </label>
+          <PerformanceCityFilter cities={(first?.options ?? options)?.cities || []} selected={filters.cities} onChange={cities=>change({cities})}/>
           <label className="flex flex-col gap-1.5">
             Time period
             <select
@@ -336,7 +346,8 @@ function Comparison({
               onChange={(e) => {
                 setPeriod(e.target.value);
                 setDateError('');
-                if (e.target.value !== 'custom')
+                if (e.target.value === 'context') change({from:initialFilters?.from,to:initialFilters?.to});
+                else if (e.target.value !== 'custom')
                   change({
                     from: undefined,
                     to: undefined,
@@ -344,7 +355,7 @@ function Comparison({
                   });
               }}
             >
-              <option value="all">All time</option>
+              {embedded && initialFilters?.from && <option value="context">Dashboard period</option>}<option value="all">All time</option>
               <option value="month">This month</option>
               <option value="lastMonth">Last month</option>
               <option value="30days">Last 30 days</option>
@@ -515,7 +526,7 @@ function Comparison({
                               : ''
                           }
                         >
-                          {managerNumber(r[c.id])}
+                          {c.id==='joined'?<ClosureCount value={r.joined}/>:managerNumber(r[c.id] ?? null)}
                         </span>
                       </td>
                     ),

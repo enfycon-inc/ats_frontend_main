@@ -3,6 +3,7 @@ import type { JobStatus } from '@/lib/job-status-contract';
 import { jobLocation } from '@/lib/job-location';
 import { normalizeJobWorkMode, type JobWorkMode } from '@/lib/job-work-mode';
 export interface AssignedRecruiterProfile {
+  city?:string|null;
   id: string;
   fullName: string;
   email?: string | null;
@@ -46,6 +47,8 @@ export interface Job {
   createdAt?: string;
   updatedAt?: string;
   creatorEmail?: string | null;
+  creatorCity?:string|null;
+  accountManagerCity?:string|null;
   createdByUserId?: string | null;
   jobTimezone?: string;
   submissionsCount: number;
@@ -135,6 +138,8 @@ export function mapApiJobToJob(api: any): Job {
     createdAt: api.createdAt || api.createdOn || undefined,
     updatedAt: api.updatedAt || api.modifiedOn || undefined,
     creatorEmail: api.creatorEmail || api.creator_email || undefined,
+    creatorCity:api.creatorCity || api.creator_city || null,
+    accountManagerCity:api.accountManagerCity || api.account_manager_city || null,
     jobTimezone: api.jobTimezone || api.job_timezone || undefined,
     submissionsCount: api.submissionsCount || 0,
     pipeline: api.pipeline || { applied: 0, interviewing: 0, offered: 0 },

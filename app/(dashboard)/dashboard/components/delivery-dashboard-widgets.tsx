@@ -15,7 +15,7 @@ const tones = {
   emerald: { card: "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900 dark:bg-emerald-950/30", text: "text-emerald-700 dark:text-emerald-300", icon: "bg-emerald-100 dark:bg-emerald-900/50", bar: "bg-emerald-500", selected: "ring-emerald-500", hex: "#10b981" },
   rose: { card: "border-rose-200 bg-rose-50/80 dark:border-rose-900 dark:bg-rose-950/30", text: "text-rose-700 dark:text-rose-300", icon: "bg-rose-100 dark:bg-rose-900/50", bar: "bg-rose-500", selected: "ring-rose-500", hex: "#f43f5e" },
 };
-const stageTone = { all: "blue", l1: "blue", l2: "violet", l3: "amber", final: "emerald", review: "amber", closed: "rose" } as const;
+const stageTone = { all: "blue", l1: "blue", l2: "violet", l3: "amber", final: "emerald", review: "amber", closed: "rose", offers: "emerald" } as const;
 
 export function DeliverySection({ title, children, id, note, action }: { title: string; children: ReactNode; id?: string; note?: string; action?: ReactNode }) {
   return <section id={id} className={deliverySurface}>

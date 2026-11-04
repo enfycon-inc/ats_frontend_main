@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
 
 export type PersonFinderOption = {
   id: string;
@@ -28,6 +29,15 @@ type PeopleFinderProps = {
   searchPlaceholder?: string;
   emptyMessage?: string;
   className?: string;
+  onOpenChange?: (open: boolean) => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  error?: boolean;
+  onRetry?: () => void;
+  allLabel?: string;
+  values?: string[];
+  onValuesChange?: (values: string[]) => void;
+  selectionLabel?: string;
 };
 
 function personName(person: PersonFinderOption) {
@@ -52,6 +62,15 @@ export function PeopleFinder({
   searchPlaceholder = "Find a colleague by name or email...",
   emptyMessage = "No matching people found.",
   className,
+  onOpenChange,
+  hasMore,
+  onLoadMore,
+  error,
+  onRetry,
+  allLabel,
+  values,
+  onValuesChange,
+  selectionLabel,
 }: PeopleFinderProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -66,9 +85,10 @@ export function PeopleFinder({
     setQuery(next);
     onSearchChange?.(next);
   };
+  if (values && onValuesChange) return <SearchableMultiSelect {...{ values, onValuesChange, disabled, placeholder, searchPlaceholder, loading, error, onSearchChange, onOpenChange, hasMore, onLoadMore, onRetry, selectionLabel }} options={options.map(person => ({ id: person.id, name: personName(person), description: person.email }))} />;
 
   return (
-    <Popover open={open} onOpenChange={(next) => { setOpen(next); if (!next) handleQueryChange(""); }}>
+    <Popover open={open} onOpenChange={(next) => { setOpen(next); onOpenChange?.(next); if (!next) handleQueryChange(""); }}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -99,6 +119,8 @@ export function PeopleFinder({
         <Command shouldFilter={!onSearchChange}>
           <CommandInput value={query} onValueChange={handleQueryChange} placeholder={searchPlaceholder} />
           <CommandList className="max-h-72">
+            {allLabel && <CommandGroup><CommandItem value={allLabel} onSelect={() => { onValueChange(''); setOpen(false); onOpenChange?.(false); handleQueryChange(''); }}>{allLabel}</CommandItem></CommandGroup>}
+            {error && <div role="alert" className="p-3 text-xs text-red-700">Unable to load options. <button type="button" onClick={onRetry} className="underline">Retry</button></div>}
             {loading ? (
               <div className="flex items-center justify-center gap-2 px-3 py-8 text-sm text-slate-500"><Loader2 className="size-4 animate-spin" />Searching people</div>
             ) : (
@@ -109,7 +131,7 @@ export function PeopleFinder({
                     <CommandItem
                       key={person.id}
                       value={`${personName(person)} ${person.email || ""} ${person.id}`}
-                      onSelect={() => { onValueChange(person.id === value ? "" : person.id); setOpen(false); handleQueryChange(""); }}
+                      onSelect={() => { onValueChange(person.id === value ? "" : person.id); setOpen(false); onOpenChange?.(false); handleQueryChange(""); }}
                       className="min-h-14 gap-3 px-3 py-2.5"
                     >
                       <Avatar className="size-9 border border-slate-200 dark:border-slate-700">
@@ -128,6 +150,7 @@ export function PeopleFinder({
               </>
             )}
           </CommandList>
+          {hasMore && <button type="button" disabled={loading} onClick={onLoadMore} className="w-full border-t p-2 text-xs text-blue-700 disabled:opacity-50">Load more</button>}
         </Command>
       </PopoverContent>
     </Popover>

@@ -1,0 +1,141 @@
+@reference "tailwindcss";
+.dashboard { @apply grid min-w-0 gap-3 text-sm; color:var(--foreground); }
+.toolbar, .summary, .pipeline, .cityCard, .comparisonTable { @apply min-w-0 rounded-lg border; border-color:var(--border);background:var(--card);color:var(--card-foreground); }
+.toolbar { @apply min-w-0; border:0; border-radius:0; background:transparent; }
+.filterRow { @apply flex flex-wrap items-start justify-end gap-3; }
+.periodField, .cityField, .dateField { @apply flex min-w-0 flex-col gap-1; }
+.dateField { width:140px; }
+.dateField .control { @apply h-8 min-h-8 px-2 text-sm; }
+.applyRange { @apply h-8 min-h-8 self-end text-sm; }
+.periodField { width:160px; }
+.cityField { width:200px; }
+.periodField .control, .cityField button { @apply h-8 min-h-8 text-sm; }
+.cityField button { max-height:2rem; }
+.field { @apply flex min-w-0 items-center gap-2 text-sm font-medium;  }
+.field > span:first-child { flex-shrink:0; }
+.field > div { @apply min-w-0 flex-1;  }
+.control { @apply h-10 min-h-10 w-full rounded-md border px-3 text-sm font-normal; border-color:var(--input);background:var(--background);color:var(--foreground); }
+.field button { @apply h-10 min-h-10 text-sm;  }
+.field button span { font-size:inherit; }
+.offersButton { @apply h-10 text-sm font-semibold text-blue-700;  }
+.note, .toolbarNote { @apply text-xs; color:var(--muted-foreground); }
+.toolbarNote { @apply mt-2 text-right;  }
+.overview { @apply grid gap-3;  }
+.summary { @apply overflow-hidden; }
+.summaryTop { @apply flex flex-wrap items-center gap-4 p-3; }
+.summaryTitle { @apply m-0 flex shrink-0 items-center gap-2 text-sm font-bold; color:var(--foreground); }
+.jobTiles { @apply grid flex-1 grid-cols-4 gap-3; min-width:0; }
+.jobTile { @apply flex min-w-0 items-center gap-3 rounded-lg border px-4 py-3; }
+.jobTile > svg { @apply size-9 shrink-0 rounded-lg p-2; }
+.jobTile span { @apply block text-xs font-medium; }
+.jobTile strong { @apply block text-xl font-semibold tabular-nums; }
+.totalTile { @apply border-blue-200 bg-blue-50 text-blue-950; }
+.totalTile > svg { @apply bg-blue-100 text-blue-700; }
+.activeTile { @apply border-green-200 bg-green-50 text-green-950; }
+.activeTile > svg { @apply bg-green-100 text-green-700; }
+.closedTile { @apply border-slate-200 bg-slate-50 text-slate-900; }
+.closedTile > svg { @apply bg-slate-200 text-slate-700; }
+.holdTile { @apply border-amber-200 bg-amber-50 text-amber-950; }
+.holdTile > svg { @apply bg-amber-100 text-amber-700; }
+.summaryBottom { @apply flex flex-wrap items-center gap-x-4 gap-y-3 border-t px-3 py-3; }
+.priorityChip, .typeChip { @apply inline-flex items-center rounded-md border px-2 py-1 text-xs; }
+.priorityChip[data-priority="HOT"] { @apply border-red-100 bg-red-50 text-red-800; }
+.priorityChip[data-priority="WARM"] { @apply border-amber-100 bg-amber-50 text-amber-800; }
+.priorityChip[data-priority="COLD"] { @apply border-blue-100 bg-blue-50 text-blue-800; }
+.typeChip { background:var(--muted); }
+.miniCounter { @apply flex shrink-0 items-center gap-2 border-l pl-4 text-xs; }
+.miniCounter strong { @apply text-sm font-semibold tabular-nums; }
+.stat { @apply flex flex-col justify-center gap-1 border-l px-3 text-xs; color:var(--muted-foreground); flex:0 0 auto; }
+.stat strong { @apply text-xl font-semibold tabular-nums; color:var(--foreground); }
+.group { @apply flex min-w-0 flex-wrap items-center gap-3; flex:1 1 auto; }
+.groupTitle { @apply m-0 text-xs font-semibold;  }
+.inlineStats { @apply flex flex-wrap gap-x-3 gap-y-1 text-xs;  }
+.inlineStats strong { @apply ml-1 font-semibold;  }
+.pipeline { @apply overflow-hidden;  }
+.pipelineHeader { @apply flex flex-wrap items-center justify-between gap-3 border-b bg-slate-50 px-4 py-3; color:var(--foreground); }
+.pipelineHeader h2 { @apply m-0 flex items-center gap-2 text-sm font-bold; color:var(--foreground); }
+.pipelineHeader h2 svg { @apply text-blue-700; }
+.pipelineHeader button { @apply border-slate-300 bg-white text-sm text-blue-900 hover:bg-blue-50; }
+.roundGrid { @apply grid grid-cols-3 gap-3 p-3;  }
+.roundCard { @apply overflow-hidden rounded-md border;  }
+.roundCard h3 { @apply m-0 bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-950;  }
+.roundCard:nth-child(2) h3 { @apply bg-violet-100 text-violet-950;  }
+.roundCard:nth-child(3) h3 { @apply bg-amber-100 text-amber-950;  }
+.roundCard button { @apply flex min-h-9 w-full items-center justify-between gap-3 border-b px-4 py-2 text-sm focus-visible:outline-2;  }
+.roundCard button:last-child { border-bottom:0; }
+.finalStrip { display:grid; grid-template-columns:110px repeat(3,minmax(0,1fr)); @apply mx-3 mb-3 overflow-hidden rounded-md border-2 border-slate-300; }
+.finalStrip h3 { @apply m-0 flex items-center bg-blue-950 px-4 py-3 text-sm font-semibold text-white; }
+.finalStrip button { @apply flex items-center justify-between gap-3 border-l px-4 py-3 text-sm;  }
+.finalStrip strong { @apply ml-2;  }
+.finalStrip button[data-outcome="SELECTED"] { @apply border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100; }
+.finalStrip button[data-outcome="OFFER"] { @apply border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100; }
+.finalStrip button[data-outcome="JOIN"] { @apply border-green-200 bg-green-50 text-green-900 hover:bg-green-100; }
+:global(.dark) .finalStrip button[data-outcome="SELECTED"] { @apply border-blue-800 bg-blue-950 text-blue-100 hover:bg-blue-900; }
+:global(.dark) .finalStrip button[data-outcome="OFFER"] { @apply border-amber-800 bg-amber-950 text-amber-100 hover:bg-amber-900; }
+:global(.dark) .finalStrip button[data-outcome="JOIN"] { @apply border-green-800 bg-green-950 text-green-100 hover:bg-green-900; }
+.citySection { @apply grid gap-3;  }
+.cityTools { @apply flex justify-end;  }
+.cityTools select { @apply h-9 min-h-9 w-40 text-sm;  }
+.cities { @apply grid grid-cols-2 items-start gap-3;  }
+.single { grid-template-columns:minmax(0,1fr); }
+.cityCard { @apply overflow-hidden;  }
+.cityHeader { @apply flex flex-wrap items-center justify-between gap-2 bg-blue-800 px-3 py-2 text-white;  }
+.cityCard:nth-child(even) .cityHeader { @apply bg-teal-700;  }
+.cityHeader h3 { @apply m-0 flex items-center gap-2 text-sm font-semibold text-white;  }
+.cityHeader button { @apply h-8 border-white/60 bg-transparent text-xs text-white hover:bg-white/10;  }
+.cityStats { @apply mx-3 grid grid-cols-5 border-b py-3;  }
+.cityStat { @apply border-l px-3 text-xs; color:var(--muted-foreground); }
+.cityStat:first-child { border-left:0; }
+.cityStat strong { @apply mt-1 block text-xl font-semibold tabular-nums; color:var(--foreground); }
+.cityBody { min-width:0; }
+.single .cityBody { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); }
+.chart { @apply min-w-0 p-3;  }
+.chartTitle { @apply mb-2 flex items-center justify-between gap-2;  }
+.chartTitle h4 { @apply m-0 text-sm font-semibold;  }
+.chartTitle select { @apply bg-transparent text-xs;  }
+.legend { @apply mb-2 flex justify-end gap-3 text-xs text-blue-700;  }
+.legend span:nth-child(2) { @apply text-green-700;  }
+.legend span:nth-child(3) { @apply text-emerald-800;  }
+.barRow { display:grid; grid-template-columns:minmax(120px,160px) minmax(30px,1fr); @apply min-h-7 w-full items-center gap-2 text-left;  }
+.barLabel { @apply truncate text-xs;  }
+.barTrack { @apply flex h-5 overflow-hidden rounded-sm bg-slate-100;  }
+.barFill { @apply block h-full overflow-hidden bg-blue-700 text-center text-xs leading-5 text-white;  }
+.barFill.offerFill { @apply bg-green-300 text-green-950;  }
+.barFill.joinFill { @apply bg-emerald-700;  }
+.employeeRegion { @apply min-w-0 border-t;  }
+.employeeScroll { @apply max-h-52 overflow-auto;  }
+.employeeTable { @apply w-full border-collapse text-left;  min-width:460px; table-layout:fixed; }
+.employeeTable th { @apply sticky top-0 z-10 border-b bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700;  }
+.employeeTable th:first-child { width:55%; }
+.functionalTable th:first-child { width:44%; }
+.employeeTable td { @apply border-b px-3 py-2 text-sm align-middle;  }
+.employeeTable td:not(:first-child), .employeeTable th:not(:first-child) { text-align:right; }
+.identity { @apply flex w-full min-w-0 items-center gap-2 text-left;  }
+.pagination { @apply flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2;  }
+.comparisonTable { @apply overflow-auto p-3;  }
+.comparisonTable > table { @apply w-full text-left text-sm;  }
+.comparisonTable th, .comparisonTable td { @apply border-b px-3 py-2;  }
+.drilldownFilters > summary { @apply cursor-pointer px-4 py-2 text-sm; color:var(--muted-foreground); }
+.dashboard > section:last-child > div:first-child h2 { @apply text-sm;  }
+.dashboard > section:last-child table th { @apply px-3 py-2 text-xs;  }
+.dashboard > section:last-child table td { @apply px-3 py-2 text-sm;  }
+.fullDialog { width:calc(100vw - 2rem); max-width:calc(100vw - 2rem); height:calc(100dvh - 2rem); @apply flex flex-col gap-3 overflow-hidden;  }
+.fullBody { @apply flex min-h-0 flex-1 flex-col;  }
+.fullBody .employeeRegion { @apply flex min-h-0 flex-1 flex-col;  }
+.fullEmployeeScroll { @apply min-h-0 flex-1 overflow-auto;  }
+.fullDialog .employeeTable th:first-child { width:55%; }
+.fullDialog .employeeTable td { @apply py-3;  }
+@media (max-width:1250px) { .group { flex-basis:auto; } }
+@media (max-width:900px) { .cities { grid-template-columns:minmax(0,1fr); } .single .cityBody { grid-template-columns:minmax(0,1fr); } .roundGrid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:600px) { .filterRow, .roundGrid { grid-template-columns:minmax(0,1fr); } .finalStrip { grid-template-columns:1fr; } .finalStrip button { border-left:0; border-top:1px solid var(--border); } .summaryTitle { width:100%; } .group { @apply py-2;  } .barRow { grid-template-columns:120px minmax(30px,1fr); } }
+@media (max-width:900px) { .summaryTitle { width:100%; } .jobTiles { flex-basis:100%; } }
+@media (max-width:600px) { .jobTiles { @apply grid-cols-2; } .miniCounter { @apply border-l-0 pl-0; } }
+:global(.dark) .pipelineHeader { @apply bg-slate-800; }
+:global(.dark) .pipelineHeader h2 svg { @apply text-blue-300; }
+:global(.dark) .pipelineHeader button { @apply border-slate-600 bg-slate-900 text-blue-200 hover:bg-slate-700; }
+:global(.dark) .jobTile { @apply border-slate-700 bg-slate-800 text-slate-100; }
+:global(.dark) .priorityChip { @apply border-slate-600 bg-slate-800 text-slate-100; }
+:global(.dark) .roundCard h3, :global(.dark) .finalStrip h3 { @apply bg-slate-800 text-slate-100;  }
+:global(.dark) .employeeTable th { @apply bg-slate-800 text-slate-100;  }
+.roundCard button:hover, .finalStrip button:hover { background:var(--accent); }
+

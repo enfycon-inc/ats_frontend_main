@@ -1,4 +1,5 @@
 "use client";
+import {UserIdentity} from '@/components/shared/user-identity';
 import { TablePagination } from "@/components/shared/table-pagination";
 
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
@@ -74,8 +75,7 @@ export function JobSubmissions({ jobId, jobType, market, initialResponse, onSave
                       <p className="mt-1 text-muted-foreground">{sub.candidatePhone || '—'}</p>
                     </td>
                     <td className="min-w-[160px] px-4 py-4">
-                      <p className="font-medium">{sub.recruiterName || 'Name unavailable'}</p>
-                      <p className="mt-1 max-w-[220px] break-words text-[10.5px] text-muted-foreground">{sub.recruiterEmail || 'Email not provided'}</p>
+                      <UserIdentity cityLayout="responsive" wrapDetails user={{name:sub.recruiterName,email:sub.recruiterEmail,avatar:sub.recruiterAvatar,city:sub.recruiterCity}}/>
                     </td>
                     <td className="min-w-[150px] px-4 py-4">
                       <p className="font-medium">{compensation.value}</p>

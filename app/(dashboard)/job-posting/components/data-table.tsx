@@ -578,6 +578,7 @@ export default function DataTable({
                     onDragEnd={handleColDragEnd}
                     className={cn(
                       "px-4 py-3.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100/95 dark:bg-slate-900 border-r border-b border-neutral-200 dark:border-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors cursor-grab active:cursor-grabbing relative whitespace-nowrap select-none",
+                      colId === "jobTitle" && "w-[240px] max-w-[240px] xl:w-[280px] xl:max-w-[280px]",
                       isDraggingThis && "opacity-30 bg-slate-200/60 dark:bg-slate-800/60",
                       isOverThis && "border-l-4 border-l-[#1a4fa0] bg-blue-100/60 dark:bg-blue-950/60"
                     )}

@@ -1,4 +1,7 @@
 "use client";
+import {CityBadge} from '@/components/shared/city-badge';
+import {JobTypeBadge} from '@/components/shared/job-type-badge';
+import {staffNameClass, staffNameChipClass} from '@/components/shared/staff-identity-styles';
 
 
 import React from "react";
@@ -31,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { atsApi } from "@/lib/ats-api";
 import { Job } from "../../data/mock-jobs";
@@ -149,7 +153,7 @@ export function JobTableRow({
         return (
           <td
             key={colId}
-            className="py-4 px-4 border-r border-neutral-200/80 dark:border-slate-800/80 whitespace-nowrap font-normal text-slate-850 dark:text-slate-200 text-xs transition-colors relative select-none cursor-default"
+            className={cn("py-4 px-4 border-r border-neutral-200/80 dark:border-slate-800/80 whitespace-nowrap font-normal text-slate-850 dark:text-slate-200 text-xs transition-colors relative select-none cursor-default", colId === "jobTitle" && "w-[240px] max-w-[240px] xl:w-[280px] xl:max-w-[280px]")}
           >
             {colId === "client" || colId === "endClientName" ? (
               <span className="font-medium text-slate-900 dark:text-slate-100">{String(job[colId as keyof Job] || "N/A")}</span>
@@ -315,12 +319,17 @@ export function JobTableRow({
                   ((job as any).sharedBranchIds && (job as any).sharedBranchIds.length > 0);
 
                 return (
-                  <div className="flex flex-col items-start gap-1.5">
-                    <Link href={`/job-posting/${job.id}`}>
-                      <span className="whitespace-nowrap hover:underline cursor-pointer text-slate-900 dark:text-slate-100 hover:text-[#1a4fa0] dark:hover:text-blue-400 font-semibold">
+                  <div className="flex w-[208px] xl:w-[248px] flex-col items-start gap-1.5 whitespace-normal">
+                    <div className="flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                    <TooltipProvider delayDuration={250}><Tooltip><TooltipTrigger asChild>
+                    <Link href={`/job-posting/${job.id}`} className="block min-w-0 max-w-full" aria-label={job.jobTitle}>
+                      <span className="line-clamp-2 whitespace-normal break-words [overflow-wrap:anywhere] hover:underline cursor-pointer text-slate-900 dark:text-slate-100 hover:text-[#1a4fa0] dark:hover:text-blue-400 font-semibold">
                         {job.jobTitle}
                       </span>
                     </Link>
+                    </TooltipTrigger><TooltipContent className="max-w-sm whitespace-normal break-words">{job.jobTitle}</TooltipContent></Tooltip></TooltipProvider>
+                    <JobTypeBadge jobType={job.jobType}/>
+                    </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                     {(isActive || isClosed) && (
                       <span
@@ -369,7 +378,7 @@ export function JobTableRow({
               })()
             ) : colId === "createdBy" ? (
               <div className="flex flex-col leading-tight py-0.5">
-                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[160px]">
+                <span className={cn(staffNameClass, "text-xs truncate max-w-[200px]")}>
                   {String(
                     job.createdBy ||
                       (job as any).creator_name ||
@@ -378,13 +387,14 @@ export function JobTableRow({
                   )}
                 </span>
                 {job.creatorEmail && (
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[180px]">
+                  <span title={job.creatorEmail} className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[220px]">
                     {job.creatorEmail}
                   </span>
                 )}
+                {job.creatorCity && <div className="mt-1"><CityBadge city={job.creatorCity}/></div>}
                 {job.createdByUserId && job.accountManagerId && job.accountManagerId !== job.createdByUserId && job.accountManagerName && (
                   <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[180px]">
-                    For {job.accountManagerName}
+                    For {job.accountManagerName}<CityBadge city={job.accountManagerCity}/>
                   </span>
                 )}
               </div>
@@ -493,7 +503,7 @@ export function JobTableRow({
                           {assignInfo.recruiters.names.slice(0, 2).map((name, i) => (
                             <span
                               key={i}
-                              className="inline-flex items-center px-1.5 py-0.2 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800 shrink-0 max-w-[85px] truncate"
+                              className={cn(staffNameChipClass, "shrink-0 gap-1")}
                             >
                               {name}
                             </span>

@@ -1,3 +1,5 @@
+import {CityBadge} from '@/components/shared/city-badge';
+import {staffNameClass} from '@/components/shared/staff-identity-styles';
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import React, { useState, useEffect } from 'react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
@@ -32,7 +34,7 @@ export function JobPodHoverCard({
   podIds: string[];
   recruiterNames?: string[];
   recruiterIds?: string[];
-  recruiterDetails?: { id: string; fullName: string; email?: string | null; avatar?: string | null }[];
+  recruiterDetails?: { id: string; fullName: string; email?: string | null; avatar?: string | null; city?:string|null }[];
   children: React.ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -74,14 +76,21 @@ export function JobPodHoverCard({
   const totalAssigned = podIds.length + Math.max(recruiterNames.length, recruiterIds.length);
 
   return (
-    <HoverCard openDelay={200} closeDelay={300} onOpenChange={setIsOpen}>
+    <HoverCard open={isOpen} openDelay={200} closeDelay={300} onOpenChange={setIsOpen}>
       <HoverCardTrigger asChild>
-        <div className="cursor-default">{children}</div>
+        <div role="button" tabIndex={0} aria-label="View assigned team details" aria-expanded={isOpen}
+          onClick={(event) => {event.stopPropagation();setIsOpen(value => !value);}}
+          onKeyDown={(event) => {
+            if(event.key === 'Enter' || event.key === ' ') {event.preventDefault();event.stopPropagation();setIsOpen(value => !value);}
+            if(event.key === 'Escape') setIsOpen(false);
+          }}
+          className="cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">{children}</div>
       </HoverCardTrigger>
       <HoverCardContent 
         className="w-80 p-0 overflow-hidden border-slate-200/80 dark:border-slate-800 shadow-xl rounded-xl bg-white dark:bg-slate-900"
         align="start"
         sideOffset={8}
+        onKeyDown={(event) => {if(event.key === 'Escape') setIsOpen(false);}}
       >
         <article>
           <header className="bg-slate-50 dark:bg-slate-900 px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -149,7 +158,7 @@ export function JobPodHoverCard({
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="flex flex-col min-w-0">
-                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">
+                                    <span className={`text-xs truncate ${staffNameClass}`}>
                                       {mName}
                                     </span>
                                     {mEmail && (
@@ -189,7 +198,7 @@ export function JobPodHoverCard({
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col min-w-0">
-                              <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">
+                              <span className={`text-xs truncate ${staffNameClass}`}>
                                 {mName}
                               </span>
                               {mEmail && (
@@ -198,6 +207,7 @@ export function JobPodHoverCard({
                                   {mEmail}
                                 </span>
                               )}
+                              <CityBadge city={u.city}/>
                             </div>
                           </div>
                         );

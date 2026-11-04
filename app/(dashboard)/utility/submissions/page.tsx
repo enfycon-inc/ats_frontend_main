@@ -4,6 +4,7 @@ import useSWR from 'swr';
 import SubmissionFilterBar from '@/components/submissions/submission-filter-bar';
 import { localFilterAccess, readSubmissionFilters, submissionFilterQuery, submissionTabs } from '@/lib/submission-filters';
 import { InterviewRoundStatus, type RoundKey, type TrackerListFilters } from '@/lib/submission-contract';
+import { JobTypeBadge } from '@/components/shared/job-type-badge';
 import { UserIdentity } from '@/components/shared/user-identity';
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 import { PodFeatureGate } from "@/components/shared/pod-feature-gate";
@@ -41,19 +42,6 @@ function submissionOrdinal(value: number): string {
   const remainder = value % 100;
   const suffix = remainder >= 11 && remainder <= 13 ? 'th' : value % 10 === 1 ? 'st' : value % 10 === 2 ? 'nd' : value % 10 === 3 ? 'rd' : 'th';
   return `${value}${suffix}`;
-}
-
-function jobTypeBadgeClass(jobType?: string | null): string {
-  switch (jobType?.trim().toLowerCase()) {
-    case 'full time': return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200';
-    case 'part time': return 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-200';
-    case 'contract': return 'bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200';
-    case 'c2h':
-    case 'contract to hire':
-    case 'contract-to-hire': return 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-200';
-    case 'freelance': return 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200';
-    default: return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
-  }
 }
 
 const PRIMARY = "bg-[#1a4fa0] text-white hover:bg-[#154181]";
@@ -367,9 +355,9 @@ function FilteredSubmissionsPage({scope}:{scope:string}) {
   }
   function renderCell(sub: TrackerSubmission, column: TrackerColumn): ReactNode {
     switch (column) {
-      case "job": return <td key="job" className="px-5 py-5"><div className="space-y-1.5"><div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"><Link href={detailHref(sub.id)} className="text-sm font-semibold leading-5 text-slate-900 hover:text-[#1a4fa0] hover:underline dark:text-slate-100">{sub.jobTitle || "Title unavailable"}</Link>{sub.jobType && <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10.5px] font-semibold leading-4 ${jobTypeBadgeClass(sub.jobType)}`}>{sub.jobType}</span>}</div><p className="whitespace-nowrap font-medium text-muted-foreground">{sub.jobCode || "Code unavailable"}</p><div className="flex items-center gap-2 whitespace-nowrap text-xs leading-5">{sub.jobUrgency && <span className="rounded bg-amber-50 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{sub.jobUrgency}</span>}<button type="button" aria-label={`${sub.submissionNumber ? `${submissionOrdinal(sub.submissionNumber)} submission` : "Submission"}; ${sub.jobSubmissionRequired ?? "No submission target"} required. Filter by this job.`} title={`${sub.submissionNumber ? `${submissionOrdinal(sub.submissionNumber)} submission` : "Submission"} · ${sub.jobSubmissionRequired ?? "—"} required`} className="border-l border-border pl-2 font-medium text-[#1a4fa0] dark:text-blue-300 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => { changeFilters({jobId:sub.jobId}); }}>{sub.submissionNumber ? submissionOrdinal(sub.submissionNumber) : "Submission"} / {sub.jobSubmissionRequired ?? "—"} req</button></div>{sub.jobIsCoSourced && <span className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Co-sourced</span>}</div></td>;
-      case "manager": return <td key="manager" className="px-2.5 py-3"><button type="button" onClick={()=>setProfileTarget({kind:'account-manager',submission:sub})} className="block w-full text-left hover:text-[#1a4fa0]"><UserIdentity size="table" wrapDetails user={{name:sub.accountManagerName,email:sub.accountManagerEmail}}/></button></td>;
-      case "recruiter": return <td key="recruiter" className="px-2.5 py-3"><button type="button" onClick={()=>setProfileTarget({kind:'recruiter',submission:sub})} className="block w-full text-left hover:text-[#1a4fa0]"><UserIdentity size="table" wrapDetails user={{name:sub.recruiterName,email:sub.recruiterEmail,avatar:sub.recruiterAvatar}}/></button></td>;
+      case "job": return <td key="job" className="px-5 py-5"><div className="space-y-1.5"><div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"><Link href={detailHref(sub.id)} className="text-sm font-semibold leading-5 text-slate-900 hover:text-[#1a4fa0] hover:underline dark:text-slate-100">{sub.jobTitle || "Title unavailable"}</Link><JobTypeBadge jobType={sub.jobType}/></div><p className="whitespace-nowrap font-medium text-muted-foreground">{sub.jobCode || "Code unavailable"}</p><div className="flex items-center gap-2 whitespace-nowrap text-xs leading-5">{sub.jobUrgency && <span className="rounded bg-amber-50 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{sub.jobUrgency}</span>}<button type="button" aria-label={`${sub.submissionNumber ? `${submissionOrdinal(sub.submissionNumber)} submission` : "Submission"}; ${sub.jobSubmissionRequired ?? "No submission target"} required. Filter by this job.`} title={`${sub.submissionNumber ? `${submissionOrdinal(sub.submissionNumber)} submission` : "Submission"} · ${sub.jobSubmissionRequired ?? "—"} required`} className="border-l border-border pl-2 font-medium text-[#1a4fa0] dark:text-blue-300 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => { changeFilters({jobId:sub.jobId}); }}>{sub.submissionNumber ? submissionOrdinal(sub.submissionNumber) : "Submission"} / {sub.jobSubmissionRequired ?? "—"} req</button></div>{sub.jobIsCoSourced && <span className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Co-sourced</span>}</div></td>;
+      case "manager": return <td key="manager" className="px-2.5 py-3"><button type="button" onClick={()=>setProfileTarget({kind:'account-manager',submission:sub})} className="block w-full text-left hover:text-[#1a4fa0]"><UserIdentity size="table" wrapDetails cityLayout="responsive" user={{name:sub.accountManagerName,email:sub.accountManagerEmail,city:sub.accountManagerCity}}/></button></td>;
+      case "recruiter": return <td key="recruiter" className="px-2.5 py-3"><button type="button" onClick={()=>setProfileTarget({kind:'recruiter',submission:sub})} className="block w-full text-left hover:text-[#1a4fa0]"><UserIdentity size="table" wrapDetails cityLayout="responsive" user={{name:sub.recruiterName,email:sub.recruiterEmail,avatar:sub.recruiterAvatar,city:sub.recruiterCity}}/></button></td>;
       case "candidate": return <td key="candidate" className="px-2.5 py-3"><CandidateCell submission={sub} onOpen={() => setProfileTarget({ kind: "candidate", submission: sub })} /></td>;
       case "payDetails": return <td key="payDetails" className="px-3 py-3"><div className="space-y-2"><div><span className="block text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">{compensationLabel(false,sub.jobType,sub.compensationPeriod)}</span><span className="text-xs font-medium">{submissionCompensationValue(sub,false)}</span></div><div><span className="block text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">{compensationLabel(true,sub.jobType,sub.compensationPeriod)}</span><span className="text-xs font-medium">{submissionCompensationValue(sub,true)}</span></div></div></td>;
       case "clientTerms": return <td key="clientTerms" className="px-3 py-3 text-xs font-medium">{formatClientTerms(sub)}</td>;

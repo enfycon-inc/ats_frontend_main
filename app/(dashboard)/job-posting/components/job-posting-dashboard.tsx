@@ -69,6 +69,9 @@ export default function JobPostingDashboard({
   // Prefer prop-based initialFilter (from dedicated pages like /my-jobs) over URL query param
   const filterParam = initialFilter || searchParams.get("filter"); // e.g. "direct", "pod", "unassigned", "my"
   const priorityParam = searchParams.get("priority") || searchParams.get("urgency");
+  const statusParam = initialStatusFilter !== 'All' ? initialStatusFilter : searchParams.get('status') || 'All';
+  const deliverySelection = searchParams.get('delivery') === '1';
+  const deliveryContext = deliverySelection ? Object.fromEntries(['delivery','period','cities','deliveryFrom','deliveryTo','jobType'].map(key => [key,searchParams.get(key)||''])) : {};
 
   // Drawer States
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -576,7 +579,8 @@ export default function JobPostingDashboard({
         </div>
       )}
 
-      {priorityParam && (
+      {deliverySelection && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm dark:border-blue-900 dark:bg-blue-950"><span>Job filters: {statusParam} · Period: {deliveryContext.period || 'all'}{deliveryContext.cities ? ` · Employee cities: ${deliveryContext.cities}` : ''}{deliveryContext.jobType ? ` · Type: ${deliveryContext.jobType}` : ''}{priorityParam ? ` · Priority: ${priorityParam}` : ''}{deliveryContext.deliveryFrom ? ` · ${deliveryContext.deliveryFrom} – ${deliveryContext.deliveryTo}` : ''}</span><button className="text-blue-700 hover:underline dark:text-blue-300" onClick={() => router.push(initialStatusFilter === 'Active' ? '/job-posting/active' : '/job-posting/all')}>Clear filters</button></div>}
+      {priorityParam && !deliverySelection && (
         <div className="flex items-center justify-between px-3.5 py-1.5 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 rounded-lg text-xs">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-slate-700 dark:text-slate-300">Filtered by Priority:</span>
@@ -598,7 +602,7 @@ export default function JobPostingDashboard({
             </>}
             key={JSON.stringify([currentUser?.id, currentUser?.tenantId, currentUser?.branchId, currentUser?.businessUnitId, userPermissions])}
             data={displayJobs}
-            catalog={{ filter: filterParam || '', status: initialStatusFilter === 'All' ? '' : initialStatusFilter, priority: priorityParam || '', tab: dashboardTab, predefined: currentFilters.predefined.join('|'), unit: currentFilters.businessUnit === 'All selected' ? '' : currentFilters.businessUnit, accountManagers: currentFilters.accountManagers.join(','), recruiters: currentFilters.recruiters.join(','), branches: currentFilters.branches.join(','), clients: currentFilters.clients.join(','), workModes: currentFilters.workModes.join(','), statuses: currentFilters.statuses.join(','), priorities: currentFilters.priorities.join(','), revision: catalogRevision, scope: JSON.stringify([currentUser?.id,currentUser?.tenantId,currentUser?.branchId,currentUser?.businessUnitId,userPermissions]) }}
+            catalog={{ ...deliveryContext, filter: filterParam || '', status: statusParam === 'All' ? '' : statusParam, priority: priorityParam || '', tab: dashboardTab, predefined: currentFilters.predefined.join('|'), unit: currentFilters.businessUnit === 'All selected' ? '' : currentFilters.businessUnit, accountManagers: currentFilters.accountManagers.join(','), recruiters: currentFilters.recruiters.join(','), branches: currentFilters.branches.join(','), clients: currentFilters.clients.join(','), workModes: currentFilters.workModes.join(','), statuses: currentFilters.statuses.join(','), priorities: currentFilters.priorities.join(','), revision: catalogRevision, scope: JSON.stringify([currentUser?.id,currentUser?.tenantId,currentUser?.branchId,currentUser?.businessUnitId,userPermissions]) }}
             selectedColumns={activeSelectedColumns}
             allColumns={allColumns}
             branchUsesPods={branchUsesPods}

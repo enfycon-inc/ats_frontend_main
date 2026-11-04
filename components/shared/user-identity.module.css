@@ -1,0 +1,12 @@
+.responsiveDetails {
+  container-type: inline-size;
+  flex: 1;
+  min-width: 0;
+}
+.nameRow { display: flex; align-items: center; gap: 0.375rem; min-width: 0; }
+.inlineCity { display: none; }
+.belowCity { margin-top: 0.25rem; }
+@container (min-width: 300px) {
+  .inlineCity { display: inline-flex; }
+  .belowCity { display: none; }
+}

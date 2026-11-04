@@ -1,4 +1,7 @@
 "use client";
+import { PerformanceCityFilter } from '@/components/shared/performance-city-filter';
+import {ClosureCount} from '@/components/shared/closure-count';
+
 
 import { useEffect, useRef, useState } from 'react';
 import useSWRInfinite from 'swr/infinite';
@@ -18,15 +21,15 @@ import Link from 'next/link';
 import { managerDetailHref, readManagerComparisonState, saveManagerComparisonState } from '@/lib/manager-detail-navigation';
 import AccountManagerCharts from './account-manager-charts';
 
-export default function AccountManagerComparison() {
+export default function AccountManagerComparison({initialFilters, embedded=false}: {initialFilters?:ManagerDashboardFilters;embedded?:boolean} = {}) {
   const { profile, selection } = useDashboardContext();
   if (!profile?.permissions?.includes('user:manage')) return <p role="alert">User management permission is required to compare account managers.</p>;
   const scope = [profile.id, profile.tenantId, profile.branchId, profile.businessUnitId, selection?.active.id, [...profile.permissions].sort().join(',')].join(':');
-  return <ScopedComparison key={scope} scope={scope} permissions={profile.permissions} />;
+  return <ScopedComparison key={`${scope}:${embedded ? JSON.stringify(initialFilters) : ""}`} scope={embedded ? `${scope}:embedded` : scope} permissions={profile.permissions} initialFilters={initialFilters} embedded={embedded} />;
 }
 
-function ScopedComparison({ scope, permissions }: { scope: string; permissions: string[] }) {
-  const [saved] = useState(() => readManagerComparisonState(scope));
+function ScopedComparison({ scope, permissions, initialFilters, embedded }: { scope: string; permissions: string[]; initialFilters?:ManagerDashboardFilters;embedded:boolean }) {
+  const [saved] = useState(() => embedded ? undefined : readManagerComparisonState(scope));
   const available = availableManagerColumns(permissions);
   const preferenceKey = `ats:manager-columns:${scope}`;
   const [selectedColumns, setSelectedColumns] = useState<ManagerSort[]>(() => {
@@ -35,11 +38,11 @@ function ScopedComparison({ scope, permissions }: { scope: string; permissions: 
   });
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [search, setSearch] = useState(saved?.search ?? '');
-  const [period, setPeriod] = useState(saved?.period ?? 'all');
+  const [period, setPeriod] = useState(initialFilters?.from ? 'context' : saved?.period ?? 'all');
   const [startDate, setStartDate] = useState(saved?.startDate ?? '');
   const [endDate, setEndDate] = useState(saved?.endDate ?? '');
   const [dateError, setDateError] = useState('');
-  const [filters, setFilters] = useState<ManagerDashboardFilters>(saved?.filters ?? { sort: permissions.includes('submission:view') ? 'joined' : 'name', direction: permissions.includes('submission:view') ? 'desc' : 'asc' });
+  const [filters, setFilters] = useState<ManagerDashboardFilters>(initialFilters ?? saved?.filters ?? { sort: permissions.includes('submission:view') ? 'joined' : 'name', direction: permissions.includes('submission:view') ? 'desc' : 'asc' });
   const [revision, setRevision] = useState(0);
   const [expanded, setExpanded] = useState(saved?.expanded ?? false);
   const [scrollTop, setScrollTop] = useState(saved?.scrollTop ?? 0);
@@ -93,15 +96,15 @@ function ScopedComparison({ scope, permissions }: { scope: string; permissions: 
   }
   function sortColumn(id: ManagerSort) { changeFilters({ sort: id, direction: filters.sort === id ? filters.direction === 'desc' ? 'asc' : 'desc' : id === 'name' ? 'asc' : 'desc' }); }
   function reset() {
-    setSearch(''); setPeriod('all'); setStartDate(''); setEndDate(''); setDateError('');
+    setSearch(''); setPeriod(initialFilters?.from ? 'context' : 'all'); setStartDate(''); setEndDate(''); setDateError('');
     setExpanded(false); setScrollTop(0);
-    setFilters({ sort: permissions.includes('submission:view') ? 'joined' : 'name', direction: permissions.includes('submission:view') ? 'desc' : 'asc' });
+    setFilters(initialFilters ?? { sort: permissions.includes('submission:view') ? 'joined' : 'name', direction: permissions.includes('submission:view') ? 'desc' : 'asc' });
   }
   function applyDates() {
     try { const range = customManagerPeriod(startDate, endDate); setDateError(''); changeFilters(range); }
     catch (failure) { setDateError(failure instanceof Error ? failure.message : 'Choose valid dates.'); }
   }
-  function rememberComparison() { saveManagerComparisonState(scope, { filters, search, period, startDate, endDate, expanded, scrollTop }); }
+  function rememberComparison() { if (embedded) return; saveManagerComparisonState(scope, { filters, search, period, startDate, endDate, expanded, scrollTop }); }
   const roster = first?.managers ?? metadata?.managers ?? [];
   const unit = first?.unit ?? metadata?.unit;
   const allRows = data?.flatMap(page => page.rows) ?? [];
@@ -116,7 +119,7 @@ function ScopedComparison({ scope, permissions }: { scope: string; permissions: 
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{[
       ['Account managers', first?.total], ['Total posted', first?.summary.postedJobs], ['Active', first?.summary.activeJobs], ['Closures', first?.summary.joined],
     ].map(([label, value]) => <div key={String(label)} className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"><p className="text-[13px] text-slate-500 dark:text-slate-400">{label}</p>{value === undefined ? <Skeleton className="mt-2 h-8 w-14" /> : <p className="mt-2 text-2xl font-semibold tabular-nums">{managerNumber(value as number | null)}</p>}</div>)}</div>
-    <AccountManagerCharts charts={first?.charts} loading={!first && !error} failed={Boolean(error && !first)} selectedPeriod={Boolean(filters.from)} managerHref={id => managerDetailHref(id, filters)} onSelectManager={rememberComparison} />
+    {!embedded && <AccountManagerCharts charts={first?.charts} loading={!first && !error} failed={Boolean(error && !first)} selectedPeriod={Boolean(filters.from)} managerHref={id => managerDetailHref(id, filters)} onSelectManager={rememberComparison} />}
     {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Could not load the latest comparison. Data may have changed while expanding.<Button size="sm" variant="outline" onClick={refresh}>Reload comparison</Button></div>}
     <div className={grid.surface}>
       <div className={grid.toolbar}>
@@ -126,7 +129,7 @@ function ScopedComparison({ scope, permissions }: { scope: string; permissions: 
       <div className={grid.filters} aria-label="Account manager filters">
         <label className="flex min-w-52 flex-1 flex-col gap-1.5"><span>Name or email</span><Input aria-label="Search account managers" maxLength={100} placeholder="Search name or email…" value={search} onChange={event => setSearch(event.target.value)} className="h-9 text-[13px]" /></label>
         <label className="flex min-w-52 flex-1 flex-col gap-1.5"><span>Account manager</span><select aria-label="Account manager" className={grid.control} value={filters.accountManagerId || ''} onChange={event => changeFilters({ accountManagerId: event.target.value })}><option value="">All account managers</option>{roster.map(manager => <option key={manager.id} value={manager.id}>{manager.name}</option>)}</select></label>
-        <label className="flex min-w-44 flex-col gap-1.5"><span>Time period</span><select aria-label="Time period" className={grid.control} value={period} onChange={event => { const next = event.target.value; setPeriod(next); setDateError(''); if (next !== 'custom') changeFilters({ from: undefined, to: undefined, ...managerPeriod(next) }); }}><option value="all">All time</option><option value="month">This month</option><option value="lastMonth">Last month</option><option value="30days">Last 30 days</option><option value="custom">Custom dates</option></select></label>
+        <PerformanceCityFilter cities={first?.options.cities || []} selected={filters.cities} onChange={cities=>changeFilters({cities})}/><label className="flex min-w-44 flex-col gap-1.5"><span>Time period</span><select aria-label="Time period" className={grid.control} value={period} onChange={event => { const next = event.target.value; setPeriod(next); setDateError(''); if (next === 'context') changeFilters({from:initialFilters?.from,to:initialFilters?.to}); else if (next !== 'custom') changeFilters({ from: undefined, to: undefined, ...managerPeriod(next) }); }}>{embedded && initialFilters?.from && <option value="context">Dashboard period</option>}<option value="all">All time</option><option value="month">This month</option><option value="lastMonth">Last month</option><option value="30days">Last 30 days</option><option value="custom">Custom dates</option></select></label>
         {period === 'custom' && <><label className="flex flex-col gap-1.5"><span>From</span><input aria-label="From date" type="date" className={grid.control} value={startDate} onChange={event => setStartDate(event.target.value)} /></label><label className="flex flex-col gap-1.5"><span>Through</span><input aria-label="Through date" type="date" className={grid.control} value={endDate} onChange={event => setEndDate(event.target.value)} /></label><Button size="sm" variant="outline" onClick={applyDates}>Apply dates</Button></>}
         <Button size="sm" variant="ghost" onClick={reset}>Reset</Button>
         {dateError && <p role="alert" className="w-full text-sm text-red-700">{dateError}</p>}
@@ -141,8 +144,8 @@ function ScopedComparison({ scope, permissions }: { scope: string; permissions: 
           <tbody>
             {start > 0 && <tr aria-hidden="true"><td colSpan={columns.length} style={{ height: start * MANAGER_ROW_HEIGHT }} /></tr>}
             {rows.slice(start, end).map((row, index) => <tr key={row.id} style={{ height: MANAGER_ROW_HEIGHT }} aria-rowindex={start + index + 2} className={grid.row}>
-              {columns.map(column => column.id === 'name' ? <th scope="row" key="name" className={cn(grid.cell, 'sticky left-0 z-10 bg-white text-left font-normal dark:bg-slate-900')}><Link href={managerDetailHref(row.id, filters)} onClick={rememberComparison} className="block rounded hover:text-[#1a4fa0] focus-visible:outline-2 focus-visible:outline-blue-600"><UserIdentity size="table" user={{ fullName: row.name, email: row.email, avatar: row.avatar }} /></Link></th>
-                : <td key={column.id} className={cn(grid.cell, 'text-center tabular-nums')}><span className={column.id === 'review' && row.review ? 'rounded bg-amber-50 px-2 py-1 text-amber-800 dark:bg-amber-950 dark:text-amber-200' : column.id === 'joined' && row.joined ? 'rounded bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200' : ''}>{managerNumber(row[column.id])}</span></td>)}
+              {columns.map(column => column.id === 'name' ? <th scope="row" key="name" className={cn(grid.cell, 'sticky left-0 z-10 bg-white text-left font-normal dark:bg-slate-900')}><Link href={managerDetailHref(row.id, filters)} onClick={rememberComparison} className="block rounded hover:text-[#1a4fa0] focus-visible:outline-2 focus-visible:outline-blue-600"><UserIdentity size="table" user={{ fullName: row.name, email: row.email, avatar: row.avatar, city:row.city }} /></Link></th>
+                : <td key={column.id} className={cn(grid.cell, 'text-center tabular-nums')}>{column.id === 'joined' ? <ClosureCount value={row.joined}/> : <span className={column.id === 'review' && row.review ? 'rounded bg-amber-50 px-2 py-1 text-amber-800 dark:bg-amber-950 dark:text-amber-200' : ''}>{managerNumber(row[column.id])}</span>}</td>)}
             </tr>)}
             {end < rows.length && <tr aria-hidden="true"><td colSpan={columns.length} style={{ height: (rows.length - end) * MANAGER_ROW_HEIGHT }} /></tr>}
             {!rows.length && <tr><td colSpan={columns.length} className="p-10 text-center text-sm text-slate-500">{!first ? error ? 'Comparison unavailable. Use Reload comparison to try again.' : 'Loading account managers…' : 'No account managers match these filters.'}</td></tr>}

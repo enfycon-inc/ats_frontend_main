@@ -1,5 +1,6 @@
 // Generated from ats_backend/src/jobs/job-catalog.contract.ts.
 export interface JobCatalogQuery {
+  delivery?: string; period?: string; cities?: string; deliveryFrom?: string; deliveryTo?: string; jobType?: string;
   page?: string | number; limit?: string | number; filter?: string; search?: string;
   status?: string; priority?: string; tab?: string; predefined?: string;
   client?: string; branch?: string; unit?: string; creator?: string; recruiter?: string; pod?: string;

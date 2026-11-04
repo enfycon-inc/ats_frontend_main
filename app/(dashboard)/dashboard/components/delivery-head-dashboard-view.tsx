@@ -15,6 +15,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ReviewWorkspace } from "@/components/submissions/review-workspace";
+import { deliveryJobHref } from '@/lib/delivery-job-navigation';
+import { DeliveryDrilldownDialog, type DeliveryDrilldown } from '@/components/dashboard/delivery-drilldown-dialog';
+import { DeliveryStageFilters, DeliveryStageWorkspace } from '@/components/dashboard/delivery-stage-workspace';
+import comparisonStyles from '@/components/dashboard/delivery-city-overview.module.css';
+import { DeliveryGlobalFilters, DeliveryRoundOverview, DeliveryCityComparison } from '@/components/dashboard/delivery-city-overview';
 import { DeliveryMetrics, DeliveryPipelineView, DeliverySection, DeliveryStatus, deliveryCell as cell, deliveryHeader as tableHeader, deliverySurface as surface } from "./delivery-dashboard-widgets";
 
 type DeliveryProfile = { id: string; permissions?: string[] };
@@ -26,14 +31,21 @@ export default function DeliveryHeadDashboardView() {
 }
 
 function ScopedDeliveryDashboard({ profile, scopeKey }: { profile: DeliveryProfile; scopeKey: string }) {
+  const [drilldown, setDrilldown] = useState<DeliveryDrilldown | null>(null);
   const [stage, setStage] = useState<DeliveryStage>("all");
   const [page, setPage] = useState(1);
   const [memberPage, setMemberPage] = useState(1);
   const [reviewId, setReviewId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const timer = setTimeout(() => { setAppliedFilters(filters); setPage(1); }, 300);
+    return () => clearTimeout(timer);
+  }, [filters]);
   const canReview = profile.permissions?.includes("submission:internal_screening") === true;
   const { data, error, isLoading, isValidating, mutate } = useSWR(
-    ["delivery-dashboard", scopeKey, stage, page, memberPage],
-    () => atsApi.businessUnits.deliveryDashboard(stage, page, memberPage),
+    ["delivery-dashboard", scopeKey, stage, page, memberPage, appliedFilters],
+    () => atsApi.businessUnits.deliveryDashboard(stage, page, memberPage, appliedFilters),
     { keepPreviousData: true, revalidateOnFocus: true, dedupingInterval: 5000 },
   );
   const selected = visibleDeliveryStage(stage, data?.pipeline, canReview);
@@ -45,7 +57,11 @@ function ScopedDeliveryDashboard({ profile, scopeKey }: { profile: DeliveryProfi
     window.addEventListener("app:refresh", refresh);
     return () => window.removeEventListener("app:refresh", refresh);
   }, [mutate]);
-  function chooseStage(next: DeliveryStage) {
+  function chooseStage(next: DeliveryStage, status?: string) {
+    if (data?.analytics) { setDrilldown({kind:"submissions",stage:next,status}); return; }
+    const retained = Object.fromEntries(Object.entries(filters).filter(([key]) => ['period', 'from', 'to', 'cities', 'employeeView', 'employeeSearch', 'employeePage', 'employeeCity'].includes(key)));
+    const nextFilters = { ...retained, ...(status ? { status } : {}) };
+    setFilters(nextFilters); setAppliedFilters(nextFilters);
     setStage(visibleDeliveryStage(next, data?.pipeline, canReview)); setPage(1);
     document.getElementById("delivery-submissions")?.scrollIntoView({ block: "nearest", behavior: "instant" });
   }
@@ -57,21 +73,24 @@ function ScopedDeliveryDashboard({ profile, scopeKey }: { profile: DeliveryProfi
   const membersReady = !error && !isLoading && data.pendingUserPage === memberPage;
   const maximumPodJobs = Math.max(0, ...(data.pods || []).map(pod => pod.jobs || 0));
   if (reviewId && canReview) return <ReviewWorkspace key={`${scopeKey}:${reviewId}`} submissionId={reviewId} onClose={() => { setReviewId(null); void mutate(); }} onSaved={() => { setReviewId(null); void mutate(); }} />;
-  return <section aria-label="Delivery Head dashboard" className="min-w-0 space-y-4 text-slate-900 dark:text-slate-100">
+  return <section aria-label="Delivery Head dashboard" className={data.analytics ? comparisonStyles.dashboard : "min-w-0 space-y-4 text-slate-900 dark:text-slate-100"}>
+    {isValidating && data.analytics && <p role="status" className="text-xs text-slate-500">Updating dashboard filters and counts…</p>}
     {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">Could not refresh the dashboard. Showing the last loaded summary.<Button size="sm" variant="outline" onClick={() => void mutate()}>Retry</Button></div>}
-    <DeliveryMetrics activeJobs={data.activeJobs} pipeline={pipeline} onSelect={chooseStage} />
+    {data.analytics ? <><DeliveryGlobalFilters onOffers={() => chooseStage("offers")} analytics={data.analytics} values={filters} onChange={patch => { setFilters(current => ({ ...current, ...patch })); setPage(1); }} /><DeliveryRoundOverview analytics={data.analytics} onSelect={chooseStage} jobHref={jobFilters => deliveryJobHref(filters,jobFilters)} /><DeliveryCityComparison analytics={data.analytics} values={appliedFilters} ready={!isValidating && JSON.stringify(filters) === JSON.stringify(appliedFilters)} /></> : <DeliveryMetrics activeJobs={data.activeJobs} pipeline={pipeline} onSelect={chooseStage} />}
+    {drilldown && data.analytics && <DeliveryDrilldownDialog key={`${scopeKey}:${JSON.stringify(drilldown)}:${filters.period}:${filters.from}:${filters.to}:${filters.cities}`} selection={drilldown} scope={scopeKey} globalFilters={filters} analytics={data.analytics} onClose={() => setDrilldown(null)} onReview={canReview ? id => {setDrilldown(null);setReviewId(id);} : undefined} />}
     {pipeline && <>
-      {showReview && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/30"><div className="flex items-center gap-3"><BellRing className="h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" /><div><h2 className="text-sm font-semibold text-amber-900 dark:text-amber-200">{pipeline.review} {pipeline.review === 1 ? "submission awaits" : "submissions await"} approval</h2><p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">Review and approve or reject with feedback.</p></div></div><Button asChild size="sm" className="bg-amber-600 text-xs text-white hover:bg-amber-700"><Link href="/utility/submissions?bucket=review">Review submissions<ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /></Link></Button></div>}
-      <DeliveryPipelineView submissionRequired={data.submissionRequired} pipeline={pipeline} selected={selected} onSelect={chooseStage} showReview={showReview} />
-      <DeliverySection id="delivery-submissions" title={`${selected === "all" ? "All submissions" : selected === "review" ? "Internal review" : selected === "closed" ? "Closed unsuccessful" : `${deliveryStageLabels[selected]} submissions`}${resultsReady ? ` · ${data.submissionTotal}` : ""}`} action={<div className="flex flex-wrap gap-2"><Button size="sm" variant={selected === "all" ? "secondary" : "outline"} className="text-xs" onClick={() => chooseStage("all")}>All</Button>{showReview && <Button size="sm" variant={selected === "review" ? "secondary" : "outline"} className="text-xs" onClick={() => chooseStage("review")}>Awaiting approval {pipeline.review}</Button>}<Button size="sm" variant={selected === "closed" ? "secondary" : "outline"} className="text-xs" onClick={() => chooseStage("closed")}>Closed {pipeline.closed}</Button></div>}>
+      {showReview && !data.analytics && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/30"><div className="flex items-center gap-3"><BellRing className="h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" /><div><h2 className="text-sm font-semibold text-amber-900 dark:text-amber-200">{pipeline.review} {pipeline.review === 1 ? "submission awaits" : "submissions await"} approval</h2><p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">Review and approve or reject with feedback.</p></div></div><Button asChild size="sm" className="bg-amber-600 text-xs text-white hover:bg-amber-700"><Link href="/utility/submissions?bucket=review">Review submissions<ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /></Link></Button></div>}
+      {!data.analytics && <DeliveryPipelineView submissionRequired={data.submissionRequired} pipeline={pipeline} selected={selected} onSelect={chooseStage} showReview={showReview} />}
+      {!data.analytics && <DeliverySection id="delivery-submissions" title={`${selected === "all" ? (data.analytics ? "Submission drilldown" : "All submissions") : selected === "review" ? "Internal review" : selected === "closed" ? "Closed unsuccessful" : selected === "offers" ? "Offers received" : `${deliveryStageLabels[selected]} submissions`}${resultsReady ? ` · ${data.submissionTotal}` : ""}`} action={<div className="flex flex-wrap gap-2"><Button size="sm" variant={selected === "all" ? "secondary" : "outline"} className="text-xs" onClick={() => chooseStage("all")}>All</Button>{showReview && <Button size="sm" variant={selected === "review" ? "secondary" : "outline"} className="text-xs" onClick={() => chooseStage("review")}>Awaiting approval {pipeline.review}</Button>}{!data.analytics && <Button size="sm" variant={selected === "closed" ? "secondary" : "outline"} className="text-xs" onClick={() => chooseStage("closed")}>Closed {pipeline.closed}</Button>}</div>}>
+        {data.analytics ? <details className={comparisonStyles.drilldownFilters}><summary>Filter submissions</summary><DeliveryStageFilters stage={selected} scope={scopeKey} values={filters} onChange={(key, value) => setFilters(current => ({ ...current, [key]: value }))} /></details> : <DeliveryStageFilters stage={selected} scope={scopeKey} values={filters} onChange={(key, value) => setFilters(current => ({ ...current, [key]: value }))} />}
         <div aria-busy={!resultsReady} aria-live="polite">{!resultsReady ? <div className="p-4">{error ? <p className="text-xs text-slate-500">Results unavailable. Retry to load this stage.</p> : <><PageLoadingSkeleton variant="table" label="Loading submissions" /><Skeleton className="h-24 w-full" /></>}</div> : <>
-          <div className="overflow-x-auto"><table className="w-full"><thead className={tableHeader}><tr>{["Candidate", "Job", "Status", "Action"].map(label => <th key={label} className={cell}>{label}</th>)}</tr></thead><tbody>{data.submissions?.map(submission => <tr key={submission.id} className="border-t border-slate-100 hover:bg-slate-50/70 dark:border-slate-800 dark:hover:bg-slate-800/40"><td className={`${cell} font-medium`}>{submission.candidateName}</td><td className={cell}>{submission.jobTitle}</td><td className={cell}><DeliveryStatus value={submission.finalStatus} /></td><td className={cell}>{selected === "review" && canReview ? <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setReviewId(submission.id)}>Review</Button> : <Link className="inline-flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400" href={`/utility/submissions?submission=${encodeURIComponent(submission.id)}`}>Open<ArrowUpRight className="h-3 w-3" aria-hidden="true" /></Link>}</td></tr>)}</tbody></table></div>
+          <DeliveryStageWorkspace compact={!!data.analytics} key={`${scopeKey}:${selected}:${page}:${JSON.stringify(appliedFilters)}`} submissions={data.submissions || []} onReview={selected === "review" && canReview ? setReviewId : undefined} />
           {!data.submissions?.length && <p className="p-5 text-xs text-slate-500">No submissions in this stage.</p>}
           {(data.submissionTotal || 0) > 10 && <Pagination page={page} total={data.submissionTotal || 0} onChange={setPage} />}
         </>}</div>
-      </DeliverySection>
+      </DeliverySection>}
     </>}
-    <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2">
+    {!data.analytics && <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2">
       <div className="min-w-0 space-y-4">
         {data.activeJobs !== null && <DeliverySection id="delivery-priority-jobs" title="Priority jobs" note="Up to 8 active jobs, highest priority first">
         <div className="overflow-x-auto"><table className="w-full"><thead className={tableHeader}><tr>{["Job", "Priority", ...(pipeline ? ["Submissions"] : [])].map(label => <th key={label} className={cell}>{label}</th>)}</tr></thead><tbody>{data.jobs.map(job => <tr key={job.id} className="border-t border-slate-100 dark:border-slate-800"><td className={cell}><Link className="font-semibold text-indigo-600 dark:text-indigo-400" href={`/job-posting/${job.id}`}>{job.jobTitle}</Link><span className="mt-1 block text-[10.5px] text-slate-500">{job.jobCode}</span></td><td className={cell}><DeliveryStatus value={job.urgency} /></td>{pipeline && <td className={`${cell} tabular-nums`}>{job.submissions}</td>}</tr>)}</tbody></table></div>{!data.jobs.length && <Empty>No active jobs in your unit.</Empty>}
@@ -91,7 +110,7 @@ function ScopedDeliveryDashboard({ profile, scopeKey }: { profile: DeliveryProfi
         </>}</div>
       </DeliverySection>}
       </div>
-    </div>
+    </div>}
   </section>;
 }
 const DashboardSkeleton = DeliveryDashboardSkeleton;

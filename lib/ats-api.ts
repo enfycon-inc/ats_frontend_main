@@ -1947,8 +1947,16 @@ const businessUnits = {
     Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
     return apiFetch<ManagerDashboard>(`/api/business-units/current/dashboard/account-managers?${query}`);
   },
-  deliveryDashboard(stage: DeliveryStage = 'review', page = 1, memberPage = 1) {
-    return apiFetch<DeliveryDashboard>(`/api/business-units/current/dashboard?stage=${stage}&page=${page}&memberPage=${memberPage}`);
+  deliveryDashboard(stage: DeliveryStage = 'review', page = 1, memberPage = 1, filters: Record<string, string> = {}) {
+    const query = new URLSearchParams({ ...filters, analytics: '1', stage, page: String(page), memberPage: String(memberPage) });
+    return apiFetch<DeliveryDashboard>(`/api/business-units/current/dashboard?${query}`);
+  },
+  deliveryJobs(filters: Record<string, string> = {}) {
+    return apiFetch<import('./delivery-dashboard-contract').DeliveryJobPage>(`/api/business-units/current/dashboard/jobs?${new URLSearchParams(filters)}`);
+  },
+  deliveryFilterOptions(kind: import('./delivery-dashboard-contract').DeliveryOptionKind, search = '', page = 1) {
+    const query = new URLSearchParams({ kind, search, page: String(page) });
+    return apiFetch<import('./delivery-dashboard-contract').DeliveryFilterOptions>(`/api/business-units/current/dashboard/filter-options?${query}`);
   },
   setCurrentUnitMemberActive(id: string, isActive: boolean) {
     return apiFetch<{ id: string; isActive: boolean }>(`/api/business-units/current/dashboard/members/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive }) });

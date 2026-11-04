@@ -1,7 +1,7 @@
 {
   "version": 1,
   "files": {
-    "lib/delivery-dashboard-contract.ts": "8e1999d652749ef11e9870e99e1553c0da161b43bbfb01006c65f8db91409ec8",
+    "lib/delivery-dashboard-contract.ts": "c1b8bb7c95730cbdf8e5b6f40990eeedc6100c36e41fee1bddb45637ce5324a7",
     "lib/tenant-branding-contract.ts": "72c2651343f41dc47d0ebc65ab8d103343e2ffb983763dce2516a7b0cd32747d",
     "lib/sign-in-policy.ts": "b7a4984fd2cb62e6e0814739cda9fc57ee144326ca2f3c8ccb3ed2db8ea193fb",
     "lib/job-capabilities.ts": "278defd70b11ca0541716843010a98b6d98f896812ac5346da8c0cd752105593",
@@ -12,6 +12,6 @@
     "lib/user-management.contract.ts": "6e89fa95add68847c75274eb2ede49c88e0685c680e9591e7f190167e275aa59",
     "lib/job-export-contract.ts": "65bddd40e0ef9fc97a87182684c2fb74d192016bbb0b72a6b31deeab398a7942",
     "lib/job-urgency-contract.ts": "644fc885b508a5909da70974ca991f8d3a68eaf4f237003237bc4789e5cfce37",
-    "lib/job-catalog-contract.ts": "f1e2b6a32f2e734a2c1e0386f536d1af5f41c9f97c5ee21f6bce321b65f8b830"
+    "lib/job-catalog-contract.ts": "d810377717ff619486cb7b6c1074e1240acf20134701c934261044f1197b01c0"
   }
 }

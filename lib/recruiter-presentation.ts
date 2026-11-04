@@ -16,7 +16,7 @@ export const recruiterColumns: {
   },
   {
     id: 'directActive',
-    label: 'Direct active',
+    label: 'Assigned jobs',
     permission: 'job:view',
     description: 'Current active direct assignments',
   },
@@ -31,6 +31,12 @@ export const recruiterColumns: {
     label: 'Submissions',
     permission: 'submission:view',
     description: 'Created in selected period',
+  },
+  {
+    id: 'rejected',
+    label: 'Rejected',
+    permission: 'submission:view',
+    description: 'Submissions in selected period rejected at internal, interview or final stage; counted once',
   },
   {
     id: 'review',
@@ -57,11 +63,11 @@ export const recruiterColumns: {
     description: 'Joined candidates in selected period',
   },
 ];
-export function availableRecruiterColumns(permissions: string[]) {
+export function availableRecruiterColumns(permissions: string[], podsEnabled = true) {
   return recruiterColumns.filter(
     (c) =>
       (!c.permission || permissions.includes(c.permission)) &&
-      (c.id !== 'sharedJobs' || permissions.includes('job:view')) &&
+      (c.id !== 'sharedJobs' || (podsEnabled && permissions.includes('job:view'))) &&
       (c.id !== 'review' || permissions.includes('submission:view')),
   );
 }
@@ -105,6 +111,7 @@ export function readRecruiterState(scope: string): RecruiterViewState | null {
         /^[a-f0-9-]{36}$/i.test(s.filters[key])
       )
         f[key] = s.filters[key];
+    if (typeof s.filters.cities === 'string' && /^[A-Z_]{1,50}(,[A-Z_]{1,50}){0,99}$/.test(s.filters.cities)) f.cities = s.filters.cities;
     if (typeof s.filters.search === 'string')
       f.search = s.filters.search.slice(0, 100);
     if (

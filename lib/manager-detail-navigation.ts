@@ -15,6 +15,7 @@ export function readManagerComparisonState(scope: string): ManagerComparisonStat
       || !['all', 'month', 'lastMonth', '30days', 'custom'].includes(state.period)
       || !MANAGER_SORTS.includes(state.filters.sort) || !['asc', 'desc'].includes(state.filters.direction)) return null;
     const filters: ManagerDashboardFilters = { sort: state.filters.sort, direction: state.filters.direction };
+    if (typeof state.filters.cities === 'string' && /^[A-Z_]{1,50}(,[A-Z_]{1,50}){0,99}$/.test(state.filters.cities)) filters.cities = state.filters.cities;
     if (typeof state.filters.search === 'string') filters.search = state.filters.search.slice(0, 100);
     if (typeof state.filters.accountManagerId === 'string' && /^[0-9a-f-]{36}$/i.test(state.filters.accountManagerId)) filters.accountManagerId = state.filters.accountManagerId;
     if (typeof state.filters.from === 'string' && typeof state.filters.to === 'string' && Number.isFinite(Date.parse(state.filters.from)) && Number.isFinite(Date.parse(state.filters.to))) { filters.from = state.filters.from; filters.to = state.filters.to; }

@@ -1,6 +1,7 @@
 import type { DeliveryPipeline, DeliveryStage } from './delivery-dashboard-contract';
 
 export const deliveryStageLabels: Record<DeliveryStage, string> = {
+  offers: 'Offers received',
   all: 'Total submissions', review: 'Internal review', l1: 'L1', l2: 'L2', l3: 'L3', final: 'Final', closed: 'Closed unsuccessful',
 };
 
