@@ -591,11 +591,12 @@ export default function JobDetailPage() {
               {/* Left Description area */}
               <div className="lg:col-span-8 space-y-4 min-w-0">
                 <Card className="bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
-                  <CardContent className="p-5 space-y-4">
+                  <CardContent className="p-5 sm:p-6 space-y-4">
                     <h2 className="text-sm font-bold text-neutral-800 dark:text-white flex items-center gap-2 border-b border-neutral-100 dark:border-slate-800 pb-2">
                       <FileText className="h-4 w-4 text-indigo-500" /> Job Description
                     </h2>
                     <JobDescriptionView
+                      variant="reading"
                       content={job.jobDescription}
                       jobTitle={job.jobTitle}
                     />

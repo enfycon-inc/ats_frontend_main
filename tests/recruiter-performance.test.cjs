@@ -142,6 +142,7 @@ async function render(count = 24, failExpansion = false) {
         ChevronUp: () => null,
         Columns3: () => null,
         RefreshCw: () => null,
+        Check: () => null,
       },
       '@/components/ui/button': {
         Button: (p) => React.createElement('button', p),
@@ -330,7 +331,8 @@ test('state restoration is isolated by scope and strips invalid keys; detail URL
 
 test('detail tabs keep cached rows paired with the correct headings while new results load', async () => {
   const calls = [], actor = `detail-${++fixture}`;
-  const permissions = ['unit_admin:manage','user:manage','job:view','submission:view','client:view','submission:internal_screening'];
+  const permissions = ['unit_admin:manage','user:manage','job:view','submission:view','client:view','submission:internal_screening','pod:view'];
+  let podsEnabled=false;
   let release;
   const Page = load('app/(dashboard)/dashboard/components/recruiter-performance-page.tsx', {
     '@/contexts/DashboardContext': { useDashboardContext: () => ({profile:{id:actor,tenantId:'tenant',branchId:'branch',businessUnitId:'unit',permissions},selection:{active:{id:'role'}}}) },
@@ -343,12 +345,20 @@ test('detail tabs keep cached rows paired with the correct headings while new re
     '@/components/shared/column-drawer': {__esModule:true,default:()=>null},
     '@/lib/ats-api': {atsApi:{businessUnits:{recruiterDetail:async (recruiterId,f)=>{
       calls.push(f); if(f.tab==='clients')await new Promise(r=>{release=r;});
-      return {recruiter:{id:recruiterId,name:'Aisha Khan',directActive:1,sharedJobs:0,submissions:2,review:1,offers:1,joined:0},unit:{branchName:'Office',name:'Staffing'},charts:null,pipeline:null,attention:{review:1,feedback:0,upcoming:0},table:{tab:f.tab,rows:[{id:'record',title:f.tab==='clients'?'Synthetic Client':'Synthetic Job',code:f.tab==='jobs'?'JOB-1':null,status:'Active',submissions:2,review:1,offers:1,joined:0}],total:1,page:1,limit:20},clients:[],undatedOutcomes:0};
+      return {features:{podsEnabled},recruiter:{id:recruiterId,name:'Aisha Khan',directActive:1,sharedJobs:0,submissions:2,review:1,offers:1,joined:0},unit:{branchName:'Office',name:'Staffing'},charts:null,pipeline:null,attention:{review:1,feedback:0,upcoming:0},table:{tab:f.tab,rows:[{id:'record',title:f.tab==='clients'?'Synthetic Client':'Synthetic Job',code:f.tab==='jobs'?'JOB-1':null,status:'Active',submissions:2,review:1,offers:1,joined:0}],total:1,page:1,limit:20},clients:[],undatedOutcomes:0};
     }}}},
   }).default;
   const container=document.createElement('div');document.body.appendChild(container);const root=createRoot(container);
   try {
     await act(async()=>root.render(React.createElement(Page,{recruiterId:id(1)})));await settle();
+    assert.match(container.textContent,/Assigned jobs/);
+    assert.doesNotMatch(container.textContent,/Direct active|Shared pod jobs/);
+    podsEnabled=true;
+    await act(async()=>button(container,'Refresh').click());await settle();
+    assert.match(container.textContent,/Shared pod jobs/);
+    podsEnabled=false;
+    await act(async()=>button(container,'Refresh').click());await settle();
+    assert.doesNotMatch(container.textContent,/Shared pod jobs/);
     assert.match(container.querySelector('thead').textContent,/Job \/ code/);
     await act(async()=>button(container,'Client Performance').click());
     assert.match(container.querySelector('thead').textContent,/Job \/ code/);assert.match(container.querySelector('[role=status]').textContent,/Updating/);

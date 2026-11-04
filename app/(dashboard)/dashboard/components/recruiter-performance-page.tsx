@@ -23,6 +23,7 @@ import ColumnDrawer from '@/components/shared/column-drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { availableRecruiterColumns, recruiterColumns } from '@/lib/recruiter-presentation';
 import {
   ManagerPipeline,
   PerformanceTrend,
@@ -369,18 +370,18 @@ function Detail({
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
             {[
-              { key: 'directActive', label: 'Direct active', current: true },
+              { key: 'directActive', current: true },
               { key: 'sharedJobs', label: 'Shared pod jobs', current: true },
               { key: 'submissions', label: 'Submissions' },
               { key: 'review', label: 'Pending review', current: true },
               { key: 'offers', label: 'Offers' },
               { key: 'joined', label: 'Closures' },
-            ].map((c) => (
+            ].filter(c => c.key !== 'sharedJobs' || availableRecruiterColumns(permissions, data.features?.podsEnabled === true).some(column => column.id === 'sharedJobs')).map((c) => (
               <div
                 key={c.key}
                 className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
               >
-                <p className="text-sm text-slate-500">{c.label}</p>
+                <p className="text-sm text-slate-500" title={recruiterColumns.find(column => column.id === c.key)?.description}>{recruiterColumns.find(column => column.id === c.key)?.label ?? c.label}</p>
                 <p className="my-2 text-2xl font-semibold tabular-nums">
                   {managerNumber(
                     data.recruiter[c.key as 'directActive'] ?? null,
@@ -506,7 +507,7 @@ function Detail({
                   >
                     <option value="">All assignments</option>
                     <option value="direct">Direct</option>
-                    {permissions.includes('pod:view') && (
+                    {data.features?.podsEnabled === true && permissions.includes('pod:view') && (
                       <option value="shared">Shared pod</option>
                     )}
                   </select>

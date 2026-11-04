@@ -49,7 +49,7 @@ export function FunctionalEmployeePerformance({analytics,values,ready=true}:{ana
       </article>)}
     </div>}
     {ready&&!response.isLoading&&!response.error&&groups?.length===0&&<p className="p-4 text-sm text-muted-foreground">No {role} match the selected cities.</p>}
-    <p className="text-xs text-muted-foreground">Closure means joined candidates. Assigned counts unique active direct/permitted pod jobs. Rejected includes internal, interview and final rejection, counted once per submission.</p>
+    <p className="text-xs text-muted-foreground">Manager Total, Active and Closed use the selected approval-date period and current job status. The job overview uses creation date and original poster; manager counts use the current account owner. Closure means joined candidates. Assigned counts unique active direct/permitted pod jobs. Rejected includes internal, interview and final rejection, counted once per submission.</p>
     <Dialog open={!!fullCity&&ready} onOpenChange={open=>{if(!open)setFullCity('');}}><DialogContent className={styles.fullDialog}><DialogTitle className="flex items-center gap-2 text-lg font-semibold"><MapPin className="size-5" aria-hidden="true"/>{names[fullCity]||fullCity} · {managers?'Account Managers':'Recruiters'}</DialogTitle><DialogDescription>Full comparison table for the selected city and dashboard period.</DialogDescription><div className="min-h-0 flex-1 overflow-auto">{fullCity&&(managers?<AccountManagerComparison embedded initialFilters={{...query,cities:fullCity,sort:canJobs?'postedJobs':'name'}}/>:<RecruiterComparison embedded initialFilters={{...query,cities:fullCity,sort:canSubs?'submissions':'name'}}/>)}</div></DialogContent></Dialog>
   </section>;
 }

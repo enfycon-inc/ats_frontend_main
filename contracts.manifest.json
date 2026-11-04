@@ -1,7 +1,7 @@
 {
   "version": 1,
   "files": {
-    "lib/delivery-dashboard-contract.ts": "c1b8bb7c95730cbdf8e5b6f40990eeedc6100c36e41fee1bddb45637ce5324a7",
+    "lib/delivery-dashboard-contract.ts": "b4761d319ed433eab8796d042b23fc9bd370d6842c39ea365b4fb174499e8f7f",
     "lib/tenant-branding-contract.ts": "72c2651343f41dc47d0ebc65ab8d103343e2ffb983763dce2516a7b0cd32747d",
     "lib/sign-in-policy.ts": "b7a4984fd2cb62e6e0814739cda9fc57ee144326ca2f3c8ccb3ed2db8ea193fb",
     "lib/job-capabilities.ts": "278defd70b11ca0541716843010a98b6d98f896812ac5346da8c0cd752105593",
