@@ -21,10 +21,10 @@ export function Pipeline({ submission }: { submission: TrackerSubmission }) {
   const terminal = ["SELECTED", "JOIN", "OFFER"].includes(submission.finalStatus);
   const current = currentRound(submission)?.key;
   const stages = [{ key: "review", label: "Internal review", complete: reviewComplete }, ...ROUNDS.map(round => ({ key: round.key, label: round.label, complete: submission[`${round.key}Status`] === "CLEARED" })) , { key: "final", label: "Final", complete: terminal }];
-  const activeKey = submission.finalStatus === "PENDING_APPROVAL" ? "review" : current || "final";
+  const activeKey = terminal ? "final" : submission.finalStatus === "PENDING_APPROVAL" ? "review" : current || "final";
   return <div className="mx-auto w-full min-w-0 max-w-[300px]" aria-label={`Pipeline: ${state.label}`}><div className="grid grid-cols-5">{stages.map((item, index) => {
     const rejected = item.key === rejectedKey;
-    const active = !submission.workflowPaused && !["NOT_SELECTED", "WITHDRAWN", "JOIN"].includes(submission.finalStatus) && !rejectedKey && item.key === activeKey && !item.complete;
+    const active = !terminal && !submission.workflowPaused && !["REJECTED", "NOT_SELECTED", "WITHDRAWN"].includes(submission.finalStatus) && !rejectedKey && item.key === activeKey && !item.complete;
     const skipped = terminal && ROUNDS.some(round => round.key === item.key) && !item.complete;
     return <div key={item.key} className="relative flex min-w-0 flex-col items-center gap-1.5">
       {index < stages.length - 1 && <span aria-hidden="true" className={cn("absolute left-[calc(50%+14px)] top-2.5 h-px w-[calc(100%-28px)]", item.complete ? "bg-[#008000]" : "bg-slate-200 dark:bg-slate-700")} />}
@@ -32,7 +32,7 @@ export function Pipeline({ submission }: { submission: TrackerSubmission }) {
         {active && <span aria-hidden="true" className="absolute -inset-1 rounded-full bg-[#1a4fa0]/15 motion-safe:animate-pulse" />}
         <span aria-hidden="true" className={cn("relative flex h-5 w-5 items-center justify-center rounded-full border-2", rejected ? "border-red-600 bg-red-600" : item.complete ? "border-[#008000] bg-[#008000]" : active ? state.tone === "red" ? "border-red-500 bg-red-50" : "border-[#1a4fa0] bg-[#1a4fa0]" : "border-slate-300 bg-background")}>{rejected ? <X className="h-3 w-3 text-white" strokeWidth={3} /> : item.complete ? <Check className="h-3 w-3 text-white" strokeWidth={3} /> : skipped ? <span className="text-xs leading-none text-muted-foreground">−</span> : null}</span>
       </span>
-      <span className={cn("text-center text-[10px] leading-tight", active ? "font-semibold text-[#1a4fa0] dark:text-blue-300" : "text-muted-foreground")}>{item.label}{skipped && <span className="sr-only"> (skipped)</span>}</span>
+      <span className={cn("text-center text-[10px] leading-tight", active ? "font-semibold text-[#1a4fa0] dark:text-blue-300" : "text-muted-foreground")}>{item.label}{skipped && <span className="block text-[9px] font-normal text-muted-foreground"> (skipped)</span>}</span>
     </div>;
   })}</div></div>;
 }

@@ -1,4 +1,5 @@
 "use client";
+import { SubmissionDetailSummary } from "@/components/submissions/submission-detail-summary";
 import { TablePagination } from "@/components/shared/table-pagination";
 import useSWR from 'swr';
 import SubmissionFilterBar from '@/components/submissions/submission-filter-bar';
@@ -264,13 +265,7 @@ function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
 }
 
 function SubmissionDetails({ submission, onReview }: { submission: TrackerSubmission; onReview: () => void }) {
-  const detail = [
-    ["Job code", submission.jobCode], ["Client", submission.clientName], ["End client", submission.endClientName],
-    ["Recruiter", submission.recruiterName], ["Account manager", submission.accountManagerName],
-    ["Email", submission.candidateEmail], ["Phone", submission.candidatePhone], ["Location", submission.candidateCurrentLocation],
-    [compensationLabel(false, submission.jobType, submission.compensationPeriod), submissionCompensationValue(submission, false)],
-    [compensationLabel(true, submission.jobType, submission.compensationPeriod), submissionCompensationValue(submission, true)],
-  ];
+  const {profile}=useDashboardContext();
   return <div className="space-y-5">
     {submission.keepExistingSubmissionsOpen && submission.jobStatus?.toLowerCase() === "closed" && <p role="status" className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:bg-blue-950 dark:text-blue-200">Closed to new submissions. Existing candidates remain in progress.</p>}
     {submission.workflowPaused && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">Job closed - workflow paused. Activate the job to edit submission status. Recorded outcomes and interview history are preserved.</p>}
@@ -288,7 +283,7 @@ function SubmissionDetails({ submission, onReview }: { submission: TrackerSubmis
           className="inline-flex min-h-6 items-center justify-center gap-1 rounded px-2 text-xs font-medium text-[#1a4fa0] hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300"
         >Review submission <span aria-hidden="true">→</span></button>}
       </div>
-      <dl className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{detail.map(([label, value]) => <div key={label}><dt className="text-[11px] text-muted-foreground">{label}</dt><dd className="mt-1 text-xs break-words">{value || "—"}</dd></div>)}</dl>
+      <div className="mt-5"><SubmissionDetailSummary submission={submission} canViewJob={profile?.permissions?.includes("job:view")===true} compensation={[false,true].map(expected=>({label:compensationLabel(expected,submission.jobType,submission.compensationPeriod),value:submissionCompensationValue(submission,expected)}))}/></div>
     </div>
     <SubmissionHistory submission={submission} />
   </div>;
