@@ -1508,8 +1508,8 @@ const candidates = {
   },
 
   /** Fetch the stored CV as a blob (auth-aware) so it can be opened or downloaded. */
-  async resumePreview(candidateId: string | number): Promise<{ pages: number }> {
-    return apiFetch(`/api/candidates/${candidateId}/resume-preview`);
+  async resumePreview(candidateId: string | number, signal?: AbortSignal): Promise<{ pages: number }> {
+    return apiFetch(`/api/candidates/${candidateId}/resume-preview`, {signal});
   },
   async resumePage(candidateId: string | number, page: number, signal?: AbortSignal): Promise<Blob> {
     const token = getToken();
