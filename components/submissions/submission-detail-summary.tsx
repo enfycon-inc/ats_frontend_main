@@ -1,5 +1,7 @@
 import type {ReactNode} from 'react';
-import Link from 'next/link';
+import {TooltipLink} from '@/components/shared/tooltip-link';
+import {EmailLink} from '@/components/shared/email-link';
+import {LinkedinProfileLink,safeLinkedinProfile} from '@/components/shared/linkedin-profile-link';
 import {BriefcaseBusiness, UserRound, Users, ExternalLink} from 'lucide-react';
 import type {TrackerSubmission} from '@/lib/submission-contract';
 import {UserAvatar} from '@/components/shared/user-identity';
@@ -30,18 +32,18 @@ export function SubmissionDetailSummary({submission:s,canViewJob,compensation}:{
       <dl className="space-y-3">
         <Field label="Job title"><span className="font-semibold">{s.jobTitle || 'Title unavailable'}</span></Field>
         <Field label="Job type">{s.jobType ? <JobTypeBadge jobType={s.jobType}/> : null}</Field>
-        <Field label="Job code">{canViewJob && s.jobId ? <Link href={`/job-posting/${encodeURIComponent(s.jobId)}`} className="inline-flex items-center gap-1 font-semibold text-[#1a4fa0] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300">{s.jobCode || 'View job'}<ExternalLink className="size-3 shrink-0" aria-hidden="true"/></Link> : s.jobCode}</Field>
+        <Field label="Job code">{canViewJob && s.jobId ? <TooltipLink tooltip="Open job details" href={`/job-posting/${encodeURIComponent(s.jobId)}`} className="inline-flex items-center gap-1 font-semibold text-[#1a4fa0] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-300">{s.jobCode || 'View job'}<ExternalLink className="size-3 shrink-0" aria-hidden="true"/></TooltipLink> : s.jobCode}</Field>
         <Field label="Client">{s.clientName}</Field><Field label="End client">{s.endClientName}</Field>
       </dl>
     </Section>
     <Section title="Candidate" icon={<UserRound className="size-4" aria-hidden="true"/>}>
       <div className="flex items-center gap-2"><UserAvatar user={{name:s.candidateName}}/><span className={`min-w-0 break-words text-sm ${staffNameClass}`}>{s.candidateName || 'Name unavailable'}</span></div>
-      <dl className="space-y-3"><Field label="Candidate email">{s.candidateEmail}</Field><Field label="Candidate phone">{s.candidatePhone}</Field><Field label="Candidate location">{s.candidateCurrentLocation}</Field></dl>
+      <dl className="space-y-3"><Field label="Email"><EmailLink email={s.candidateEmail}/></Field><Field label="Phone number">{s.candidatePhone}</Field><Field label="Location">{s.candidateCurrentLocation}</Field>{safeLinkedinProfile(s.candidateLinkedinUrl) && <Field label="LinkedIn"><LinkedinProfileLink url={s.candidateLinkedinUrl}/></Field>}</dl>
       <dl className="grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-2">{compensation.map(item=><div key={item.label}><dt className="text-xs text-muted-foreground">{item.label}</dt><dd className="mt-1 break-words text-xs font-semibold">{item.value}</dd></div>)}</dl>
     </Section>
     {staff.map(person=><Section key={person.title} title={person.title} icon={<Users className="size-4" aria-hidden="true"/>}>
       <div className="flex min-w-0 items-center gap-2"><UserAvatar user={{name:person.name,avatar:person.avatar}}/><span className={`min-w-0 break-words text-sm ${staffNameClass}`}>{person.name || 'Name unavailable'}</span></div>
-      <dl className="space-y-3"><Field label={`${person.title} email`}>{person.email}</Field>{person.city && <Field label="Staff city"><CityBadge city={person.city}/></Field>}</dl>
+      <dl className="space-y-3"><Field label="Email"><EmailLink email={person.email}/></Field>{person.city && <Field label="City"><CityBadge city={person.city}/></Field>}</dl>
     </Section>)}
   </div>;
 }

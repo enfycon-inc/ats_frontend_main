@@ -11,16 +11,16 @@ test('contacts remain within their corresponding named sections',()=>{
   const doc=render();
   const section=name=>[...doc.querySelectorAll('section')].find(element=>element.getAttribute('aria-label')===name)?.textContent ?? (()=>{throw Error([...doc.querySelectorAll('section')].map(element=>element.outerHTML.slice(0,150)).join('\n'));})();
   assert.match(section('Candidate'),/candidate@example.test/);
-  assert.match(section('Candidate'),/Candidate phone\+919999999999/);
+  assert.match(section('Candidate'),/Phone number\+919999999999/);
   assert.doesNotMatch(section('Recruiter'),/candidate@example.test|9999999999/);
-  assert.match(section('Recruiter'),/Recruiter emailrecruiter@example.test/);
-  assert.match(section('Account manager'),/Account manager emailmanager@example.test/);
+  assert.match(section('Recruiter'),/Emailrecruiter@example.test/);
+  assert.match(section('Account manager'),/Emailmanager@example.test/);
   assert.doesNotMatch(section('Job & client'),/candidate@example.test/);
 });
 test('job code links to the actual job only with job access and a job ID',()=>{
-  assert.equal(render().querySelector('a').getAttribute('href'),'/job-posting/job-123');
-  assert.equal(render(submission,false).querySelector('a'),null);
-  assert.equal(render({...submission,jobId:''}).querySelector('a'),null);
+  assert.equal(render().querySelector('a[href^="/job-posting/"]').getAttribute('href'),'/job-posting/job-123');
+  assert.equal(render(submission,false).querySelector('a[href^="/job-posting/"]'),null);
+  assert.equal(render({...submission,jobId:''}).querySelector('a[href^="/job-posting/"]'),null);
 });
 test('website applicants do not acquire employee contacts or staff city',()=>{
   const doc=render({...submission,submissionOrigin:'WEBSITE',recruiterCity:'VIZAG'});
