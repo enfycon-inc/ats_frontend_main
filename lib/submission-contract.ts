@@ -155,6 +155,7 @@ export interface TrackerSubmission {
   candidateName?: string;
   candidateEmail?: string;
   candidatePhone?: string;
+  candidateLinkedinUrl?: string | null;
   candidateCurrentLocation?: string;
   candidateExperience?: number | null;
   candidateDesignation?: string | null;

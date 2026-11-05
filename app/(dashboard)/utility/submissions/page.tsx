@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import SubmissionFilterBar from '@/components/submissions/submission-filter-bar';
 import { localFilterAccess, readSubmissionFilters, submissionFilterQuery, submissionTabs } from '@/lib/submission-filters';
 import { InterviewRoundStatus, type RoundKey, type TrackerListFilters } from '@/lib/submission-contract';
+import { LinkedinProfileLink } from '@/components/shared/linkedin-profile-link';
 import { JobTypeBadge } from '@/components/shared/job-type-badge';
 import { UserIdentity } from '@/components/shared/user-identity';
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
@@ -121,7 +122,7 @@ function PersonProfileDialog({ target, onClose }: { target: ProfileTarget; onClo
   </Dialog>;
 }
 function CandidateCell({ submission: sub, onOpen }: { submission: TrackerSubmission; onOpen: () => void }) {
-  return <><button type="button" onClick={onOpen} className="text-left font-semibold text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.candidateName || "Name unavailable"}</button>{[sub.candidateEmail || "Email unavailable", sub.candidatePhone || "Mobile unavailable", sub.candidateCurrentLocation || "Location unavailable"].map((text, i) => <p key={i} className="mt-1 break-words text-xs text-muted-foreground">{text}</p>)}</>;
+  return <><button type="button" onClick={onOpen} className="text-left font-semibold text-[#1a4fa0] hover:underline dark:text-blue-300">{sub.candidateName || "Name unavailable"}</button>{[sub.candidateEmail || "Email unavailable", sub.candidatePhone || "Mobile unavailable", sub.candidateCurrentLocation || "Location unavailable"].map((text, i) => <p key={i} className="mt-1 break-words text-xs text-muted-foreground">{text}</p>)}<LinkedinProfileLink url={sub.candidateLinkedinUrl}/></>;
 }
 interface RemarkTemplate { id: number; stage: string; remarkText: string; remarkType?: string }
 function UpdateDialog({ submission, action: initialAction, onClose, onSaved }: {
