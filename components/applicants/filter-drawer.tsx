@@ -18,15 +18,15 @@ export interface SelectedFilters {
 }
 
 const PREDEFINED_FILTERS = [
-  "New leads",
-  "Interviewing",
-  "Submitted to Client",
+  "No visible submissions",
+  "In progress",
+  "Awaiting screening",
+  "No active submissions",
   "H1B Candidates",
   "US Citizens",
   "My Owned Profiles",
   "Profiles with Resumes",
-  "Placed Candidates",
-  "Rejected",
+  "Joined",
   "Dice Sourced",
   "LinkedIn Sourced",
 ];

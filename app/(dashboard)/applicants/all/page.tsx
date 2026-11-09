@@ -162,7 +162,7 @@ export default function AllApplicantsPage() {
       updatedAt: c.updatedAt || null,
       state: c.state || "Unknown",
       source: c.source || "CV Upload",
-      status: c.status || "New lead",
+      status: c.status || "Activity unavailable",
       jobTitle: c.jobTitle || "Unknown",
       workAuthorization: c.workAuthorization || "US Citizen",
       ownership: c.uploadedByName || "System",
@@ -185,8 +185,11 @@ export default function AllApplicantsPage() {
     if (filters.predefined.length > 0) {
       result = result.filter((a) => {
         return filters.predefined.some((tag) => {
-          if (tag === "New leads") return a.status === "New lead";
-          if (tag === "Interviewing") return a.status === "Interviewing";
+          if (tag === "No visible submissions") return a.status === "No visible submissions";
+          if (tag === "In progress") return a.status.includes("In progress ·");
+          if (tag === "Awaiting screening") return a.status.includes("Awaiting screening ·");
+          if (tag === "No active submissions") return a.status === "No active submissions";
+          if (tag === "Joined") return a.status === "Joined";
           if (tag === "H1B Candidates") return a.workAuthorization === "Have H1 Visa";
           if (tag === "US Citizens") return a.workAuthorization === "US Citizen";
           if (tag === "Dice Sourced") return a.source === "Dice";

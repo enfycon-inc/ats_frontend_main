@@ -92,7 +92,7 @@ export const ALL_COLUMNS: { id: string; label: string }[] = [
   { id: "state", label: "State" },
   { id: "source", label: "Source" },
   { id: "uploadedByName", label: "Uploaded By" },
-  { id: "status", label: "Status" },
+  { id: "status", label: "Recruitment activity" },
   { id: "workAuthorization", label: "Work Auth" },
   { id: "createdOn", label: "Created On" },
   { id: "experience", label: "Experience" },
@@ -501,7 +501,7 @@ export default function ApplicantsTable({
               getStatusStyle(applicant.status)
             )}
           >
-            {applicant.status}
+            <span title="Activity across jobs visible to you">{applicant.status}</span>
           </span>
         );
 
