@@ -93,8 +93,8 @@ function ResumePagesContent({ candidateId,filename }: { candidateId: string | nu
       link.download = filename || `candidate-${candidateId}-resume${extension}`;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      toast.error('Unable to download the original resume.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to download the original resume.');
     } finally {
       setDownloading(false);
     }

@@ -1536,12 +1536,25 @@ const candidates = {
     return res.blob();
   },
   async fetchResumeBlob(candidateId: string | number): Promise<Blob> {
-    if (!auth.getCurrentUser()?.permissions?.includes('candidate:download_resume')) throw new Error('Original resume download permission is required.');
+    // The server also authorizes scoped screening of pending website applications.
     const token = getToken();
     const headers: Record<string, string> = activeRoleHeaders();
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res = await fetch(`${getApiBase()}/api/candidates/${candidateId}/resume`, { headers });
-    if (!res.ok) throw new Error(res.status === 404 ? 'No CV on file for this candidate.' : `Download failed: ${res.status}`);
+    let res: Response;
+    try {
+      res = await fetch(`${getApiBase()}/api/candidates/${candidateId}/resume`, { headers });
+    } catch {
+      throw new Error('Unable to connect. Check your connection and retry the resume download.');
+    }
+    if (!res.ok) {
+      const messages: Record<number, string> = {
+        401: 'Your session has expired. Sign in again to download the resume.',
+        403: 'You do not have access to download this candidate’s original resume.',
+        404: 'No original resume is available for this candidate.',
+        503: 'The original resume is temporarily unavailable. Please retry later.',
+      };
+      throw new Error(messages[res.status] || 'Unable to download the original resume. Please retry later.');
+    }
     return res.blob();
   },
 
